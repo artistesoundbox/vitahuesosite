@@ -1,16 +1,20 @@
 body, html { 
     margin: 0; 
     padding: 0; 
+    width: 100%;
+    height: 100%;
     overflow: hidden; 
     background-color: #000; 
-    font-family: 'Courier New', Courier, monospace; 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 #vh-canvas {
     position: fixed;
     top: 0;
     left: 0;
-    z-index: 1;
+    width: 100%;
+    height: 100%;
+    z-index: 1; /* Under everything */
 }
 
 #landing-page {
@@ -19,11 +23,11 @@ body, html {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.4); /* Slightly transparent */
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 100;
+    z-index: 100; /* Over the canvas */
 }
 
 .button-container {
@@ -32,7 +36,7 @@ body, html {
 }
 
 .side-btn {
-    background: rgba(0, 20, 60, 0.9);
+    background: rgba(10, 10, 10, 0.9);
     color: #00ffff;
     border: 2px solid #00ffff;
     padding: 20px 40px;
@@ -40,25 +44,25 @@ body, html {
     text-transform: uppercase;
     letter-spacing: 4px;
     font-weight: bold;
-    transition: 0.3s;
+    transition: all 0.3s ease;
 }
 
 .side-btn:hover {
     background: #00ffff;
     color: #000;
-    box-shadow: 0 0 20px #00ffff;
+    box-shadow: 0 0 25px #00ffff;
 }
 
 #back-from-portal {
     position: fixed;
-    top: 30px;
+    bottom: 40px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 200;
     display: none;
-    background: #000;
+    background: rgba(0, 0, 0, 0.8);
     color: #00ffff;
     border: 1px solid #00ffff;
-    padding: 10px 20px;
+    padding: 12px 24px;
     cursor: pointer;
 }
