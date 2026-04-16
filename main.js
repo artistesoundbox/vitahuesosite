@@ -1,132 +1,105 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-let scene, camera, renderer, controls, composer, traffic = [];
-const textureLoader = new THREE.TextureLoader();
+let scene, camera, renderer, controls, skyboxContainer = null;
+const gltfLoader = new GLTFLoader();
+const raycaster = new THREE.Raycaster(); // Prepped for your logo clicks
+const mouse = new THREE.Vector2();
 
 init();
 animate();
 
 function init() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x020408);
-    scene.fog = new THREE.FogExp2(0x020408, 0.002);
+    scene.background = new THREE.Color(0x87ceeb); 
 
-    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
-    camera.position.set(0, 150, 400);
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100000);
+    camera.position.set(0, 2, 8); 
 
     const canvas = document.getElementById("vh-canvas");
     renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
 
-    // LIGHTING - Boosted so it's not dark
-    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-    const dLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    dLight.position.set(200, 500, 200);
-    scene.add(dLight);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2.0));
 
-    createEnvironment();
+    // --- SKYBOX LOADER ---
+    gltfLoader.load('skybox.glb', (gltf) => {
+        skyboxContainer = gltf.scene;
+        const box = new THREE.Box3().setFromObject(skyboxContainer);
+        const center = box.getCenter(new THREE.Vector3());
+        
+        skyboxContainer.position.sub(center); // Auto-center
+        skyboxContainer.scale.setScalar(1000 / Math.max(...box.getSize(new THREE.Vector3()).toArray()));
 
-    // Load texture and build city
-    textureLoader.load('windows.png', 
-        (tex) => { buildCity(tex); }, 
-        undefined, 
-        () => { buildCity(null); } // Fallback if texture fails
-    );
+        skyboxContainer.traverse((child) => {
+            if (child.isMesh) {
+                child.material.side = THREE.DoubleSide;
+                if (child.material.map) {
+                    child.material.emissive = new THREE.Color(0xffffff);
+                    child.material.emissiveIntensity = 0.05;
+                }
+            }
+        });
+        scene.add(skyboxContainer);
+    });
 
-    createTrafficSystem(150);
-
-    // BLOOM (Glow effect)
-    const renderScene = new RenderPass(scene, camera);
-    const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-    composer = new EffectComposer(renderer);
-    composer.addPass(renderScene);
-    composer.addPass(bloomPass);
-
+    // --- CONTROLS (Rotation Only) ---
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.autoRotate = true;
+    controls.enableZoom = false; // Disabled to keep the balcony experience stable
 
     setupUI();
-}
-
-function buildCity(tex) {
-    const geo = new THREE.BoxGeometry(1, 1, 1);
-    for (let i = 0; i < 100; i++) {
-        const h = 40 + Math.random() * 150;
-        const w = 30 + Math.random() * 20;
-        
-        const mat = new THREE.MeshLambertMaterial({ 
-            color: 0x050505,
-            emissive: 0x00ffff,
-            emissiveIntensity: tex ? 2 : 0.5,
-            emissiveMap: tex
-        });
-
-        if(tex) {
-            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-            mat.emissiveMap.repeat.set(w * 0.1, h * 0.05);
-        }
-
-        const b = new THREE.Mesh(geo, mat);
-        let x = (Math.round((Math.random() - 0.5) * 10) * 200) + 100;
-        let z = (Math.round((Math.random() - 0.5) * 10) * 200) + 100;
-        b.scale.set(w, h, w);
-        b.position.set(x, h/2, z);
-        scene.add(b);
-    }
-}
-
-function createEnvironment() {
-    const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(4000, 4000),
-        new THREE.MeshStandardMaterial({ color: 0x111111 })
-    );
-    ground.rotation.x = -Math.PI / 2;
-    scene.add(ground);
-}
-
-function createTrafficSystem(count) {
-    const dotGeo = new THREE.SphereGeometry(1, 6, 6);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    for (let i = 0; i < count; i++) {
-        const dot = new THREE.Mesh(dotGeo, mat);
-        dot.position.set((Math.random()-0.5)*2000, 2, (Math.random()-0.5)*2000);
-        dot.userData = { speed: 2 + Math.random() * 3 };
-        scene.add(dot);
-        traffic.push(dot);
-    }
+    window.addEventListener('resize', onWindowResize);
+    window.addEventListener('click', onSceneClick); // Prepped for later
 }
 
 function setupUI() {
+    // Using simple onclick to ensure they work
     const orbitBtn = document.getElementById('enter-orbit');
     const portalBtn = document.getElementById('enter-portal');
     const exitBtn = document.getElementById('back-from-portal');
     const landing = document.getElementById('landing-page');
 
-    orbitBtn.onclick = () => window.location.href = 'list.html';
+    if(orbitBtn) orbitBtn.onclick = () => window.location.href = 'list.html';
     
-    portalBtn.onclick = () => {
-        landing.style.display = 'none';
-        exitBtn.style.display = 'block';
-    };
+    if(portalBtn) {
+        portalBtn.onclick = () => {
+            landing.style.display = 'none'; 
+            exitBtn.style.display = 'block'; 
+        };
+    }
 
-    exitBtn.onclick = () => {
-        exitBtn.style.display = 'none';
-        landing.style.display = 'flex';
-    };
+    if(exitBtn) {
+        exitBtn.onclick = () => {
+            exitBtn.style.display = 'none'; 
+            landing.style.display = 'flex'; 
+        };
+    }
+}
+
+// This function is where the "Spotify/Apple" logic will live!
+function onSceneClick(event) {
+    // Logic for clicking 3D models goes here once you import them
+    console.log("Scene clicked - ready for 3D logos!");
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
 function animate() {
     requestAnimationFrame(animate);
-    traffic.forEach(t => {
-        t.position.x += t.userData.speed;
-        if(t.position.x > 1000) t.position.x = -1000;
-    });
+    if (skyboxContainer) {
+        skyboxContainer.position.copy(camera.position);
+        skyboxContainer.position.y -= 3; 
+    }
     controls.update();
-    composer.render();
+    renderer.render(scene, camera);
 }
