@@ -13,6 +13,28 @@
       }
     }
     </script>
+    <style>
+        /* This patch centers the third button perfectly underneath the first two */
+        .button-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px; /* Keeps the spacing consistent */
+            max-width: 500px; /* Prevents layout stretching */
+            margin: 0 auto;
+        }
+        .full-width-btn-wrapper {
+            flex-basis: 100%;
+            display: flex;
+            justify-content: center;
+            margin-top: 5px;
+        }
+        .full-width-btn-wrapper .side-btn {
+            min-width: 220px; /* Matches the visual weight of the top buttons */
+            text-decoration: none;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
     <canvas id="vh-canvas"></canvas>
@@ -21,6 +43,11 @@
         <div class="button-container">
             <button id="enter-orbit" class="side-btn">ENTER ORBIT</button>
             <button id="enter-portal" class="side-btn">ENTER PORTAL</button>
+            
+            <!-- New Centered Button Block Below -->
+            <div class="full-width-btn-wrapper">
+                <a href="3d_binaural_world.html" class="side-btn" id="free-hemisync">FREE HEMISYNC</a>
+            </div>
         </div>
     </div>
 
