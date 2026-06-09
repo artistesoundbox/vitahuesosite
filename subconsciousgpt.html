@@ -1,0 +1,541 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+--accent:#7F77DD;--accent-bg:#EEEDFE;--accent-text:#3C3489;
+--theme-bg:#EEEDFE;--theme-mid:#AFA9EC;--theme-strong:#534AB7;
+}
+#frame{background:var(--color-background-secondary);border-radius:32px;border:0.5px solid var(--color-border-secondary);padding:12px;max-width:380px;margin:0 auto;transition:background .4s}
+#screen{background:var(--color-background-primary);border-radius:24px;overflow:hidden;min-height:760px;display:flex;flex-direction:column;border:0.5px solid var(--color-border-tertiary)}
+.topbar{padding:13px 14px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:0.5px solid var(--color-border-tertiary);flex-shrink:0;transition:background .4s}
+.topbar-left h1{font-size:15px;font-weight:500;color:var(--color-text-primary)}
+.topbar-left p{font-size:11px;color:var(--color-text-tertiary);margin-top:1px}
+.theme-pip{width:10px;height:10px;border-radius:50%;background:var(--accent);flex-shrink:0;transition:background .3s}
+.nav{display:flex;border-top:0.5px solid var(--color-border-tertiary);background:var(--color-background-primary);flex-shrink:0}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0 11px;font-size:10px;color:var(--color-text-tertiary);background:none;border:none;cursor:pointer;transition:color .15s}
+.nav-btn.active{color:var(--accent)}
+.nav-btn i{font-size:19px}
+.page{flex:1;overflow-y:auto;padding:13px 13px 6px;display:none}
+.page.active{display:block}
+.sec{font-size:10px;font-weight:500;color:var(--color-text-tertiary);letter-spacing:.07em;text-transform:uppercase;margin:12px 0 7px}
+.sec:first-child{margin-top:0}
+.mode-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:10px}
+.mode-tab{font-size:12px;padding:7px 0;border-radius:var(--border-radius-md);background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);color:var(--color-text-secondary);cursor:pointer;text-align:center;transition:all .15s}
+.mode-tab.active{background:var(--accent-bg);color:var(--accent-text);font-weight:500;border-color:var(--accent)}
+.mood-row{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-bottom:10px}
+.mood-btn{display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 2px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);cursor:pointer;font-size:10px;color:var(--color-text-secondary);transition:all .15s}
+.mood-btn i{font-size:17px}
+.mood-btn.sel{border-color:var(--accent);background:var(--accent-bg);color:var(--accent-text);font-weight:500}
+.hint{font-size:12px;color:var(--color-text-secondary);font-style:italic;margin-bottom:7px;min-height:15px}
+textarea{width:100%;min-height:82px;resize:none;font-size:14px;line-height:1.6;font-family:var(--font-sans);color:var(--color-text-primary);background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:9px 11px;outline:none;transition:border-color .2s}
+textarea:focus{border-color:var(--accent);background:var(--color-background-primary)}
+.send-row{display:flex;justify-content:flex-end;margin-top:7px}
+.btn{font-size:13px;font-weight:500;padding:7px 15px;border-radius:var(--border-radius-md);background:var(--color-background-secondary);border:0.5px solid var(--color-border-secondary);color:var(--color-text-primary);cursor:pointer;transition:background .15s;white-space:nowrap}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn:hover:not(:disabled){background:var(--color-background-tertiary)}
+.btn-accent{background:var(--accent-bg);border-color:var(--accent);color:var(--accent-text)}
+.btn-accent:hover:not(:disabled){background:var(--theme-mid);color:#fff}
+.bubble{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:11px 13px;margin-top:10px;font-size:13px;line-height:1.7;color:var(--color-text-primary);display:none}
+.bubble.vis{display:block}
+.bubble-lbl{font-size:10px;color:var(--color-text-tertiary);letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px}
+.dots span{display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--color-text-tertiary);margin:0 2px;animation:dot 1.2s infinite}
+.dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
+@keyframes dot{0%,80%,100%{opacity:.2;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+.stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.stat-card{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:11px}
+.stat-val{font-size:22px;font-weight:500;color:var(--accent)}
+.stat-lbl{font-size:11px;color:var(--color-text-secondary);margin-top:2px}
+.chart-wrap{position:relative;width:100%;height:125px;margin-bottom:12px}
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.legend span{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--color-text-secondary)}
+.legend-dot{width:7px;height:7px;border-radius:2px;flex-shrink:0}
+.summary-card{background:var(--accent-bg);border:0.5px solid var(--accent);border-radius:var(--border-radius-lg);padding:11px 13px;margin-bottom:11px}
+.summary-card p{font-size:13px;line-height:1.7;color:var(--accent-text)}
+
+.search-wrap{position:relative;margin-bottom:10px}
+.search-wrap i{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:15px;color:var(--color-text-tertiary);pointer-events:none}
+#search-input{width:100%;font-size:13px;padding:8px 10px 8px 32px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);color:var(--color-text-primary);outline:none;font-family:var(--font-sans);transition:border-color .2s}
+#search-input:focus{border-color:var(--accent);background:var(--color-background-primary)}
+.filter-row{display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap}
+.filter-pill{font-size:11px;padding:4px 10px;border-radius:20px;border:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);color:var(--color-text-secondary);cursor:pointer;transition:all .15s}
+.filter-pill.active{border-color:var(--accent);background:var(--accent-bg);color:var(--accent-text);font-weight:500}
+.entry-count{font-size:11px;color:var(--color-text-tertiary);margin-bottom:8px}
+
+.entry-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:11px 13px;margin-bottom:8px;cursor:pointer;transition:border-color .2s}
+.entry-card:hover{border-color:var(--color-border-secondary)}
+.entry-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.entry-date{font-size:11px;color:var(--color-text-tertiary)}
+.entry-actions{display:flex;align-items:center;gap:5px}
+.mood-pill{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;cursor:pointer}
+.del-btn,.share-btn{font-size:11px;color:var(--color-text-tertiary);background:none;border:none;cursor:pointer;padding:2px 4px;transition:color .15s}
+.share-btn:hover{color:var(--accent)}
+.del-btn:hover{color:#E24B4A}
+.entry-text{font-size:13px;color:var(--color-text-secondary);line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.entry-resp{font-size:12px;color:var(--color-text-secondary);margin-top:8px;padding-top:8px;border-top:0.5px solid var(--color-border-tertiary);line-height:1.55;font-style:italic;display:none}
+.entry-card.exp .entry-resp{display:block}
+.entry-card.exp .entry-text{-webkit-line-clamp:unset}
+.empty{text-align:center;padding:32px 16px;color:var(--color-text-tertiary);font-size:13px}
+.empty i{font-size:26px;margin-bottom:8px;display:block}
+mark{background:var(--accent-bg);color:var(--accent-text);border-radius:2px;padding:0 2px}
+
+.settings-section{background:var(--color-background-secondary);border-radius:var(--border-radius-lg);padding:0 12px;margin-bottom:12px}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:0.5px solid var(--color-border-tertiary)}
+.settings-row:last-child{border-bottom:none}
+.settings-label{font-size:14px;color:var(--color-text-primary)}
+.settings-sub{font-size:11px;color:var(--color-text-tertiary);margin-top:2px}
+select{font-size:13px;padding:5px 8px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary);cursor:pointer}
+.toggle{position:relative;width:38px;height:22px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;border-radius:11px;background:var(--color-border-secondary);cursor:pointer;transition:background .2s}
+.toggle input:checked+.toggle-slider{background:var(--accent)}
+.toggle-slider:before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;border-radius:50%;background:#fff;transition:transform .2s}
+.toggle input:checked+.toggle-slider:before{transform:translateX(16px)}
+.theme-swatches{display:flex;gap:8px;padding:10px 0}
+.swatch{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .15s,border-color .15s;flex-shrink:0}
+.swatch:hover{transform:scale(1.15)}
+.swatch.active{border-color:var(--color-text-primary)}
+.action-btn{width:100%;font-size:13px;font-weight:500;padding:11px;border-radius:var(--border-radius-md);background:var(--color-background-secondary);border:0.5px solid var(--color-border-secondary);color:var(--color-text-primary);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .15s;margin-bottom:9px}
+.action-btn:hover{background:var(--color-background-tertiary)}
+.action-btn i{font-size:17px}
+.danger-btn{color:#A32D2D;border-color:#F7C1C1;background:#FCEBEB}
+
+.modal-bg{min-height:500px;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;padding:20px;display:none}
+.modal-bg.open{display:flex}
+.modal{background:var(--color-background-primary);border-radius:var(--border-radius-lg);width:100%;max-width:340px;overflow:hidden;border:0.5px solid var(--color-border-secondary)}
+.share-card-preview{padding:20px;background:var(--accent-bg)}
+.share-card-inner{background:var(--color-background-primary);border-radius:12px;padding:16px;border:0.5px solid var(--accent)}
+.share-card-header{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.share-card-pip{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.share-card-title{font-size:12px;font-weight:500;color:var(--accent-text)}
+.share-card-mood{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500;margin-left:auto}
+.share-card-text{font-size:13px;line-height:1.65;color:var(--color-text-primary);margin-bottom:12px}
+.share-card-resp{font-size:12px;color:var(--accent-text);font-style:italic;line-height:1.6;padding-top:10px;border-top:0.5px solid var(--accent);background:var(--accent-bg);margin:-16px;margin-top:10px;padding:10px 14px;border-radius:0 0 10px 10px}
+.share-card-footer{font-size:10px;color:var(--color-text-tertiary);margin-top:10px;text-align:right}
+.modal-actions{display:flex;gap:8px;padding:12px}
+.modal-actions button{flex:1;font-size:13px;font-weight:500;padding:9px;border-radius:var(--border-radius-md);cursor:pointer;border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);color:var(--color-text-primary);transition:background .15s}
+.modal-actions button:hover{background:var(--color-background-tertiary)}
+.modal-actions .copy-btn{background:var(--accent-bg);border-color:var(--accent);color:var(--accent-text)}
+</style>
+
+<h2 class="sr-only">Subconscious GPT v4 — with search, mood themes, and shareable entry cards</h2>
+
+<div id="frame">
+ <div id="screen">
+  <div class="topbar">
+   <div class="topbar-left">
+    <h1>subconscious gpt</h1>
+    <p id="topbar-sub">a quiet space to reflect</p>
+   </div>
+   <div style="display:flex;align-items:center;gap:8px">
+    <div class="theme-pip" id="theme-pip"></div>
+    <svg width="24" height="40" viewBox="0 0 24 40" style="flex-shrink:0">
+     <line x1="12" y1="2" x2="12" y2="2" id="ms" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+     <circle id="mb" cx="12" cy="2" r="6" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="0.5"/>
+    </svg>
+   </div>
+  </div>
+
+  <div id="pg-write" class="page active">
+   <div class="mode-tabs">
+    <div class="mode-tab active" onclick="setMode('vent',this)">vent</div>
+    <div class="mode-tab" onclick="setMode('journal',this)">journal</div>
+    <div class="mode-tab" onclick="setMode('reflect',this)">reflect</div>
+   </div>
+   <div class="sec">how are you feeling?</div>
+   <div class="mood-row">
+    <button class="mood-btn" id="mb-awful" onclick="selMood('awful')"><i class="ti ti-cloud-storm" aria-hidden="true"></i>awful</button>
+    <button class="mood-btn" id="mb-low" onclick="selMood('low')"><i class="ti ti-mood-sad" aria-hidden="true"></i>low</button>
+    <button class="mood-btn" id="mb-okay" onclick="selMood('okay')"><i class="ti ti-mood-neutral" aria-hidden="true"></i>okay</button>
+    <button class="mood-btn" id="mb-good" onclick="selMood('good')"><i class="ti ti-mood-smile" aria-hidden="true"></i>good</button>
+    <button class="mood-btn" id="mb-great" onclick="selMood('great')"><i class="ti ti-mood-happy" aria-hidden="true"></i>great</button>
+   </div>
+   <div class="hint" id="hint">pick a mood, then write freely</div>
+   <textarea id="txt" placeholder="what's on your mind..."></textarea>
+   <div class="send-row"><button class="btn btn-accent" id="send-btn" onclick="doSend()">send ↗</button></div>
+   <div class="bubble" id="resp-bubble"><div class="bubble-lbl">subconscious</div><div id="resp-txt"></div></div>
+  </div>
+
+  <div id="pg-tracker" class="page">
+   <div class="stat-grid">
+    <div class="stat-card"><div class="stat-val" id="st-entries">0</div><div class="stat-lbl">entries written</div></div>
+    <div class="stat-card"><div class="stat-val" id="st-streak">0</div><div class="stat-lbl">day streak</div></div>
+   </div>
+   <div class="sec">mood over time</div>
+   <div class="legend">
+    <span><span class="legend-dot" style="background:#E24B4A"></span>awful</span>
+    <span><span class="legend-dot" style="background:#BA7517"></span>low</span>
+    <span><span class="legend-dot" style="background:#378ADD"></span>okay</span>
+    <span><span class="legend-dot" style="background:#1D9E75"></span>good</span>
+    <span><span class="legend-dot" style="background:#639922"></span>great</span>
+   </div>
+   <div class="chart-wrap"><canvas id="mood-chart" role="img" aria-label="Line chart of mood scores over recent entries">Mood history over recent journal entries.</canvas></div>
+   <div class="sec">weekly ai summary</div>
+   <div class="summary-card"><p id="summary-txt" style="font-style:italic;opacity:.7">generate your first summary after writing a few entries.</p></div>
+   <button class="action-btn btn-accent" id="summary-btn" onclick="genSummary()"><i class="ti ti-sparkles" aria-hidden="true"></i>generate this week's summary</button>
+   <div class="sec">patterns</div>
+   <p id="patterns-txt" style="font-size:13px;color:var(--color-text-secondary);line-height:1.65;margin-bottom:8px">write a few entries to see your patterns here.</p>
+  </div>
+
+  <div id="pg-journal" class="page">
+   <div class="search-wrap">
+    <i class="ti ti-search" aria-hidden="true"></i>
+    <input type="text" id="search-input" placeholder="search entries..." oninput="renderEntries()" aria-label="Search entries">
+   </div>
+   <div class="filter-row" id="filter-row">
+    <div class="filter-pill active" data-mood="all" onclick="setFilter('all',this)">all</div>
+    <div class="filter-pill" data-mood="awful" onclick="setFilter('awful',this)">awful</div>
+    <div class="filter-pill" data-mood="low" onclick="setFilter('low',this)">low</div>
+    <div class="filter-pill" data-mood="okay" onclick="setFilter('okay',this)">okay</div>
+    <div class="filter-pill" data-mood="good" onclick="setFilter('good',this)">good</div>
+    <div class="filter-pill" data-mood="great" onclick="setFilter('great',this)">great</div>
+   </div>
+   <div class="entry-count" id="entry-count"></div>
+   <div id="entries-list"></div>
+  </div>
+
+  <div id="pg-settings" class="page">
+   <div class="sec">your profile</div>
+   <div class="settings-section">
+    <div class="settings-row">
+     <div><div class="settings-label">name</div><div class="settings-sub">shown in pdf exports</div></div>
+     <input type="text" id="set-name" placeholder="your name" style="width:110px;font-size:13px;padding:5px 8px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary)" oninput="saveSetting('name',this.value)">
+    </div>
+    <div class="settings-row">
+     <div><div class="settings-label">tone</div><div class="settings-sub">how the ai speaks to you</div></div>
+     <select id="set-tone" onchange="saveSetting('tone',this.value)">
+      <option value="warm">warm</option>
+      <option value="direct">direct</option>
+      <option value="poetic">poetic</option>
+      <option value="coach">coach</option>
+     </select>
+    </div>
+   </div>
+   <div class="sec">theme color</div>
+   <div class="settings-section">
+    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:4px">
+     <div><div class="settings-label">mood-based color</div><div class="settings-sub">app accent changes with your last mood</div></div>
+     <label class="toggle" style="margin-top:6px"><input type="checkbox" id="set-moodtheme" onchange="saveSetting('moodtheme',this.checked);applyTheme()"><span class="toggle-slider"></span></label>
+    </div>
+    <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:2px;padding-bottom:12px">
+     <div class="settings-label" style="margin-bottom:4px">manual color</div>
+     <div class="theme-swatches" id="theme-swatches">
+      <div class="swatch" data-theme="purple" style="background:#7F77DD" onclick="pickTheme('purple')" title="purple"></div>
+      <div class="swatch" data-theme="teal" style="background:#1D9E75" onclick="pickTheme('teal')" title="teal"></div>
+      <div class="swatch" data-theme="coral" style="background:#D85A30" onclick="pickTheme('coral')" title="coral"></div>
+      <div class="swatch" data-theme="pink" style="background:#D4537E" onclick="pickTheme('pink')" title="pink"></div>
+      <div class="swatch" data-theme="blue" style="background:#378ADD" onclick="pickTheme('blue')" title="blue"></div>
+      <div class="swatch" data-theme="amber" style="background:#BA7517" onclick="pickTheme('amber')" title="amber"></div>
+     </div>
+    </div>
+   </div>
+   <div class="sec">preferences</div>
+   <div class="settings-section">
+    <div class="settings-row">
+     <div><div class="settings-label">show ai responses</div><div class="settings-sub">in journal view</div></div>
+     <label class="toggle"><input type="checkbox" id="set-showresp" checked onchange="saveSetting('showresp',this.checked)"><span class="toggle-slider"></span></label>
+    </div>
+   </div>
+   <div class="sec">data</div>
+   <button class="action-btn" onclick="exportPDF()"><i class="ti ti-file-download" aria-hidden="true"></i>export journal as pdf</button>
+   <button class="action-btn danger-btn" onclick="clearData()"><i class="ti ti-trash" aria-hidden="true"></i>clear all entries</button>
+  </div>
+
+  <div class="nav">
+   <button class="nav-btn active" onclick="showPage('write',this)" aria-label="Write"><i class="ti ti-pencil" aria-hidden="true"></i>write</button>
+   <button class="nav-btn" onclick="showPage('tracker',this)" aria-label="Tracker"><i class="ti ti-chart-line" aria-hidden="true"></i>tracker</button>
+   <button class="nav-btn" onclick="showPage('journal',this)" aria-label="Journal"><i class="ti ti-book" aria-hidden="true"></i>journal</button>
+   <button class="nav-btn" onclick="showPage('settings',this)" aria-label="Settings"><i class="ti ti-settings" aria-hidden="true"></i>settings</button>
+  </div>
+ </div>
+</div>
+
+<div class="modal-bg" id="share-modal" onclick="closeShare(event)">
+ <div class="modal" onclick="event.stopPropagation()">
+  <div class="share-card-preview" id="share-preview"></div>
+  <div class="modal-actions">
+   <button onclick="closeShareModal()">close</button>
+   <button class="copy-btn" onclick="copyShareText()"><i class="ti ti-copy" aria-hidden="true" style="font-size:14px;margin-right:4px"></i>copy text</button>
+  </div>
+ </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const THEMES={
+ purple:{accent:'#7F77DD',bg:'#EEEDFE',mid:'#AFA9EC',strong:'#534AB7',text:'#3C3489'},
+ teal:{accent:'#1D9E75',bg:'#E1F5EE',mid:'#5DCAA5',strong:'#0F6E56',text:'#085041'},
+ coral:{accent:'#D85A30',bg:'#FAECE7',mid:'#F0997B',strong:'#993C1D',text:'#712B13'},
+ pink:{accent:'#D4537E',bg:'#FBEAF0',mid:'#ED93B1',strong:'#993556',text:'#72243E'},
+ blue:{accent:'#378ADD',bg:'#E6F1FB',mid:'#85B7EB',strong:'#185FA5',text:'#0C447C'},
+ amber:{accent:'#BA7517',bg:'#FAEEDA',mid:'#EF9F27',strong:'#854F0B',text:'#633806'}
+};
+const MOOD_THEME={awful:'coral',low:'amber',okay:'blue',good:'teal',great:'teal'};
+const MC={awful:'#E24B4A',low:'#BA7517',okay:'#378ADD',good:'#1D9E75',great:'#639922'};
+const MBG={awful:'#FCEBEB',low:'#FAEEDA',okay:'#E6F1FB',good:'#E1F5EE',great:'#EAF3DE'};
+const MTX={awful:'#501313',low:'#412402',okay:'#042C53',good:'#04342C',great:'#173404'};
+const MS={awful:1,low:2,okay:3,good:4,great:5};
+const MH={vent:'write freely — no filter, no judgment',journal:'what happened today? what did you notice?',reflect:'what are you carrying, and what might it mean?'};
+const TONES={warm:'warm, empathetic, nurturing',direct:'clear, honest, no fluff',poetic:'lyrical and metaphorical',coach:'motivating and growth-focused'};
+
+let curMode='vent',curMood=null,thinking=false,filterMood='all';
+let swA=0,swD=1,swInt=null,shareEntry=null;
+
+function applyTheme(themeName){
+ const s=getS();
+ let t=themeName||s.theme||'purple';
+ if(s.moodtheme&&curMood) t=MOOD_THEME[curMood]||t;
+ if(!THEMES[t])t='purple';
+ const th=THEMES[t];
+ document.documentElement.style.setProperty('--accent',th.accent);
+ document.documentElement.style.setProperty('--accent-bg',th.bg);
+ document.documentElement.style.setProperty('--accent-text',th.text);
+ document.documentElement.style.setProperty('--theme-mid',th.mid);
+ document.documentElement.style.setProperty('--theme-strong',th.strong);
+ document.getElementById('theme-pip').style.background=th.accent;
+ document.querySelectorAll('.swatch').forEach(sw=>{
+  sw.classList.toggle('active',sw.dataset.theme===t);
+ });
+}
+function pickTheme(t){saveSetting('theme',t);applyTheme(t);}
+
+const ms=document.getElementById('ms'),mb=document.getElementById('mb');
+function updP(deg){const r=deg*Math.PI/180,bx=12+32*Math.sin(r),by=2+32*Math.cos(r);mb.setAttribute('cx',bx.toFixed(1));mb.setAttribute('cy',by.toFixed(1));ms.setAttribute('x2',bx.toFixed(1));ms.setAttribute('y2',by.toFixed(1));}
+function startSw(sp=0.018,mx=26){stopSw();swInt=setInterval(()=>{swA+=swD*sp;if(Math.abs(swA)>=mx*Math.PI/180)swD*=-1;updP(swA*180/Math.PI);},16);}
+function stopSw(){if(swInt){clearInterval(swInt);swInt=null;}}
+function slowSw(){stopSw();let d=swA;const iv=setInterval(()=>{d*=0.93;updP(d*180/Math.PI);if(Math.abs(d)<0.003){clearInterval(iv);updP(0);}},16);}
+
+function setMode(m,el){curMode=m;document.querySelectorAll('.mode-tab').forEach(b=>b.classList.remove('active'));el.classList.add('active');document.getElementById('hint').textContent=MH[m];}
+function selMood(m){
+ curMood=m;
+ document.querySelectorAll('.mood-btn').forEach(b=>b.classList.remove('sel'));
+ document.getElementById('mb-'+m).classList.add('sel');
+ const s=getS();if(s.moodtheme)applyTheme();
+}
+
+document.getElementById('txt').addEventListener('input',()=>{
+ const v=document.getElementById('txt').value.trim();
+ if(v&&!thinking){startSw(0.016,24);document.getElementById('topbar-sub').textContent='listening...';}
+ else if(!thinking){slowSw();document.getElementById('topbar-sub').textContent='a quiet space to reflect';}
+});
+
+function getE(){try{const r=JSON.parse(localStorage.getItem('sgpt_v4')||'[]');return Array.isArray(r)?r:[];}catch{return[];}}
+function saveE(a){try{localStorage.setItem('sgpt_v4',JSON.stringify(a));}catch{}}
+function getS(){try{return JSON.parse(localStorage.getItem('sgpt_s4')||'{}');}catch{return{};}}
+function saveSetting(k,v){const s=getS();s[k]=v;try{localStorage.setItem('sgpt_s4',JSON.stringify(s));}catch{}}
+
+async function doSend(){
+ const text=document.getElementById('txt').value.trim();
+ if(!text||thinking)return;
+ thinking=true;
+ document.getElementById('send-btn').disabled=true;
+ startSw(0.028,18);
+ document.getElementById('topbar-sub').textContent='holding space...';
+ const bubble=document.getElementById('resp-bubble');const rt=document.getElementById('resp-txt');
+ bubble.classList.add('vis');rt.innerHTML='<div class="dots"><span></span><span></span><span></span></div>';
+ const s=getS();const tone=TONES[s.tone||'warm'];
+ const mCtx={vent:"Acknowledge their specific emotion first. Gently reframe or offer one grounding insight. 2-3 sentences.",journal:"Reflect what they may be discovering. End with one gentle open question. 2-4 sentences.",reflect:"Offer a poetic observation grounded in self-compassion. 2-3 sentences."};
+ try{
+  const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:`You are Subconscious GPT — a journaling companion. Tone: ${tone}. ${mCtx[curMode]} ${curMood?`Their mood: ${curMood}.`:''} Never start with "I". Be specific. No platitudes.`,messages:[{role:"user",content:text}]})});
+  const data=await res.json();
+  const reply=data.content?.map(b=>b.text||'').join('')||"You're not alone in this. Take a breath.";
+  slowSw();setTimeout(()=>{startSw(0.006,6);},600);
+  rt.textContent='';let i=0;const words=reply.split(' ');
+  const ticker=setInterval(()=>{
+   if(i<words.length){rt.textContent+=(i===0?'':' ')+words[i++];}
+   else{
+    clearInterval(ticker);
+    const entry={id:Date.now(),date:new Date().toISOString(),mode:curMode,mood:curMood||'okay',text,response:reply};
+    const entries=getE();entries.unshift(entry);saveE(entries);
+    renderEntries();updateTracker();
+    thinking=false;document.getElementById('send-btn').disabled=false;
+    document.getElementById('txt').value='';
+    document.getElementById('topbar-sub').textContent='a quiet space to reflect';
+    curMood=null;document.querySelectorAll('.mood-btn').forEach(b=>b.classList.remove('sel'));
+    setTimeout(()=>slowSw(),2500);
+   }
+  },38);
+ }catch(e){
+  rt.textContent="Something went quiet. Try again shortly.";
+  thinking=false;document.getElementById('send-btn').disabled=false;slowSw();
+  document.getElementById('topbar-sub').textContent='a quiet space to reflect';
+ }
+}
+
+async function genSummary(){
+ const entries=getE();const week=entries.filter(e=>(Date.now()-new Date(e.date))/86400000<=7);
+ if(!week.length){document.getElementById('summary-txt').textContent='write at least one entry this week first.';return;}
+ const btn=document.getElementById('summary-btn');btn.disabled=true;
+ btn.innerHTML='<div class="dots"><span></span><span></span><span></span></div>';
+ document.getElementById('summary-txt').innerHTML='<div class="dots"><span></span><span></span><span></span></div>';
+ const digest=week.map(e=>`[${e.mood}, ${e.mode}] ${e.text}`).join('\n\n');
+ const s=getS();const tone=TONES[s.tone||'warm'];
+ try{
+  const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:`Tone: ${tone}. Write a 3-5 sentence weekly emotional summary. Identify the dominant emotional thread, one pattern worth noticing, and one gentle invitation for the coming week. Warm and specific. Do not start with "This week".`,messages:[{role:"user",content:`My journal entries this week:\n\n${digest}`}]})});
+  const data=await res.json();
+  const summary=data.content?.map(b=>b.text||'').join('')||'Keep writing. Every word is an act of self-care.';
+  document.getElementById('summary-txt').textContent=summary;
+  saveSetting('lastSummary',summary);
+ }catch(e){document.getElementById('summary-txt').textContent='Could not generate summary right now.';}
+ btn.disabled=false;btn.innerHTML='<i class="ti ti-sparkles" aria-hidden="true"></i>generate this week\'s summary';
+}
+
+function highlight(text,q){
+ if(!q)return text;
+ const re=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+ return text.replace(re,'<mark>$1</mark>');
+}
+
+function setFilter(mood,el){
+ filterMood=mood;
+ document.querySelectorAll('.filter-pill').forEach(p=>p.classList.remove('active'));
+ el.classList.add('active');
+ renderEntries();
+}
+
+function renderEntries(){
+ const all=getE();
+ const q=document.getElementById('search-input').value.trim().toLowerCase();
+ const s=getS();const showResp=s.showresp!==false;
+ let filtered=all;
+ if(filterMood!=='all')filtered=filtered.filter(e=>e.mood===filterMood);
+ if(q)filtered=filtered.filter(e=>e.text.toLowerCase().includes(q)||(e.response&&e.response.toLowerCase().includes(q)));
+ document.getElementById('entry-count').textContent=filtered.length===all.length?`${all.length} entries`:` ${filtered.length} of ${all.length} entries`;
+ const el=document.getElementById('entries-list');
+ if(!filtered.length){el.innerHTML=`<div class="empty"><i class="ti ti-search" aria-hidden="true"></i>${q||filterMood!=='all'?'no entries match your search':'no entries yet — start writing'}</div>`;return;}
+ el.innerHTML=filtered.map(e=>{
+  const ht=q?highlight(e.text,q):e.text;
+  const hr=q&&e.response?highlight(e.response,q):e.response;
+  return `<div class="entry-card" id="ec-${e.id}" onclick="toggleE(${e.id})">
+   <div class="entry-hdr">
+    <span class="entry-date">${timeAgo(e.date)} · ${e.mode}</span>
+    <div class="entry-actions">
+     <span class="mood-pill" style="background:${MBG[e.mood]};color:${MTX[e.mood]}">${e.mood}</span>
+     <button class="share-btn" onclick="openShare(event,${e.id})" aria-label="Share entry"><i class="ti ti-share" aria-hidden="true"></i></button>
+     <button class="del-btn" onclick="delE(event,${e.id})" aria-label="Delete"><i class="ti ti-trash" aria-hidden="true"></i></button>
+    </div>
+   </div>
+   <div class="entry-text">${ht}</div>
+   ${showResp&&e.response?`<div class="entry-resp"><i class="ti ti-quote" aria-hidden="true" style="font-size:11px;margin-right:3px"></i>${hr||e.response}</div>`:''}
+  </div>`;
+ }).join('');
+}
+
+function timeAgo(iso){const d=(Date.now()-new Date(iso))/1000;if(d<60)return'just now';if(d<3600)return Math.round(d/60)+'m ago';if(d<86400)return Math.round(d/3600)+'h ago';return Math.round(d/86400)+'d ago';}
+function fmtDate(iso){return new Date(iso).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});}
+function toggleE(id){document.getElementById('ec-'+id)?.classList.toggle('exp');}
+function delE(ev,id){ev.stopPropagation();saveE(getE().filter(x=>x.id!==id));renderEntries();updateTracker();}
+
+function openShare(ev,id){
+ ev.stopPropagation();
+ const entry=getE().find(e=>e.id===id);if(!entry)return;
+ shareEntry=entry;
+ const th=THEMES[MOOD_THEME[entry.mood]||'purple'];
+ const preview=document.getElementById('share-preview');
+ const truncText=entry.text.length>220?entry.text.slice(0,217)+'…':entry.text;
+ const truncResp=entry.response&&entry.response.length>180?entry.response.slice(0,177)+'…':entry.response;
+ preview.innerHTML=`
+  <div class="share-card-inner" style="background:var(--color-background-primary);border-color:${th.accent}">
+   <div class="share-card-header">
+    <div style="width:8px;height:8px;border-radius:50%;background:${th.accent}"></div>
+    <span style="font-size:12px;font-weight:500;color:${th.text}">subconscious gpt</span>
+    <span class="share-card-mood" style="background:${MBG[entry.mood]};color:${MTX[entry.mood]};margin-left:auto">${entry.mood}</span>
+   </div>
+   <div style="font-size:13px;line-height:1.65;color:var(--color-text-primary);margin-bottom:${truncResp?'10px':'0'}">${truncText}</div>
+   ${truncResp?`<div style="font-size:12px;color:${th.text};font-style:italic;line-height:1.6;padding-top:10px;border-top:0.5px solid ${th.accent}">${truncResp}</div>`:''}
+   <div style="font-size:10px;color:var(--color-text-tertiary);margin-top:10px;text-align:right">${fmtDate(entry.date)}</div>
+  </div>`;
+ document.getElementById('share-modal').classList.add('open');
+}
+
+function closeShareModal(){document.getElementById('share-modal').classList.remove('open');shareEntry=null;}
+function closeShare(ev){if(ev.target===document.getElementById('share-modal'))closeShareModal();}
+
+function copyShareText(){
+ if(!shareEntry)return;
+ const text=`subconscious gpt — ${fmtDate(shareEntry.date)}\nmood: ${shareEntry.mood}\n\n${shareEntry.text}${shareEntry.response?'\n\n— '+shareEntry.response:''}`;
+ navigator.clipboard.writeText(text).then(()=>{
+  const btn=document.querySelector('.copy-btn');const orig=btn.innerHTML;
+  btn.innerHTML='<i class="ti ti-check" aria-hidden="true" style="font-size:14px;margin-right:4px"></i>copied!';
+  setTimeout(()=>{btn.innerHTML=orig;},2000);
+ }).catch(()=>alert('copy: '+text));
+}
+
+let moodChart=null;
+function updateTracker(){
+ const entries=getE();
+ document.getElementById('st-entries').textContent=entries.length;
+ document.getElementById('st-streak').textContent=calcStreak(entries);
+ const recent=entries.slice(0,12).reverse();
+ if(moodChart)moodChart.destroy();
+ if(recent.length){
+  moodChart=new Chart(document.getElementById('mood-chart'),{type:'line',data:{labels:recent.map(e=>timeAgo(e.date)),datasets:[{label:'mood',data:recent.map(e=>MS[e.mood]||3),borderColor:getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#7F77DD',backgroundColor:'rgba(127,119,221,0.07)',borderWidth:1.5,pointBackgroundColor:recent.map(e=>MC[e.mood]||'#378ADD'),pointBorderColor:recent.map(e=>MC[e.mood]||'#378ADD'),pointRadius:5,tension:0.4,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:(c)=>['','awful','low','okay','good','great'][c.raw]||''}}},scales:{y:{min:0,max:6,ticks:{stepSize:1,callback:(v)=>['','awful','low','okay','good','great'][v]||'',font:{size:9}},grid:{color:'rgba(128,128,128,0.08)'}},x:{ticks:{font:{size:9},maxRotation:30},grid:{display:false}}}}});
+ }
+ if(entries.length>=3){
+  const mc={};entries.forEach(e=>{mc[e.mood]=(mc[e.mood]||0)+1;});
+  const top=Object.entries(mc).sort((a,b)=>b[1]-a[1])[0];
+  const avg=(entries.reduce((s,e)=>s+(MS[e.mood]||3),0)/entries.length).toFixed(1);
+  document.getElementById('patterns-txt').textContent=`most common mood: "${top[0]}" (${top[1]}x). average score: ${avg}/5.`;
+ }
+ const s=getS();if(s.lastSummary)document.getElementById('summary-txt').textContent=s.lastSummary;
+}
+
+function calcStreak(entries){if(!entries.length)return 0;const days=new Set(entries.map(e=>new Date(e.date).toDateString()));let streak=0,d=new Date();while(days.has(d.toDateString())){streak++;d.setDate(d.getDate()-1);}return streak;}
+
+function exportPDF(){
+ const entries=getE();const s=getS();
+ const{jsPDF}=window.jspdf;const doc=new jsPDF({unit:'mm',format:'a4'});
+ const W=210,M=18,CW=W-M*2;let y=M;
+ doc.setFillColor(238,237,254);doc.rect(0,0,W,36,'F');
+ doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(83,74,183);doc.text('subconscious gpt',M,y+7);
+ doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(120,118,110);
+ doc.text(`${s.name||'your'}'s journal — ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}`,M,y+14);
+ doc.setFontSize(9);doc.text(`${entries.length} entries · streak: ${calcStreak(entries)} days`,M,y+20);
+ y=44;
+ if(s.lastSummary){
+  doc.setFillColor(238,237,254);doc.roundedRect(M,y,CW,8,'F');
+  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(83,74,183);doc.text('weekly summary',M+4,y+5.5);y+=11;
+  doc.setFont('helvetica','italic');doc.setFontSize(10);doc.setTextColor(60,52,137);
+  const sl=doc.splitTextToSize(s.lastSummary,CW-2);doc.text(sl,M,y);y+=sl.length*5+8;
+ }
+ const mcc={awful:[242,75,74],low:[186,117,23],okay:[55,138,221],good:[29,158,117],great:[99,153,34]};
+ entries.forEach(e=>{
+  const tl=doc.splitTextToSize(e.text,CW-8);
+  const rl=e.response?doc.splitTextToSize(e.response,CW-10):[];
+  const cardH=26+(tl.length*5)+(rl.length?(rl.length*4.5+10):0);
+  if(y+cardH>285){doc.addPage();y=M;}
+  doc.setDrawColor(220,218,210);doc.setLineWidth(0.3);doc.roundedRect(M,y,CW,cardH,2,2,'S');
+  const mc2=mcc[e.mood]||[55,138,221];
+  doc.setFillColor(...mc2);doc.roundedRect(M+CW-28,y+3,24,6,1,1,'F');
+  doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(255,255,255);doc.text(e.mood,M+CW-16,y+7.2,{align:'center'});
+  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(140,135,128);doc.text(`${fmtDate(e.date)}  ·  ${e.mode}`,M+4,y+7);
+  doc.setFontSize(10);doc.setTextColor(44,44,42);const baseY=y+14;doc.text(tl,M+4,baseY);
+  let ey=baseY+tl.length*5+2;
+  if(rl.length){doc.setDrawColor(230,228,220);doc.setLineWidth(0.2);doc.line(M+4,ey+2,M+CW-4,ey+2);doc.setFont('helvetica','italic');doc.setFontSize(9);doc.setTextColor(95,94,90);doc.text(rl,M+5,ey+7);}
+  y+=cardH+5;
+ });
+ const total=doc.getNumberOfPages();
+ for(let p=1;p<=total;p++){doc.setPage(p);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(160,158,150);doc.text(`subconscious gpt  ·  page ${p} of ${total}`,W/2,295,{align:'center'});}
+ doc.save(`subconscious-${new Date().toISOString().slice(0,10)}.pdf`);
+}
+
+function clearData(){if(confirm('clear all entries? this cannot be undone.')){saveE([]);renderEntries();updateTracker();}}
+
+function showPage(p,btn){
+ document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+ document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+ document.getElementById('pg-'+p).classList.add('active');btn.classList.add('active');
+ if(p==='tracker'||p==='journal'){renderEntries();updateTracker();}
+ if(p==='settings'){loadSettings();}
+}
+
+function loadSettings(){
+ const s=getS();
+ if(s.name)document.getElementById('set-name').value=s.name;
+ if(s.tone)document.getElementById('set-tone').value=s.tone;
+ if(s.showresp!==undefined)document.getElementById('set-showresp').checked=s.showresp;
+ if(s.moodtheme)document.getElementById('set-moodtheme').checked=s.moodtheme;
+}
+
+updP(0);applyTheme();renderEntries();updateTracker();loadSettings();
+</script>
