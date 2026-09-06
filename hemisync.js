@@ -331,6 +331,15 @@
     muteLabel();
     panel.appendChild(muteBtn);
 
+    // The mute button only means something when the Godot bridge exists
+    // (inside the exported game). On plain pages (game.html etc.) hide it;
+    // a watcher syncs visibility so late engine boots reveal it again.
+    function syncMuteVisibility() {
+      muteBtn.style.display = (typeof window.vhGameMusic === 'function') ? '' : 'none';
+    }
+    syncMuteVisibility();
+    setInterval(syncMuteVisibility, 2000);
+
     var tip = document.createElement('div');
     tip.style.cssText = 'color:#6f88a8;font-size:11.5px;margin-top:14px;line-height:1.5';
     tip.textContent = 'Tones are generated live (pure sine, no files). Muting the game track ' +
