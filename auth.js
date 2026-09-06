@@ -8,13 +8,20 @@
  *      VH_CONFIG below.
  *   3. In "Allowed Callback URLs" add:
  *        http://127.0.0.1:8936/auth/callback.html
- *        https://artistesoundbox.github.io/auth/callback.html
- *   4. In "Allowed Web Origins" and "Allowed Logout URLs" add the same
- *      origins (without the path).
- *   5. When your custom domain is ready, add
+ *        https://artistesoundbox.github.io/vitahuesosite/auth/callback.html
+ *   4. In "Allowed Web Origins" add:
+ *        http://127.0.0.1:8936
+ *        https://artistesoundbox.github.io
+ *   5. In "Allowed Logout URLs" — must match the returnTo EXACTLY
+ *      (path included, both trailing-slash variants):
+ *        https://artistesoundbox.github.io/vitahuesosite/
+ *        https://artistesoundbox.github.io/vitahuesosite/index.html
+ *      Without these, logout lands on Auth0's generic "logged out" page.
+ *   6. When your custom domain is ready, add
  *        https://YOURDOMAIN/auth/callback.html
- *      to Callback URLs and the origins to Web/Logout origins.
- *      Nothing else changes.
+ *      to Callback URLs, the origin to Web Origins, and
+ *        https://YOURDOMAIN/  +  https://YOURDOMAIN/index.html
+ *      to Logout URLs. Nothing else changes.
  */
 
 const VH_CONFIG = {
@@ -131,8 +138,11 @@ async function login(returnTo = 'game.html') {
 async function logout() {
   if (!_configured()) return;
   const c = await _auth();
+  // Return to the site ROOT ('…/vitahuesosite/'). Auth0 matches Allowed
+  // Logout URLs exactly — the root variant is whitelisted and verified
+  // (302), while '/index.html' is not, so don't send players there.
   await c.logout({
-    logoutParams: { returnTo: new URL('index.html', window.location.href).href },
+    logoutParams: { returnTo: new URL('.', window.location.href).href },
   });
 }
 
