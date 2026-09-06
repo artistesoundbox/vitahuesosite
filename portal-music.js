@@ -1,11 +1,18 @@
 /*
  * Portal ambience — lovingmyobstacles.mp3.
  *
- * Browsers block sound until the visitor interacts, so the track starts on
- * the first click / tap / key press anywhere, with a soft fade-in, and
- * loops forever. A corner speaker toggle mutes/unmutes; the choice is
- * remembered (localStorage 'vhPortalMuted'). Volume sits at 60% so it
- * reads as ambience, not a jukebox.
+ * Speed strategy (why this loads fast now):
+ *   1. fetch() the ENTIRE track into memory as a blob the moment the page
+ *      opens — one shot, no media-element range-request dithering, so it
+ *      finishes long before the visitor's first click in most cases.
+ *   2. Try autoplay as soon as the blob is ready: browsers with a history
+ *      of playing media on this site (Chrome's engagement index) allow it —
+ *      returning visitors get instant music with zero clicks.
+ *   3. If autoplay is blocked (first visit), the very first click/tap/key
+ *      starts playback instantly from the in-memory blob — no buffering.
+ *
+ * A corner speaker toggle mutes/unmutes; the choice is remembered
+ * (localStorage 'vhPortalMuted'). Volume 60% = ambience, not a jukebox.
  */
 (function () {
   'use strict';
@@ -15,27 +22,45 @@
   var BASE_VOL = 0.6;
 
   var audio = null;
-  var started = false;
+  var blobUrl = null;
+  var fetchStarted = false;
+  var pendingStart = false;   // user interacted before the blob landed
   var muted = false;
   try { muted = localStorage.getItem(KEY) === '1'; } catch (e) { /* private mode */ }
 
   var btn = null;
   var fadeTimer = null;
 
+  // expose a peek handle for diagnostics/testing
+  window.__portalMusic = { get ready() { return blobUrl !== null; } };
+
   function ensureAudio() {
     if (audio) return audio;
-    audio = new Audio(SRC);
+    audio = new Audio();
     audio.loop = true;
     audio.volume = 0;
     audio.preload = 'auto';
-    audio.load();
     return audio;
   }
 
-  // Buffer the track IMMEDIATELY on page load — browsers still require a
-  // user gesture before *playing*, but downloading early means the first
-  // click starts sound instantly instead of after a buffering wait.
-  ensureAudio();
+  /* ---------- fetch the whole track up front ---------- */
+
+  function prefetch() {
+    if (fetchStarted) return;
+    fetchStarted = true;
+    fetch(SRC)
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+      .then(function (b) {
+        blobUrl = URL.createObjectURL(b);
+        // Returning-visitor fast path: try autoplay right away. If the
+        // browser allows it, music starts with zero interaction.
+        if (!muted) tryStart(true);
+        updateBtn();
+      })
+      .catch(function () { /* network hiccup: first click retries via start() */ });
+  }
+
+  /* ---------- playback ---------- */
 
   function fadeTo(target, ms) {
     if (!audio) return;
@@ -49,20 +74,40 @@
     }, 50);
   }
 
-  function start() {
-    if (started) return;
-    started = true;
+  function playFromBlob() {
     var a = ensureAudio();
+    if (!blobUrl) {          // blob not landed yet: start the moment it does
+      pendingStart = true;
+      return false;
+    }
+    if (a.src !== blobUrl) a.src = blobUrl;
     a.play().then(function () {
       if (!muted) fadeTo(BASE_VOL, 1800);
       updateBtn();
     }).catch(function () {
-      // Some browsers need the interaction that spawned this to settle;
-      // retry on the very next interaction.
-      started = false;
-      a.volume = 0;
+      // Gesture needed after all: retry on next interaction.
+      pendingStart = true;
     });
+    return true;
   }
+
+  function tryStart(fromAutoplay) {
+    if (muted) return;
+    if (!fromAutoplay) pendingStart = false;
+    playFromBlob();
+  }
+
+  function start() { tryStart(false); }
+
+  // blob landed but a click already happened (or autoplay just got allowed)
+  function flushPending() {
+    if (pendingStart && !muted) {
+      pendingStart = false;
+      playFromBlob();
+    }
+  }
+
+  /* ---------- toggle UI ---------- */
 
   function updateBtn() {
     if (!btn) return;
@@ -88,13 +133,11 @@
       e.stopPropagation();
       muted = !muted;
       try { localStorage.setItem(KEY, muted ? '1' : '0'); } catch (err) { /* ignore */ }
-      ensureAudio();
       if (muted) {
-        fadeTo(0, 500);
+        if (audio && !audio.paused) fadeTo(0, 500);
         setTimeout(function () { if (muted && audio) audio.pause(); }, 550);
       } else {
-        if (started) { audio.play().catch(function () {}); fadeTo(BASE_VOL, 800); }
-        else start();
+        start();
       }
       updateBtn();
     });
@@ -102,20 +145,23 @@
     updateBtn();
   }
 
-  // First interaction anywhere starts the music (browser autoplay policy).
-  var OPTS = { once: true, capture: true };
-  function arm() {
-    window.addEventListener('pointerdown', onFirst, OPTS);
-    window.addEventListener('keydown', onFirst, OPTS);
-    window.addEventListener('touchstart', onFirst, OPTS);
-  }
+  /* ---------- wiring ---------- */
+
+  prefetch();   // download starts immediately, in parallel with the 3D city
+
+  // First interaction anywhere: instant play from memory (or queue if the
+  // blob is still landing — flushPending starts it the moment it arrives).
+  var OPTS = { once: false, capture: true };
   function onFirst() {
+    start();
+    flushPending();
     window.removeEventListener('pointerdown', onFirst, OPTS);
     window.removeEventListener('keydown', onFirst, OPTS);
     window.removeEventListener('touchstart', onFirst, OPTS);
-    start();
   }
-  arm();
+  window.addEventListener('pointerdown', onFirst, OPTS);
+  window.addEventListener('keydown', onFirst, OPTS);
+  window.addEventListener('touchstart', onFirst, OPTS);
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', makeToggle);
