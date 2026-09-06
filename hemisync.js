@@ -1,5 +1,5 @@
 /*
- * VitaminaHueso — Hemisync / chakra tone panel (left side).
+ * Vitamina Hueso @ Manteca Studios — Hemisync / chakra tone panel (left side).
  *
  * Self-contained sibling of spotify.js: injects its own DOM + styles,
  * mounted on the game page by tools/patch-web-export.mjs after every export.

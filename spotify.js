@@ -1,5 +1,5 @@
 /*
- * VitaminaHueso — Spotify side panel.
+ * Vitamina Hueso @ Manteca Studios — Spotify side panel.
  *
  * Self-contained widget: injects its own DOM + styles, no dependencies.
  * Mounted on game.html and inside the game page (post-export patch).

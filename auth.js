@@ -1,5 +1,5 @@
 /*
- * VitaminaHueso — Auth0 login gate (SPA SDK, no build step).
+ * Vitamina Hueso @ Manteca Studios — Auth0 login gate (SPA SDK, no build step).
  *
  * SETUP (one time, ~5 minutes):
  *   1. Create a free account at https://auth0.com and an "Application"
