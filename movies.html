@@ -20,7 +20,6 @@
     }
     a { color: #8ec2ff; }
 
-    /* ---- header: same language as the game page panel ---- */
     header {
       max-width: 1200px;
       margin: 0 auto;
@@ -54,7 +53,6 @@
       flex-wrap: wrap;
     }
 
-    /* ---- buttons: exact .btn language from game.html ---- */
     .btn {
       display: inline-block;
       padding: 15px 52px;
@@ -79,16 +77,64 @@
     }
     .btn.small { padding: 11px 34px; font-size: 14px; }
 
-    /* ---- theater grid ---- */
+    /* ---- controls: search + tabs + count ---- */
     main { max-width: 1200px; margin: 0 auto; padding: 26px 6vw 80px; }
-    .section-h {
-      font-size: 14px;
-      letter-spacing: 0.42em;
-      text-transform: uppercase;
-      color: #7f9cbd;
-      margin: 34px 0 18px;
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
     }
-    .section-h:first-child { margin-top: 4px; }
+    #search {
+      flex: 1 1 240px;
+      max-width: 340px;
+      padding: 11px 18px;
+      font: inherit;
+      font-size: 15px;
+      color: #eaf4ff;
+      background: rgba(8, 14, 24, 0.6);
+      border: 1px solid rgba(120, 180, 255, 0.45);
+      border-radius: 999px;
+      outline: none;
+      backdrop-filter: blur(6px);
+      transition: border-color .2s, box-shadow .2s;
+    }
+    #search::placeholder { color: #6f88a8; }
+    #search:focus {
+      border-color: rgba(160, 210, 255, 0.9);
+      box-shadow: 0 0 18px rgba(80, 150, 255, 0.35);
+    }
+    .chip {
+      padding: 10px 20px;
+      font-size: 13px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #9fb8d8;
+      background: rgba(8, 14, 24, 0.5);
+      border: 1px solid rgba(120, 180, 255, 0.35);
+      border-radius: 999px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .chip:hover { color: #eaf4ff; border-color: rgba(160, 210, 255, 0.8); }
+    .chip.active {
+      color: #ffffff;
+      background: rgba(20, 40, 70, 0.85);
+      border-color: rgba(160, 210, 255, 0.95);
+      box-shadow: 0 0 16px rgba(80, 150, 255, 0.4);
+    }
+    #count {
+      margin-left: auto;
+      font-size: 13px;
+      letter-spacing: 0.14em;
+      color: #6f88a8;
+      white-space: nowrap;
+    }
+
+    /* ---- theater grid ---- */
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
@@ -98,6 +144,7 @@
       .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; }
     }
     .card {
+      position: relative;
       background: none;
       border: none;
       padding: 0;
@@ -120,6 +167,29 @@
       box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
       transform: translateY(-4px);
     }
+    .save-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid rgba(160, 210, 255, 0.55);
+      background: rgba(4, 8, 15, 0.72);
+      color: #cfe4ff;
+      font-size: 17px;
+      line-height: 1;
+      cursor: pointer;
+      backdrop-filter: blur(4px);
+      transition: all 0.2s ease;
+      z-index: 2;
+    }
+    .save-btn:hover { transform: scale(1.12); box-shadow: 0 0 14px rgba(80,150,255,0.5); }
+    .save-btn.saved {
+      color: #ffd76a;
+      border-color: rgba(255, 215, 106, 0.8);
+      box-shadow: 0 0 12px rgba(255, 200, 80, 0.45);
+    }
     .card .t {
       margin-top: 10px;
       font-size: 14px;
@@ -132,6 +202,28 @@
       font-size: 12px;
       letter-spacing: 0.14em;
       color: #7f9cbd;
+    }
+    .badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 4px 10px;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #0a1626;
+      background: rgba(140, 200, 255, 0.92);
+      border-radius: 999px;
+      font-weight: 600;
+    }
+    #empty {
+      display: none;
+      padding: 60px 20px;
+      text-align: center;
+      color: #7f9cbd;
+      font-size: 16px;
+      letter-spacing: 0.06em;
+      line-height: 1.7;
     }
 
     /* ---- player overlay (theater mode) ---- */
@@ -195,23 +287,30 @@
       </div>
       <a class="btn small" href="index.html">BACK TO PORTAL</a>
     </div>
-    <p class="tag">A little cinema with your saucer. Classic feature films free for everyone,
-    plus AI-generated fantasy and alien shorts from creators around the web —
-    press play right here on the page.</p>
+    <p class="tag">A little cinema with your saucer. Classic features free for everyone,
+    plus AI-generated fantasy and alien shorts — newest first, searchable, and
+    you can save titles for later.</p>
   </header>
 
   <main>
-    <h2 class="section-h">Classic Features — free &amp; public domain</h2>
-    <div class="grid" id="grid"></div>
+    <div class="controls">
+      <input id="search" type="search" placeholder="Search films, creators, eras…" autocomplete="off" />
+      <button class="chip active" data-tab="all" type="button">All</button>
+      <button class="chip" data-tab="ai" type="button">AI Shorts</button>
+      <button class="chip" data-tab="classics" type="button">Classics</button>
+      <button class="chip" data-tab="saved" type="button">★ Saved</button>
+      <span id="count"></span>
+    </div>
 
-    <h2 class="section-h">AI &amp; Alien Shorts — fresh from the generators</h2>
-    <div class="grid" id="grid-ai"></div>
+    <div class="grid" id="grid"></div>
+    <div id="empty">Nothing here yet.<br />Tap the ☆ on any poster to save it for later.</div>
   </main>
 
   <p class="footer-note">Classic films stream from the Internet Archive's public collections
   (public domain / freely distributed). AI and alien shorts stream via YouTube embeds and
-  belong to their credited creators — we showcase them, they keep their work. If a title
-  ever stops playing, its copy moved; the library updates by editing one list in this page.</p>
+  belong to their credited creators — we showcase them, they keep their work. Your saved
+  list lives in this browser. If a title ever stops playing, its copy moved; the library
+  updates by editing one list in this page.</p>
 
   <!-- theater overlay -->
   <div id="theater" role="dialog" aria-modal="true">
@@ -225,61 +324,72 @@
   <script>
   (function () {
     'use strict';
-    // Every entry below was verified live before publish (embed allowed + poster loads).
-    // Archive classics:   { id: 'archiveIdentifier', title, year }
-    // YouTube AI shorts:  { yt: 'videoId', title, year: 'credit line' }
-    var CLASSICS = [
-      { id: 'Night.Of.The.Living.Dead_1080p', title: 'Night of the Living Dead', year: '1968 · Horror' },
-      { id: 'CarnivalofSouls', title: 'Carnival of Souls', year: '1962 · Horror' },
-      { id: 'Nosferatu1922', title: 'Nosferatu', year: '1922 · Horror' },
-      { id: 'ThePhantomoftheOpera', title: 'The Phantom of the Opera', year: '1925 · Horror' },
-      { id: 'DasKabinettdesDoktorCaligariTheCabinetofDrCaligari', title: 'The Cabinet of Dr. Caligari', year: '1920 · Horror' },
-      { id: 'house_on_haunted_hill_ipod', title: 'House on Haunted Hill', year: '1959 · Horror' },
-      { id: 'Killers_from_space', title: 'Killers from Space', year: '1954 · Sci-Fi' },
-      { id: 'lost_world', title: 'The Lost World', year: '1925 · Sci-Fi' },
-      { id: '20000LeaguesUndertheSea', title: '20,000 Leagues Under the Sea', year: '1916 · Sci-Fi' },
-      { id: 'TheGeneral', title: 'The General', year: '1926 · Comedy' },
-      { id: 'charlie_chaplin_film_fest', title: 'Charlie Chaplin Festival', year: '1910s · Comedy' },
-      { id: 'his_girl_friday', title: 'His Girl Friday', year: '1940 · Comedy' },
-      { id: 'my_favorite_brunette', title: 'My Favorite Brunette', year: '1947 · Comedy' },
-      { id: 'dressed_to_kill', title: 'Dressed to Kill', year: '1947 · Mystery' },
-      { id: 'suddenly', title: 'Suddenly', year: '1954 · Thriller' },
-      { id: 'TheStranger_0', title: 'The Stranger', year: '1946 · Thriller' },
-      { id: 'TheFastandtheFuriousJohnIreland1954goofyrip', title: 'The Fast and the Furious', year: '1954 · Action' },
-      { id: 'mclintok_widescreen', title: 'McLintock!', year: '1963 · Western' },
-      { id: 'abraham_lincoln', title: 'Abraham Lincoln', year: '1930 · Drama' },
-      { id: 'gullivers_travels1939', title: "Gulliver's Travels", year: '1939 · Animation' },
-      { id: 'JungleBook', title: 'Jungle Book', year: '1942 · Adventure' },
-      { id: 'The_Pied_Piper_of_Hamelin', title: 'The Pied Piper of Hamelin', year: '1957 · Musical' },
-      { id: 'Sita_Sings_the_Blues', title: 'Sita Sings the Blues', year: '2008 · Animation' },
-      { id: '3stooges', title: 'Three Stooges Episodes', year: '1930s · Shorts' }
+    // Every entry verified live before publish (embed allowed + poster loads).
+    // kind: 'yt' = YouTube AI short, 'archive' = Internet Archive classic.
+    // era: 1 = current-era AI productions, 0 = archive classic.
+    // yearNum drives newest-first ordering inside each era.
+    var FILMS = [
+      // ---- AI & Alien Shorts (newest era) ----
+      { kind: 'yt', id: 'F2av8beFltE', title: 'KEPLER-37B: Journey to the Alien Planet', sub: 'AI Film · Exoplanet Research', era: 1, yearNum: 2026 },
+      { kind: 'yt', id: '9ERK_nnZQ3Q', title: 'A Cosmic Odyssey', sub: 'AI Film · AI Retro Vision', era: 1, yearNum: 2026 },
+      { kind: 'yt', id: '6dtSqhYhcrs', title: 'Last Stand', sub: 'AI Film · Hashem Al-Ghaili', era: 1, yearNum: 2025 },
+      { kind: 'yt', id: 'H6-N1v1REu8', title: 'Simulation', sub: 'Award-Winning Sci-Fi · Hashem Al-Ghaili', era: 1, yearNum: 2025 },
+      { kind: 'yt', id: 'ziw03BIcqdU', title: 'STRANDED: Survival Island', sub: 'AI Film · Karma ai films', era: 1, yearNum: 2025 },
+      { kind: 'yt', id: 'X0mhMgdI08I', title: 'Alien Jungle Saga', sub: 'AI Film · Pure AI Films', era: 1, yearNum: 2025 },
+      { kind: 'yt', id: 'GOP_8wX8Nx0', title: 'New Earth: The True King', sub: 'AI Series · AVERN PICTURES', era: 1, yearNum: 2025 },
+      { kind: 'yt', id: '5fco1hT4vAo', title: 'Humans vs. Kaaris — Final Battle', sub: 'AI Film · ImaginaryStudio', era: 1, yearNum: 2025 },
+      { kind: 'yt', id: 'NWe79HR3-hk', title: 'The Girl and the Alien Robot', sub: 'AI Film · Neon Toad', era: 1, yearNum: 2025 },
+      { kind: 'yt', id: 'Sgm_4WRcGRo', title: "R'ha", sub: 'CGI Sci-Fi · DUST', era: 1, yearNum: 2024 },
+      { kind: 'yt', id: 'NLAZubEa6X4', title: 'WOODNUTS', sub: 'Sci-Fi Horror · Gossip Goblin', era: 1, yearNum: 2024 },
+      { kind: 'yt', id: 'uWCGK4nneeU', title: 'The OceanMaker', sub: 'Sci-Fi · DUST', era: 1, yearNum: 2024 },
+      { kind: 'yt', id: 't8LD0iUYv80', title: 'FTL', sub: 'Sci-Fi · DUST', era: 1, yearNum: 2024 },
+      { kind: 'yt', id: '07eWIv-Bwmo', title: 'BEACON', sub: 'Animated Sci-Fi Horror · animatrocities', era: 1, yearNum: 2024 },
+      { kind: 'yt', id: 'amXGChr-YFI', title: 'LAST MAN', sub: 'Post-Apocalyptic · Cracked Bulb Films', era: 1, yearNum: 2023 },
+      { kind: 'yt', id: 'mEVl0NS0vu8', title: "That's AI", sub: 'AI-Thriller · maximise', era: 1, yearNum: 2026 },
+      // ---- Classics (public domain) ----
+      { kind: 'archive', id: 'Sita_Sings_the_Blues', title: 'Sita Sings the Blues', sub: '2008 · Animation', era: 0, yearNum: 2008 },
+      { kind: 'archive', id: 'Night.Of.The.Living.Dead_1080p', title: 'Night of the Living Dead', sub: '1968 · Horror', era: 0, yearNum: 1968 },
+      { kind: 'archive', id: 'mclintok_widescreen', title: 'McLintock!', sub: '1963 · Western', era: 0, yearNum: 1963 },
+      { kind: 'archive', id: 'CarnivalofSouls', title: 'Carnival of Souls', sub: '1962 · Horror', era: 0, yearNum: 1962 },
+      { kind: 'archive', id: 'house_on_haunted_hill_ipod', title: 'House on Haunted Hill', sub: '1959 · Horror', era: 0, yearNum: 1959 },
+      { kind: 'archive', id: 'The_Pied_Piper_of_Hamelin', title: 'The Pied Piper of Hamelin', sub: '1957 · Musical', era: 0, yearNum: 1957 },
+      { kind: 'archive', id: 'suddenly', title: 'Suddenly', sub: '1954 · Thriller', era: 0, yearNum: 1954 },
+      { kind: 'archive', id: 'TheFastandtheFuriousJohnIreland1954goofyrip', title: 'The Fast and the Furious', sub: '1954 · Action', era: 0, yearNum: 1954 },
+      { kind: 'archive', id: 'Killers_from_space', title: 'Killers from Space', sub: '1954 · Sci-Fi', era: 0, yearNum: 1954 },
+      { kind: 'archive', id: 'my_favorite_brunette', title: 'My Favorite Brunette', sub: '1947 · Comedy', era: 0, yearNum: 1947 },
+      { kind: 'archive', id: 'dressed_to_kill', title: 'Dressed to Kill', sub: '1947 · Mystery', era: 0, yearNum: 1947 },
+      { kind: 'archive', id: 'TheStranger_0', title: 'The Stranger', sub: '1946 · Thriller', era: 0, yearNum: 1946 },
+      { kind: 'archive', id: 'JungleBook', title: 'Jungle Book', sub: '1942 · Adventure', era: 0, yearNum: 1942 },
+      { kind: 'archive', id: 'his_girl_friday', title: 'His Girl Friday', sub: '1940 · Comedy', era: 0, yearNum: 1940 },
+      { kind: 'archive', id: 'gullivers_travels1939', title: "Gulliver's Travels", sub: '1939 · Animation', era: 0, yearNum: 1939 },
+      { kind: 'archive', id: '3stooges', title: 'Three Stooges Episodes', sub: '1930s · Shorts', era: 0, yearNum: 1935 },
+      { kind: 'archive', id: 'abraham_lincoln', title: 'Abraham Lincoln', sub: '1930 · Drama', era: 0, yearNum: 1930 },
+      { kind: 'archive', id: 'TheGeneral', title: 'The General', sub: '1926 · Comedy', era: 0, yearNum: 1926 },
+      { kind: 'archive', id: 'ThePhantomoftheOpera', title: 'The Phantom of the Opera', sub: '1925 · Horror', era: 0, yearNum: 1925 },
+      { kind: 'archive', id: 'lost_world', title: 'The Lost World', sub: '1925 · Sci-Fi', era: 0, yearNum: 1925 },
+      { kind: 'archive', id: 'Nosferatu1922', title: 'Nosferatu', sub: '1922 · Horror', era: 0, yearNum: 1922 },
+      { kind: 'archive', id: 'DasKabinettdesDoktorCaligariTheCabinetofDrCaligari', title: 'The Cabinet of Dr. Caligari', sub: '1920 · Horror', era: 0, yearNum: 1920 },
+      { kind: 'archive', id: '20000LeaguesUndertheSea', title: '20,000 Leagues Under the Sea', sub: '1916 · Sci-Fi', era: 0, yearNum: 1916 },
+      { kind: 'archive', id: 'charlie_chaplin_film_fest', title: 'Charlie Chaplin Festival', sub: '1910s · Comedy', era: 0, yearNum: 1915 }
     ];
 
-    var AI_SHORTS = [
-      { yt: 'F2av8beFltE', title: 'KEPLER-37B: Journey to the Alien Planet', year: 'AI Film · Exoplanet Research' },
-      { yt: '9ERK_nnZQ3Q', title: 'A Cosmic Odyssey', year: 'AI Film · AI Retro Vision' },
-      { yt: '6dtSqhYhcrs', title: 'Last Stand', year: 'AI Film · Hashem Al-Ghaili' },
-      { yt: 'ziw03BIcqdU', title: 'STRANDED: Survival Island', year: 'AI Film · Karma ai films' },
-      { yt: 'X0mhMgdI08I', title: 'Alien Jungle Saga', year: 'AI Film · Pure AI Films' },
-      { yt: 'GOP_8wX8Nx0', title: 'New Earth: The True King', year: 'AI Series · AVERN PICTURES' },
-      { yt: '5fco1hT4vAo', title: 'Humans vs. Kaaris — Final Battle', year: 'AI Film · ImaginaryStudio' },
-      { yt: 'NWe79HR3-hk', title: 'The Girl and the Alien Robot', year: 'AI Film · Neon Toad' },
-      { yt: 'Sgm_4WRcGRo', title: "R'ha", year: 'CGI Sci-Fi · DUST' },
-      { yt: 'NLAZubEa6X4', title: 'WOODNUTS', year: 'Sci-Fi Horror · Gossip Goblin' },
-      { yt: 'H6-N1v1REu8', title: 'Simulation', year: 'Award-Winning Sci-Fi · Hashem Al-Ghaili' },
-      { yt: 'uWCGK4nneeU', title: 'The OceanMaker', year: 'Sci-Fi · DUST' },
-      { yt: 't8LD0iUYv80', title: 'FTL', year: 'Sci-Fi · DUST' },
-      { yt: '07eWIv-Bwmo', title: 'BEACON', year: 'Animated Sci-Fi Horror · animatrocities' },
-      { yt: 'amXGChr-YFI', title: 'LAST MAN', year: 'Post-Apocalyptic · Cracked Bulb Films' },
-      { yt: 'mEVl0NS0vu8', title: "That's AI", year: 'AI-Thriller · maximise' }
-    ];
-
-    var ALL = CLASSICS.concat(AI_SHORTS);
+    var SAVE_KEY = 'vh_movies_saved';
     var grid = document.getElementById('grid');
-    var gridAI = document.getElementById('grid-ai');
+    var empty = document.getElementById('empty');
+    var countEl = document.getElementById('count');
+    var searchEl = document.getElementById('search');
     var theater = document.getElementById('theater');
     var player = document.getElementById('player');
     var nowPlaying = document.getElementById('now-playing');
+
+    var activeTab = 'all';
+    var saved = (function () {
+      try { return new Set(JSON.parse(localStorage.getItem(SAVE_KEY) || '[]')); }
+      catch (e) { return new Set(); }
+    })();
+    function persistSaved() {
+      try { localStorage.setItem(SAVE_KEY, JSON.stringify(Array.from(saved))); } catch (e) { /* private mode */ }
+    }
 
     function esc(s) {
       return String(s).replace(/[&<>"']/g, function (c) {
@@ -287,35 +397,92 @@
       });
     }
     function posterUrl(f) {
-      return f.yt
-        ? 'https://i.ytimg.com/vi/' + f.yt + '/hqdefault.jpg'
+      return f.kind === 'yt'
+        ? 'https://i.ytimg.com/vi/' + f.id + '/hqdefault.jpg'
         : 'https://archive.org/services/img/' + encodeURIComponent(f.id);
     }
     function embedUrl(f) {
-      return f.yt
-        ? 'https://www.youtube-nocookie.com/embed/' + f.yt + '?autoplay=1&rel=0'
+      return f.kind === 'yt'
+        ? 'https://www.youtube-nocookie.com/embed/' + f.id + '?autoplay=1&rel=0'
         : 'https://archive.org/embed/' + encodeURIComponent(f.id) + '?autoplay=1';
     }
+    function eraLabel(f) { return f.era === 1 ? 'AI SHORT' : 'CLASSIC'; }
 
-    function render(list, mount, offset) {
-      list.forEach(function (f, i) {
-        var card = document.createElement('button');
+    /* newest first: current-era productions first, then by year, then A–Z */
+    var sorted = FILMS.slice().sort(function (a, b) {
+      if (b.era !== a.era) return b.era - a.era;
+      if (b.yearNum !== a.yearNum) return b.yearNum - a.yearNum;
+      return a.title.localeCompare(b.title);
+    });
+
+    function matches(f) {
+      if (activeTab === 'saved' && !saved.has(f.id)) return false;
+      if (activeTab === 'ai' && f.era !== 1) return false;
+      if (activeTab === 'classics' && f.era !== 0) return false;
+      var q = searchEl.value.trim().toLowerCase();
+      if (!q) return true;
+      return (f.title + ' ' + f.sub).toLowerCase().indexOf(q) !== -1;
+    }
+
+    function render() {
+      grid.innerHTML = '';
+      var shown = 0;
+      sorted.forEach(function (f) {
+        if (!matches(f)) return;
+        shown++;
+        var card = document.createElement('div');
         card.className = 'card';
-        card.type = 'button';
+        card.tabIndex = 0;
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-label', 'Play ' + f.title);
         card.innerHTML =
+          '<span class="badge">' + eraLabel(f) + '</span>' +
+          '<button class="save-btn' + (saved.has(f.id) ? ' saved' : '') + '" type="button"' +
+          ' title="' + (saved.has(f.id) ? 'Remove from saved' : 'Save for later') + '"' +
+          ' aria-label="Save for later">' + (saved.has(f.id) ? '★' : '☆') + '</button>' +
           '<img class="poster" loading="lazy" alt="' + esc(f.title) + ' poster"' +
           ' src="' + posterUrl(f) + '" />' +
           '<div class="t">' + esc(f.title) + '</div>' +
-          '<div class="y">' + esc(f.year) + '</div>';
-        card.addEventListener('click', function () { openFilm(offset + i); });
-        mount.appendChild(card);
+          '<div class="y">' + esc(f.sub) + '</div>';
+        card.addEventListener('click', function () { openFilm(f); });
+        card.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openFilm(f); }
+        });
+        card.querySelector('.save-btn').addEventListener('click', function (e) {
+          e.stopPropagation();
+          toggleSave(f, card.querySelector('.save-btn'));
+        });
+        grid.appendChild(card);
       });
+      empty.style.display = shown ? 'none' : 'block';
+      countEl.textContent = shown + (shown === 1 ? ' film' : ' films') +
+        (saved.size ? ' · ' + saved.size + ' saved' : '');
     }
-    render(CLASSICS, grid, 0);
-    render(AI_SHORTS, gridAI, CLASSICS.length);
 
-    function openFilm(i) {
-      var f = ALL[i];
+    function toggleSave(f, btn) {
+      if (saved.has(f.id)) { saved.delete(f.id); } else { saved.add(f.id); }
+      persistSaved();
+      if (btn) {
+        var on = saved.has(f.id);
+        btn.classList.toggle('saved', on);
+        btn.textContent = on ? '★' : '☆';
+        btn.title = on ? 'Remove from saved' : 'Save for later';
+      }
+      if (activeTab === 'saved') render();       // unsave inside Saved view removes the card
+      else render();                              // keep count line fresh everywhere
+    }
+
+    document.querySelectorAll('.chip').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        document.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('active'); });
+        chip.classList.add('active');
+        activeTab = chip.dataset.tab;
+        render();
+      });
+    });
+    searchEl.addEventListener('input', render);
+
+    function openFilm(f) {
       player.src = embedUrl(f);
       nowPlaying.textContent = 'NOW PLAYING — ' + f.title.toUpperCase();
       theater.classList.add('open');
@@ -330,6 +497,8 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && theater.classList.contains('open')) closeTheater();
     });
+
+    render();
   })();
   </script>
 </body>
