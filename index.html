@@ -58,6 +58,27 @@
         .play-art-link:hover #play-art-img {
             box-shadow: 0 0 26px rgba(80, 150, 255, 0.5); /* same glow as landing .btn:hover */
         }
+
+        /* MOVIES art button — same spec as the PLAY art button */
+        .movies-art-link {
+            pointer-events: auto;
+            display: block;
+            text-align: center;
+            line-height: 0;
+        }
+        #movies-art-img {
+            display: block;
+            max-width: 340px;
+            width: 100%;
+            height: auto;
+            margin: 0 auto;
+            border-radius: 18px;
+            box-shadow: 0 0 22px rgba(80, 150, 255, 0.35);
+            transition: box-shadow 0.25s ease;
+        }
+        .movies-art-link:hover #movies-art-img {
+            box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
+        }
     </style>
 </head>
 <body>
@@ -70,6 +91,13 @@
             <div class="full-width-btn-wrapper">
                 <a href="splash.html" class="play-art-link" id="play-over-the-ice" aria-label="Play Over The Ice">
                     <img src="playovertheicebutton.png" alt="Play Over The Ice" id="play-art-img" />
+                </a>
+            </div>
+
+            <!-- Movies — the free film library -->
+            <div class="full-width-btn-wrapper">
+                <a href="movies.html" class="movies-art-link" id="movies-button" aria-label="Movies – free film library">
+                    <img src="moviesbutton.png" alt="Movies – free film library" id="movies-art-img" />
                 </a>
             </div>
         </div>
