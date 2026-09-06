@@ -199,7 +199,7 @@ const engine = new Engine(GODOT_CONFIG);
 		}
 	} else {
 		setStatusMode('progress');
-		const RELEASE_PACK = 'https://github.com/artistesoundbox/vitahuesosite/releases/latest/download/tunnel-run.pck';
+		const RELEASE_PACK = 'https://media.githubusercontent.com/media/artistesoundbox/vitahuesosite/main/game/index.pck';
 		const LOCAL_PACK = 'index.pck';
 		const probe = fetch(RELEASE_PACK, { method: 'HEAD', mode: 'cors' })
 			.then((r) => (r.ok ? RELEASE_PACK : LOCAL_PACK))
