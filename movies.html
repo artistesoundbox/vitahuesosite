@@ -338,8 +338,7 @@
   (function () {
     'use strict';
     // Every entry verified live before publish (embed allowed + poster loads).
-    // kind: 'yt' = YouTube AI short, 'archive' = Internet Archive classic.
-    // era: 1 = current-era AI productions, 0 = archive classic.
+    // kind: 'yt' = YouTube AI short.
     // yearNum drives newest-first ordering inside each era.
     var FILMS = [
       // ---- AI & Alien Shorts (newest era) ----
@@ -390,11 +389,8 @@
         : 'https://archive.org/services/img/' + encodeURIComponent(f.id);
     }
     function embedUrl(f) {
-      return f.kind === 'yt'
-        ? 'https://www.youtube-nocookie.com/embed/' + f.id + '?autoplay=1&rel=0'
-        : 'https://archive.org/embed/' + encodeURIComponent(f.id) + '?autoplay=1';
+      return 'https://www.youtube-nocookie.com/embed/' + f.id + '?autoplay=1&rel=0';
     }
-    function eraLabel(f) { return f.era === 1 ? 'AI SHORT' : 'CLASSIC'; }
 
     /* newest first: by year, then A–Z */
     var sorted = FILMS.slice().sort(function (a, b) {
