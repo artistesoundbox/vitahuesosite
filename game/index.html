@@ -111,7 +111,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":327377688,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":327384436,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
@@ -199,11 +199,16 @@ const engine = new Engine(GODOT_CONFIG);
 		}
 	} else {
 		setStatusMode('progress');
+				// Pack source chain: R2 (fast, no quota) -> GitHub LFS -> same-origin (offline dev)
+				const R2_BASE = '';
 				const RELEASE_PACK = 'https://media.githubusercontent.com/media/artistesoundbox/vitahuesosite/main/game/index.pck';
 		const LOCAL_PACK = 'index.pck';
-		const probe = fetch(RELEASE_PACK, { method: 'HEAD', mode: 'cors' })
-			.then((r) => (r.ok ? RELEASE_PACK : LOCAL_PACK))
-			.catch(() => LOCAL_PACK);
+		const head = (u) => fetch(u, { method: 'HEAD', mode: 'cors' }).then((r) => r.ok).catch(() => false);
+		const probe = (async () => {
+			if (R2_BASE && (await head(R2_BASE + '/index.pck'))) return R2_BASE + '/index.pck';
+			if (await head(RELEASE_PACK)) return RELEASE_PACK;
+			return LOCAL_PACK;
+		})();
 		probe.then((packUrl) => {
 		engine.startGame({ mainPack: packUrl,
 			'onProgress': function (current, total) {
