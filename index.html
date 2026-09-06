@@ -34,6 +34,31 @@
             text-decoration: none;
             text-align: center;
         }
+
+        /* PLAY button — same design language as the game landing's login button */
+        #play-over-the-ice {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            padding: 15px 52px;
+            font-size: 18px;
+            letter-spacing: 0.32em;
+            color: #cfe4ff;
+            background: rgba(8, 14, 24, 0.6);
+            border: 1px solid rgba(120, 180, 255, 0.6);
+            border-radius: 999px;
+            backdrop-filter: blur(6px);
+            animation: playpulse 2.6s ease-in-out infinite;
+        }
+        #play-over-the-ice:hover {
+            color: #ffffff;
+            background: rgba(20, 40, 70, 0.85);
+            border-color: rgba(160, 210, 255, 0.95);
+            box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
+            animation-play-state: paused;
+        }
+        @keyframes playpulse {
+            0%, 100% { box-shadow: 0 0 8px rgba(80, 150, 255, 0.15); }
+            50%      { box-shadow: 0 0 22px rgba(80, 150, 255, 0.45); }
+        }
     </style>
 </head>
 <body>
