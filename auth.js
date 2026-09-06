@@ -16,7 +16,9 @@
  *      (path included, both trailing-slash variants):
  *        https://artistesoundbox.github.io/vitahuesosite/
  *        https://artistesoundbox.github.io/vitahuesosite/index.html
+ *        https://artistesoundbox.github.io/vitahuesosite/game.html
  *      Without these, logout lands on Auth0's generic "logged out" page.
+ *      '/game.html' is what enables returning there after logout.
  *   6. When your custom domain is ready, add
  *        https://YOURDOMAIN/auth/callback.html
  *      to Callback URLs, the origin to Web Origins, and
@@ -28,6 +30,17 @@ const VH_CONFIG = {
   domain: 'dev-um47bcoddy6kauvl.us.auth0.com',
   clientId: 'aDiPGXEuqimOCyv5Keaq0oiTWcCQlCp9',
 };
+
+// Pages logout may return the player to. MUST mirror the dashboard's
+// "Allowed Logout URLs" (Auth0 matches exactly — path included). Logout
+// checks this list: current page if allowed, else the site root, so a
+// missing dashboard entry can never strand players on Auth0's generic
+// "logged out" page. Add '/game.html' to the dashboard to enable
+// returning there after logout.
+const VH_LOGOUT_RETURNS = [
+  '/',           // site root — whitelisted (verified: Auth0 302s back)
+  '/game.html',  // game description page — enable via Allowed Logout URLs
+];
 
 // Auth0 SPA SDK from CDN (promise-based, token stored in memory/sessionStorage)
 const VH_SDK = 'https://cdn.jsdelivr.net/npm/@auth0/auth0-spa-js@2/dist/auth0-spa-js.production.min.js';
@@ -134,16 +147,25 @@ async function login(returnTo = 'game.html') {
   });
 }
 
-/** Log out and land back on the portal page. */
+/**
+ * Pick the logout return URL: the page the player is on when it's
+ * whitelisted with Auth0, else the site root (always allowed).
+ */
+function _logoutReturnTo() {
+  const siteRoot = new URL('.', window.location.href).href;   // absolute site root
+  const here = window.location.href.split(/[?#]/)[0];         // current page, absolute
+  const hereDir = new URL('.', here).href;                    // its directory form
+  const allowed = VH_LOGOUT_RETURNS.map(function (p) { return new URL(p, siteRoot).href; });
+  if (allowed.indexOf(here) !== -1) return here;
+  if (allowed.indexOf(hereDir) !== -1) return hereDir;
+  return siteRoot;
+}
+
+/** Log out and land back where the player came from (or the portal). */
 async function logout() {
   if (!_configured()) return;
   const c = await _auth();
-  // Return to the site ROOT ('…/vitahuesosite/'). Auth0 matches Allowed
-  // Logout URLs exactly — the root variant is whitelisted and verified
-  // (302), while '/index.html' is not, so don't send players there.
-  await c.logout({
-    logoutParams: { returnTo: new URL('.', window.location.href).href },
-  });
+  await c.logout({ logoutParams: { returnTo: _logoutReturnTo() } });
 }
 
 /**
