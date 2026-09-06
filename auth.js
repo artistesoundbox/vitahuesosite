@@ -51,7 +51,7 @@ async function _auth() {
     domain: VH_CONFIG.domain,
     clientId: VH_CONFIG.clientId,
     cacheLocation: 'localstorage', // valid values: 'memory' | 'localstorage'
-    useRefreshTokens: false,
+    useRefreshTokens: true, // rotating refresh tokens: sessions survive tab reloads/crashes
   });
   return _client;
 }
@@ -61,7 +61,16 @@ async function isLoggedIn() {
   if (!_configured()) return false;
   try {
     const c = await _auth();
-    return await c.isAuthenticated();
+    if (await c.isAuthenticated()) return true;
+    // Silent recovery after a tab crash/reload: the refresh token (or Auth0's
+    // SSO cookie) can restore the session WITHOUT showing the login page.
+    // Fails quietly when a real login is required (interaction_required).
+    try {
+      await c.getTokenSilently({ timeoutInSeconds: 10 });
+      return await c.isAuthenticated();
+    } catch (_e) {
+      return false;
+    }
   } catch (e) {
     console.warn('auth check failed:', e);
     return false;
