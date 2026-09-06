@@ -1,0 +1,316 @@
+/*
+ * VitaminaHueso — Hemisync / chakra tone panel (left side).
+ *
+ * Self-contained sibling of spotify.js: injects its own DOM + styles,
+ * mounted on the game page by tools/patch-web-export.mjs after every export.
+ *
+ *   - Seven chakra rows using the classic solfeggio frequencies
+ *     (396/417/528/639/741/852/963 Hz), generated live with Web Audio.
+ *   - Optional binaural beat (Alpha/Theta/Delta): a second oscillator in the
+ *     RIGHT ear offset a few Hz from the left one — headphones required.
+ *   - Volume slider; tones fade in/out to avoid clicks.
+ *   - "MUTE GAME MUSIC" runs the same bridge the Spotify widget uses
+ *     (window.vhGameMusic), so players can drift on chakra tones alone.
+ *
+ * Init: initHemisyncPanel() — called by the patcher's mount snippet.
+ */
+(function () {
+  'use strict';
+
+  var CHAKRAS = [
+    { hz: 396, name: 'Root',       color: '#e5484d' },
+    { hz: 417, name: 'Sacral',     color: '#f07d2e' },
+    { hz: 528, name: 'Solar Plexus', color: '#e8c93e' },
+    { hz: 639, name: 'Heart',      color: '#46c46e' },
+    { hz: 741, name: 'Throat',     color: '#3ea6e8' },
+    { hz: 852, name: 'Third Eye',  color: '#6a5be0' },
+    { hz: 963, name: 'Crown',      color: '#b45be0' },
+  ];
+  var BEATS = [
+    { label: 'No binaural', hz: 0 },
+    { label: 'Alpha · 10 Hz', hz: 10 },
+    { label: 'Theta · 6 Hz', hz: 6 },
+    { label: 'Delta · 3 Hz', hz: 3 },
+  ];
+  var KEY_VOL = 'vh_hemisync_vol';
+  var KEY_BEAT = 'vh_hemisync_beat';
+
+  var ctx = null;
+  var master = null;
+  var oscL = null, oscR = null, panL = null, panR = null;
+  var activeIdx = -1;
+  var gameMuted = false;
+  var els = {};
+
+  function css(el, rules) { for (var k in rules) el.style[k] = rules[k]; return el; }
+  function load(k, d) { try { var v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }
+  function save(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } }
+
+  /* ---------- audio engine ---------- */
+
+  function ensureCtx() {
+    if (!ctx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      ctx = new AC();
+      master = ctx.createGain();
+      master.gain.value = volValue();
+      master.connect(ctx.destination);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+
+  function volValue() { return parseInt(els.vol.value, 10) / 100 * 0.22; }
+
+  function startTone(idx) {
+    ensureCtx();
+    stopTone(true);
+    var f = CHAKRAS[idx].hz;
+    var beat = BEATS[parseInt(els.beat.value, 10)].hz;
+
+    oscL = ctx.createOscillator();
+    oscL.type = 'sine';
+    oscL.frequency.value = f;
+    panL = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+    if (panL.pan) panL.pan.value = beat > 0 ? -1 : 0;
+    oscL.connect(panL).connect(master);
+
+    if (beat > 0) {
+      oscR = ctx.createOscillator();
+      oscR.type = 'sine';
+      oscR.frequency.value = f + beat;
+      panR = ctx.createStereoPanner();
+      panR.pan.value = 1;
+      oscR.connect(panR).connect(master);
+    }
+
+    // fade in over 0.8 s (clickless)
+    var t = ctx.currentTime;
+    master.gain.cancelScheduledValues(t);
+    master.gain.setValueAtTime(0.0001, t);
+    master.gain.exponentialRampToValueAtTime(Math.max(volValue(), 0.0002), t + 0.8);
+
+    oscL.start();
+    if (oscR) oscR.start();
+    activeIdx = idx;
+    markRows();
+    els.tabDot.style.display = 'block';
+  }
+
+  function stopTone(instant) {
+    if (activeIdx === -1) return;
+    var idx = activeIdx;
+    activeIdx = -1;
+    markRows();
+    els.tabDot.style.display = 'none';
+    if (!ctx) return;
+    var t = ctx.currentTime;
+    if (instant) {
+      master.gain.cancelScheduledValues(t);
+      master.gain.setValueAtTime(0.0001, t);
+    } else {
+      // fade out, then hard-stop the oscillators
+      master.gain.cancelScheduledValues(t);
+      master.gain.setValueAtTime(master.gain.value, t);
+      master.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+    }
+    var l = oscL, r = oscR;
+    oscL = null; oscR = null;
+    setTimeout(function () {
+      try { if (l) l.stop(); if (r) r.stop(); } catch (e) { /* already stopped */ }
+    }, instant ? 0 : 560);
+  }
+
+  function retune() {
+    // beat selection changed while a tone plays: rebuild the pair
+    if (activeIdx !== -1) startTone(activeIdx);
+  }
+
+  /* ---------- UI ---------- */
+
+  function markRows() {
+    els.rows.forEach(function (row, i) {
+      var on = i === activeIdx;
+      row.el.style.borderColor = on ? row.c.color : 'rgba(120,180,255,.25)';
+      row.el.style.background = on ? 'rgba(20,40,70,.55)' : 'rgba(8,14,24,.45)';
+      row.btn.textContent = on ? '■' : '▶';
+      row.btn.title = on ? 'Stop tone' : 'Play ' + row.c.hz + ' Hz';
+    });
+  }
+
+  function initHemisyncPanel() {
+    if (document.getElementById('hs-panel')) return;
+
+    /* panel */
+    var panel = document.createElement('div');
+    panel.id = 'hs-panel';
+    css(panel, {
+      position: 'fixed', top: '0', left: '-332px', width: '320px', height: '100%',
+      zIndex: 60, background: 'rgba(10,14,20,.92)',
+      borderRight: '1px solid rgba(120,180,255,.35)',
+      transition: 'left .28s ease', overflowY: 'auto', padding: '18px 18px 30px',
+      color: '#cfe4ff', font: '14px/1.45 system-ui, sans-serif',
+      backdropFilter: 'blur(6px)'
+    });
+
+    /* tab (right edge of the left panel) */
+    var tab = document.createElement('div');
+    tab.id = 'hs-tab';
+    css(tab, {
+      position: 'absolute', right: '-34px', top: '46px', width: '34px', height: '130px',
+      cursor: 'pointer', background: 'rgba(10,14,20,.9)',
+      border: '1px solid rgba(120,180,255,.35)', borderLeft: 'none',
+      borderRadius: '0 8px 8px 0', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', writingMode: 'vertical-rl',
+      letterSpacing: '.25em', fontSize: '12px', color: '#8ec2ff',
+      userSelect: 'none'
+    });
+    tab.textContent = '☸ HEMISYNC';
+    var tabDot = document.createElement('div');
+    tabDot.id = 'hs-tab-dot';
+    css(tabDot, {
+      display: 'none', position: 'absolute', top: '8px', left: '50%',
+      marginLeft: '-4px', width: '8px', height: '8px', borderRadius: '50%',
+      background: '#46c46e', boxShadow: '0 0 8px #46c46e'
+    });
+    tab.appendChild(tabDot);
+    panel.appendChild(tab);
+    els.tabDot = tabDot;
+
+    /* header */
+    var head = document.createElement('div');
+    head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:4px';
+    head.innerHTML = '<b style="letter-spacing:.2em;font-size:15px">HEMISYNC</b>';
+    var close = document.createElement('button');
+    close.textContent = '✕';
+    css(close, {
+      background: 'none', border: 'none', color: '#8ec2ff', fontSize: '16px',
+      cursor: 'pointer', padding: '4px'
+    });
+    head.appendChild(close);
+    panel.appendChild(head);
+
+    var sub = document.createElement('div');
+    sub.textContent = 'Chakra tone therapy · headphones recommended for binaural';
+    css(sub, { color: '#7f9cbd', fontSize: '12px', marginBottom: '14px' });
+    panel.appendChild(sub);
+
+    /* chakra rows */
+    els.rows = [];
+    CHAKRAS.forEach(function (c, i) {
+      var row = document.createElement('div');
+      css(row, {
+        display: 'flex', alignItems: 'center', gap: '10px',
+        border: '1px solid rgba(120,180,255,.25)', borderRadius: '10px',
+        padding: '9px 12px', marginBottom: '8px', cursor: 'pointer',
+        background: 'rgba(8,14,24,.45)', transition: 'background .2s,border-color .2s'
+      });
+      var dot = document.createElement('span');
+      css(dot, {
+        width: '12px', height: '12px', borderRadius: '50%', flex: 'none',
+        background: c.color, boxShadow: '0 0 8px ' + c.color
+      });
+      var label = document.createElement('span');
+      label.style.flex = '1';
+      label.innerHTML = c.name + ' <span style="color:#7f9cbd;font-size:12px">· ' + c.hz + ' Hz</span>';
+      var btn = document.createElement('button');
+      css(btn, {
+        background: 'none', border: '1px solid rgba(120,180,255,.4)',
+        borderRadius: '50%', color: '#cfe4ff', width: '26px', height: '26px',
+        cursor: 'pointer', fontSize: '11px', lineHeight: '1'
+      });
+      row.appendChild(dot); row.appendChild(label); row.appendChild(btn);
+      row.addEventListener('click', function () {
+        if (activeIdx === i) stopTone(); else startTone(i);
+      });
+      panel.appendChild(row);
+      els.rows.push({ el: row, btn: btn, c: c });
+    });
+
+    /* binaural select */
+    var beatWrap = document.createElement('div');
+    beatWrap.style.cssText = 'margin:14px 0 8px';
+    beatWrap.innerHTML = '<div style="font-size:12px;color:#7f9cbd;margin-bottom:6px">BINAURAL BEAT (right ear offset)</div>';
+    var beat = document.createElement('select');
+    beat.id = 'hs-beat';
+    css(beat, {
+      width: '100%', padding: '8px', borderRadius: '8px',
+      background: 'rgba(8,14,24,.6)', color: '#cfe4ff',
+      border: '1px solid rgba(120,180,255,.35)', font: 'inherit'
+    });
+    BEATS.forEach(function (b, i) {
+      var o = document.createElement('option');
+      o.value = String(i); o.textContent = b.label;
+      beat.appendChild(o);
+    });
+    beat.value = load(KEY_BEAT, '0');
+    beat.addEventListener('change', function () { save(KEY_BEAT, beat.value); retune(); });
+    beatWrap.appendChild(beat);
+    panel.appendChild(beatWrap);
+    els.beat = beat;
+
+    /* volume */
+    var volWrap = document.createElement('div');
+    volWrap.style.cssText = 'margin:10px 0 16px';
+    volWrap.innerHTML = '<div style="font-size:12px;color:#7f9cbd;margin-bottom:6px">VOLUME</div>';
+    var vol = document.createElement('input');
+    vol.id = 'hs-vol';
+    vol.type = 'range'; vol.min = '0'; vol.max = '100';
+    vol.value = load(KEY_VOL, '70');
+    css(vol, { width: '100%', accentColor: '#3ea6e8' });
+    vol.addEventListener('input', function () {
+      save(KEY_VOL, vol.value);
+      if (master && activeIdx !== -1) {
+        var t = ctx.currentTime;
+        master.gain.cancelScheduledValues(t);
+        master.gain.setValueAtTime(Math.max(master.gain.value, 0.0002), t);
+        master.gain.exponentialRampToValueAtTime(Math.max(volValue(), 0.0002), t + 0.15);
+      }
+    });
+    volWrap.appendChild(vol);
+    panel.appendChild(volWrap);
+    els.vol = vol;
+
+    /* game music mute — same bridge the Spotify widget uses */
+    var muteBtn = document.createElement('button');
+    muteBtn.id = 'hs-mute';
+    muteBtn.style.cssText =
+      'width:100%;padding:11px;border-radius:999px;cursor:pointer;font:inherit;' +
+      'letter-spacing:.14em;background:rgba(8,14,24,.6);color:#cfe4ff;' +
+      'border:1px solid rgba(120,180,255,.5);transition:all .2s';
+    function muteLabel() {
+      muteBtn.textContent = gameMuted ? 'GAME MUSIC: MUTED' : 'MUTE GAME MUSIC';
+      muteBtn.style.background = gameMuted ? 'rgba(60,20,24,.6)' : 'rgba(8,14,24,.6)';
+      muteBtn.style.borderColor = gameMuted ? 'rgba(229,72,77,.7)' : 'rgba(120,180,255,.5)';
+    }
+    muteBtn.addEventListener('click', function () {
+      if (window.vhGameMusic) {
+        window.vhGameMusic();
+        gameMuted = !gameMuted;
+      } else {
+        // outside the game (or non-web build): still flip the label so the
+        // widget is testable standalone
+        gameMuted = !gameMuted;
+      }
+      muteLabel();
+    });
+    muteLabel();
+    panel.appendChild(muteBtn);
+
+    var tip = document.createElement('div');
+    tip.style.cssText = 'color:#6f88a8;font-size:11.5px;margin-top:14px;line-height:1.5';
+    tip.textContent = 'Tones are generated live (pure sine, no files). Muting the game track ' +
+      'frees the soundscape; the Spotify panel on the right plays your own playlist.';
+    panel.appendChild(tip);
+
+    /* behaviors */
+    tab.addEventListener('click', function () {
+      panel.style.left = panel.style.left === '0px' ? '-332px' : '0px';
+    });
+    close.addEventListener('click', function () { panel.style.left = '-332px'; });
+
+    document.body.appendChild(panel);
+  }
+
+  window.initHemisyncPanel = initHemisyncPanel;
+})();
