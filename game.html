@@ -185,18 +185,23 @@
       line-height: 1.7;
     }
     #controls b { color: #a8c4e6; font-weight: 600; }
-    #home-link {
+    #nav-row {
       position: fixed;
       top: 22px;
       left: 26px;
       z-index: 5;
+      display: flex;
+      gap: 22px;
+    }
+    #nav-row a {
       color: #7f9cbd;
       font-size: 13px;
       letter-spacing: 0.28em;
       text-transform: uppercase;
       text-decoration: none;
+      transition: color .2s;
     }
-    #home-link:hover { color: #ffffff; }
+    #nav-row a:hover { color: #ffffff; }
 
     /* Title art above the gate buttons (same image as the portal) */
     #play-art-img {
@@ -259,7 +264,10 @@
   <img id="cover" src="sobreelgelocover.png" alt="" />
   <div id="shade"></div>
 
-  <a id="home-link" href="index.html">&larr; Portal</a>
+  <div id="nav-row">
+    <a id="back-link" href="index.html">&larr; Back</a>
+    <a id="home-link" href="index.html">⌂ Portal</a>
+  </div>
 
   <div id="welcome" role="group" aria-label="Account">
     <span>Welcome back, <b class="vh-email"></b></span>
@@ -357,6 +365,17 @@
       document.getElementById('launch').style.display = 'none';
       wireGate('login-btn', 'launch', 'dev-note', 'welcome', 'verify-card');
     });
+  </script>
+  <script>
+    // BACK: return to the previous page when there is one, else the portal
+    (function () {
+      var back = document.getElementById('back-link');
+      back.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (document.referrer && history.length > 1) history.back();
+        else location.href = 'index.html';
+      });
+    })();
   </script>
   <script src="spotify.js"></script>
   <script>

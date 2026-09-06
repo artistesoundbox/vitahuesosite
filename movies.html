@@ -296,7 +296,10 @@
         <div class="kicker">Vitamina Hueso</div>
         <h1>MOVIES</h1>
       </div>
-      <a class="btn small" href="index.html">BACK TO PORTAL</a>
+      <div style="display:flex; gap:10px; flex-wrap:wrap">
+        <a class="btn small nav-back" href="index.html">◀ BACK</a>
+        <a class="btn small" href="index.html">⌂ HOME</a>
+      </div>
     </div>
     <p class="tag">A little cinema with your saucer. Classic features free for everyone,
     plus AI-generated fantasy and alien shorts — newest first, searchable, and
@@ -308,7 +311,6 @@
       <input id="search" type="search" placeholder="Search films, creators, eras…" autocomplete="off" />
       <button class="chip active" data-tab="all" type="button">All</button>
       <button class="chip" data-tab="ai" type="button">AI Shorts</button>
-      <button class="chip" data-tab="classics" type="button">Classics</button>
       <button class="chip" data-tab="saved" type="button">★ Saved</button>
       <span id="count"></span>
     </div>
@@ -429,7 +431,6 @@
     function matches(f) {
       if (activeTab === 'saved' && !saved.has(f.id)) return false;
       if (activeTab === 'ai' && f.era !== 1) return false;
-      if (activeTab === 'classics' && f.era !== 0) return false;
       var q = searchEl.value.trim().toLowerCase();
       if (!q) return true;
       return (f.title + ' ' + f.sub).toLowerCase().indexOf(q) !== -1;
@@ -504,6 +505,15 @@
       player.src = 'about:blank'; // stop audio/video
       document.body.style.overflow = '';
     }
+    // BACK: return to the previous page when there is one, else the portal
+    document.querySelectorAll('.nav-back').forEach(function (b) {
+      b.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (document.referrer && history.length > 1) history.back();
+        else location.href = 'index.html';
+      });
+    });
+
     document.getElementById('close-theater').addEventListener('click', closeTheater);
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && theater.classList.contains('open')) closeTheater();
