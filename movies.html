@@ -200,6 +200,7 @@
       border-color: rgba(255, 215, 106, 0.8);
       box-shadow: 0 0 12px rgba(255, 200, 80, 0.45);
     }
+    .badge { display: none; }
     .card .t {
       margin-top: 10px;
       font-size: 14px;
@@ -301,9 +302,9 @@
         <a class="btn small" href="index.html">⌂ HOME</a>
       </div>
     </div>
-    <p class="tag">A little cinema with your saucer. Classic features free for everyone,
-    plus AI-generated fantasy and alien shorts — newest first, searchable, and
-    you can save titles for later.</p>
+    <p class="tag">A little cinema with your saucer. AI-generated fantasy and alien shorts
+    from creators around the web — newest first, searchable, and you can save
+    titles for later.</p>
   </header>
 
   <main>
@@ -319,11 +320,10 @@
     <div id="empty">Nothing here yet.<br />Tap the ☆ on any poster to save it for later.</div>
   </main>
 
-  <p class="footer-note">Classic films stream from the Internet Archive's public collections
-  (public domain / freely distributed). AI and alien shorts stream via YouTube embeds and
-  belong to their credited creators — we showcase them, they keep their work. Your saved
-  list lives in this browser. If a title ever stops playing, its copy moved; the library
-  updates by editing one list in this page.</p>
+  <p class="footer-note">AI and alien shorts stream via YouTube embeds and belong to their
+  credited creators — we showcase them, they keep their work. Your saved list lives in
+  this browser. If a title ever stops playing, its copy moved; the library updates by
+  editing one list in this page.</p>
 
   <!-- theater overlay -->
   <div id="theater" role="dialog" aria-modal="true">
@@ -358,32 +358,7 @@
       { kind: 'yt', id: 't8LD0iUYv80', title: 'FTL', sub: 'Sci-Fi · DUST', era: 1, yearNum: 2024 },
       { kind: 'yt', id: '07eWIv-Bwmo', title: 'BEACON', sub: 'Animated Sci-Fi Horror · animatrocities', era: 1, yearNum: 2024 },
       { kind: 'yt', id: 'amXGChr-YFI', title: 'LAST MAN', sub: 'Post-Apocalyptic · Cracked Bulb Films', era: 1, yearNum: 2023 },
-      { kind: 'yt', id: 'mEVl0NS0vu8', title: "That's AI", sub: 'AI-Thriller · maximise', era: 1, yearNum: 2026 },
-      // ---- Classics (public domain) ----
-      { kind: 'archive', id: 'Sita_Sings_the_Blues', title: 'Sita Sings the Blues', sub: '2008 · Animation', era: 0, yearNum: 2008 },
-      { kind: 'archive', id: 'Night.Of.The.Living.Dead_1080p', title: 'Night of the Living Dead', sub: '1968 · Horror', era: 0, yearNum: 1968 },
-      { kind: 'archive', id: 'mclintok_widescreen', title: 'McLintock!', sub: '1963 · Western', era: 0, yearNum: 1963 },
-      { kind: 'archive', id: 'CarnivalofSouls', title: 'Carnival of Souls', sub: '1962 · Horror', era: 0, yearNum: 1962 },
-      { kind: 'archive', id: 'house_on_haunted_hill_ipod', title: 'House on Haunted Hill', sub: '1959 · Horror', era: 0, yearNum: 1959 },
-      { kind: 'archive', id: 'The_Pied_Piper_of_Hamelin', title: 'The Pied Piper of Hamelin', sub: '1957 · Musical', era: 0, yearNum: 1957 },
-      { kind: 'archive', id: 'suddenly', title: 'Suddenly', sub: '1954 · Thriller', era: 0, yearNum: 1954 },
-      { kind: 'archive', id: 'TheFastandtheFuriousJohnIreland1954goofyrip', title: 'The Fast and the Furious', sub: '1954 · Action', era: 0, yearNum: 1954 },
-      { kind: 'archive', id: 'Killers_from_space', title: 'Killers from Space', sub: '1954 · Sci-Fi', era: 0, yearNum: 1954 },
-      { kind: 'archive', id: 'my_favorite_brunette', title: 'My Favorite Brunette', sub: '1947 · Comedy', era: 0, yearNum: 1947 },
-      { kind: 'archive', id: 'dressed_to_kill', title: 'Dressed to Kill', sub: '1947 · Mystery', era: 0, yearNum: 1947 },
-      { kind: 'archive', id: 'TheStranger_0', title: 'The Stranger', sub: '1946 · Thriller', era: 0, yearNum: 1946 },
-      { kind: 'archive', id: 'JungleBook', title: 'Jungle Book', sub: '1942 · Adventure', era: 0, yearNum: 1942 },
-      { kind: 'archive', id: 'his_girl_friday', title: 'His Girl Friday', sub: '1940 · Comedy', era: 0, yearNum: 1940 },
-      { kind: 'archive', id: 'gullivers_travels1939', title: "Gulliver's Travels", sub: '1939 · Animation', era: 0, yearNum: 1939 },
-      { kind: 'archive', id: '3stooges', title: 'Three Stooges Episodes', sub: '1930s · Shorts', era: 0, yearNum: 1935 },
-      { kind: 'archive', id: 'abraham_lincoln', title: 'Abraham Lincoln', sub: '1930 · Drama', era: 0, yearNum: 1930 },
-      { kind: 'archive', id: 'TheGeneral', title: 'The General', sub: '1926 · Comedy', era: 0, yearNum: 1926 },
-      { kind: 'archive', id: 'ThePhantomoftheOpera', title: 'The Phantom of the Opera', sub: '1925 · Horror', era: 0, yearNum: 1925 },
-      { kind: 'archive', id: 'lost_world', title: 'The Lost World', sub: '1925 · Sci-Fi', era: 0, yearNum: 1925 },
-      { kind: 'archive', id: 'Nosferatu1922', title: 'Nosferatu', sub: '1922 · Horror', era: 0, yearNum: 1922 },
-      { kind: 'archive', id: 'DasKabinettdesDoktorCaligariTheCabinetofDrCaligari', title: 'The Cabinet of Dr. Caligari', sub: '1920 · Horror', era: 0, yearNum: 1920 },
-      { kind: 'archive', id: '20000LeaguesUndertheSea', title: '20,000 Leagues Under the Sea', sub: '1916 · Sci-Fi', era: 0, yearNum: 1916 },
-      { kind: 'archive', id: 'charlie_chaplin_film_fest', title: 'Charlie Chaplin Festival', sub: '1910s · Comedy', era: 0, yearNum: 1915 }
+      { kind: 'yt', id: 'mEVl0NS0vu8', title: "That's AI", sub: 'AI-Thriller · maximise', era: 1, yearNum: 2026 }
     ];
 
     var SAVE_KEY = 'vh_movies_saved';
@@ -421,9 +396,8 @@
     }
     function eraLabel(f) { return f.era === 1 ? 'AI SHORT' : 'CLASSIC'; }
 
-    /* newest first: current-era productions first, then by year, then A–Z */
+    /* newest first: by year, then A–Z */
     var sorted = FILMS.slice().sort(function (a, b) {
-      if (b.era !== a.era) return b.era - a.era;
       if (b.yearNum !== a.yearNum) return b.yearNum - a.yearNum;
       return a.title.localeCompare(b.title);
     });
@@ -448,7 +422,6 @@
         card.setAttribute('role', 'button');
         card.setAttribute('aria-label', 'Play ' + f.title);
         card.innerHTML =
-          '<span class="badge">' + eraLabel(f) + '</span>' +
           '<button class="save-btn' + (saved.has(f.id) ? ' saved' : '') + '" type="button"' +
           ' title="' + (saved.has(f.id) ? 'Remove from saved' : 'Save for later') + '"' +
           ' aria-label="Save for later">' + (saved.has(f.id) ? '★' : '☆') + '</button>' +
