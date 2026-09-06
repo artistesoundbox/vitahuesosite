@@ -44,7 +44,7 @@
       font-size: clamp(15px, 2vw, 19px);
       line-height: 1.55;
       color: #9fb8d8;
-      max-width: 760px;
+      max-width: 820px;
     }
     .top-row {
       display: flex;
@@ -81,6 +81,14 @@
 
     /* ---- theater grid ---- */
     main { max-width: 1200px; margin: 0 auto; padding: 26px 6vw 80px; }
+    .section-h {
+      font-size: 14px;
+      letter-spacing: 0.42em;
+      text-transform: uppercase;
+      color: #7f9cbd;
+      margin: 34px 0 18px;
+    }
+    .section-h:first-child { margin-top: 4px; }
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
@@ -187,17 +195,23 @@
       </div>
       <a class="btn small" href="index.html">BACK TO PORTAL</a>
     </div>
-    <p class="tag">A little cinema with your saucer. Classic feature films free for everyone —
+    <p class="tag">A little cinema with your saucer. Classic feature films free for everyone,
+    plus AI-generated fantasy and alien shorts from creators around the web —
     press play right here on the page.</p>
   </header>
 
   <main>
+    <h2 class="section-h">Classic Features — free &amp; public domain</h2>
     <div class="grid" id="grid"></div>
+
+    <h2 class="section-h">AI &amp; Alien Shorts — fresh from the generators</h2>
+    <div class="grid" id="grid-ai"></div>
   </main>
 
-  <p class="footer-note">These films stream from the Internet Archive's public collections
-  (public domain / freely distributed). If a title ever stops playing, its copy moved —
-  the library updates by editing one list in this page.</p>
+  <p class="footer-note">Classic films stream from the Internet Archive's public collections
+  (public domain / freely distributed). AI and alien shorts stream via YouTube embeds and
+  belong to their credited creators — we showcase them, they keep their work. If a title
+  ever stops playing, its copy moved; the library updates by editing one list in this page.</p>
 
   <!-- theater overlay -->
   <div id="theater" role="dialog" aria-modal="true">
@@ -211,9 +225,10 @@
   <script>
   (function () {
     'use strict';
-    // Verified live Internet Archive identifiers (embed + poster checked before publish).
-    // To add a film: { id: 'archiveIdentifier', title: 'Display Title', year: 'Year' }
-    var FILMS = [
+    // Every entry below was verified live before publish (embed allowed + poster loads).
+    // Archive classics:   { id: 'archiveIdentifier', title, year }
+    // YouTube AI shorts:  { yt: 'videoId', title, year: 'credit line' }
+    var CLASSICS = [
       { id: 'Night.Of.The.Living.Dead_1080p', title: 'Night of the Living Dead', year: '1968 · Horror' },
       { id: 'CarnivalofSouls', title: 'Carnival of Souls', year: '1962 · Horror' },
       { id: 'Nosferatu1922', title: 'Nosferatu', year: '1922 · Horror' },
@@ -240,7 +255,28 @@
       { id: '3stooges', title: 'Three Stooges Episodes', year: '1930s · Shorts' }
     ];
 
+    var AI_SHORTS = [
+      { yt: 'F2av8beFltE', title: 'KEPLER-37B: Journey to the Alien Planet', year: 'AI Film · Exoplanet Research' },
+      { yt: '9ERK_nnZQ3Q', title: 'A Cosmic Odyssey', year: 'AI Film · AI Retro Vision' },
+      { yt: '6dtSqhYhcrs', title: 'Last Stand', year: 'AI Film · Hashem Al-Ghaili' },
+      { yt: 'ziw03BIcqdU', title: 'STRANDED: Survival Island', year: 'AI Film · Karma ai films' },
+      { yt: 'X0mhMgdI08I', title: 'Alien Jungle Saga', year: 'AI Film · Pure AI Films' },
+      { yt: 'GOP_8wX8Nx0', title: 'New Earth: The True King', year: 'AI Series · AVERN PICTURES' },
+      { yt: '5fco1hT4vAo', title: 'Humans vs. Kaaris — Final Battle', year: 'AI Film · ImaginaryStudio' },
+      { yt: 'NWe79HR3-hk', title: 'The Girl and the Alien Robot', year: 'AI Film · Neon Toad' },
+      { yt: 'Sgm_4WRcGRo', title: "R'ha", year: 'CGI Sci-Fi · DUST' },
+      { yt: 'NLAZubEa6X4', title: 'WOODNUTS', year: 'Sci-Fi Horror · Gossip Goblin' },
+      { yt: 'H6-N1v1REu8', title: 'Simulation', year: 'Award-Winning Sci-Fi · Hashem Al-Ghaili' },
+      { yt: 'uWCGK4nneeU', title: 'The OceanMaker', year: 'Sci-Fi · DUST' },
+      { yt: 't8LD0iUYv80', title: 'FTL', year: 'Sci-Fi · DUST' },
+      { yt: '07eWIv-Bwmo', title: 'BEACON', year: 'Animated Sci-Fi Horror · animatrocities' },
+      { yt: 'amXGChr-YFI', title: 'LAST MAN', year: 'Post-Apocalyptic · Cracked Bulb Films' },
+      { yt: 'mEVl0NS0vu8', title: "That's AI", year: 'AI-Thriller · maximise' }
+    ];
+
+    var ALL = CLASSICS.concat(AI_SHORTS);
     var grid = document.getElementById('grid');
+    var gridAI = document.getElementById('grid-ai');
     var theater = document.getElementById('theater');
     var player = document.getElementById('player');
     var nowPlaying = document.getElementById('now-playing');
@@ -250,24 +286,37 @@
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
       });
     }
+    function posterUrl(f) {
+      return f.yt
+        ? 'https://i.ytimg.com/vi/' + f.yt + '/hqdefault.jpg'
+        : 'https://archive.org/services/img/' + encodeURIComponent(f.id);
+    }
+    function embedUrl(f) {
+      return f.yt
+        ? 'https://www.youtube-nocookie.com/embed/' + f.yt + '?autoplay=1&rel=0'
+        : 'https://archive.org/embed/' + encodeURIComponent(f.id) + '?autoplay=1';
+    }
 
-    FILMS.forEach(function (f, i) {
-      var card = document.createElement('button');
-      card.className = 'card';
-      card.type = 'button';
-      card.dataset.idx = String(i);
-      card.innerHTML =
-        '<img class="poster" loading="lazy" alt="' + esc(f.title) + ' poster"' +
-        ' src="https://archive.org/services/img/' + encodeURIComponent(f.id) + '" />' +
-        '<div class="t">' + esc(f.title) + '</div>' +
-        '<div class="y">' + esc(f.year) + '</div>';
-      card.addEventListener('click', function () { openFilm(i); });
-      grid.appendChild(card);
-    });
+    function render(list, mount, offset) {
+      list.forEach(function (f, i) {
+        var card = document.createElement('button');
+        card.className = 'card';
+        card.type = 'button';
+        card.innerHTML =
+          '<img class="poster" loading="lazy" alt="' + esc(f.title) + ' poster"' +
+          ' src="' + posterUrl(f) + '" />' +
+          '<div class="t">' + esc(f.title) + '</div>' +
+          '<div class="y">' + esc(f.year) + '</div>';
+        card.addEventListener('click', function () { openFilm(offset + i); });
+        mount.appendChild(card);
+      });
+    }
+    render(CLASSICS, grid, 0);
+    render(AI_SHORTS, gridAI, CLASSICS.length);
 
     function openFilm(i) {
-      var f = FILMS[i];
-      player.src = 'https://archive.org/embed/' + encodeURIComponent(f.id) + '?autoplay=1';
+      var f = ALL[i];
+      player.src = embedUrl(f);
       nowPlaying.textContent = 'NOW PLAYING — ' + f.title.toUpperCase();
       theater.classList.add('open');
       document.body.style.overflow = 'hidden';
