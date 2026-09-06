@@ -121,6 +121,51 @@
       text-decoration: none;
     }
     #home-link:hover { color: #ffffff; }
+
+    /* Welcome-back bar: shown after login, top-right */
+    #welcome {
+      display: none; /* auth.js reveals it once the session is verified */
+      position: fixed;
+      top: 22px;
+      right: 26px;
+      z-index: 5;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 10px 8px 16px;
+      border: 1px solid rgba(120, 180, 255, 0.25);
+      border-radius: 999px;
+      background: rgba(8, 14, 24, 0.55);
+      backdrop-filter: blur(6px);
+      font-size: 13px;
+      letter-spacing: 0.05em;
+      color: #9fb8d8;
+      white-space: nowrap;
+    }
+    #welcome .vh-email {
+      color: #eaf4ff;
+      font-weight: 600;
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #logout-btn {
+      padding: 6px 16px;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #9fb8d8;
+      background: transparent;
+      border: 1px solid rgba(120, 180, 255, 0.35);
+      border-radius: 999px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s ease;
+    }
+    #logout-btn:hover {
+      color: #ffffff;
+      border-color: rgba(160, 210, 255, 0.95);
+      box-shadow: 0 0 14px rgba(80, 150, 255, 0.35);
+    }
   </style>
 </head>
 <body>
@@ -128,6 +173,11 @@
   <div id="shade"></div>
 
   <a id="home-link" href="index.html">&larr; Portal</a>
+
+  <div id="welcome" role="group" aria-label="Account">
+    <span>Welcome back, <b class="vh-email"></b></span>
+    <button id="logout-btn" type="button">Log Out</button>
+  </div>
 
   <div id="panel">
     <div class="kicker">Sobre El Gelo</div>
@@ -155,7 +205,8 @@
 
   <script src="auth.js"></script>
   <script>
-    wireGate('login-btn', 'launch', 'dev-note');
+    wireGate('login-btn', 'launch', 'dev-note', 'welcome');
+    document.getElementById('logout-btn').addEventListener('click', logout);
   </script>
   <script src="spotify.js"></script>
   <script>

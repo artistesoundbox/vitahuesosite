@@ -68,6 +68,17 @@ async function isLoggedIn() {
   }
 }
 
+/** The logged-in user's profile (null when logged out). */
+async function getUser() {
+  if (!_configured()) return null;
+  try {
+    const c = await _auth();
+    return await c.getUser();
+  } catch (e) {
+    return null;
+  }
+}
+
 /** Send the visitor to the Auth0 hosted login page, returning to `returnTo`. */
 async function login(returnTo = 'game.html') {
   if (!_configured()) return; // dev mode: gate is transparent until configured
@@ -93,7 +104,7 @@ async function logout() {
  *   readyId  — id of the button/element revealed after login (e.g. LAUNCH)
  *   noteId   — optional element shown when Auth0 is not configured yet
  */
-async function wireGate(gateId, readyId, noteId) {
+async function wireGate(gateId, readyId, noteId, welcomeId) {
   const gate = document.getElementById(gateId);
   const ready = document.getElementById(readyId);
   const note = document.getElementById(noteId || '');
@@ -108,6 +119,15 @@ async function wireGate(gateId, readyId, noteId) {
   if (await isLoggedIn()) {
     gate.style.display = 'none';
     ready.style.display = 'inline-block';
+    if (welcomeId) {
+      const w = document.getElementById(welcomeId);
+      const u = await getUser();
+      if (w && u) {
+        const el = w.querySelector('.vh-email') || w.querySelector('b') || w.querySelector('span');
+        if (el) el.textContent = u.email || u.name || 'player';
+        w.style.display = 'flex';
+      }
+    }
   } else {
     ready.style.display = 'none';
     gate.addEventListener('click', () => login('game.html'));
@@ -128,4 +148,4 @@ async function finishLogin() {
   }
 }
 
-window.VH_AUTH = { isLoggedIn, login, logout, wireGate, finishLogin, _configured };
+window.VH_AUTH = { isLoggedIn, login, logout, getUser, wireGate, finishLogin, _configured };
