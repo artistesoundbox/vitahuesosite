@@ -34,7 +34,19 @@
 
   <script src="../auth.js"></script>
   <script>
-    finishLogin();
+    // Surface Auth0's rejection instead of silently bouncing to the game:
+    // if the dashboard is missing this callback URL, show it plainly.
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('error')) {
+      document.querySelector('.spinner').style.display = 'none';
+      document.getElementById('msg').innerHTML =
+        '<b>Login failed:</b> ' + q.get('error_description') +
+        '<br><br><a href="../game.html" style="color:#9fc5ff">&larr; back to the game</a>';
+      document.getElementById('msg').style.letterSpacing = 'normal';
+      document.getElementById('msg').style.textTransform = 'none';
+    } else {
+      finishLogin();
+    }
   </script>
 </body>
 </html>
