@@ -50,7 +50,7 @@ async function _auth() {
   _client = await auth0.createAuth0Client({
     domain: VH_CONFIG.domain,
     clientId: VH_CONFIG.clientId,
-    cacheLocation: 'sessionstorage', // survive reloads within the tab session
+    cacheLocation: 'localstorage', // valid values: 'memory' | 'localstorage'
     useRefreshTokens: false,
   });
   return _client;
