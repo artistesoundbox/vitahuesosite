@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hemisync – Vitamina Hueso @ Manteca Studios</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; min-height: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #cfe4ff;
+      background: #04070d;
+    }
+    body {
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(40, 80, 160, 0.18), transparent 60%),
+        radial-gradient(900px 500px at 10% 110%, rgba(80, 150, 255, 0.10), transparent 60%),
+        #04070d;
+    }
+    a { color: #8ec2ff; }
+
+    /* ---- title art ---- */
+    .title-art {
+      display: block;
+      width: min(300px, 70vw);
+      height: auto;
+      margin: 0 auto 18px;
+      border-radius: 18px;
+      box-shadow: 0 0 22px rgba(80, 150, 255, 0.35);
+    }
+
+    header {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 46px 6vw 10px;
+      text-align: center;
+    }
+    .kicker {
+      font-size: 14px;
+      letter-spacing: 0.42em;
+      text-transform: uppercase;
+      color: #7f9cbd;
+      margin-bottom: 8px;
+    }
+    header h1 {
+      font-size: clamp(36px, 6vw, 62px);
+      letter-spacing: 0.1em;
+      color: #eaf4ff;
+      text-shadow: 0 0 30px rgba(80, 150, 255, 0.55);
+      margin-bottom: 10px;
+    }
+    header p.tag {
+      font-size: clamp(15px, 2vw, 19px);
+      line-height: 1.55;
+      color: #9fb8d8;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    .top-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 26px;
+    }
+    .btn {
+      display: inline-block;
+      padding: 15px 52px;
+      font-size: 18px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #cfe4ff;
+      background: rgba(8, 14, 24, 0.6);
+      border: 1px solid rgba(120, 180, 255, 0.6);
+      border-radius: 999px;
+      cursor: pointer;
+      text-decoration: none;
+      font-family: inherit;
+      backdrop-filter: blur(6px);
+      transition: all 0.25s ease;
+    }
+    .btn:hover {
+      color: #ffffff;
+      background: rgba(20, 40, 70, 0.85);
+      border-color: rgba(160, 210, 255, 0.95);
+      box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
+    }
+    .btn.small { padding: 11px 34px; font-size: 14px; }
+
+    /* ---- sanctuary card ---- */
+    main { max-width: 1200px; margin: 0 auto; padding: 0 6vw 80px; }
+    .sanctuary {
+      max-width: 560px;
+      margin: 0 auto;
+      background: rgba(8, 14, 24, 0.55);
+      border: 1px solid rgba(120, 180, 255, 0.3);
+      border-radius: 22px;
+      padding: 28px 26px 30px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 0 40px rgba(80, 150, 255, 0.18);
+    }
+    .now-line {
+      text-align: center;
+      min-height: 22px;
+      font-size: 13px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: #8ec2ff;
+      margin-bottom: 18px;
+    }
+    .chakra {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      width: 100%;
+      border: 1px solid rgba(120, 180, 255, 0.25);
+      border-radius: 14px;
+      padding: 13px 16px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      background: rgba(8, 14, 24, 0.45);
+      color: #cfe4ff;
+      font: inherit;
+      text-align: left;
+      transition: background .2s, border-color .2s, box-shadow .2s;
+    }
+    .chakra:hover { border-color: rgba(160, 210, 255, 0.6); }
+    .chakra.on {
+      background: rgba(20, 40, 70, 0.55);
+      border-color: var(--c);
+      box-shadow: 0 0 18px var(--glow);
+    }
+    .dot {
+      width: 16px; height: 16px; border-radius: 50%; flex: none;
+      background: var(--c);
+      box-shadow: 0 0 10px var(--glow);
+    }
+    .chakra.on .dot { animation: breathe 3.2s ease-in-out infinite; }
+    @keyframes breathe {
+      0%, 100% { transform: scale(1);    opacity: 1; }
+      50%      { transform: scale(1.35); opacity: 0.75; }
+    }
+    .chakra .name { flex: 1; }
+    .chakra .name b { letter-spacing: 0.06em; }
+    .chakra .hz { color: #7f9cbd; font-size: 13px; letter-spacing: 0.12em; }
+    .chakra .state { font-size: 15px; color: #8ec2ff; width: 18px; text-align: center; }
+
+    .lab {
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #7f9cbd;
+      margin: 16px 0 6px;
+    }
+    select, input[type="range"] {
+      width: 100%;
+      font: inherit;
+      color: #cfe4ff;
+      background: rgba(8, 14, 24, 0.6);
+      border: 1px solid rgba(120, 180, 255, 0.35);
+      border-radius: 10px;
+      padding: 10px 12px;
+      outline: none;
+    }
+    input[type="range"] { padding: 0; border: none; background: none; accent-color: #3ea6e8; }
+    #rem {
+      text-align: center;
+      color: #8ec2ff;
+      font-size: 13px;
+      letter-spacing: 0.1em;
+      min-height: 18px;
+      margin-top: 8px;
+    }
+    .tip {
+      margin-top: 16px;
+      color: #6f88a8;
+      font-size: 12px;
+      line-height: 1.6;
+      text-align: center;
+    }
+    .footer-note {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 6vw 60px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #6f88a8;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="hemisync.png" alt="Hemisync" class="title-art" />
+    <div class="kicker">Vitamina Hueso @ Manteca Studios</div>
+    <h1>HEMISYNC</h1>
+    <p class="tag">A chakra tone sanctuary. Seven solfeggio frequencies generated live —
+    for focus, drift, or letting the day dissolve.</p>
+    <div class="top-row" style="margin-top:22px">
+      <a class="btn small nav-back" href="index.html">◀ BACK</a>
+      <a class="btn small" href="index.html">⌂ HOME</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="sanctuary">
+      <div class="now-line" id="now">&nbsp;</div>
+      <div id="rows"></div>
+
+      <div class="lab">Binaural beat (headphones required)</div>
+      <select id="beat">
+        <option value="0">No binaural</option>
+        <option value="1">Alpha · 10 Hz — calm focus</option>
+        <option value="2">Theta · 6 Hz — deep meditation</option>
+        <option value="3">Delta · 3 Hz — sleep drift</option>
+      </select>
+
+      <div class="lab">Volume</div>
+      <input id="vol" type="range" min="0" max="100" value="85" />
+
+      <div class="lab">Session timer</div>
+      <select id="timer">
+        <option value="0">Off — plays until I stop it</option>
+        <option value="15">15 minutes</option>
+        <option value="30">30 minutes</option>
+        <option value="45">45 minutes</option>
+      </select>
+      <div id="rem"></div>
+
+      <div class="tip">Tones are pure sine waves generated live in your browser — no files,
+      no loops. A gentle chime ends timed sessions.</div>
+    </div>
+  </main>
+
+  <p class="footer-note">Binaural mode plays a slightly different pitch in each ear —
+  the beat exists only in your brain. Use headphones for the full effect.</p>
+
+  <script>
+  (function () {
+    'use strict';
+    var CHAKRAS = [
+      { hz: 396, name: 'Root',         color: '#e5484d' },
+      { hz: 417, name: 'Sacral',       color: '#f07d2e' },
+      { hz: 528, name: 'Solar Plexus', color: '#e8c93e' },
+      { hz: 639, name: 'Heart',        color: '#46c46e' },
+      { hz: 741, name: 'Throat',       color: '#3ea6e8' },
+      { hz: 852, name: 'Third Eye',    color: '#6a5be0' },
+      { hz: 963, name: 'Crown',        color: '#b45be0' },
+    ];
+    var BEATS = [0, 10, 6, 3];
+    var KEY_VOL = 'vh_hemisync_vol';
+    var KEY_BEAT = 'vh_hemisync_beat';
+
+    var rowsEl = document.getElementById('rows');
+    var nowEl = document.getElementById('now');
+    var remEl = document.getElementById('rem');
+    var beatEl = document.getElementById('beat');
+    var volEl = document.getElementById('vol');
+    var timerEl = document.getElementById('timer');
+
+    try { volEl.value = localStorage.getItem(KEY_VOL) || '85'; } catch (e) {}
+    try { beatEl.value = localStorage.getItem(KEY_BEAT) || '0'; } catch (e) {}
+
+    var ctx = null, master = null, oscL = null, oscR = null;
+    var active = -1;
+    var timerEnds = 0, tick = null;
+
+    function ensureCtx() {
+      if (!ctx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        ctx = new AC();
+        master = ctx.createGain();
+        master.gain.value = 0;
+        master.connect(ctx.destination);
+      }
+      if (ctx.state === 'suspended') ctx.resume();
+      return ctx;
+    }
+    function vol() { return parseInt(volEl.value, 10) / 100 * 0.22; }
+
+    function start(idx) {
+      ensureCtx();
+      stop(true);
+      var f = CHAKRAS[idx].hz;
+      var beat = BEATS[parseInt(beatEl.value, 10)];
+      oscL = ctx.createOscillator();
+      oscL.type = 'sine';
+      oscL.frequency.value = f;
+      var panL = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+      if (panL.pan) panL.pan.value = beat > 0 ? -1 : 0;
+      oscL.connect(panL).connect(master);
+      if (beat > 0) {
+        oscR = ctx.createOscillator();
+        oscR.type = 'sine';
+        oscR.frequency.value = f + beat;
+        var panR = ctx.createStereoPanner();
+        panR.pan.value = 1;
+        oscR.connect(panR).connect(master);
+      }
+      var t = ctx.currentTime;
+      master.gain.cancelScheduledValues(t);
+      master.gain.setValueAtTime(0.0001, t);
+      master.gain.exponentialRampToValueAtTime(Math.max(vol(), 0.0002), t + 0.8);
+      oscL.start();
+      if (oscR) oscR.start();
+      active = idx;
+      mark();
+      armTimer();
+    }
+
+    function stop(instant, fadeSec) {
+      if (active === -1) return;
+      active = -1;
+      mark();
+      clearTimer(true);
+      if (!ctx) return;
+      var fs = instant ? 0 : (typeof fadeSec === 'number' ? fadeSec : 0.5);
+      var t = ctx.currentTime;
+      master.gain.cancelScheduledValues(t);
+      if (fs <= 0) {
+        master.gain.setValueAtTime(0.0001, t);
+      } else {
+        master.gain.setValueAtTime(Math.max(master.gain.value, 0.0002), t);
+        master.gain.exponentialRampToValueAtTime(0.0001, t + fs);
+      }
+      var l = oscL, r = oscR;
+      oscL = null; oscR = null;
+      setTimeout(function () {
+        try { if (l) l.stop(); if (r) r.stop(); } catch (e) {}
+      }, fs * 1000 + 60);
+    }
+
+    function mark() {
+      rows.forEach(function (row, i) {
+        row.el.classList.toggle('on', i === active);
+        row.state.textContent = i === active ? '■' : '▶';
+      });
+      nowEl.textContent = active === -1 ? '\u00a0'
+        : 'NOW PLAYING — ' + CHAKRAS[active].name.toUpperCase() + ' · ' + CHAKRAS[active].hz + ' HZ';
+    }
+
+    /* rows */
+    var rows = [];
+    CHAKRAS.forEach(function (c, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chakra';
+      b.style.setProperty('--c', c.color);
+      b.style.setProperty('--glow', c.color + '66');
+      b.innerHTML =
+        '<span class="dot"></span>' +
+        '<span class="name"><b>' + c.name + '</b> <span class="hz">· ' + c.hz + ' Hz</span></span>' +
+        '<span class="state">▶</span>';
+      b.addEventListener('click', function () {
+        if (active === i) stop(); else start(i);
+      });
+      rowsEl.appendChild(b);
+      rows.push({ el: b, state: b.querySelector('.state') });
+    });
+
+    /* controls */
+    beatEl.addEventListener('change', function () {
+      try { localStorage.setItem(KEY_BEAT, beatEl.value); } catch (e) {}
+      if (active !== -1) start(active);   // retune with new beat
+    });
+    volEl.addEventListener('input', function () {
+      try { localStorage.setItem(KEY_VOL, volEl.value); } catch (e) {}
+      if (master && active !== -1) {
+        var t = ctx.currentTime;
+        master.gain.cancelScheduledValues(t);
+        master.gain.setValueAtTime(Math.max(master.gain.value, 0.0002), t);
+        master.gain.exponentialRampToValueAtTime(Math.max(vol(), 0.0002), t + 0.15);
+      }
+    });
+    timerEl.addEventListener('change', function () {
+      clearTimer(true);
+      if (parseInt(timerEl.value, 10) > 0 && active !== -1) armTimer();
+    });
+
+    /* timer */
+    function armTimer() {
+      var m = parseInt(timerEl.value, 10);
+      if (m > 0 && active !== -1 && timerEnds === 0) {
+        timerEnds = Date.now() + m * 60000;
+        startTick();
+      }
+    }
+    function clearTimer(clearLabel) {
+      timerEnds = 0;
+      if (clearLabel) remEl.textContent = '';
+    }
+    function startTick() {
+      if (tick) return;
+      tick = setInterval(function () {
+        if (timerEnds > 0) {
+          var left = timerEnds - Date.now();
+          if (left <= 0) { endSession(); return; }
+          var s = Math.ceil(left / 1000);
+          remEl.textContent = Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2) + ' remaining';
+        } else {
+          clearInterval(tick);
+          tick = null;
+        }
+      }, 500);
+    }
+    function endSession() {
+      clearTimer(false);
+      remEl.textContent = 'session complete ♪';
+      setTimeout(function () {
+        if (remEl.textContent.indexOf('complete') !== -1) remEl.textContent = '';
+      }, 6000);
+      stop(false, 9);
+      setTimeout(playChime, 4200);
+    }
+    function playChime() {
+      if (!ctx) return;
+      var t0 = ctx.currentTime + 0.05;
+      [
+        { f: 528.0, g: 0.10, at: 0.0 },
+        { f: 792.0, g: 0.06, at: 0.35 },
+        { f: 1056.0, g: 0.035, at: 0.8 },
+      ].forEach(function (n) {
+        var o = ctx.createOscillator();
+        o.type = 'sine';
+        o.frequency.value = n.f;
+        var g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t0 + n.at);
+        g.gain.exponentialRampToValueAtTime(n.g, t0 + n.at + 0.04);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + n.at + 2.8);
+        o.connect(g).connect(ctx.destination);
+        o.start(t0 + n.at);
+        o.stop(t0 + n.at + 3.0);
+      });
+    }
+
+    /* Esc stops the tone */
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && active !== -1) stop();
+    });
+
+    /* BACK: previous page when there is one, else the portal */
+    document.querySelectorAll('.nav-back').forEach(function (b) {
+      b.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (document.referrer && history.length > 1) history.back();
+        else location.href = 'index.html';
+      });
+    });
+
+    mark();
+  })();
+  </script>
+</body>
+</html>
