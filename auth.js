@@ -18,8 +18,8 @@
  */
 
 const VH_CONFIG = {
-  domain: 'YOUR_TENANT.auth0.com', // e.g. vitaminahueso.us.auth0.com
-  clientId: 'YOUR_CLIENT_ID',
+  domain: 'dev-um47bcoddy6kauvl.us.auth0.com',
+  clientId: '8duUMUSCGHYlJfNJTuAlh1VzN8nCFvag',
 };
 
 // Auth0 SPA SDK from CDN (promise-based, token stored in memory/sessionStorage)
