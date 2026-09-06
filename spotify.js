@@ -20,6 +20,7 @@
 const SP_CONFIG = {
   clientId: '', // developer.spotify.com app Client ID (enables Premium Connect)
   redirectUri: null, // default: <site>/auth/spotify-callback.html
+  playerName: 'Over The Ice', // how this tab shows up in Spotify's device list
   scopes: [
     'streaming', 'user-read-email', 'user-read-private',
     'user-read-playback-state', 'user-modify-playback-state',
@@ -54,7 +55,7 @@ async function finishSpotifyLogin() {
   const r = await fetch('https://accounts.spotify.com/api/token', { method: 'POST', body });
   if (!r.ok) { console.warn('spotify token failed', r.status); window.location.href = '../game.html'; return; }
   const tok = await r.json();
-  _spToken = { access_token: tok.access_token, expires_at: Date.now() + tok.expires_in * 1000 };
+  _spToken = { access_token: tok.access_token, expires_at: Date.now() + tok.expires_in * 1000, refresh_token: tok.refresh_token || null };
   sessionStorage.setItem('sp_token', JSON.stringify(_spToken));
   window.location.href = '../game.html?sp=connected';
 }
@@ -74,20 +75,118 @@ async function spotifyLogin() {
 }
 
 function spToken() {
-  if (_spToken) return _spToken.access_token;
+  if (_spToken && _spToken.expires_at > Date.now()) return _spToken.access_token;
   const raw = sessionStorage.getItem('sp_token');
-  if (raw) { _spToken = JSON.parse(raw); if (_spToken.expires_at > Date.now()) return _spToken.access_token; }
-  return null;
+  if (raw) _spToken = JSON.parse(raw);
+  if (!_spToken || _spToken.expires_at <= Date.now()) return null;
+  return _spToken.access_token;
 }
 
-function spCommand(cmd, body) {
-  const tok = spToken();
-  if (!tok) return Promise.resolve(false);
-  return fetch('https://api.spotify.com/v1/me/player/' + cmd, {
-    method: body ? 'PUT' : 'POST',
+/** Like spToken() but refreshes an expired token first (async network callers). */
+async function _freshToken() {
+  return spToken() || (await _refreshToken());
+}
+
+/** Exchange the refresh token for a new access token (keeps long sessions alive). */
+async function _refreshToken() {
+  if (!_spToken || !_spToken.refresh_token || !SP_CONFIG.clientId) return null;
+  try {
+    const body = new URLSearchParams({
+      grant_type: 'refresh_token', refresh_token: _spToken.refresh_token, client_id: SP_CONFIG.clientId,
+    });
+    const r = await fetch('https://accounts.spotify.com/api/token', { method: 'POST', body });
+    if (!r.ok) return null;
+    const tok = await r.json();
+    _spToken = {
+      access_token: tok.access_token,
+      expires_at: Date.now() + tok.expires_in * 1000,
+      refresh_token: tok.refresh_token || _spToken.refresh_token, // Spotify may rotate it
+    };
+    sessionStorage.setItem('sp_token', JSON.stringify(_spToken));
+    return _spToken.access_token;
+  } catch (e) {
+    return null;
+  }
+}
+
+/* ---------- Web Playback SDK (plays IN this tab — the game keeps running) ----------
+   Spotify's SDK script is loaded lazily once the user connects. The player
+   registers as a Spotify Connect device named SP_CONFIG.playerName, so the
+   transport buttons control music playing right here in the browser while
+   the saucer stays airborne. Loading does not touch the game canvas. */
+let _spDeviceId = null;
+
+function _loadPlaybackSdk() {
+  if (window.Spotify) return Promise.resolve();
+  window.onSpotifyWebPlaybackSDKReady = () => {};
+  return new Promise((res) => {
+    const s = document.createElement('script');
+    s.src = 'https://sdk.scdn.co/spotify-player.js';
+    s.onload = res;
+    document.head.appendChild(s);
+  });
+}
+
+async function ensurePlayer() {
+  if (_spDeviceId || !(await _freshToken())) return;
+  await _loadPlaybackSdk();
+  const player = new window.Spotify.Player({
+    name: SP_CONFIG.playerName,
+    getOAuthToken: (cb) => {
+      const t = spToken();
+      if (t) cb(t);
+      else _refreshToken().then((n) => { if (n) cb(n); });
+    },
+    volume: 0.7,
+  });
+  player.addListener('ready', ({ device_id }) => { _spDeviceId = device_id; });
+  player.addListener('initialization_error', (e) => console.warn('sp init:', e.message));
+  player.addListener('authentication_error', (e) => console.warn('sp auth:', e.message));
+  await player.connect();
+  // small wait so the device id lands before the first command
+  for (let i = 0; i < 20 && !_spDeviceId; i++) await new Promise((r) => setTimeout(r, 250));
+}
+
+async function spCommand(cmd, body) {
+  const tok = await _freshToken();
+  if (!tok) return false;
+  if (cmd === 'play' || cmd === 'pause') await ensurePlayer();
+  // Fresh in-tab device has nothing queued: default to the playlist the user
+  // already loaded in the widget (localStorage), if any.
+  if (cmd === 'play' && !body) {
+    const savedUri = localStorage.getItem('vh_spotify_uri');
+    if (savedUri) body = { context_uri: savedUri };
+  }
+  const url = 'https://api.spotify.com/v1/me/player/' + cmd +
+    ((cmd === 'play' || cmd === 'pause') && _spDeviceId ? '?device_id=' + _spDeviceId : '');
+  return fetch(url, {
+    method: body ? 'PUT' : cmd === 'play' || cmd === 'pause' ? 'PUT' : 'POST',
     headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   }).then((r) => r.ok).catch(() => false);
+}
+
+async function isPlaying() {
+  const tok = await _freshToken();
+  if (!tok) return false;
+  try {
+    const r = await fetch('https://api.spotify.com/v1/me/player', {
+      headers: { Authorization: 'Bearer ' + tok },
+    });
+    if (r.status === 204) return false; // nothing active
+    const s = await r.json();
+    return !!(s && s.is_playing);
+  } catch (e) { return false; }
+}
+
+/** Sync the transport's play/pause label with the real playback state. */
+async function refreshPlaybackState() {
+  const btn = document.getElementById('sp-playpause');
+  if (!btn) return;
+  const playing = await isPlaying();
+  btn.innerHTML = playing
+    ? '&#10074;&#10074;'   // playing → show pause glyph
+    : '&#9654;';           // paused → show play glyph
 }
 
 /* ---------- Panel widget ---------- */
@@ -222,15 +321,28 @@ function initSpotifyPanel(opts) {
 
   /* premium transport */
   if (premium) {
-    $('sp-connect').addEventListener('click', () => { if (!spToken()) spotifyLogin(); });
+    const revealTransport = () => {
+      $('sp-connect').style.display = 'none';
+      $('sp-transport').style.display = 'flex';
+      refreshPlaybackState();
+      ensurePlayer(); // warm up the in-tab device now, not on first tap
+    };
+    $('sp-connect').addEventListener('click', async () => {
+      if (spToken() || (await _freshToken())) { revealTransport(); return; }
+      spotifyLogin(); // redirects to Spotify; auth/spotify-callback.html finishes
+    });
     $('sp-prev').addEventListener('click', (e) => { spCommand('previous'); e.target.blur(); });
     $('sp-next').addEventListener('click', (e) => { spCommand('next'); e.target.blur(); });
-    $('sp-playpause').addEventListener('click', (e) => { spCommand('play'); e.target.blur(); });
-    if (new URLSearchParams(window.location.search).get('sp') === 'connected') {
-      $('sp-connect').textContent = 'SPOTIFY CONNECTED';
-      $('sp-transport').style.display = 'flex';
-    }
+    $('sp-playpause').addEventListener('click', async (e) => {
+      const playing = await isPlaying();
+      await spCommand(playing ? 'pause' : 'play');
+      e.target.blur();
+    });
+    // returning from the Spotify redirect with a fresh token?
+    if (new URLSearchParams(window.location.search).get('sp') === 'connected') revealTransport();
+    // or already connected in this tab (sessionStorage token)?
+    else { (async () => { if (await _freshToken()) revealTransport(); })(); }
   }
 }
 
-window.VH_SPOTIFY = { initSpotifyPanel, finishSpotifyLogin, spotifyLogin, spToken, spCommand };
+window.VH_SPOTIFY = { initSpotifyPanel, finishSpotifyLogin, spotifyLogin, spToken, spCommand, isPlaying, refreshPlaybackState, ensurePlayer };
