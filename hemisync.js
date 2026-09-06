@@ -95,30 +95,33 @@
     activeIdx = idx;
     markRows();
     els.tabDot.style.display = 'block';
+    armTimer();
   }
 
-  function stopTone(instant) {
+  function stopTone(fadeSec) {
     if (activeIdx === -1) return;
     var idx = activeIdx;
     activeIdx = -1;
     markRows();
     els.tabDot.style.display = 'none';
+    // true = instant cut (retune), undefined = normal 0.5 s, number = custom
+    var fs = (fadeSec === true) ? 0 : (typeof fadeSec === 'number' ? fadeSec : 0.5);
     if (!ctx) return;
     var t = ctx.currentTime;
-    if (instant) {
+    if (fs <= 0) {
       master.gain.cancelScheduledValues(t);
       master.gain.setValueAtTime(0.0001, t);
     } else {
       // fade out, then hard-stop the oscillators
       master.gain.cancelScheduledValues(t);
-      master.gain.setValueAtTime(master.gain.value, t);
-      master.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      master.gain.setValueAtTime(Math.max(master.gain.value, 0.0002), t);
+      master.gain.exponentialRampToValueAtTime(0.0001, t + fs);
     }
     var l = oscL, r = oscR;
     oscL = null; oscR = null;
     setTimeout(function () {
       try { if (l) l.stop(); if (r) r.stop(); } catch (e) { /* already stopped */ }
-    }, instant ? 0 : 560);
+    }, fs * 1000 + 60);
   }
 
   function retune() {
@@ -221,7 +224,7 @@
       });
       row.appendChild(dot); row.appendChild(label); row.appendChild(btn);
       row.addEventListener('click', function () {
-        if (activeIdx === i) stopTone(); else startTone(i);
+        if (activeIdx === i) { clearTimer(true); stopTone(); } else startTone(i);
       });
       panel.appendChild(row);
       els.rows.push({ el: row, btn: btn, c: c });
@@ -271,6 +274,37 @@
     panel.appendChild(volWrap);
     els.vol = vol;
 
+    /* session timer: 15/30/45 min, gentle fade + chime at the end */
+    var tWrap = document.createElement('div');
+    tWrap.style.cssText = 'margin:10px 0 4px';
+    tWrap.innerHTML = '<div style="font-size:12px;color:#7f9cbd;margin-bottom:6px">SESSION TIMER</div>';
+    var tsel = document.createElement('select');
+    tsel.id = 'hs-timer';
+    css(tsel, {
+      width: '100%', padding: '8px', borderRadius: '8px',
+      background: 'rgba(8,14,24,.6)', color: '#cfe4ff',
+      border: '1px solid rgba(120,180,255,.35)', font: 'inherit'
+    });
+    [['0', 'Off — plays until I stop it'], ['15', '15 minutes'], ['30', '30 minutes'], ['45', '45 minutes']]
+      .forEach(function (o) {
+        var op = document.createElement('option');
+        op.value = o[0]; op.textContent = o[1];
+        tsel.appendChild(op);
+      });
+    tsel.value = '0';
+    tsel.addEventListener('change', function () {
+      clearTimer(true);
+      if (timerMinutes() > 0) armTimer();
+    });
+    tWrap.appendChild(tsel);
+    var rem = document.createElement('div');
+    rem.id = 'hs-timer-rem';
+    css(rem, { color: '#8ec2ff', fontSize: '12px', marginTop: '6px', minHeight: '16px' });
+    tWrap.appendChild(rem);
+    panel.appendChild(tWrap);
+    els.timer = tsel;
+    els.rem = rem;
+
     /* game music mute — same bridge the Spotify widget uses */
     var muteBtn = document.createElement('button');
     muteBtn.id = 'hs-mute';
@@ -310,6 +344,73 @@
     close.addEventListener('click', function () { panel.style.left = '-332px'; });
 
     document.body.appendChild(panel);
+  }
+
+  /* ---------- session timer + end chime ---------- */
+
+  var timerEnds = 0;   // epoch ms when the session should dissolve (0 = none)
+  var timerTick = null;
+
+  function timerMinutes() { return parseInt(els.timer.value, 10) || 0; }
+
+  function armTimer() {
+    var m = timerMinutes();
+    if (m > 0 && activeIdx !== -1 && timerEnds === 0) {
+      timerEnds = Date.now() + m * 60000;
+      startTick();
+    }
+  }
+
+  function clearTimer(resetLabel) {
+    timerEnds = 0;
+    if (resetLabel && els.rem) els.rem.textContent = '';
+  }
+
+  function startTick() {
+    if (timerTick) return;
+    timerTick = setInterval(function () {
+      if (timerEnds > 0) {
+        var left = timerEnds - Date.now();
+        if (left <= 0) { endSession(); return; }
+        var s = Math.ceil(left / 1000);
+        els.rem.textContent = Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2) + ' remaining';
+      } else {
+        clearInterval(timerTick);
+        timerTick = null;
+      }
+    }, 500);
+  }
+
+  function endSession() {
+    clearTimer(false);
+    els.rem.textContent = 'session complete ♪';
+    setTimeout(function () {
+      if (els.rem.textContent.indexOf('complete') !== -1) els.rem.textContent = '';
+    }, 6000);
+    stopTone(9);                  // long, gentle dissolve
+    setTimeout(playChime, 4200);  // chime drifts in as the tone fades
+  }
+
+  /* Soft three-note singing-bowl chime (no audio files, all synthesized). */
+  function playChime() {
+    if (!ctx) return;
+    var t0 = ctx.currentTime + 0.05;
+    [
+      { f: 528.0, g: 0.10, at: 0.0 },
+      { f: 792.0, g: 0.06, at: 0.35 },
+      { f: 1056.0, g: 0.035, at: 0.8 },
+    ].forEach(function (n) {
+      var o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = n.f;
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t0 + n.at);
+      g.gain.exponentialRampToValueAtTime(n.g, t0 + n.at + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + n.at + 2.8);
+      o.connect(g).connect(ctx.destination);
+      o.start(t0 + n.at);
+      o.stop(t0 + n.at + 3.0);
+    });
   }
 
   window.initHemisyncPanel = initHemisyncPanel;
