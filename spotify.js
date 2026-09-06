@@ -297,6 +297,12 @@ function initSpotifyPanel(opts) {
      The bridge registers LATE (after the ~310 MB pack loads), so poll for
      it instead of checking once at mount. */
   $('sp-game-row').style.display = 'none';
+  // Pause-state sink defined at MOUNT: Godot pushes its initial state the
+  // instant it registers the bridge — before the poll below can install a
+  // listener — so the sink must already exist. The latest pushed value is
+  // buffered and consumed at discovery; no lost updates, no console errors.
+  window._vhLastPaused = null;
+  window.vhGamePausedState = function (paused) { window._vhLastPaused = paused; };
   const bridgeTimer = setInterval(() => {
     if (!window.vhGamePause) return;
     clearInterval(bridgeTimer);
@@ -312,10 +318,17 @@ function initSpotifyPanel(opts) {
         ? 'GAME TRACK: OFF' : 'MUTE GAME TRACK';
       e.target.blur();
     });
-    // Godot pushes pause state on every change (Esc pauses too) — label stays in sync
+    // Godot pushes pause state on every change (Esc pauses too) — keep the
+    // buffered sink but make it live-update the label from now on.
     window.vhGamePausedState = function (paused) {
+      window._vhLastPaused = paused;
       $('sp-pause').innerHTML = paused ? '&#9654; RESUME GAME' : '&#10074;&#10074; PAUSE GAME';
     };
+    // consume whatever Godot pushed before we discovered the bridge, then
+    // double-check with a fresh query
+    if (window._vhLastPaused !== null) {
+      $('sp-pause').innerHTML = window._vhLastPaused ? '&#9654; RESUME GAME' : '&#10074;&#10074; PAUSE GAME';
+    }
     if (window.vhGamePauseQuery) window.vhGamePauseQuery(); // fetch current state
   }, 1000);
 
