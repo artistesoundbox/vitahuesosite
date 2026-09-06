@@ -59,6 +59,28 @@
             0%, 100% { box-shadow: 0 0 8px rgba(80, 150, 255, 0.15); }
             50%      { box-shadow: 0 0 22px rgba(80, 150, 255, 0.45); }
         }
+
+        /* Title art above the PLAY button (playovertheicebutton.png) */
+        .play-art-link {
+            display: block;
+            margin-bottom: 16px;
+            text-align: center;
+            line-height: 0;
+        }
+        #play-art-img {
+            max-width: 340px;
+            width: 100%;
+            height: auto;
+            border-radius: 18px;
+            box-shadow: 0 0 22px rgba(80, 150, 255, 0.35);
+            transition: all 0.25s ease;
+            animation: playpulse 2.6s ease-in-out infinite;
+        }
+        .play-art-link:hover #play-art-img {
+            box-shadow: 0 0 36px rgba(120, 180, 255, 0.65);
+            transform: translateY(-2px);
+            animation-play-state: paused;
+        }
     </style>
 </head>
 <body>
@@ -69,7 +91,9 @@
 
             <!-- Sobre El Gelo / Over The Ice — the saucer game -->
             <div class="full-width-btn-wrapper">
-                <a href="splash.html" class="side-btn" id="play-over-the-ice">PLAY OVER THE ICE</a>
+                <a href="splash.html" class="play-art-link" id="play-over-the-ice" aria-label="Play Over The Ice">
+                    <img src="playovertheicebutton.png" alt="Play Over The Ice" id="play-art-img" />
+                </a>
             </div>
         </div>
     </div>

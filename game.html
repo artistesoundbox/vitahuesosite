@@ -168,6 +168,17 @@
     }
     #home-link:hover { color: #ffffff; }
 
+    /* Title art above the gate buttons (same image as the portal) */
+    #play-art-img {
+      display: block;
+      max-width: 340px;
+      width: 100%;
+      height: auto;
+      margin-bottom: 22px;
+      border-radius: 18px;
+      box-shadow: 0 0 22px rgba(80, 150, 255, 0.35);
+    }
+
     /* Welcome-back bar: shown after login, top-right */
     #welcome {
       display: none; /* auth.js reveals it once the session is verified */
@@ -233,6 +244,8 @@
       Weave through the dark, blast hostiles out of the sky, grab powerups,
       and survive the Galaxian formations waiting beyond the ice.
     </p>
+
+    <img src="playovertheicebutton.png" alt="Play Over The Ice" id="play-art-img" />
 
     <!-- Login gate: login → verify-email → launch, one visible at a time -->
     <button class="btn" id="login-btn">Log in to Play</button>
