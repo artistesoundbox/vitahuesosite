@@ -32,7 +32,10 @@
   var fadeTimer = null;
 
   // expose a peek handle for diagnostics/testing
-  window.__portalMusic = { get ready() { return blobUrl !== null; } };
+  window.__portalMusic = {
+    get ready() { return blobUrl !== null; },
+    get playing() { return !!(audio && !audio.paused && !audio.ended && audio.currentTime > 0); },
+  };
 
   function ensureAudio() {
     if (audio) return audio;
@@ -55,6 +58,9 @@
         // Returning-visitor fast path: try autoplay right away. If the
         // browser allows it, music starts with zero interaction.
         if (!muted) tryStart(true);
+        // A click may have landed while the blob was still downloading:
+        // start now that the bytes are in memory.
+        flushPending();
         updateBtn();
       })
       .catch(function () { /* network hiccup: first click retries via start() */ });
@@ -149,15 +155,21 @@
 
   prefetch();   // download starts immediately, in parallel with the 3D city
 
-  // First interaction anywhere: instant play from memory (or queue if the
-  // blob is still landing — flushPending starts it the moment it arrives).
-  var OPTS = { once: false, capture: true };
-  function onFirst() {
-    start();
-    flushPending();
+  // Interactions RETRY until playback is real. The old code removed its
+  // listeners after the first click, so a click that landed before the blob
+  // finished downloading left the player stranded in silence forever (the
+  // "no music at start" bug). Now every click/tap/key keeps trying until
+  // the audio is actually audible, then the listeners stand down.
+  var OPTS = { capture: true };
+  function playing() { return !!(audio && !audio.paused && !audio.ended && audio.currentTime > 0); }
+  function detachFirst() {
     window.removeEventListener('pointerdown', onFirst, OPTS);
     window.removeEventListener('keydown', onFirst, OPTS);
     window.removeEventListener('touchstart', onFirst, OPTS);
+  }
+  function onFirst() {
+    if (playing()) { detachFirst(); return; } // autoplay already won
+    if (!muted) { start(); flushPending(); }
   }
   window.addEventListener('pointerdown', onFirst, OPTS);
   window.addEventListener('keydown', onFirst, OPTS);

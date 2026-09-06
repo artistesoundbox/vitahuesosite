@@ -214,10 +214,11 @@ function initSpotifyPanel(opts) {
       backdrop-filter:blur(8px);transition:right .3s ease;color:#cfe4ff;
       font-family:system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;flex-direction:column}
     #sp-panel.open{right:0}
-    #sp-tab{position:absolute;left:-34px;top:46px;width:34px;height:120px;cursor:pointer;
+    /* 44px wide so the ~32px sliver visible when closed is an easy target */
+    #sp-tab{position:absolute;left:-44px;top:46px;width:44px;height:150px;cursor:pointer;
       writing-mode:vertical-rl;background:rgba(10,14,20,.92);
       border:1px solid rgba(120,180,255,.35);border-right:none;border-radius:8px 0 0 8px;
-      color:#1db954;letter-spacing:.3em;font-size:12px;display:flex;align-items:center;justify-content:center}
+      color:#1db954;letter-spacing:.3em;font-size:13px;display:flex;align-items:center;justify-content:center}
     #sp-head{padding:12px 14px 8px;font-size:13px;letter-spacing:.25em;color:#1db954;
       border-bottom:1px solid rgba(120,180,255,.2)}
     #sp-body{padding:12px 14px;display:flex;flex-direction:column;gap:10px;overflow:auto}
@@ -267,12 +268,28 @@ function initSpotifyPanel(opts) {
 
   const $ = (id) => document.getElementById(id);
 
+  /* Give the keyboard back to the game after one-shot widget actions.
+     Clicking the panel steals focus from the Godot canvas, and the canvas
+     only hears keys while focused — ESC/movement went dead until the
+     player clicked back into the game. Mirrors hemisync.js. */
+  const _backToGame = () => {
+    const c = document.querySelector('canvas');
+    if (c && c.focus) { try { c.focus(); } catch (e) { /* not focusable */ } }
+  };
+  const _blurSoon = (el) => {
+    setTimeout(() => {
+      if (el && el.blur) { try { el.blur(); } catch (e) { /* ignore */ } }
+      _backToGame();
+    }, 0);
+  };
+
   /* open/close */
   let open = false;
-  $('sp-tab').addEventListener('click', () => {
+  $('sp-tab').addEventListener('click', (e) => {
     open = !open;
     panel.classList.toggle('open', open);
     if (open && opts.onOpen) opts.onOpen();
+    _blurSoon(e.currentTarget); // opening the panel shouldn't strand the game's keyboard
   });
 
   /* embed loader */
@@ -287,7 +304,7 @@ function initSpotifyPanel(opts) {
       '<iframe style="border:0;width:100%;height:' + _heightFor(uri) + 'px" src="' + html +
       '" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>';
   }
-  $('sp-load').addEventListener('click', () => loadEmbed(_uriFromLink($('sp-link').value) || null));
+  $('sp-load').addEventListener('click', (e) => { loadEmbed(_uriFromLink($('sp-link').value) || null); _blurSoon(e.target); });
   $('sp-link').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') loadEmbed(_uriFromLink($('sp-link').value) || null);
   });
@@ -309,14 +326,14 @@ function initSpotifyPanel(opts) {
     $('sp-game-row').style.display = 'flex';
     $('sp-pause').addEventListener('click', (e) => {
       window.vhGamePause(); // no args = toggle
-      e.target.blur();
+      _blurSoon(e.target);
     });
     $('sp-gamemusic').addEventListener('click', (e) => {
       if (window.vhGameMusic) window.vhGameMusic();
       // widget owns this label (Godot only pushes pause state)
       e.target.textContent = e.target.textContent.indexOf('MUTE') !== -1
         ? 'GAME TRACK: OFF' : 'MUTE GAME TRACK';
-      e.target.blur();
+      _blurSoon(e.target);
     });
     // Godot pushes pause state on every change (Esc pauses too) — keep the
     // buffered sink but make it live-update the label from now on.
@@ -344,12 +361,12 @@ function initSpotifyPanel(opts) {
       if (spToken() || (await _freshToken())) { revealTransport(); return; }
       spotifyLogin(); // redirects to Spotify; auth/spotify-callback.html finishes
     });
-    $('sp-prev').addEventListener('click', (e) => { spCommand('previous'); e.target.blur(); });
-    $('sp-next').addEventListener('click', (e) => { spCommand('next'); e.target.blur(); });
+    $('sp-prev').addEventListener('click', (e) => { spCommand('previous'); _blurSoon(e.target); });
+    $('sp-next').addEventListener('click', (e) => { spCommand('next'); _blurSoon(e.target); });
     $('sp-playpause').addEventListener('click', async (e) => {
       const playing = await isPlaying();
       await spCommand(playing ? 'pause' : 'play');
-      e.target.blur();
+      _blurSoon(e.target);
     });
     // returning from the Spotify redirect with a fresh token?
     if (new URLSearchParams(window.location.search).get('sp') === 'connected') revealTransport();

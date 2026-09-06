@@ -46,6 +46,23 @@
   function load(k, d) { try { var v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }
   function save(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } }
 
+  /* Give the keyboard back to the game. Clicking any widget steals focus
+     from the Godot canvas, and in web exports the canvas only hears keys
+     while focused — ESC/movement went dead until the player clicked the
+     game again (the "couldn't go back to the game" bug). After one-shot
+     widget actions we blur the control and refocus the canvas, if one
+     exists (plain pages have none — the call is a harmless no-op). */
+  function backToGame() {
+    var c = document.querySelector('canvas');
+    if (c && c.focus) { try { c.focus(); } catch (e) { /* not focusable */ } }
+  }
+  function blurSoon(el) {
+    setTimeout(function () {
+      if (el && el.blur) { try { el.blur(); } catch (e) { /* ignore */ } }
+      backToGame();
+    }, 0);
+  }
+
   /* ---------- audio engine ---------- */
 
   function ensureCtx() {
@@ -156,16 +173,17 @@
       backdropFilter: 'blur(6px)'
     });
 
-    /* tab (right edge of the left panel) */
+    /* tab (right edge of the left panel) — 44px wide so the ~32px sliver
+       left visible when closed is an easy target even mid-flight */
     var tab = document.createElement('div');
     tab.id = 'hs-tab';
     css(tab, {
-      position: 'absolute', right: '-34px', top: '46px', width: '34px', height: '130px',
+      position: 'absolute', right: '-44px', top: '46px', width: '44px', height: '150px',
       cursor: 'pointer', background: 'rgba(10,14,20,.9)',
       border: '1px solid rgba(120,180,255,.35)', borderLeft: 'none',
       borderRadius: '0 8px 8px 0', display: 'flex', alignItems: 'center',
       justifyContent: 'center', writingMode: 'vertical-rl',
-      letterSpacing: '.25em', fontSize: '12px', color: '#8ec2ff',
+      letterSpacing: '.25em', fontSize: '13px', color: '#8ec2ff',
       userSelect: 'none'
     });
     tab.textContent = '☸ HEMISYNC';
@@ -224,6 +242,7 @@
       });
       row.appendChild(dot); row.appendChild(label); row.appendChild(btn);
       row.addEventListener('click', function () {
+        blurSoon(row);
         if (activeIdx === i) { clearTimer(true); stopTone(); } else startTone(i);
       });
       panel.appendChild(row);
@@ -247,7 +266,7 @@
       beat.appendChild(o);
     });
     beat.value = load(KEY_BEAT, '0');
-    beat.addEventListener('change', function () { save(KEY_BEAT, beat.value); retune(); });
+    beat.addEventListener('change', function () { save(KEY_BEAT, beat.value); retune(); blurSoon(beat); });
     beatWrap.appendChild(beat);
     panel.appendChild(beatWrap);
     els.beat = beat;
@@ -270,6 +289,7 @@
         master.gain.exponentialRampToValueAtTime(Math.max(volValue(), 0.0002), t + 0.15);
       }
     });
+    vol.addEventListener('change', function () { blurSoon(vol); });
     volWrap.appendChild(vol);
     panel.appendChild(volWrap);
     els.vol = vol;
@@ -295,6 +315,7 @@
     tsel.addEventListener('change', function () {
       clearTimer(true);
       if (timerMinutes() > 0) armTimer();
+      blurSoon(tsel);
     });
     tWrap.appendChild(tsel);
     var rem = document.createElement('div');
@@ -318,6 +339,7 @@
       muteBtn.style.borderColor = gameMuted ? 'rgba(229,72,77,.7)' : 'rgba(120,180,255,.5)';
     }
     muteBtn.addEventListener('click', function () {
+      blurSoon(muteBtn);
       if (window.vhGameMusic) {
         window.vhGameMusic();
         gameMuted = !gameMuted;
@@ -349,8 +371,9 @@
     /* behaviors */
     tab.addEventListener('click', function () {
       panel.style.left = panel.style.left === '0px' ? '-332px' : '0px';
+      blurSoon(tab);   // opening the panel shouldn't strand the game's keyboard
     });
-    close.addEventListener('click', function () { panel.style.left = '-332px'; });
+    close.addEventListener('click', function () { panel.style.left = '-332px'; blurSoon(close); });
 
     document.body.appendChild(panel);
   }
