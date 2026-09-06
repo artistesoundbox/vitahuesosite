@@ -28,8 +28,14 @@
     audio.loop = true;
     audio.volume = 0;
     audio.preload = 'auto';
+    audio.load();
     return audio;
   }
+
+  // Buffer the track IMMEDIATELY on page load — browsers still require a
+  // user gesture before *playing*, but downloading early means the first
+  // click starts sound instantly instead of after a buffering wait.
+  ensureAudio();
 
   function fadeTo(target, ms) {
     if (!audio) return;
