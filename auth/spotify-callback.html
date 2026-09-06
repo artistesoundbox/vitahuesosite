@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>VitaminaHueso – Connecting Spotify…</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(circle at top, #1b2a3d 0%, #05070b 60%, #000000 100%);
+      color: #cfe4ff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .box { text-align: center; }
+    .spinner {
+      width: 46px; height: 46px;
+      margin: 0 auto 18px;
+      border: 3px solid rgba(29, 185, 84, 0.25);
+      border-top-color: #1db954;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #msg { letter-spacing: 0.2em; text-transform: uppercase; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="spinner"></div>
+    <div id="msg">Connecting Spotify…</div>
+  </div>
+
+  <script src="../spotify.js"></script>
+  <script>
+    finishSpotifyLogin();
+  </script>
+</body>
+</html>

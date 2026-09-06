@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sobre El Gelo – Over The Ice</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #cfe4ff;
+      background: #04070d;
+    }
+    /* Cover art fills the screen, darkened on the text side for readability */
+    #cover {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: saturate(1.05);
+    }
+    #shade {
+      position: fixed;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(3, 6, 12, 0.88) 0%, rgba(3, 6, 12, 0.55) 42%, rgba(3, 6, 12, 0.15) 75%, rgba(3, 6, 12, 0.35) 100%),
+        linear-gradient(0deg, rgba(3, 6, 12, 0.85) 0%, transparent 30%);
+    }
+    #panel {
+      position: fixed;
+      left: 6vw;
+      top: 50%;
+      transform: translateY(-50%);
+      max-width: 540px;
+      z-index: 5;
+    }
+    #panel .kicker {
+      font-size: 14px;
+      letter-spacing: 0.42em;
+      text-transform: uppercase;
+      color: #7f9cbd;
+      margin-bottom: 8px;
+    }
+    #panel h1 {
+      font-size: clamp(36px, 6vw, 62px);
+      letter-spacing: 0.1em;
+      color: #eaf4ff;
+      text-shadow: 0 0 30px rgba(80, 150, 255, 0.55);
+      margin-bottom: 14px;
+    }
+    #panel p.tag {
+      font-size: clamp(15px, 2vw, 19px);
+      line-height: 1.55;
+      color: #9fb8d8;
+      margin-bottom: 32px;
+    }
+    .btn {
+      display: inline-block;
+      padding: 15px 52px;
+      font-size: 18px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #cfe4ff;
+      background: rgba(8, 14, 24, 0.6);
+      border: 1px solid rgba(120, 180, 255, 0.6);
+      border-radius: 999px;
+      cursor: pointer;
+      text-decoration: none;
+      font-family: inherit;
+      backdrop-filter: blur(6px);
+      transition: all 0.25s ease;
+    }
+    .btn:hover {
+      color: #ffffff;
+      background: rgba(20, 40, 70, 0.85);
+      border-color: rgba(160, 210, 255, 0.95);
+      box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
+    }
+    #launch {
+      animation: pulse 2.6s ease-in-out infinite;
+    }
+    #launch:hover { animation-play-state: paused; }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 8px rgba(80, 150, 255, 0.15); }
+      50%      { box-shadow: 0 0 22px rgba(80, 150, 255, 0.45); }
+    }
+    /* Shown only while Auth0 is unconfigured (dev mode) */
+    #dev-note {
+      display: none;
+      margin-top: 14px;
+      font-size: 12px;
+      color: #d8b46f;
+      letter-spacing: 0.04em;
+    }
+    #load-note {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #5d7492;
+      letter-spacing: 0.04em;
+    }
+    #controls {
+      margin-top: 24px;
+      font-size: 13.5px;
+      letter-spacing: 0.06em;
+      color: #6f88a8;
+      line-height: 1.7;
+    }
+    #controls b { color: #a8c4e6; font-weight: 600; }
+    #home-link {
+      position: fixed;
+      top: 22px;
+      left: 26px;
+      z-index: 5;
+      color: #7f9cbd;
+      font-size: 13px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      text-decoration: none;
+    }
+    #home-link:hover { color: #ffffff; }
+  </style>
+</head>
+<body>
+  <img id="cover" src="sobreelgelocover.png" alt="" />
+  <div id="shade"></div>
+
+  <a id="home-link" href="index.html">&larr; Portal</a>
+
+  <div id="panel">
+    <div class="kicker">Sobre El Gelo</div>
+    <h1>OVER THE ICE</h1>
+    <p class="tag">
+      Pilot your saucer down an endless tunnel at breakneck speed.
+      Weave through the dark, blast hostiles out of the sky, grab powerups,
+      and survive the Galaxian formations waiting beyond the ice.
+    </p>
+
+    <!-- Login gate: one of the two buttons is visible at a time -->
+    <button class="btn" id="login-btn">Log in to Play</button>
+    <a class="btn" id="launch" href="game/index.html" style="display:none">Launch Game</a>
+    <div id="dev-note">
+      Auth0 not configured yet &mdash; gate is open for development.
+      Fill in <b>auth.js &rarr; VH_CONFIG</b> to enable the login.
+    </div>
+
+    <div id="load-note">First launch downloads the game pack (~310 MB). After that, your browser keeps it.</div>
+    <div id="controls">
+      <b>WASD / Left stick</b> steer &nbsp;&bull;&nbsp; <b>Space / RT / Click</b> fire<br />
+      <b>Bumpers</b> barrel roll &nbsp;&bull;&nbsp; <b>M / Start</b> music &nbsp;&bull;&nbsp; <b>Esc / B</b> pause
+    </div>
+  </div>
+
+  <script src="auth.js"></script>
+  <script>
+    wireGate('login-btn', 'launch', 'dev-note');
+  </script>
+  <script src="spotify.js"></script>
+  <script>
+    initSpotifyPanel();
+  </script>
+</body>
+</html>
