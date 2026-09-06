@@ -256,7 +256,7 @@
     var vol = document.createElement('input');
     vol.id = 'hs-vol';
     vol.type = 'range'; vol.min = '0'; vol.max = '100';
-    vol.value = load(KEY_VOL, '70');
+    vol.value = load(KEY_VOL, '85');
     css(vol, { width: '100%', accentColor: '#3ea6e8' });
     vol.addEventListener('input', function () {
       save(KEY_VOL, vol.value);
