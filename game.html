@@ -141,6 +141,36 @@
       content: '…';
     }
 
+    /* Mobile heads-up: big first download on phones */
+    #mobile-note {
+      display: none;
+      position: relative;
+      margin-top: 22px;
+      padding: 13px 34px 13px 16px;
+      max-width: 460px;
+      border: 1px solid rgba(120, 180, 255, 0.4);
+      border-radius: 14px;
+      background: rgba(10, 18, 32, 0.6);
+      backdrop-filter: blur(6px);
+      font-size: 13.5px;
+      line-height: 1.55;
+      color: #a8c4e6;
+    }
+    #mobile-note b { color: #eaf4ff; }
+    #mobile-note .vh-close {
+      position: absolute;
+      top: 6px;
+      right: 10px;
+      background: none;
+      border: none;
+      color: #6f88a8;
+      font-size: 17px;
+      cursor: pointer;
+      padding: 4px 6px;
+      line-height: 1;
+    }
+    #mobile-note .vh-close:hover { color: #ffffff; }
+
     #load-note {
       margin-top: 10px;
       font-size: 12px;
@@ -266,6 +296,13 @@
     </div>
 
     <div id="load-note">First launch downloads the game pack (~310 MB). After that, your browser keeps it.</div>
+
+    <!-- Mobile heads-up (phones/tablets only, dismissible) -->
+    <div id="mobile-note" role="note">
+      <button class="vh-close" type="button" aria-label="Dismiss">&times;</button>
+      <span id="mobile-note-text"></span>
+    </div>
+
     <div id="controls">
       <b>WASD / Left stick</b> steer &nbsp;&bull;&nbsp; <b>Space / RT / Click</b> fire<br />
       <b>Bumpers</b> barrel roll &nbsp;&bull;&nbsp; <b>M / Start</b> music &nbsp;&bull;&nbsp; <b>Esc / B</b> pause
@@ -276,6 +313,34 @@
   <script>
     wireGate('login-btn', 'launch', 'dev-note', 'welcome', 'verify-card');
     document.getElementById('logout-btn').addEventListener('click', logout);
+
+    // ---- Mobile heads-up: warn phones about the big first download -------
+    // iPadOS masquerades as desktop Mac — catch it via multi-touch.
+    function _isMobile() {
+      return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+        (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+    }
+    function showMobileNote(force) {
+      if (!force && !_isMobile()) return;
+      const note = document.getElementById('mobile-note');
+      const txt = document.getElementById('mobile-note-text');
+      const launched = localStorage.getItem('vh_game_launched');
+      txt.innerHTML = launched
+        ? '<b>Welcome back.</b> The game is cached on this device — loading should be much faster now.'
+        : '<b>Heads-up:</b> first launch downloads <b>~330&nbsp;MB</b> over Wi-Fi ' +
+          'and can take several minutes on a phone. Keep this tab open — it ' +
+          'only happens once; your browser keeps the game after that.';
+      note.style.display = 'block';
+    }
+    window._showMobileNote = showMobileNote; // test hook
+    showMobileNote(false);
+    document.querySelector('#mobile-note .vh-close').addEventListener('click', () => {
+      document.getElementById('mobile-note').style.display = 'none';
+    });
+    // remember that the pack was fetched, so future visits get the soft message
+    document.getElementById('launch').addEventListener('click', () => {
+      localStorage.setItem('vh_game_launched', '1');
+    });
 
     // "I've verified — check again": pull a fresh session from Auth0 (which
     // carries the updated email_verified claim), then re-run the gate logic.
