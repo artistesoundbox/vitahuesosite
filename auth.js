@@ -19,11 +19,21 @@
  *        https://artistesoundbox.github.io/vitahuesosite/game.html
  *      Without these, logout lands on Auth0's generic "logged out" page.
  *      '/game.html' is what enables returning there after logout.
- *   6. When your custom domain is ready, add
- *        https://YOURDOMAIN/auth/callback.html
- *      to Callback URLs, the origin to Web Origins, and
- *        https://YOURDOMAIN/  +  https://YOURDOMAIN/index.html
- *      to Logout URLs. Nothing else changes.
+ *   6. anthonitus.com hookup — add ALL of these in the Auth0 dashboard
+ *      (Applications → the SPA app → Settings), keeping the existing
+ *      github.io entries in place:
+ *        Allowed Callback URLs:  https://anthonitus.com/auth/callback.html
+ *                                https://www.anthonitus.com/auth/callback.html
+ *        Allowed Web Origins:    https://anthonitus.com
+ *                                https://www.anthonitus.com
+ *        Allowed Logout URLs:    https://anthonitus.com/
+ *                                https://anthonitus.com/index.html
+ *                                https://anthonitus.com/game.html
+ *                                https://www.anthonitus.com/
+ *                                https://www.anthonitus.com/index.html
+ *                                https://www.anthonitus.com/game.html
+ *      The code needs NO changes — every URL it builds is relative and
+ *      follows whichever origin serves the page.
  */
 
 const VH_CONFIG = {
