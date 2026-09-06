@@ -79,6 +79,27 @@
         .movies-art-link:hover #movies-art-img {
             box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
         }
+
+        /* HEMISYNC art button — same spec as the other art buttons */
+        .hs-art-link {
+            pointer-events: auto;
+            display: block;
+            text-align: center;
+            line-height: 0;
+        }
+        #hs-art-img {
+            display: block;
+            max-width: 340px;
+            width: 100%;
+            height: auto;
+            margin: 0 auto;
+            border-radius: 18px;
+            box-shadow: 0 0 22px rgba(80, 150, 255, 0.35);
+            transition: box-shadow 0.25s ease;
+        }
+        .hs-art-link:hover #hs-art-img {
+            box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
+        }
     </style>
 </head>
 <body>
@@ -98,6 +119,13 @@
             <div class="full-width-btn-wrapper">
                 <a href="movies.html" class="movies-art-link" id="movies-button" aria-label="Movies – free film library">
                     <img src="moviesbutton.png" alt="Movies – free film library" id="movies-art-img" />
+                </a>
+            </div>
+
+            <!-- Hemisync — chakra tone sanctuary -->
+            <div class="full-width-btn-wrapper">
+                <a href="hemisync.html" class="hs-art-link" id="hemisync-button" aria-label="Hemisync – chakra tone sanctuary">
+                    <img src="hemisync.png" alt="Hemisync – chakra tone sanctuary" id="hs-art-img" />
                 </a>
             </div>
         </div>
