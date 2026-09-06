@@ -384,9 +384,7 @@
       });
     }
     function posterUrl(f) {
-      return f.kind === 'yt'
-        ? 'https://i.ytimg.com/vi/' + f.id + '/hqdefault.jpg'
-        : 'https://archive.org/services/img/' + encodeURIComponent(f.id);
+      return 'https://i.ytimg.com/vi/' + f.id + '/hqdefault.jpg';
     }
     function embedUrl(f) {
       return 'https://www.youtube-nocookie.com/embed/' + f.id + '?autoplay=1&rel=0';
