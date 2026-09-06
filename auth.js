@@ -79,6 +79,35 @@ async function getUser() {
   }
 }
 
+/**
+ * False only when the logged-in account is an email+password signup whose
+ * address Auth0 has not verified yet. Social/passwordless logins (and users
+ * without an email) are considered verified — the provider already proved
+ * ownership of that identity.
+ */
+async function isEmailVerified() {
+  if (!_configured()) return true; // dev mode: gate is transparent
+  const u = await getUser();
+  return !u || u.email_verified !== false;
+}
+
+/**
+ * Pull a fresh token from Auth0 so profile claims (like email_verified)
+ * reflect what the user has done OUTSIDE this tab — e.g. clicking the
+ * verification link in their inbox. The SDK caches claims from login time.
+ */
+async function refreshSession() {
+  if (!_configured()) return false;
+  try {
+    const c = await _auth();
+    await c.getTokenSilently({ ignoreCache: true });
+    return true;
+  } catch (e) {
+    console.warn('session refresh:', e);
+    return false;
+  }
+}
+
 /** Send the visitor to the Auth0 hosted login page, returning to `returnTo`. */
 async function login(returnTo = 'game.html') {
   if (!_configured()) return; // dev mode: gate is transparent until configured
@@ -104,7 +133,7 @@ async function logout() {
  *   readyId  — id of the button/element revealed after login (e.g. LAUNCH)
  *   noteId   — optional element shown when Auth0 is not configured yet
  */
-async function wireGate(gateId, readyId, noteId, welcomeId) {
+async function wireGate(gateId, readyId, noteId, welcomeId, verifyId) {
   const gate = document.getElementById(gateId);
   const ready = document.getElementById(readyId);
   const note = document.getElementById(noteId || '');
@@ -118,11 +147,21 @@ async function wireGate(gateId, readyId, noteId, welcomeId) {
 
   if (await isLoggedIn()) {
     gate.style.display = 'none';
-    ready.style.display = 'inline-block';
-    if (welcomeId) {
+    const u = await getUser();
+
+    // Verified-email gate: hold LAUNCH until Auth0 says the address is real.
+    const verify = document.getElementById(verifyId || '');
+    if (u && u.email_verified === false && verify) {
+      const em = verify.querySelector('.vh-verify-email');
+      if (em) em.textContent = u.email || 'your inbox';
+      verify.style.display = 'block';
+    } else {
+      ready.style.display = 'inline-block';
+    }
+
+    if (welcomeId && u) {
       const w = document.getElementById(welcomeId);
-      const u = await getUser();
-      if (w && u) {
+      if (w) {
         const el = w.querySelector('.vh-email') || w.querySelector('b') || w.querySelector('span');
         if (el) el.textContent = u.email || u.name || 'player';
         w.style.display = 'flex';
@@ -148,4 +187,4 @@ async function finishLogin() {
   }
 }
 
-window.VH_AUTH = { isLoggedIn, login, logout, getUser, wireGate, finishLogin, _configured };
+window.VH_AUTH = { isLoggedIn, login, logout, getUser, isEmailVerified, refreshSession, wireGate, finishLogin, _configured };

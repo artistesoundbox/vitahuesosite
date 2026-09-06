@@ -95,6 +95,52 @@
       color: #d8b46f;
       letter-spacing: 0.04em;
     }
+    /* Email-verification card: holds LAUNCH until Auth0 confirms the address */
+    #verify-card {
+      display: none; /* auth.js reveals it only for unverified accounts */
+      margin-top: 26px;
+      padding: 16px 18px;
+      max-width: 440px;
+      border: 1px solid rgba(216, 180, 111, 0.45);
+      border-radius: 14px;
+      background: rgba(30, 24, 10, 0.55);
+      backdrop-filter: blur(6px);
+      font-size: 14px;
+      line-height: 1.55;
+      color: #d8c9a5;
+    }
+    #verify-card .vh-verify-title {
+      font-size: 13px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #e8d5a3;
+      margin-bottom: 8px;
+    }
+    #verify-card b { color: #fff3d6; }
+    #verify-recheck {
+      margin-top: 12px;
+      padding: 9px 20px;
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #e8d5a3;
+      background: transparent;
+      border: 1px solid rgba(216, 180, 111, 0.6);
+      border-radius: 999px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s ease;
+    }
+    #verify-recheck:hover {
+      color: #fff8e8;
+      border-color: rgba(240, 215, 150, 0.95);
+      box-shadow: 0 0 16px rgba(216, 180, 111, 0.35);
+    }
+    #verify-recheck:disabled { opacity: 0.55; cursor: wait; }
+    #verify-recheck.loading::after {
+      content: '…';
+    }
+
     #load-note {
       margin-top: 10px;
       font-size: 12px;
@@ -188,9 +234,19 @@
       and survive the Galaxian formations waiting beyond the ice.
     </p>
 
-    <!-- Login gate: one of the two buttons is visible at a time -->
+    <!-- Login gate: login → verify-email → launch, one visible at a time -->
     <button class="btn" id="login-btn">Log in to Play</button>
     <a class="btn" id="launch" href="game/index.html" style="display:none">Launch Game</a>
+
+    <div id="verify-card" style="display:none">
+      <div class="vh-verify-title">Confirm your email to unlock the game</div>
+      <p>
+        We sent a verification link to <b class="vh-verify-email"></b>.<br />
+        Click it, then press the button below — no need to log in again.
+      </p>
+      <button id="verify-recheck" type="button">I've Verified &mdash; Check Again</button>
+    </div>
+
     <div id="dev-note">
       Auth0 not configured yet &mdash; gate is open for development.
       Fill in <b>auth.js &rarr; VH_CONFIG</b> to enable the login.
@@ -205,8 +261,24 @@
 
   <script src="auth.js"></script>
   <script>
-    wireGate('login-btn', 'launch', 'dev-note', 'welcome');
+    wireGate('login-btn', 'launch', 'dev-note', 'welcome', 'verify-card');
     document.getElementById('logout-btn').addEventListener('click', logout);
+
+    // "I've verified — check again": pull a fresh session from Auth0 (which
+    // carries the updated email_verified claim), then re-run the gate logic.
+    document.getElementById('verify-recheck').addEventListener('click', async (e) => {
+      const btn = e.target;
+      btn.disabled = true;
+      btn.classList.add('loading');
+      const ok = await refreshSession();
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      if (!ok) return; // offline / transient — leave the card up
+      document.getElementById('verify-card').style.display = 'none';
+      document.getElementById('login-btn').style.display = '';  // gate re-decides
+      document.getElementById('launch').style.display = 'none';
+      wireGate('login-btn', 'launch', 'dev-note', 'welcome', 'verify-card');
+    });
   </script>
   <script src="spotify.js"></script>
   <script>
