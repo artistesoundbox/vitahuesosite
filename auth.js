@@ -5,13 +5,12 @@
  *   (Single Page Web Application). Client ID is wired in VH_CONFIG below.
  *   Fill the URL lists in Applications -> "anthonitus" -> Settings:
  *
- *   Allowed Callback URLs — the code BUILDS the /callback form (paste these):
+ *   Allowed Callback URLs — the code PINS this exact value (paste it):
  *        https://anthonitus.com/callback
- *        https://www.anthonitus.com/callback
- *        http://127.0.0.1:8936/callback            (local dev)
- *      (/callback is a shim that forwards the query to /auth/callback.html;
- *      if the dashboard also lists the long /auth/callback.html form, that
- *      path keeps working too — both are supported.)
+ *      (www logins also land there — the pin makes every origin behave
+ *      identically, so no per-origin entries are needed. /callback is a
+ *      shim forwarding the query to /auth/callback.html; the long form
+ *      keeps working if it is also listed.)
  *
  *   Allowed Web Origins (for silent token renewal):
  *        https://anthonitus.com
@@ -34,6 +33,11 @@ const VH_CONFIG = {
   // Auth0 application "anthonitus" (Single Page App) in the dev tenant
   domain: 'dev-um47bcoddy6kauvl.us.auth0.com',
   clientId: 'aDiPGXEuqimOCyv5Keaq0oiTWcCQlCp9',
+  // Redirect URI is PINNED to the production domain (was origin-relative):
+  // every login lands at https://anthonitus.com/callback no matter which
+  // host serves the page (anthonitus.com, github.io, localhost). The
+  // dashboard needs exactly this value in Allowed Callback URLs.
+  redirectUri: 'https://anthonitus.com/callback',
 };
 
 // Pages logout may return the player to. MUST mirror the dashboard's
@@ -77,8 +81,8 @@ async function _auth() {
     clientId: VH_CONFIG.clientId,
     // Pin redirect_uri at creation so the token exchange replays the SAME
     // value the authorization request used (dashboard must list it — see
-    // the SETUP block): https://anthonitus.com/callback
-    authorizationParams: { redirect_uri: new URL('callback', window.location.href).href },
+    // VH_CONFIG.redirectUri): https://anthonitus.com/callback
+    authorizationParams: { redirect_uri: VH_CONFIG.redirectUri },
     cacheLocation: 'localstorage', // valid values: 'memory' | 'localstorage'
     useRefreshTokens: true, // rotating refresh tokens: sessions survive tab reloads/crashes
   });
@@ -152,11 +156,11 @@ async function login(returnTo = 'game.html') {
   const c = await _auth();
   await c.loginWithRedirect({
     authorizationParams: {
-      // Built origin-relative (follows http/https + hostname) but ALWAYS the
-      // /callback form, so it matches the dashboard entry exactly:
-      //   https://anthonitus.com/callback  (+ www / localhost variants).
-      // /callback is a shim that forwards the query to /auth/callback.html.
-      redirect_uri: new URL('callback', window.location.href).href,
+      // PINNED to the production domain (see VH_CONFIG.redirectUri):
+      // https://anthonitus.com/callback — a shim that forwards the query
+      // to /auth/callback.html. Same value from every host, so the
+      // dashboard allow-list can never mismatch.
+      redirect_uri: VH_CONFIG.redirectUri,
     },
     appState: { returnTo: new URL(returnTo, window.location.href).href },
   });
