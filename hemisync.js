@@ -370,6 +370,48 @@
     syncMuteVisibility();
     setInterval(syncMuteVisibility, 2000);
 
+    /* RESUME GAME — a visible, guaranteed way back into a paused game:
+       the game only hears ESC while the canvas has focus, and (in web
+       builds) mouse clicks no longer resume, so this button closes both
+       traps. Uses the same bridge as the right panel's pause button.
+       Shown only while the game reports it is paused. */
+    var resumeBtn = document.createElement('button');
+    resumeBtn.id = 'hs-resume';
+    resumeBtn.style.cssText =
+      'width:100%;padding:11px;border-radius:999px;cursor:pointer;font:inherit;' +
+      'letter-spacing:.14em;margin-top:8px;background:rgba(16,40,24,.6);' +
+      'color:#b9f0c8;border:1px solid rgba(70,196,110,.6);transition:all .2s;display:none';
+    resumeBtn.textContent = '▶ RESUME GAME';
+    resumeBtn.addEventListener('click', function () {
+      blurSoon(resumeBtn);
+      // bridge semantic: vhGamePause(false) = SET paused=false (resume);
+      // no-arg = toggle. Either would work here, but explicit is safer.
+      if (typeof window.vhGamePause === 'function') window.vhGamePause(false);
+    });
+    panel.appendChild(resumeBtn);
+
+    function syncResumeVisibility() {
+      var on = (typeof window.vhGamePause === 'function') && window._vhLastPaused === true;
+      resumeBtn.style.display = on ? '' : 'none';
+    }
+    setInterval(syncResumeVisibility, 800);
+    syncResumeVisibility();
+
+    /* ESC rescue: Godot receives keys only while its canvas is focused.
+       When focus is elsewhere the game never hears ESC — this handler
+       refocuses the canvas and resumes on the game's behalf. When the
+       canvas IS focused it does nothing (Godot handles the key itself,
+       and forwarding would double-toggle straight back to paused). */
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      var c = document.querySelector('canvas');
+      if (c && document.activeElement === c) return;   // game is listening
+      if (c && c.focus) { try { c.focus(); } catch (err) { /* ignore */ } }
+      if (window._vhLastPaused === true && typeof window.vhGamePause === 'function') {
+        window.vhGamePause(false);   // paused AND deaf: resume for it
+      }
+    }, true);   // capture: runs before the page's other key handlers
+
     var tip = document.createElement('div');
     tip.style.cssText = 'color:#6f88a8;font-size:11.5px;margin-top:14px;line-height:1.5';
     tip.textContent = 'Tones are generated live (pure sine, no files). Muting the game track ' +
