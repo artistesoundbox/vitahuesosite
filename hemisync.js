@@ -56,6 +56,30 @@
   var nature = {};        // id -> handle { stop(fadeSec) }
   var natMaster = null;
 
+  /* Meditation drones — sustained harmonic beds, synthesized live.
+     Layerable like nature; all ride the ambience volume. */
+  var DRONES = [
+    { id: 'om',      label: 'Om · 136.1 Hz' },
+    { id: 'tanpura', label: 'Tanpura' },
+    { id: 'earth',   label: 'Deep Earth' },
+    { id: 'choir',   label: 'Aether Choir' },
+    { id: 'crystal', label: 'Crystal Bowl' },
+    { id: 'void',    label: 'The Void' }
+  ];
+  /* Standalone binaural beats — pure left/right tone pairs offset by the
+     target brainwave rate. One at a time (competing beats fight each
+     other); headphones required — the beat exists only between the ears. */
+  var BEATS2 = [
+    { id: 'delta', label: 'Delta · 3 Hz — sleep',       beat: 3 },
+    { id: 'theta', label: 'Theta · 6 Hz — meditate',    beat: 6 },
+    { id: 'alpha', label: 'Alpha · 10 Hz — calm focus', beat: 10 },
+    { id: 'beta',  label: 'Beta · 18 Hz — alert',       beat: 18 },
+    { id: 'gamma', label: 'Gamma · 40 Hz — insight',    beat: 40 }
+  ];
+  var BEAT2_CARRIER = 110;   // Hz in both ears; the offset makes the beat
+  var drones = {};
+  var beat2 = null, beat2Handle = null;
+
   var ctx = null;
   var master = null;
   var oscL = null, oscR = null, panL = null, panR = null;
@@ -171,7 +195,8 @@
 
   function updateDot() {
     if (!els || !els.tabDot) return;
-    var any = activeIdx !== -1 || Object.keys(nature).length > 0;
+    var any = activeIdx !== -1 || Object.keys(nature).length > 0 ||
+              Object.keys(drones).length > 0 || !!beat2;
     els.tabDot.style.display = any ? 'block' : 'none';
   }
 
@@ -354,18 +379,190 @@
       }
       nature[id] = natureSound(id);
     }
-    if (els.natChips) markNature();
+    if (els.natChips) markAmbience();
     updateDot();
     armTimer();
   }
 
-  function markNature() {
-    els.natChips.forEach(function (ch) {
-      var on = !!nature[ch.id];
-      ch.el.style.borderColor = on ? 'rgba(70,196,110,.8)' : 'rgba(120,180,255,.35)';
-      ch.el.style.background = on ? 'rgba(16,40,24,.6)' : 'rgba(8,14,24,.6)';
-      ch.el.style.boxShadow = on ? '0 0 12px rgba(70,196,110,.35)' : 'none';
-    });
+  function markAmbience() {
+    function mark(list, isActive) {
+      (list || []).forEach(function (ch) {
+        var on = isActive(ch.id);
+        ch.el.style.borderColor = on ? 'rgba(70,196,110,.8)' : 'rgba(120,180,255,.35)';
+        ch.el.style.background = on ? 'rgba(16,40,24,.6)' : 'rgba(8,14,24,.6)';
+        ch.el.style.boxShadow = on ? '0 0 12px rgba(70,196,110,.35)' : 'none';
+      });
+    }
+    mark(els.natChips, function (id) { return !!nature[id]; });
+    mark(els.droneChips, function (id) { return !!drones[id]; });
+    mark(els.beatChips, function (id) { return beat2 === id; });
+  }
+
+  /* ---------- meditation drones (synthesized, layerable) ---------- */
+
+  function droneSound(id) {
+    var out = ctx.createGain();
+    out.gain.value = 1;
+    out.connect(natMaster);
+    var nodes = [], oscs = [];
+    function voice(type, freq, g, detuneCents, dest) {
+      var o = ctx.createOscillator();
+      o.type = type; o.frequency.value = freq;
+      if (detuneCents) o.detune.value = detuneCents;
+      var vg = ctx.createGain(); vg.gain.value = g;
+      o.connect(vg); vg.connect(dest || out);
+      o.start();
+      nodes.push(vg); oscs.push(o);
+      return vg;
+    }
+    function bed(cut, g) {
+      var f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cut;
+      var ng = ctx.createGain(); ng.gain.value = g;
+      loopSrc(brown(), f); f.connect(ng); ng.connect(out);
+      nodes.push(f); nodes.push(ng);
+      return f;
+    }
+    function lfo(hz, depth, param) {
+      var p = lfoOn(hz, depth, param);
+      oscs.push(p[0]); nodes.push(p[1]);
+    }
+
+    if (id === 'om') {
+      /* the classic 136.1 Hz Om tuning + fifth + octave, chorus-widened,
+         breathing slowly like group chant */
+      var lp = ctx.createBiquadFilter(); lp.type = 'lowpass';
+      lp.frequency.value = 900; lp.connect(out); nodes.push(lp);
+      voice('sine', 136.1, 0.42, 0, lp);
+      voice('sine', 136.1, 0.34, 4, lp);
+      voice('sine', 204.15, 0.22, -3, lp);
+      voice('sine', 272.2, 0.14, 2, lp);
+      lfo(0.05, 0.12, out.gain);
+    } else if (id === 'tanpura') {
+      /* sawtooth drone with jawari shimmer — the buzzing overtone bloom */
+      var lp2 = ctx.createBiquadFilter(); lp2.type = 'lowpass';
+      lp2.frequency.value = 1100; lp2.connect(out); nodes.push(lp2);
+      voice('sawtooth', 110, 0.14, 0, lp2);
+      voice('sawtooth', 110, 0.12, 5, lp2);
+      voice('sawtooth', 165, 0.09, -4, lp2);
+      voice('sawtooth', 220, 0.07, 3, lp2);
+      var shim = voice('sine', 330, 0.05, 0, lp2);
+      lfo(1.1, 0.035, shim.gain);
+      lfo(0.07, 220, lp2.frequency);
+    } else if (id === 'earth') {
+      /* sub-bass planet hum with a rock-deep noise bed */
+      voice('sine', 55, 0.5);
+      voice('sine', 27.5, 0.3);
+      bed(90, 0.22);
+      lfo(0.03, 0.18, out.gain);
+    } else if (id === 'choir') {
+      /* an aetheric held chord — four voices adrift off perfect tuning */
+      var lp3 = ctx.createBiquadFilter(); lp3.type = 'lowpass';
+      lp3.frequency.value = 1500; lp3.connect(out); nodes.push(lp3);
+      [220, 277.18, 329.63, 440].forEach(function (f, i) {
+        voice('sine', f, 0.2, (i % 2 ? 3 : -3) + i, lp3);
+      });
+      lfo(0.02, 0.12, out.gain);
+      lfo(0.05, 120, lp3.frequency);
+    } else if (id === 'crystal') {
+      /* singing-bowl glass: 528 against 529.5 makes a soft internal beat */
+      voice('sine', 528, 0.3);
+      voice('sine', 529.5, 0.2);
+      voice('sine', 1056, 0.07);
+      voice('sine', 1584, 0.025);
+      lfo(0.08, 0.18, out.gain);
+    } else if (id === 'void') {
+      /* the bottom of space: 40 Hz plus the faintest moving pressure */
+      voice('sine', 40, 0.5);
+      voice('sine', 80.3, 0.18);
+      bed(60, 0.12);
+      lfo(0.015, 0.22, out.gain);
+    }
+
+    return {
+      stop: function (fadeSec) {
+        var fs = typeof fadeSec === 'number' ? fadeSec : 0.4;
+        var t = ctx.currentTime;
+        out.gain.cancelScheduledValues(t);
+        out.gain.setValueAtTime(Math.max(out.gain.value, 0.0002), t);
+        out.gain.exponentialRampToValueAtTime(0.0001, t + fs);
+        setTimeout(function () {
+          oscs.forEach(function (o) { try { o.stop(); } catch (e) { /* done */ } });
+          nodes.forEach(function (n) { try { n.disconnect(); } catch (e) { /* gone */ } });
+          try { out.disconnect(); } catch (e) { /* gone */ }
+        }, fs * 1000 + 80);
+      }
+    };
+  }
+
+  function droneToggle(id) {
+    ensureCtx();
+    if (drones[id]) {
+      drones[id].stop();
+      delete drones[id];
+    } else {
+      if (!natMaster) {
+        natMaster = ctx.createGain();
+        natMaster.gain.value = natVol();
+        natMaster.connect(ctx.destination);
+      }
+      drones[id] = droneSound(id);
+    }
+    markAmbience(); updateDot(); armTimer();
+  }
+
+  /* ---------- standalone binaural beats (one at a time) ---------- */
+
+  function stopBeat2(fade) {
+    if (beat2Handle) {
+      var h = beat2Handle;
+      beat2Handle = null;
+      h.stop(fade);
+    }
+    beat2 = null;
+  }
+
+  function beat2Toggle(id) {
+    ensureCtx();
+    if (beat2 === id) { stopBeat2(0.3); markAmbience(); updateDot(); return; }
+    stopBeat2(0.15);
+    if (!natMaster) {
+      natMaster = ctx.createGain();
+      natMaster.gain.value = natVol();
+      natMaster.connect(ctx.destination);
+    }
+    var spec = null;
+    BEATS2.forEach(function (b) { if (b.id === id) spec = b; });
+    if (!spec) return;
+    var fade = ctx.createGain(); fade.gain.value = 1; fade.connect(natMaster);
+    var oL = ctx.createOscillator(); oL.type = 'sine';
+    oL.frequency.value = BEAT2_CARRIER;
+    var oR = ctx.createOscillator(); oR.type = 'sine';
+    oR.frequency.value = BEAT2_CARRIER + spec.beat;
+    var pL = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+    var pR = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+    if (pL.pan) pL.pan.value = -1;
+    if (pR.pan) pR.pan.value = 1;
+    var gL = ctx.createGain(); gL.gain.value = 0.5;
+    var gR = ctx.createGain(); gR.gain.value = 0.5;
+    oL.connect(pL); pL.connect(gL); gL.connect(fade);
+    oR.connect(pR); pR.connect(gR); gR.connect(fade);
+    oL.start(); oR.start();
+    beat2Handle = {
+      stop: function (fs) {
+        var t = ctx.currentTime;
+        fade.gain.cancelScheduledValues(t);
+        fade.gain.setValueAtTime(Math.max(fade.gain.value, 0.0002), t);
+        fade.gain.exponentialRampToValueAtTime(0.0001, t + (fs || 0.3));
+        setTimeout(function () {
+          try { oL.stop(); oR.stop(); } catch (e) { /* done */ }
+          [pL, pR, gL, gR, fade].forEach(function (n) {
+            try { n.disconnect(); } catch (e) { /* gone */ }
+          });
+        }, (fs || 0.3) * 1000 + 80);
+      }
+    };
+    beat2 = id;
+    markAmbience(); updateDot(); armTimer();
   }
 
   /* Chips + volume, renderable into any container — the panel mounts it
@@ -391,9 +588,54 @@
       els.natChips.push({ id: n.id, el: b });
     });
     container.appendChild(grid);
+
+    /* meditation drones */
+    var dlab = document.createElement('div');
+    dlab.style.cssText = 'font-size:12px;color:#7f9cbd;margin:14px 0 6px;letter-spacing:.14em';
+    dlab.textContent = 'MEDITATION DRONES · layer freely';
+    container.appendChild(dlab);
+    var dgrid = document.createElement('div');
+    dgrid.style.cssText = 'display:flex;flex-wrap:wrap;gap:7px';
+    els.droneChips = [];
+    DRONES.forEach(function (n) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = n.label;
+      b.style.cssText =
+        'font:inherit;font-size:12px;letter-spacing:.06em;color:#cfe4ff;cursor:pointer;' +
+        'padding:7px 12px;border-radius:999px;background:rgba(8,14,24,.6);' +
+        'border:1px solid rgba(120,180,255,.35);transition:all .2s';
+      b.addEventListener('click', function () { blurSoon(b); droneToggle(n.id); });
+      dgrid.appendChild(b);
+      els.droneChips.push({ id: n.id, el: b });
+    });
+    container.appendChild(dgrid);
+
+    /* standalone binaural beats (radio behavior: one at a time) */
+    var blab = document.createElement('div');
+    blab.style.cssText = 'font-size:12px;color:#7f9cbd;margin:14px 0 6px;letter-spacing:.14em';
+    blab.textContent = 'BINAURAL BEATS · headphones required · one at a time';
+    container.appendChild(blab);
+    var bgrid = document.createElement('div');
+    bgrid.style.cssText = 'display:flex;flex-wrap:wrap;gap:7px';
+    els.beatChips = [];
+    BEATS2.forEach(function (n) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = n.label;
+      b.style.cssText =
+        'font:inherit;font-size:12px;letter-spacing:.06em;color:#cfe4ff;cursor:pointer;' +
+        'padding:7px 12px;border-radius:999px;background:rgba(8,14,24,.6);' +
+        'border:1px solid rgba(120,180,255,.35);transition:all .2s';
+      b.addEventListener('click', function () { blurSoon(b); beat2Toggle(n.id); });
+      bgrid.appendChild(b);
+      els.beatChips.push({ id: n.id, el: b });
+    });
+    container.appendChild(bgrid);
+
     var nlab = document.createElement('div');
     nlab.style.cssText = 'font-size:12px;color:#7f9cbd;margin:10px 0 6px;letter-spacing:.14em';
-    nlab.textContent = 'NATURE VOLUME';
+    nlab.textContent = 'AMBIENCE VOLUME · nature · drones · beats';
     container.appendChild(nlab);
     var nv = document.createElement('input');
     nv.type = 'range'; nv.min = '0'; nv.max = '100';
@@ -714,7 +956,7 @@
 
     var tip = document.createElement('div');
     tip.style.cssText = 'color:#6f88a8;font-size:11.5px;margin-top:14px;line-height:1.5';
-    tip.textContent = 'Tones and nature sounds are generated live — no files, no loops. ' +
+    tip.textContent = 'Tones, nature, drones and binaural beats are generated live — no files, no loops. ' +
       'Muting the game track frees the soundscape; the Spotify panel on the right plays your own playlist.';
     panel.appendChild(tip);
 
@@ -743,7 +985,8 @@
 
   function armTimer() {
     var m = timerMinutes();
-    if (m > 0 && (activeIdx !== -1 || Object.keys(nature).length > 0) && timerEnds === 0) {
+    if (m > 0 && (activeIdx !== -1 || Object.keys(nature).length > 0 ||
+        Object.keys(drones).length > 0 || !!beat2) && timerEnds === 0) {
       timerEnds = Date.now() + m * 60000;
       startTick();
     }
@@ -778,7 +1021,10 @@
     stopTone(9);                  // long, gentle dissolve
     Object.keys(nature).forEach(function (id) { nature[id].stop(6); });
     nature = {};
-    if (els.natChips) markNature();
+    Object.keys(drones).forEach(function (id) { drones[id].stop(6); });
+    drones = {};
+    if (beat2Handle) { beat2Handle.stop(6); beat2Handle = null; beat2 = null; }
+    if (els.natChips) markAmbience();
     updateDot();
     setTimeout(playChime, 4200);  // chime drifts in as the tone fades
   }
