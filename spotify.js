@@ -292,6 +292,11 @@ function initSpotifyPanel(opts) {
     _blurSoon(e.currentTarget); // opening the panel shouldn't strand the game's keyboard
   });
 
+  /* Any click on the panel's empty space (padding, gaps) also hands the
+     keyboard back to the game — a button-less click used to leave focus
+     on <body> and the paused game went deaf to ESC. Mirrors hemisync.js. */
+  panel.addEventListener('click', () => _backToGame());
+
   /* embed loader */
   const saved = localStorage.getItem('vh_spotify_uri');
   function loadEmbed(uri) {

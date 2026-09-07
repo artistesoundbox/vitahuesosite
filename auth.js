@@ -1,42 +1,37 @@
 /*
  * Vitamina Hueso @ Manteca Studios — Auth0 login gate (SPA SDK, no build step).
  *
- * SETUP (one time, ~5 minutes):
- *   1. Create a free account at https://auth0.com and an "Application"
- *      of type "Single Page Web Application".
- *   2. In the app's Settings, copy "Domain" and "Client ID" into
- *      VH_CONFIG below.
- *   3. In "Allowed Callback URLs" add:
- *        http://127.0.0.1:8936/auth/callback.html
- *        https://artistesoundbox.github.io/vitahuesosite/auth/callback.html
- *   4. In "Allowed Web Origins" add:
- *        http://127.0.0.1:8936
- *        https://artistesoundbox.github.io
- *   5. In "Allowed Logout URLs" — must match the returnTo EXACTLY
- *      (path included, both trailing-slash variants):
- *        https://artistesoundbox.github.io/vitahuesosite/
- *        https://artistesoundbox.github.io/vitahuesosite/index.html
- *        https://artistesoundbox.github.io/vitahuesosite/game.html
+ * SETUP — tenant dev-um47bcoddy6kauvl.us.auth0.com, application "anthonitus"
+ *   (Single Page Web Application). Client ID is wired in VH_CONFIG below.
+ *   Fill the URL lists in Applications -> "anthonitus" -> Settings:
+ *
+ *   Allowed Callback URLs — BOTH forms work; the code builds the /auth one:
+ *        https://anthonitus.com/auth/callback.html
+ *        https://www.anthonitus.com/auth/callback.html
+ *        https://anthonitus.com/callback
+ *        https://www.anthonitus.com/callback
+ *      (/callback is a shim that forwards to /auth/callback.html with the
+ *      query intact, so a dashboard paste of either form never mismatches.)
+ *
+ *   Allowed Web Origins (for silent token renewal):
+ *        https://anthonitus.com
+ *        https://www.anthonitus.com
+ *
+ *   Allowed Logout URLs — must match returnTo EXACTLY (path included):
+ *        https://anthonitus.com/
+ *        https://anthonitus.com/index.html
+ *        https://anthonitus.com/game.html
+ *        https://www.anthonitus.com/
+ *        https://www.anthonitus.com/index.html
+ *        https://www.anthonitus.com/game.html
  *      Without these, logout lands on Auth0's generic "logged out" page.
- *      '/game.html' is what enables returning there after logout.
- *   6. anthonitus.com hookup — add ALL of these in the Auth0 dashboard
- *      (Applications → the SPA app → Settings), keeping the existing
- *      github.io entries in place:
- *        Allowed Callback URLs:  https://anthonitus.com/auth/callback.html
- *                                https://www.anthonitus.com/auth/callback.html
- *        Allowed Web Origins:    https://anthonitus.com
- *                                https://www.anthonitus.com
- *        Allowed Logout URLs:    https://anthonitus.com/
- *                                https://anthonitus.com/index.html
- *                                https://anthonitus.com/game.html
- *                                https://www.anthonitus.com/
- *                                https://www.anthonitus.com/index.html
- *                                https://www.anthonitus.com/game.html
- *      The code needs NO changes — every URL it builds is relative and
- *      follows whichever origin serves the page.
+ *
+ *   The code needs NO other changes — every URL it builds is relative and
+ *   follows whichever origin serves the page.
  */
 
 const VH_CONFIG = {
+  // Auth0 application "anthonitus" (Single Page App) in the dev tenant
   domain: 'dev-um47bcoddy6kauvl.us.auth0.com',
   clientId: 'aDiPGXEuqimOCyv5Keaq0oiTWcCQlCp9',
 };

@@ -383,6 +383,12 @@
     });
     close.addEventListener('click', function () { panel.style.left = '-332px'; blurSoon(close); });
 
+    /* Any click on the panel's empty space (padding, gaps) also hands the
+       keyboard back to the game — a button-less click used to leave focus
+       on <body>, and the paused game went deaf to ESC until re-clicked.
+       Button handlers refocus anyway; this catches everything else. */
+    panel.addEventListener('click', function () { backToGame(); });
+
     document.body.appendChild(panel);
   }
 

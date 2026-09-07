@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Anthonitus – Signing in…</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body>
+  <!--
+    Short-form callback shim. The Auth0 dashboard may be configured with
+    https://anthonitus.com/callback (short form) while the SDK builds
+    https://anthonitus.com/auth/callback.html (long form). This page accepts
+    the short form and forwards the full query (?code=...&state=... or an
+    error) to the real handler, so either dashboard paste works.
+  -->
+  <script>
+    (function () {
+      var to = '../auth/callback.html' + window.location.search + window.location.hash;
+      window.location.replace(to);
+    })();
+  </script>
+  <p style="font-family:system-ui;color:#cfe4ff;text-align:center;margin-top:40vh">Signing you in…</p>
+</body>
+</html>
