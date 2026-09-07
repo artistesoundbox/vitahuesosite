@@ -18,13 +18,20 @@
   'use strict';
 
   var CHAKRAS = [
-    { hz: 396, name: 'Root',       color: '#e5484d' },
-    { hz: 417, name: 'Sacral',     color: '#f07d2e' },
-    { hz: 528, name: 'Solar Plexus', color: '#e8c93e' },
-    { hz: 639, name: 'Heart',      color: '#46c46e' },
-    { hz: 741, name: 'Throat',     color: '#3ea6e8' },
-    { hz: 852, name: 'Third Eye',  color: '#6a5be0' },
-    { hz: 963, name: 'Crown',      color: '#b45be0' },
+    { hz: 396, name: 'Root',       color: '#e5484d',
+      desc: 'Grounding and safety. Eases worry about money, home, belonging.' },
+    { hz: 417, name: 'Sacral',     color: '#f07d2e',
+      desc: 'Creativity and flow. Loosens old patterns, invites play and desire.' },
+    { hz: 528, name: 'Solar Plexus', color: '#e8c93e',
+      desc: 'Confidence and willpower. Steadies the stomach-knot of stress.' },
+    { hz: 639, name: 'Heart',      color: '#46c46e',
+      desc: 'Connection and forgiveness. Softens grief, opens us to others.' },
+    { hz: 741, name: 'Throat',     color: '#3ea6e8',
+      desc: 'Expression and truth. Helps say what needs saying, cleanly.' },
+    { hz: 852, name: 'Third Eye',  color: '#6a5be0',
+      desc: 'Intuition and clarity. Clears mental fog, invites insight.' },
+    { hz: 963, name: 'Crown',      color: '#b45be0',
+      desc: 'Stillness and oneness. The quiet at the top of the breath.' },
   ];
   var BEATS = [
     { label: 'No binaural', hz: 0 },
@@ -233,7 +240,8 @@
       });
       var label = document.createElement('span');
       label.style.flex = '1';
-      label.innerHTML = c.name + ' <span style="color:#7f9cbd;font-size:12px">· ' + c.hz + ' Hz</span>';
+      label.innerHTML = c.name + ' <span style="color:#7f9cbd;font-size:12px">· ' + c.hz + ' Hz</span>' +
+        '<div style="color:#8aa2c4;font-size:11px;line-height:1.35;margin-top:2px">' + c.desc + '</div>';
       var btn = document.createElement('button');
       css(btn, {
         background: 'none', border: '1px solid rgba(120,180,255,.4)',

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <title>Vitamina Hueso @ Manteca Studios â€“ Orbit Portal</title>
+    <title>Vitamina Hueso @ Manteca Studios – Orbit Portal</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="style.css" />
     <script type="importmap">
@@ -35,6 +35,24 @@
             text-align: center;
         }
 
+        /* Site banner (anthonitus.png) — pinned to the top of the page,
+           layout-independent so it never fights the centered button stack */
+        .site-banner {
+            pointer-events: auto;
+            position: fixed;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 30;
+            line-height: 0;
+        }
+        #site-banner-img {
+            display: block;
+            width: min(430px, 76vw);
+            height: auto;
+            filter: drop-shadow(0 0 18px rgba(80, 150, 255, 0.35));
+        }
+
         /* PLAY art button — sized and glowing exactly like the landing page art */
 
         /* PLAY title art — identical spec to the landing page's art */
@@ -47,7 +65,7 @@
         }
         #play-art-img {
             display: block;
-            max-width: 255px;
+            max-width: 215px;
             width: 100%;
             height: auto;
             margin: 0 auto;
@@ -68,7 +86,7 @@
         }
         #movies-art-img {
             display: block;
-            max-width: 255px;
+            max-width: 215px;
             width: 100%;
             height: auto;
             margin: 0 auto;
@@ -89,7 +107,7 @@
         }
         #hs-art-img {
             display: block;
-            max-width: 255px;
+            max-width: 215px;
             width: 100%;
             height: auto;
             margin: 0 auto;
@@ -106,6 +124,9 @@
     <canvas id="vh-canvas"></canvas>
 
     <div id="landing-page">
+        <div class="site-banner">
+            <img src="anthonitus.png" alt="Anthonitus" id="site-banner-img" />
+        </div>
         <div class="button-container">
 
             <!-- Sobre El Gelo / Over The Ice — the saucer game -->
@@ -130,6 +151,6 @@
             </div>
         </div>
     </div>	<script type="module" src="main.js"></script>
-	<script src="portal-music.js?v=2"></script>
+	<script src="portal-music.js?v=3"></script>
 </body>
 </html>
