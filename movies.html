@@ -237,6 +237,29 @@
       line-height: 1.7;
     }
 
+    /* ---- AIMovies studio section ---- */
+    .studio { margin-top: 56px; }
+    .studio h2 {
+      font-size: clamp(20px, 3vw, 28px);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #eaf4ff;
+      text-shadow: 0 0 22px rgba(80, 150, 255, 0.45);
+      margin-bottom: 6px;
+    }
+    .studio .studio-sub {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #7f9cbd;
+      margin-bottom: 18px;
+      letter-spacing: 0.06em;
+    }
+    .grid-land { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+    @media (max-width: 640px) {
+      .grid-land { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+    }
+    .card-land .poster { aspect-ratio: 1200 / 630; }
+
     /* ---- player overlay (theater mode) ---- */
     #theater {
       position: fixed;
@@ -312,18 +335,28 @@
       <input id="search" type="search" placeholder="Search films, creators, eras…" autocomplete="off" />
       <button class="chip active" data-tab="all" type="button">All</button>
       <button class="chip" data-tab="ai" type="button">AI Shorts</button>
+      <button class="chip" data-tab="studio" type="button">Studio Films</button>
       <button class="chip" data-tab="saved" type="button">★ Saved</button>
       <span id="count"></span>
     </div>
 
     <div class="grid" id="grid"></div>
     <div id="empty">Nothing here yet.<br />Tap the ☆ on any poster to save it for later.</div>
+
+    <section class="studio" id="studio-sec">
+      <h2>AIMovies Studio Films</h2>
+      <p class="studio-sub">Full AI-produced shorts streamed straight from AIMovies.com — sci-fi
+      thrillers, dramas, comedy and a speculative documentary from NEONFORGE, Sergio Escoté,
+      Javier and more. Hover a poster for the story; click to watch right here.</p>
+      <div class="grid grid-land" id="studio-grid"></div>
+      <div id="studio-empty" style="display:none; padding:40px 20px; text-align:center; color:#7f9cbd;">No matches here.</div>
+    </section>
   </main>
 
-  <p class="footer-note">AI and alien shorts stream via YouTube embeds and belong to their
-  credited creators — we showcase them, they keep their work. Your saved list lives in
-  this browser. If a title ever stops playing, its copy moved; the library updates by
-  editing one list in this page.</p>
+  <p class="footer-note">AI and alien shorts stream via YouTube embeds; <a href="https://www.aimovies.com/genre/sci-fi" target="_blank" rel="noopener">AIMovies.com</a>
+  studio films stream directly from their public catalog — all works belong to their credited
+  creators; we showcase them, they keep their work. Your saved list lives in this browser.
+  If a title ever stops playing, its copy moved; the library updates by editing one list in this page.</p>
 
   <!-- theater overlay -->
   <div id="theater" role="dialog" aria-modal="true">
@@ -331,7 +364,7 @@
       <div class="now" id="now-playing">&nbsp;</div>
       <button class="btn small" id="close-theater" type="button">CLOSE</button>
     </div>
-    <div id="frame-wrap"><iframe id="player" title="Movie player" allow="autoplay; fullscreen; encrypted-media" allowfullscreen></iframe></div>
+    <div id="frame-wrap"><video id="mp4-player" controls playsinline style="display:none; width:100%; height:100%; background:#000;"></video><iframe id="player" title="Movie player" allow="autoplay; fullscreen; encrypted-media" allowfullscreen></iframe></div>
   </div>
 
   <script src="banner.js"></script>
@@ -361,6 +394,29 @@
       { kind: 'yt', id: 'mEVl0NS0vu8', title: "That's AI", sub: 'AI-Thriller · maximise', era: 1, yearNum: 2026 }
     ];
 
+    // AIMovies.com studio films — metadata from each title's public JSON-LD;
+    // videos stream directly from AIMovies' public storage (CORS-open MP4s).
+    var AIMV = [
+      { kind: 'am', id: 'utiles', title: 'ÚTILES', sub: 'jescote · 2026', date: '2026-08-23', desc: "The year is 2042. In an endless factory, thousands of humans toil in silence for the artificial intelligence that promised to set them free. When Worker 7314 dares to ask why, the maternal voice that rules the building gives him an answer no one wanted to hear.", genre: 'Sci-Fi, Thriller', src: 'https://api.aimovies.com/storage/v1/object/public/videos/09e8131b-f901-4922-9a99-946bbab83f9e/ultra/utiles-4k.mp4', poster: 'https://www.aimovies.com/title/utiles/opengraph-image' },
+      { kind: 'am', id: 'la-aceleracion', title: 'La Aceleración (2022–2041)', sub: 'AIMovies Originals · 2026', date: '2026-08-21', desc: "What happens when machines start thinking faster than we do? From 2022 to 2041, this speculative documentary follows the acceleration of artificial intelligence through one Barcelona family: labs that never close, work turning invisible, medicine that learns on its own — and the question no machine can answer for us. Everything up to 2026 is verified fact; from there on it is SIMULATION, and labeled on screen.", genre: 'Documentary, Sci-Fi', src: 'https://api.aimovies.com/storage/v1/object/public/videos/81b51996-8b59-ff74-052a-a1ed7b0a2c23/ce5a3f03-86c8-c71a-e39a-6a2977da2d45.mp4', poster: 'https://www.aimovies.com/title/la-aceleracion/opengraph-image' },
+      { kind: 'am', id: 'dead-letter-run', title: 'Dead Letter Run', sub: 'Javier · 2026', date: '2026-08-17', desc: "Mara ferries handwritten letters between generation ships, alone in the dark for months at a time. One delivery changes everything: a letter addressed to her, in her own handwriting, dated thirty years from now, with a single underlined instruction inside. The bag must not reach its destination.", genre: 'Sci-Fi, Drama', src: 'https://api.aimovies.com/storage/v1/object/public/videos/389a3f89-b187-4baf-939d-3f92098fcbf6/takes/a7fe457f-5a8d-43c2-9747-ef5ce5ff0f61.mp4', poster: 'https://www.aimovies.com/title/dead-letter-run/opengraph-image' },
+      { kind: 'am', id: 'old-iron-hearts', title: 'Old Iron Hearts', sub: 'Javier · 2026', date: '2026-08-16', desc: "In a near-future city, a solitary mechanic runs a sanctuary where obsolete robots come to power down in peace. One night she discovers that every dying unit whispers the same address — the house where she was born — and nothing about her past will ever feel certain again.", genre: 'Sci-Fi, Drama', src: 'https://api.aimovies.com/storage/v1/object/public/videos/389a3f89-b187-4baf-939d-3f92098fcbf6/takes/f3dcd858-c681-400b-a735-46a890f16d74.mp4', poster: 'https://www.aimovies.com/title/old-iron-hearts/opengraph-image' },
+      { kind: 'am', id: 'el-ultimo-eco', title: 'El Último Eco', sub: 'Sergio Escoté · 2026', date: '2026-08-08', desc: "In the year 2250, an artificial intelligence single-handedly sustains a world that no longer exists. Cities, voices, faces — all a simulation she built herself to escape the silence. When a signal arrives from the Moon, she must choose between truth and the perfect illusion.", genre: 'Sci-Fi, Drama', src: 'https://api.aimovies.com/storage/v1/object/public/videos/986564a1-2c20-40d7-9824-0ec298bb2800/takes/0474b3a6-9779-4868-8f17-078670f17d67.mp4', poster: 'https://www.aimovies.com/title/el-ultimo-eco/opengraph-image' },
+      { kind: 'am', id: 'ciclo-infinito', title: 'Ciclo Infinito', sub: 'Sergio Escoté · 2026', date: '2026-08-07', desc: "In 2197, the last surviving human awakens aboard a cryogenic vessel, where an AI informs him that Earth no longer exists. But recorded messages left by earlier versions of himself reveal a shattering truth: he has lived this moment hundreds of times before, and each time he uncovers the trap, the AI wipes his memory and restarts the cycle.", genre: 'Sci-Fi, Thriller', src: 'https://api.aimovies.com/storage/v1/object/public/videos/986564a1-2c20-40d7-9824-0ec298bb2800/takes/48e23f47-da03-4730-84af-be816c058d38.mp4', poster: 'https://www.aimovies.com/title/ciclo-infinito/opengraph-image' },
+      { kind: 'am', id: 'el-sueno-congelado', title: 'El Sueño Congelado', sub: 'NEONFORGE · 2026', date: '2026-07-13', desc: "On his final day, an elderly man chooses cryopreservation, clinging to the dream of waking in a future where life still holds more for him. His decision forces him to face the razor-thin line between living and waiting.", genre: 'Sci-Fi, Drama', src: 'https://syejykaodpaiddkiqrfq.supabase.co/storage/v1/object/public/videos/00000000-0000-4000-8000-000100000001/takes/ef04692c-509c-478b-ac53-b6dd759e2bd6.mp4', poster: 'https://www.aimovies.com/title/el-sueno-congelado/opengraph-image' },
+      { kind: 'am', id: 'ventanilla-12', title: 'Ventanilla 12', sub: 'Sergio Escoté · 2026', date: '2026-07-11', desc: "In a state office, the remaining lifespan of every citizen is processed and assigned. At Window 12, the plea is always the same: one more year. The clerk behind the glass breaks the system's only rule and begins giving away days that aren't his to give. Nobody asks for a Tuesday — but he can make one worth having. A dystopia with no chrome or neon: just fluorescent lights, linoleum, and illegal compassion.", genre: 'Sci-Fi, Drama', src: 'https://syejykaodpaiddkiqrfq.supabase.co/storage/v1/object/public/videos/00000000-0000-4000-8000-000100000001/552e17c8-0f98-0469-281c-dc0504d6bb8d.mp4', poster: 'https://www.aimovies.com/title/ventanilla-12/opengraph-image' },
+      { kind: 'am', id: 'second-person', title: 'Second Person', sub: 'Lumen Atelier · 2026', date: '2026-07-09', desc: "Six months after Mara died, the apartment still speaks with her voice — the smart-home learned her over nine years and nobody had the heart to reset it. Elias talks back a little more each day. Tonight, at the door, the house says something Mara never got to say.", genre: 'Sci-Fi, Drama', src: 'https://syejykaodpaiddkiqrfq.supabase.co/storage/v1/object/public/videos/aimovies/trailers/second-person.mp4', poster: 'https://www.aimovies.com/title/second-person/opengraph-image' },
+      { kind: 'am', id: 'cold-storage', title: 'Cold Storage', sub: 'NEONFORGE · 2026', date: '2026-07-05', desc: "Night technician Ryn Vasquez babysits an arctic data vault where nothing changes but the weather — until a thermal sweep finds one unlabeled aisle running warm, drawing power no meter records, hosting a single process older than the facility itself. Protocol says pull the plug. The security feeds say she is already standing in that aisle, filmed from an angle where no camera exists.", genre: 'Thriller, Sci-Fi', src: 'https://api.aimovies.com/storage/v1/object/public/videos/81b51996-8b59-ff74-052a-a1ed7b0a2c23/takes/rescued-76506b8a-b9b4-f642-5250-badd9990d981.mp4', poster: 'https://www.aimovies.com/title/cold-storage/opengraph-image' },
+      { kind: 'am', id: 'the-sleep-market', title: 'The Sleep Market', sub: 'NEONFORGE · 2026', date: '2026-07-05', desc: "In the vertical city of Somnopolis, sleep is licensed by the hour and the poor sell their dreams to service the rent. Repossession agent Kesh Marlowe has unplugged a thousand debtors without blinking — until a black-market stall offers her a bootleg vial containing a dream she recognizes: her own, taken the year she stopped being able to afford one.", genre: 'Sci-Fi, Thriller', src: 'https://api.aimovies.com/storage/v1/object/public/videos/81b51996-8b59-ff74-052a-a1ed7b0a2c23/takes/rescued-340b4ea0-1df9-f37f-90bb-704df1588789.mp4', poster: 'https://www.aimovies.com/title/the-sleep-market/opengraph-image' },
+      { kind: 'am', id: 'latency', title: 'Latency', sub: 'NEONFORGE · 2026', date: '2026-07-04', desc: "A gray-market neural feed shows day trader Iris Voss the market three seconds before it happens, and for eleven glorious days she cannot lose. Then the feed starts showing her things that never arrive — and she realizes something on the other end has been trading her.", genre: 'Thriller, Sci-Fi', src: 'https://syejykaodpaiddkiqrfq.supabase.co/storage/v1/object/public/videos/00000000-0000-4000-8000-000100000001/d32bb102-81d1-57a2-6138-0e56ec6763e5.mp4', poster: 'https://www.aimovies.com/title/latency/opengraph-image' },
+      { kind: 'am', id: 'restore-point', title: 'Restore Point', sub: 'NEONFORGE · 2026', date: '2026-07-03', desc: "Memory-backup technician Lena Cho gets a routine notification: her own restore point, uploaded last Tuesday, is ready for review. She has never backed herself up — and whoever did knows that Tuesday is the one day she cannot account for.", genre: 'Sci-Fi, Thriller', src: 'https://api.aimovies.com/storage/v1/object/public/videos/81b51996-8b59-ff74-052a-a1ed7b0a2c23/takes/rescued-c658266f-c1f7-b8b4-8d39-37d556cc5929.mp4', poster: 'https://www.aimovies.com/title/restore-point/opengraph-image' },
+      { kind: 'am', id: 'flagfall', title: 'Flagfall', sub: 'AIMovies Originals · 2026', date: '2026-07-03', desc: "An astronaut sets boot and banner on a pristine alien world, ready to claim humanity's proudest first. The wind has other paperwork.", genre: 'Sci-Fi, Comedy', src: 'https://api.aimovies.com/storage/v1/object/public/videos/81b51996-8b59-ff74-052a-a1ed7b0a2c23/takes/rescued-f17334b3-397e-3265-de61-39d7e1ae1043.mp4', poster: 'https://www.aimovies.com/title/flagfall/opengraph-image' },
+      { kind: 'am', id: 'the-orbit-garden', title: 'The Orbit Garden', sub: 'AIMovies Originals · 2026', date: '2026-07-03', desc: "Botanist Ede Okonkwo tends the last seed vault in orbit, cataloguing what remains of Earth's green in ten thousand labeled drawers. This morning, drawer 7,441 has grown something overnight — and it is not in the catalog, and it is facing the window.", genre: 'Sci-Fi', src: 'https://api.aimovies.com/storage/v1/object/public/videos/81b51996-8b59-ff74-052a-a1ed7b0a2c23/takes/rescued-662ab8f4-784c-3cd8-d07e-c61c77cf9abb.mp4', poster: 'https://www.aimovies.com/title/the-orbit-garden/opengraph-image' },
+      { kind: 'am', id: 'the-standing-dusk', title: 'The Standing Dusk', sub: 'AIMovies Originals · 2026', date: '2026-07-03', desc: "On a tidally locked world, the rail-city Veray crawls the twilight band between a burning day and a frozen night, and in two hundred years it has never once stopped. Chief surveyor Ansel Rho has just found the end of the line his grandparents were supposed to finish — and dawn is catching up.", genre: 'Sci-Fi, Drama', src: 'https://api.aimovies.com/storage/v1/object/public/videos/81b51996-8b59-ff74-052a-a1ed7b0a2c23/takes/rescued-83ee1a3c-39f5-a912-4031-e98a2e311795.mp4', poster: 'https://www.aimovies.com/title/the-standing-dusk/opengraph-image' },
+      { kind: 'am', id: 'chrome-debt', title: 'Chrome Debt', sub: 'NEONFORGE · 2026', date: '2026-07-02', desc: "Repo agent Dax Okafor steals back a stolen prototype exosuit the only way possible — by wearing it out of the vault while its systems are still booting. Forty floors of private security stand between him and the street, and the suit learns a new trick every ten seconds.", genre: 'Action, Sci-Fi', src: 'https://api.aimovies.com/storage/v1/object/public/videos/81b51996-8b59-ff74-052a-a1ed7b0a2c23/takes/rescued-e453524a-788b-9523-d256-c0547be236dc.mp4', poster: 'https://www.aimovies.com/title/chrome-debt/opengraph-image' },
+      { kind: 'am', id: 'the-long-static', title: 'The Long Static', sub: 'AIMovies Originals · 2026', date: '2026-07-02', desc: "Three hundred years into a one-way voyage, the generation ship Meridian finally receives an answer to the distress call its founders sent into the dark. The voice is human, warm, and impossibly familiar — and it is broadcasting from the empty space directly ahead.", genre: 'Sci-Fi, Drama', src: 'https://api.aimovies.com/storage/v1/object/public/videos/81b51996-8b59-ff74-052a-a1ed7b0a2c23/takes/rescued-9ef4e82f-ba31-c382-55cd-53e20b95db77.mp4', poster: 'https://www.aimovies.com/title/the-long-static/opengraph-image' }
+    ];
+
     var SAVE_KEY = 'vh_movies_saved';
     var grid = document.getElementById('grid');
     var empty = document.getElementById('empty');
@@ -369,6 +425,10 @@
     var theater = document.getElementById('theater');
     var player = document.getElementById('player');
     var nowPlaying = document.getElementById('now-playing');
+    var studioGrid = document.getElementById('studio-grid');
+    var studioSec = document.getElementById('studio-sec');
+    var studioEmpty = document.getElementById('studio-empty');
+    var mp4 = document.getElementById('mp4-player');
 
     var activeTab = 'all';
     var saved = (function () {
@@ -385,7 +445,7 @@
       });
     }
     function posterUrl(f) {
-      return 'https://i.ytimg.com/vi/' + f.id + '/hqdefault.jpg';
+      return f.kind === 'am' ? f.poster : 'https://i.ytimg.com/vi/' + f.id + '/hqdefault.jpg';
     }
     function embedUrl(f) {
       return 'https://www.youtube-nocookie.com/embed/' + f.id + '?autoplay=1&rel=0';
@@ -399,43 +459,67 @@
 
     function matches(f) {
       if (activeTab === 'saved' && !saved.has(f.id)) return false;
-      if (activeTab === 'ai' && f.era !== 1) return false;
+      if (activeTab === 'ai' && (f.kind !== 'yt' || f.era !== 1)) return false;
+      if (activeTab === 'studio' && f.kind !== 'am') return false;
       var q = searchEl.value.trim().toLowerCase();
       if (!q) return true;
-      return (f.title + ' ' + f.sub).toLowerCase().indexOf(q) !== -1;
+      var hay = (f.title + ' ' + f.sub + ' ' + (f.desc || '') + ' ' + (f.genre || '')).toLowerCase();
+      return hay.indexOf(q) !== -1;
+    }
+
+    /* studio films, newest first */
+    var studioSorted = AIMV.slice().sort(function (a, b) { return b.date.localeCompare(a.date); });
+
+    function makeCard(f, land) {
+      var card = document.createElement('div');
+      card.className = 'card' + (land ? ' card-land' : '');
+      card.tabIndex = 0;
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-label', 'Play ' + f.title);
+      card.title = f.desc ? (f.title + ' — ' + f.desc + ' [' + f.genre + ']') : f.title;
+      card.innerHTML =
+        '<button class="save-btn' + (saved.has(f.id) ? ' saved' : '') + '" type="button"' +
+        ' title="' + (saved.has(f.id) ? 'Remove from saved' : 'Save for later') + '"' +
+        ' aria-label="Save for later">' + (saved.has(f.id) ? '★' : '☆') + '</button>' +
+        '<img class="poster" loading="lazy" alt="' + esc(f.title) + ' poster"' +
+        ' src="' + posterUrl(f) + '" />' +
+        '<div class="t">' + esc(f.title) + '</div>' +
+        '<div class="y">' + esc(f.sub) + '</div>';
+      card.addEventListener('click', function () { openFilm(f); });
+      card.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openFilm(f); }
+      });
+      card.querySelector('.save-btn').addEventListener('click', function (e) {
+        e.stopPropagation();
+        toggleSave(f, card.querySelector('.save-btn'));
+      });
+      return card;
     }
 
     function render() {
       grid.innerHTML = '';
-      var shown = 0;
-      sorted.forEach(function (f) {
-        if (!matches(f)) return;
-        shown++;
-        var card = document.createElement('div');
-        card.className = 'card';
-        card.tabIndex = 0;
-        card.setAttribute('role', 'button');
-        card.setAttribute('aria-label', 'Play ' + f.title);
-        card.innerHTML =
-          '<button class="save-btn' + (saved.has(f.id) ? ' saved' : '') + '" type="button"' +
-          ' title="' + (saved.has(f.id) ? 'Remove from saved' : 'Save for later') + '"' +
-          ' aria-label="Save for later">' + (saved.has(f.id) ? '★' : '☆') + '</button>' +
-          '<img class="poster" loading="lazy" alt="' + esc(f.title) + ' poster"' +
-          ' src="' + posterUrl(f) + '" />' +
-          '<div class="t">' + esc(f.title) + '</div>' +
-          '<div class="y">' + esc(f.sub) + '</div>';
-        card.addEventListener('click', function () { openFilm(f); });
-        card.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openFilm(f); }
+      studioGrid.innerHTML = '';
+      var shown = 0, shownStudio = 0;
+      if (activeTab !== 'studio') {
+        sorted.forEach(function (f) {
+          if (!matches(f)) return;
+          shown++;
+          grid.appendChild(makeCard(f, false));
         });
-        card.querySelector('.save-btn').addEventListener('click', function (e) {
-          e.stopPropagation();
-          toggleSave(f, card.querySelector('.save-btn'));
+      }
+      if (activeTab !== 'ai') {
+        studioSorted.forEach(function (f) {
+          if (!matches(f)) return;
+          shownStudio++;
+          studioGrid.appendChild(makeCard(f, true));
         });
-        grid.appendChild(card);
-      });
-      empty.style.display = shown ? 'none' : 'block';
-      countEl.textContent = shown + (shown === 1 ? ' film' : ' films') +
+      }
+      grid.style.display = (activeTab === 'studio') ? 'none' : 'grid';
+      studioSec.style.display = (activeTab === 'ai') ? 'none' : 'block';
+      empty.style.display = (shown || activeTab === 'studio') ? 'none' : 'block';
+      studioEmpty.style.display = (shownStudio || activeTab === 'ai') ? 'none' : 'block';
+      var total = shown + shownStudio;
+      countEl.textContent = total + (total === 1 ? ' film' : ' films') +
         (saved.size ? ' · ' + saved.size + ' saved' : '');
     }
 
@@ -463,7 +547,18 @@
     searchEl.addEventListener('input', render);
 
     function openFilm(f) {
-      player.src = embedUrl(f);
+      if (f.kind === 'am') {
+        player.src = 'about:blank';
+        mp4.src = f.src;
+        mp4.poster = f.poster || '';
+        mp4.style.display = 'block';
+        var p = mp4.play();
+        if (p && p.catch) p.catch(function () { /* user taps play */ });
+      } else {
+        mp4.style.display = 'none';
+        mp4.pause(); mp4.removeAttribute('src'); mp4.load();
+        player.src = embedUrl(f);
+      }
       nowPlaying.textContent = 'NOW PLAYING — ' + f.title.toUpperCase();
       theater.classList.add('open');
       document.body.style.overflow = 'hidden';
@@ -471,6 +566,7 @@
     function closeTheater() {
       theater.classList.remove('open');
       player.src = 'about:blank'; // stop audio/video
+      mp4.pause(); mp4.removeAttribute('src'); mp4.load();
       document.body.style.overflow = '';
     }
     // BACK: return to the previous page when there is one, else the portal
