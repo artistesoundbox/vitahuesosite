@@ -203,7 +203,7 @@ ALBUMS.forEach(function (a) {
       return;
     }
     var f = document.createElement('iframe');
-    f.src = 'https://www.bandlab.com/embed/?id=' + a.id;
+    f.src = 'https://www.bandlab.com/embed/collection/?id=' + a.id;   // collection route = albums/playlists; plain ?id= is tracks-only
     f.allow = 'autoplay; encrypted-media';
     f.loading = 'lazy';
     f.title = a.name + ' — BandLab player';
