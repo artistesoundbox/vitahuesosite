@@ -14,15 +14,19 @@
     if (document.getElementById('vh-site-banner')) return;
     var wrap = document.createElement('div');
     wrap.id = 'vh-site-banner';
+    // wrapper is click-THROUGH: its full-width box used to swallow clicks on
+    // game.html's Back/Home links that sit under it. Only the image itself
+    // catches the pointer.
     wrap.style.cssText =
       'text-align:center;padding:14px 10px 0;line-height:0;' +
-      'position:relative;z-index:20;';
+      'position:relative;z-index:20;pointer-events:none;';
     var img = document.createElement('img');
     img.src = 'anthonitus.png';
     img.alt = 'Anthonitus';
     img.style.cssText =
       'display:inline-block;width:min(360px,70vw);height:auto;' +
-      'filter:drop-shadow(0 0 18px rgba(80,150,255,0.35));';
+      'filter:drop-shadow(0 0 18px rgba(80,150,255,0.35));' +
+      'pointer-events:none;';
     wrap.appendChild(img);
     document.body.insertBefore(wrap, document.body.firstChild);
   }

@@ -1,39 +1,36 @@
 /*
  * Portal ambience — lovingmyobstacles.mp3.
  *
- * Instant-start strategy:
+ * Auto-start strategy:
  *   1. The <audio> element is created and pointed at the track THE MOMENT
  *      the page opens — the download starts immediately, in parallel with
  *      the 3D city, and playback begins as soon as the browser has
  *      buffered the first moments of audio (no waiting for the full file).
- *   2. Autoplay is attempted right away: browsers that have seen media
- *      played on this site before (Chrome engagement) allow it — returning
- *      visitors get music with zero clicks.
- *   3. If autoplay is blocked, the very first click/tap/key starts playback
- *      instantly from the already-buffering stream, and a small "TAP FOR
- *      MUSIC" pill (top-right) makes that obvious while blocked.
+ *   2. Autoplay is attempted right away and again on every interaction:
+ *      browsers that have seen media played on this site before (Chrome
+ *      engagement) allow it — returning visitors get music with zero
+ *      clicks. First-time visitors get it on their first tap/key anywhere.
+ *   3. No nag UI: if a browser blocks autoplay, the fallback is silent —
+ *      the page simply waits for the first interaction and starts.
  *
  * Music only plays while the portal is actually on screen: leaving the
  * page pauses it (navigation destroys the page on desktop; mobile
  * back-forward-cache restores get an instant resume via pageshow).
  *
- * A corner speaker toggle mutes/unmutes; the choice is remembered
- * (localStorage 'vhPortalMuted'). Volume 60% = ambience, not a jukebox.
+ * A corner speaker toggle mutes/unmutes for the CURRENT visit only —
+ * every fresh page load tries music again (no remembered-mute trap
+ * leaving a browser silent forever). Volume 60% = ambience.
  */
 (function () {
   'use strict';
 
   var SRC = 'lovingmyobstacles.mp3';
-  var KEY = 'vhPortalMuted';
   var BASE_VOL = 0.6;
 
   var audio = null;
-  var pendingStart = false;   // autoplay blocked — waiting for a gesture
   var muted = false;
-  try { muted = localStorage.getItem(KEY) === '1'; } catch (e) { /* private mode */ }
 
   var btn = null;
-  var pill = null;
   var fadeTimer = null;
 
   // diagnostics handle
@@ -68,23 +65,15 @@
   }
 
   function onLive() {
-    pendingStart = false;
     if (!muted) fadeTo(BASE_VOL, 1600);
     updateBtn();
-    syncPill();
   }
 
   function tryStart() {
-    if (muted) { syncPill(); return; }
+    if (muted) return;
     ensureAudio();
     var p = audio.play();
-    if (p && p.then) {
-      p.then(onLive).catch(function () {
-        // gesture required — the stream keeps buffering; surface the pill
-        pendingStart = true;
-        syncPill();
-      });
-    }
+    if (p && p.then) p.then(onLive).catch(function () { /* blocked: silent */ });
   }
 
   /* ---------- interaction retries (until audio is genuinely live) ---------- */
@@ -97,10 +86,7 @@
   }
   function onFirst() {
     if (isLive()) { detachFirst(); return; }   // autoplay already won
-    if (!muted) {
-      pendingStart = false;
-      tryStart();                              // instant from buffered stream
-    }
+    if (!muted) tryStart();                    // instant from buffered stream
   }
   window.addEventListener('pointerdown', onFirst, OPTS);
   window.addEventListener('keydown', onFirst, OPTS);
@@ -116,7 +102,6 @@
   window.addEventListener('pageshow', function (e) {
     if (e.persisted) {   // restored from back-forward cache
       if (!muted) tryStart();
-      syncPill();
     }
   });
 
@@ -127,44 +112,6 @@
     btn.textContent = muted ? '🔇' : '🔊';
     btn.title = muted ? 'Play portal music' : 'Mute portal music';
     btn.style.opacity = muted ? '0.45' : '0.85';
-  }
-
-  /* Visible rescue pill (top-right): whenever music is NOT playing but the
-     visitor clearly wants it (muted in a past visit, or autoplay blocked),
-     a big obvious "TAP FOR MUSIC" appears. Hidden the moment audio lives. */
-  function syncPill() {
-    if (!pill) return;
-    var show = !isLive() && (muted || pendingStart);
-    pill.style.display = show ? 'flex' : 'none';
-  }
-
-  function makePill() {
-    pill = document.createElement('button');
-    pill.id = 'vh-portal-music-pill';
-    pill.textContent = '🔊 TAP FOR MUSIC';
-    pill.style.cssText = [
-      'position:fixed', 'top:18px', 'right:18px',
-      'z-index:9999', 'display:none', 'align-items:center',
-      'padding:10px 20px', 'border-radius:999px', 'cursor:pointer',
-      'background:rgba(8,14,26,0.72)', 'color:#dce8ff',
-      'border:1px solid rgba(140,180,255,0.45)', 'font-size:13px',
-      'letter-spacing:0.12em', 'font-family:inherit', 'backdrop-filter:blur(6px)'
-    ].join(';');
-    var st = document.createElement('style');
-    st.textContent = '@keyframes vhMusicPulse{0%,100%{box-shadow:0 0 10px rgba(90,150,255,0.15)}50%{box-shadow:0 0 24px rgba(90,150,255,0.5)}}';
-    document.head.appendChild(st);
-    pill.style.animation = 'vhMusicPulse 2.4s ease-in-out infinite';
-    pill.addEventListener('click', function (e) {
-      e.stopPropagation();
-      if (muted) {
-        muted = false;
-        try { localStorage.setItem(KEY, '0'); } catch (err) { /* private mode */ }
-      }
-      pendingStart = false;
-      tryStart();
-    });
-    document.body.appendChild(pill);
-    syncPill();
   }
 
   function makeToggle() {
@@ -183,16 +130,13 @@
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
       muted = !muted;
-      try { localStorage.setItem(KEY, muted ? '1' : '0'); } catch (err) { /* ignore */ }
       if (muted) {
         if (audio && !audio.paused) fadeTo(0, 500);
         setTimeout(function () { if (muted && audio) audio.pause(); }, 550);
       } else {
-        pendingStart = false;
         tryStart();
       }
       updateBtn();
-      syncPill();
     });
     document.body.appendChild(btn);
     updateBtn();
@@ -203,14 +147,9 @@
   ensureAudio();            // streaming download starts at page open
   if (!muted) tryStart();   // autoplay attempt right away (returning visitors)
 
-  function mountAll() {
-    makeToggle();
-    makePill();
-    syncPill();
-  }
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', mountAll);
+    document.addEventListener('DOMContentLoaded', makeToggle);
   } else {
-    mountAll();
+    makeToggle();
   }
 })();
