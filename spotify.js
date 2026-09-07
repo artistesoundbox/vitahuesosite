@@ -219,8 +219,18 @@ function initSpotifyPanel(opts) {
       writing-mode:vertical-rl;background:rgba(10,14,20,.92);
       border:1px solid rgba(120,180,255,.35);border-right:none;border-radius:8px 0 0 8px;
       color:#1db954;letter-spacing:.3em;font-size:13px;display:flex;align-items:center;justify-content:center}
-    #sp-head{padding:12px 14px 8px;font-size:13px;letter-spacing:.25em;color:#1db954;
+    #sp-head{display:flex;gap:6px;padding:10px 12px;
       border-bottom:1px solid rgba(120,180,255,.2)}
+    .sp-svc-tab{flex:1;text-align:center;padding:8px 0;font-size:11px;letter-spacing:.14em;
+      color:#7f9cbd;cursor:pointer;border-radius:999px;border:1px solid transparent;
+      user-select:none;transition:all .2s}
+    .sp-svc-tab:hover{color:#cfe4ff}
+    .sp-svc-tab.sp-svc-on{color:#fff;background:rgba(20,40,70,.7);
+      border-color:rgba(120,180,255,.5)}
+    #am-link{background:rgba(8,14,24,.7);border:1px solid rgba(120,180,255,.4);color:#eaf4ff;
+      border-radius:8px;padding:8px 10px;font-size:13px;outline:none;width:100%}
+    #am-link:focus{border-color:rgba(250,150,180,.9)}
+    #am-embed{border-radius:12px;overflow:hidden}
     #sp-body{padding:12px 14px;display:flex;flex-direction:column;gap:10px;overflow:auto}
     #sp-link{background:rgba(8,14,24,.7);border:1px solid rgba(120,180,255,.4);color:#eaf4ff;
       border-radius:8px;padding:8px 10px;font-size:13px;outline:none;width:100%}
@@ -243,8 +253,12 @@ function initSpotifyPanel(opts) {
   const premium = !!SP_CONFIG.clientId;
   panel.innerHTML = `
     <div id="sp-tab">&#9835; MUSIC</div>
-    <div id="sp-head">YOUR MUSIC</div>
+    <div id="sp-head">
+      <span id="sp-tab-spotify" class="sp-svc-tab sp-svc-on">SPOTIFY</span>
+      <span id="sp-tab-apple" class="sp-svc-tab">APPLE MUSIC</span>
+    </div>
     <div id="sp-body">
+      <div id="sp-view-spotify">
       <div id="sp-game-row">
         <button class="sp-btn" id="sp-pause">&#10074;&#10074; PAUSE GAME</button>
         <button class="sp-btn" id="sp-gamemusic">MUTE GAME TRACK</button>
@@ -263,10 +277,64 @@ function initSpotifyPanel(opts) {
       <div id="sp-note">Paste any Spotify link to play it here. Premium users hear
       full tracks; free accounts get previews. Log in to Spotify inside the embed
       (top-right &ldquo;...&rdquo;) to use your own library.</div>`}
+      </div>
+
+      <div id="sp-view-apple" style="display:none">
+        <input id="am-link" type="text" spellcheck="false"
+          placeholder="Paste an Apple Music link (song, album, playlist)" />
+        <button class="sp-btn" id="am-load">LOAD</button>
+        <div id="am-embed"></div>
+        <div id="sp-note">Plays through Apple's official web player. Free accounts
+        hear previews; Apple Music subscribers hear full tracks.</div>
+      </div>
     </div>`;
   document.body.appendChild(panel);
 
   const $ = (id) => document.getElementById(id);
+
+  /* ---------- service tabs (Spotify / Apple Music) ---------- */
+  const viewSp = $('sp-view-spotify'), viewAm = $('sp-view-apple');
+  function showSvc(spotify) {
+    viewSp.style.display = spotify ? 'block' : 'none';
+    viewAm.style.display = spotify ? 'none' : 'block';
+    $('sp-tab-spotify').classList.toggle('sp-svc-on', spotify);
+    $('sp-tab-apple').classList.toggle('sp-svc-on', !spotify);
+  }
+  $('sp-tab-spotify').addEventListener('click', () => showSvc(true));
+  $('sp-tab-apple').addEventListener('click', () => showSvc(false));
+
+  /* ---------- Apple Music embed (official web player) ---------- */
+  // music.apple.com/<cc>/<kind>/<slug>/<id>(?i=<songId>) -> embed.music.apple.com
+  function _amParse(v) {
+    const m = v.trim().match(
+      /music\.apple\.com\/([a-z]{2})\/(album|playlist|song|music-video|station)(?:\/[^\/\s?#]+)?\/(\d+)(?:[\/?]i=(\d+))?/i);
+    return m ? { cc: m[1], kind: m[2].toLowerCase(), id: m[3], i: m[4] || null } : null;
+  }
+  function _amFrame(url, h) {
+    return '<iframe style="border:0;width:100%;height:' + h + 'px" src="' + url +
+      '" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" '
+      + 'sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-storage-access-by-user-activation" '
+      + 'loading="lazy"></iframe>';
+  }
+  function loadApple(p) {
+    if (!p) { $('am-link').style.borderColor = 'rgba(255,120,120,.8)'; return; }
+    $('am-link').style.borderColor = 'rgba(120,180,255,.4)';
+    const url = 'https://embed.music.apple.com/' + p.cc + '/' + p.kind + '/' + p.id +
+      (p.i ? ('?i=' + p.i) : '') + '&app=music';
+    localStorage.setItem('vh_apple_uri', url);
+    const h = (p.kind === 'song' || p.kind === 'music-video') ? 260 : 450;
+    $('am-embed').innerHTML = _amFrame(url, h);
+  }
+  $('am-load').addEventListener('click', (e) => { loadApple(_amParse($('am-link').value)); _blurSoon(e.target); });
+  $('am-link').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') loadApple(_amParse($('am-link').value));
+  });
+  const amSaved = localStorage.getItem('vh_apple_uri');
+  if (amSaved) {
+    const h = amSaved.indexOf('i=') !== -1 && /\/song\//.test(amSaved) ? 260
+      : amSaved.indexOf('/song/') !== -1 ? 260 : 450;
+    $('am-embed').innerHTML = _amFrame(amSaved, h);
+  }
 
   /* Give the keyboard back to the game after one-shot widget actions.
      Clicking the panel steals focus from the Godot canvas, and the canvas
