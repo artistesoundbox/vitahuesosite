@@ -445,7 +445,10 @@
       });
     }
     function posterUrl(f) {
-      return f.kind === 'am' ? f.poster : 'https://i.ytimg.com/vi/' + f.id + '/hqdefault.jpg';
+      // studio posters are self-hosted (the source generates each image
+      // server-side in ~1 s — too slow/flaky for a grid of 18)
+      return f.kind === 'am' ? 'posters/aim/' + f.id + '.png'
+                             : 'https://i.ytimg.com/vi/' + f.id + '/hqdefault.jpg';
     }
     function embedUrl(f) {
       return 'https://www.youtube-nocookie.com/embed/' + f.id + '?autoplay=1&rel=0';
@@ -482,7 +485,9 @@
         ' title="' + (saved.has(f.id) ? 'Remove from saved' : 'Save for later') + '"' +
         ' aria-label="Save for later">' + (saved.has(f.id) ? '★' : '☆') + '</button>' +
         '<img class="poster" loading="lazy" alt="' + esc(f.title) + ' poster"' +
-        ' src="' + posterUrl(f) + '" />' +
+        ' src="' + posterUrl(f) + '"' +
+        (f.kind === 'am' ? ' onerror="this.onerror=null;this.src=\'' + f.poster + '\''"' : '') +
+        ' />' +
         '<div class="t">' + esc(f.title) + '</div>' +
         '<div class="y">' + esc(f.sub) + '</div>';
       card.addEventListener('click', function () { openFilm(f); });
@@ -550,7 +555,7 @@
       if (f.kind === 'am') {
         player.src = 'about:blank';
         mp4.src = f.src;
-        mp4.poster = f.poster || '';
+        mp4.poster = posterUrl(f);
         mp4.style.display = 'block';
         var p = mp4.play();
         if (p && p.catch) p.catch(function () { /* user taps play */ });
