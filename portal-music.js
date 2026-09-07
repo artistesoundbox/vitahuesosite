@@ -1,25 +1,24 @@
 /*
  * Portal ambience — lovingmyobstacles.mp3.
  *
- * Auto-start strategy:
- *   1. The <audio> element is created and pointed at the track THE MOMENT
- *      the page opens — the download starts immediately, in parallel with
- *      the 3D city, and playback begins as soon as the browser has
- *      buffered the first moments of audio (no waiting for the full file).
- *   2. Autoplay is attempted right away and again on every interaction:
- *      browsers that have seen media played on this site before (Chrome
- *      engagement) allow it — returning visitors get music with zero
- *      clicks. First-time visitors get it on their first tap/key anywhere.
- *   3. No nag UI: if a browser blocks autoplay, the fallback is silent —
- *      the page simply waits for the first interaction and starts.
+ * Auto-start strategy (works with, not against, browser autoplay rules):
+ *   1. The <audio> element is created THE MOMENT the page opens — the
+ *      download starts immediately, in parallel with the 3D city.
+ *   2. Unmuted autoplay is attempted right away: browsers that have seen
+ *      the visitor interact with this domain before (returning visitors,
+ *      back-navigation) allow it — music with zero clicks.
+ *   3. If the browser blocks audible autoplay (first-ever visit rules),
+ *      the track keeps playing MUTED — Chrome always allows muted
+ *      playback — so it is fully buffered and rolling. The FIRST tap or
+ *      key anywhere unmutes it: instant sound, zero buffering wait.
+ *   4. No nag UI. The fallback is silence-then-instant, not a button.
  *
  * Music only plays while the portal is actually on screen: leaving the
  * page pauses it (navigation destroys the page on desktop; mobile
  * back-forward-cache restores get an instant resume via pageshow).
  *
- * A corner speaker toggle mutes/unmutes for the CURRENT visit only —
- * every fresh page load tries music again (no remembered-mute trap
- * leaving a browser silent forever). Volume 60% = ambience.
+ * The corner speaker toggle mutes/unmutes for the CURRENT visit only —
+ * every fresh page load tries music again. Volume 60% = ambience.
  */
 (function () {
   'use strict';
@@ -28,7 +27,7 @@
   var BASE_VOL = 0.6;
 
   var audio = null;
-  var muted = false;
+  var userMuted = false;   // the speaker toggle (current visit only)
 
   var btn = null;
   var fadeTimer = null;
@@ -37,6 +36,7 @@
   window.__portalMusic = {
     get ready() { return !!audio && audio.readyState >= 2; },
     get playing() { return isLive(); },
+    get silentStart() { return !!(audio && audio.muted); }, // parked muted, waiting for a gesture
   };
 
   function isLive() {
@@ -65,18 +65,39 @@
   }
 
   function onLive() {
-    if (!muted) fadeTo(BASE_VOL, 1600);
+    if (!userMuted) fadeTo(BASE_VOL, 1600);
+    updateBtn();
+  }
+
+  /* Park the stream playing-but-silent (muted autoplay is always allowed).
+     A gesture later unmutes it into instant sound. */
+  function startMuted() {
+    ensureAudio();
+    if (audio.muted) return;
+    audio.muted = true;
+    var p = audio.play();
+    if (p && p.then) p.catch(function () { /* even muted blocked: just wait */ });
+  }
+
+  function audibleFromMuted() {
+    if (!audio) return;
+    audio.muted = false;
+    fadeTo(BASE_VOL, 1200);
     updateBtn();
   }
 
   function tryStart() {
-    if (muted) return;
+    if (userMuted) return;
     ensureAudio();
     var p = audio.play();
-    if (p && p.then) p.then(onLive).catch(function () { /* blocked: silent */ });
+    if (p && p.then) {
+      p.then(onLive).catch(function () { startMuted(); });
+    } else {
+      onLive(); // legacy browsers: assume it plays
+    }
   }
 
-  /* ---------- interaction retries (until audio is genuinely live) ---------- */
+  /* ---------- gestures: until the track is genuinely audible ---------- */
 
   var OPTS = { capture: true };
   function detachFirst() {
@@ -85,8 +106,11 @@
     window.removeEventListener('touchstart', onFirst, OPTS);
   }
   function onFirst() {
-    if (isLive()) { detachFirst(); return; }   // autoplay already won
-    if (!muted) tryStart();                    // instant from buffered stream
+    if (userMuted) { if (isLive()) detachFirst(); return; }
+    if (isLive() && !audio.muted) { detachFirst(); return; }  // autoplay already won
+    if (isLive() && audio.muted) { audibleFromMuted(); detachFirst(); return; }
+    tryStart();   // this gesture makes audible playback legal
+    detachFirst();
   }
   window.addEventListener('pointerdown', onFirst, OPTS);
   window.addEventListener('keydown', onFirst, OPTS);
@@ -101,7 +125,7 @@
   });
   window.addEventListener('pageshow', function (e) {
     if (e.persisted) {   // restored from back-forward cache
-      if (!muted) tryStart();
+      if (!userMuted) tryStart();
     }
   });
 
@@ -109,9 +133,9 @@
 
   function updateBtn() {
     if (!btn) return;
-    btn.textContent = muted ? '🔇' : '🔊';
-    btn.title = muted ? 'Play portal music' : 'Mute portal music';
-    btn.style.opacity = muted ? '0.45' : '0.85';
+    btn.textContent = userMuted ? '🔇' : '🔊';
+    btn.title = userMuted ? 'Play portal music' : 'Mute portal music';
+    btn.style.opacity = userMuted ? '0.45' : '0.85';
   }
 
   function makeToggle() {
@@ -129,10 +153,12 @@
     btn.addEventListener('mouseleave', function () { btn.style.boxShadow = 'none'; });
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
-      muted = !muted;
-      if (muted) {
+      // silent-start state: the toggle acts as the "make it audible" click
+      if (!userMuted && audio && audio.muted && isLive()) { audibleFromMuted(); return; }
+      userMuted = !userMuted;
+      if (userMuted) {
         if (audio && !audio.paused) fadeTo(0, 500);
-        setTimeout(function () { if (muted && audio) audio.pause(); }, 550);
+        setTimeout(function () { if (userMuted && audio) audio.pause(); }, 550);
       } else {
         tryStart();
       }
@@ -145,7 +171,7 @@
   /* ---------- boot ---------- */
 
   ensureAudio();            // streaming download starts at page open
-  if (!muted) tryStart();   // autoplay attempt right away (returning visitors)
+  tryStart();               // audible attempt now; muted parking on refusal
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', makeToggle);
