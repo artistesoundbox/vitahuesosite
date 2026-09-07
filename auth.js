@@ -5,13 +5,13 @@
  *   (Single Page Web Application). Client ID is wired in VH_CONFIG below.
  *   Fill the URL lists in Applications -> "anthonitus" -> Settings:
  *
- *   Allowed Callback URLs — BOTH forms work; the code builds the /auth one:
- *        https://anthonitus.com/auth/callback.html
- *        https://www.anthonitus.com/auth/callback.html
+ *   Allowed Callback URLs — the code BUILDS the /callback form (paste these):
  *        https://anthonitus.com/callback
  *        https://www.anthonitus.com/callback
- *      (/callback is a shim that forwards to /auth/callback.html with the
- *      query intact, so a dashboard paste of either form never mismatches.)
+ *        http://127.0.0.1:8936/callback            (local dev)
+ *      (/callback is a shim that forwards the query to /auth/callback.html;
+ *      if the dashboard also lists the long /auth/callback.html form, that
+ *      path keeps working too — both are supported.)
  *
  *   Allowed Web Origins (for silent token renewal):
  *        https://anthonitus.com
@@ -75,6 +75,10 @@ async function _auth() {
   _client = await auth0.createAuth0Client({
     domain: VH_CONFIG.domain,
     clientId: VH_CONFIG.clientId,
+    // Pin redirect_uri at creation so the token exchange replays the SAME
+    // value the authorization request used (dashboard must list it — see
+    // the SETUP block): https://anthonitus.com/callback
+    authorizationParams: { redirect_uri: new URL('callback', window.location.href).href },
     cacheLocation: 'localstorage', // valid values: 'memory' | 'localstorage'
     useRefreshTokens: true, // rotating refresh tokens: sessions survive tab reloads/crashes
   });
@@ -147,7 +151,13 @@ async function login(returnTo = 'game.html') {
   if (!_configured()) return; // dev mode: gate is transparent until configured
   const c = await _auth();
   await c.loginWithRedirect({
-    authorizationParams: { redirect_uri: new URL('auth/callback.html', window.location.href).href },
+    authorizationParams: {
+      // Built origin-relative (follows http/https + hostname) but ALWAYS the
+      // /callback form, so it matches the dashboard entry exactly:
+      //   https://anthonitus.com/callback  (+ www / localhost variants).
+      // /callback is a shim that forwards the query to /auth/callback.html.
+      redirect_uri: new URL('callback', window.location.href).href,
+    },
     appState: { returnTo: new URL(returnTo, window.location.href).href },
   });
 }
