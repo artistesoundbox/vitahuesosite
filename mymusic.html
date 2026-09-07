@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>My Music – Vitamina Hueso @ Manteca Studios</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; min-height: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #cfe4ff; background: #04070d;
+    }
+    body {
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(160, 60, 200, 0.16), transparent 60%),
+        radial-gradient(900px 500px at 10% 110%, rgba(80, 150, 255, 0.10), transparent 60%),
+        #04070d;
+    }
+    header { max-width: 900px; margin: 0 auto; padding: 46px 6vw 10px; }
+    .top-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+    .btn {
+      display: inline-block; padding: 11px 34px; font-size: 14px;
+      letter-spacing: 0.3em; text-transform: uppercase; color: #cfe4ff;
+      background: rgba(8, 14, 24, 0.6);
+      border: 1px solid rgba(120, 180, 255, 0.6); border-radius: 999px;
+      cursor: pointer; text-decoration: none; font-family: inherit;
+      backdrop-filter: blur(6px); transition: all 0.25s ease;
+    }
+    .btn:hover {
+      color: #fff; background: rgba(20, 40, 70, 0.85);
+      border-color: rgba(160, 210, 255, 0.95); box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
+    }
+    header h1 {
+      margin-top: 30px; font-size: clamp(36px, 6vw, 60px); letter-spacing: 0.1em;
+      color: #eaf4ff; text-shadow: 0 0 30px rgba(180, 90, 255, 0.55);
+    }
+    header p.tag { margin-top: 12px; font-size: clamp(15px, 2vw, 18px); line-height: 1.6; color: #9fb8d8; max-width: 760px; }
+    .bl-btn {
+      display: inline-block; margin-top: 22px; padding: 13px 40px; font-size: 14px;
+      letter-spacing: 0.22em; text-transform: uppercase; text-decoration: none;
+      color: #c9ffd8; background: rgba(10, 26, 18, 0.6);
+      border: 1px solid rgba(80, 220, 130, 0.55); border-radius: 999px;
+      transition: all .25s ease;
+    }
+    .bl-btn:hover { color: #fff; border-color: rgba(120, 255, 170, 0.95); box-shadow: 0 0 24px rgba(60, 220, 120, 0.4); }
+
+    main { max-width: 900px; margin: 0 auto; padding: 34px 6vw 90px; }
+
+    .album {
+      display: flex; gap: 26px; align-items: flex-start;
+      padding: 24px; margin-top: 30px;
+      border: 1px solid rgba(120, 180, 255, 0.22); border-radius: 18px;
+      background: rgba(8, 14, 24, 0.5); backdrop-filter: blur(6px);
+    }
+    .album .cover { flex: 0 0 220px; }
+    .album .cover img {
+      width: 220px; height: 220px; object-fit: cover; display: block;
+      border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+    }
+    .album .info { flex: 1; min-width: 0; }
+    .chapter {
+      font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase;
+      color: #7f9cbd; margin-bottom: 6px;
+    }
+    .album h2 { font-size: clamp(24px, 4vw, 34px); color: #eaf4ff; letter-spacing: 0.06em; }
+    .album .desc { margin-top: 10px; font-size: 15px; line-height: 1.6; color: #9fb8d8; }
+    .album .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; align-items: center; }
+    .play-btn {
+      padding: 11px 28px; font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase;
+      color: #eaf4ff; cursor: pointer; font-family: inherit;
+      background: rgba(30, 16, 50, 0.7);
+      border: 1px solid rgba(180, 90, 255, 0.6); border-radius: 999px;
+      transition: all 0.2s ease;
+    }
+    .play-btn:hover { color: #fff; border-color: rgba(220, 160, 255, 0.95); box-shadow: 0 0 20px rgba(180, 90, 255, 0.45); }
+    .bl-link {
+      font-size: 13px; letter-spacing: 0.1em; color: #8ec2ff; text-decoration: none;
+      border-bottom: 1px dotted rgba(120, 180, 255, 0.5); padding-bottom: 2px;
+    }
+    .bl-link:hover { color: #fff; }
+    .player { margin-top: 16px; }
+    .player iframe {
+      width: 100%; height: 420px; display: block; border: 0; border-radius: 12px;
+      background: #0a0a0f; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    }
+    details.tracks { margin-top: 14px; }
+    details.tracks summary {
+      cursor: pointer; font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: #7f9cbd; user-select: none;
+    }
+    details.tracks summary:hover { color: #b9d2f2; }
+    details.tracks ol { margin: 10px 0 0 20px; color: #8aa2c4; font-size: 13.5px; line-height: 1.85; }
+
+    .footer-note {
+      max-width: 760px; margin: 50px auto 0; padding: 0 6vw;
+      color: #6f88a8; font-size: 12.5px; line-height: 1.65; text-align: center;
+    }
+    @media (max-width: 640px) {
+      .album { flex-direction: column; }
+      .album .cover { flex: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="top-row">
+      <a class="btn nav-back" href="index.html">◀ BACK</a>
+      <a class="btn" href="index.html">⌂ HOME</a>
+    </div>
+    <h1>MY MUSIC</h1>
+    <p class="tag">A five‑chapter journey of awakening, reflection, acceptance, transformation, and
+    creation — an urban fusion saga where every album reveals a new layer of the self.
+    Music for the subconscious, by Vitamina Hueso.</p>
+    <a class="bl-btn" href="https://www.bandlab.com/artistesoundbox" target="_blank" rel="noopener">Open BandLab profile ↗</a>
+  </header>
+
+  <main>
+    <!-- albums injected by script below -->
+    <div id="albums"></div>
+  </main>
+
+  <p class="footer-note">All five chapters stream straight from BandLab — press play on any album
+  to open its player right here. The full catalog, singles, and new releases live on the
+  BandLab profile above.</p>
+
+<script>
+'use strict';
+/* ---- the fivetilogy (metadata pulled from the BandLab catalog) ---- */
+var ALBUMS = [
+  {
+    n: 1, name: 'Vent', year: '2026', month: 'February', tracks: 11,
+    id: '5fc89598-312f-f111-8ef3-6045bd2d91c7', cover: 'covers/album1.jpg',
+    desc: '“Vent is the first release in the fivetilogy — a raw exhale of emotion, truth, and rebirth. A dark, bluish confession where silence becomes strength.”',
+    list: ['01 · I see God in you', '02 · You’re Allowed to Rest', '03 · The Mind Lies, The Heart Knows', '04 · Tell Them While They’re Here', '05 · I Forgive You, I Forgive Me', '06 · The Inner Child Still Matters', '07 · You’re Not Too Late', '08 · Your Heart Is Still Good', '09 · Thank You for Carrying Me', '010 · I’m Proud of You', '011 · We’re All Just Trying to Come Home']
+  },
+  {
+    n: 2, name: 'Reflect', year: '2026', month: 'March', tracks: 6,
+    id: '83ecb141-eb2f-f111-8ef3-6045bd2d91c7', cover: 'covers/album2.jpg',
+    desc: '“A quiet journey inward. A moonlit conversation with your past self, facing truth, memory, and healing — where stillness becomes clarity.”',
+    list: ['01 · Still Water', '02 · Echos of Me', '03 · Beneath the Quiet', '04 · The Part I Hid', '05 · When I finally let go', '06 · I See Myself Now']
+  },
+  {
+    n: 3, name: 'Accept', year: '2026', month: 'April', tracks: 8,
+    id: '508d304c-0030-f111-8ef3-6045bd2d91c7', cover: 'covers/album3.jpg',
+    desc: '“A warm, bilingual sunrise of self‑integration. Accept breathes clarity, forgiveness, and emotional truth — the moment you stop resisting and finally exhale.”',
+    list: ['01 · The Realization', '02 · Resistance', '03 · Reflection', '04 · I Feel it Now', '05 · I Take the Step', '06 · I Stand Here', '07 · I Open Up', '08 · I Reach for You']
+  },
+  {
+    n: 4, name: 'Become', year: '2026', month: 'April', tracks: 10,
+    id: 'c3e6d6d8-2930-f111-8ef3-6045bd2d91c7', cover: 'covers/album4.jpg',
+    desc: '“The moment you step outside yourself and finally see the growth. A warm, evolving chapter of clarity, confidence, and transformation — the version of you that was waiting.”',
+    list: ['01 · Outside Myself', '02 · New Edges', '03 · The Shift', '04 · In My Own Light', '05 · Little Victories', '06 · Choosing Me', '07 · Steady Rise', '08 · Clearer Now', '09 · Here With Myself', '010 · Becoming Still']
+  },
+  {
+    n: 5, name: 'Create', year: '2026', month: 'April', tracks: 12,
+    id: '463efe5e-3a30-f111-8ef3-6045bd2d91c7', cover: 'covers/album5.jpg',
+    desc: '“The spark of manifestation. Electric calm meets intention; the artist steps into motion, shaping worlds with quiet confidence and luminous resolve.”',
+    list: ['01 · Déjalo Fluir (Let it Flow)', '02 · Azul en mis Manos', '03 · Galaxias con Ritmo', '04 · Stretch like a Cat', '05 · Drifting into Me', '06 · I Zen-ter Myself', '07 · Simply Be', '08 · Enough for Now', '09 · No More Conflicting Thoughts', '010 · Inner Light', '011 · A Flame that Doesn’t Seem to Move', '012 · Not a Goodbye but a New Welcome']
+  }
+];
+
+function esc(s) {
+  return String(s).replace(/[&<>\"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+var wrap = document.getElementById('albums');
+var openPlayer = null;   // only one album player at a time
+
+ALBUMS.forEach(function (a) {
+  var sec = document.createElement('section');
+  sec.className = 'album';
+  sec.innerHTML =
+    '<div class="cover"><img src="' + a.cover + '" alt="' + esc(a.name) + ' cover art" loading="lazy"></div>' +
+    '<div class="info">' +
+      '<div class="chapter">Chapter ' + a.n + ' · ' + a.month + ' ' + a.year + ' · ' + a.tracks + ' tracks</div>' +
+      '<h2>' + esc(a.name) + '</h2>' +
+      '<p class="desc">' + esc(a.desc) + '</p>' +
+      '<div class="actions">' +
+        '<button class="play-btn">▶ Play the album</button>' +
+        '<a class="bl-link" target="_blank" rel="noopener" href="https://www.bandlab.com/artistesoundbox/albums/' + a.id + '">Open on BandLab ↗</a>' +
+      '</div>' +
+      '<div class="player"></div>' +
+      '<details class="tracks"><summary>Track list</summary><ol>' +
+        a.list.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') +
+      '</ol></details>' +
+    '</div>';
+
+  var btn = sec.querySelector('.play-btn');
+  var slot = sec.querySelector('.player');
+  btn.addEventListener('click', function () {
+    var isOpen = slot.firstChild !== null;
+    if (openPlayer && openPlayer !== slot) {         // close the other one
+      openPlayer.innerHTML = '';
+      openPlayer._btn.textContent = '▶ Play the album';
+    }
+    if (isOpen) {
+      slot.innerHTML = '';
+      openPlayer = null;
+      btn.textContent = '▶ Play the album';
+      return;
+    }
+    var f = document.createElement('iframe');
+    f.src = 'https://www.bandlab.com/embed/?id=' + a.id;
+    f.allow = 'autoplay; encrypted-media';
+    f.loading = 'lazy';
+    f.title = a.name + ' — BandLab player';
+    slot.appendChild(f);
+    openPlayer = slot;
+    openPlayer._btn = btn;
+    btn.textContent = '◼ Close player';
+  });
+  wrap.appendChild(sec);
+});
+</script>
+<script src="banner.js"></script>
+</body>
+</html>
