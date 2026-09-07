@@ -42,6 +42,20 @@
   var KEY_VOL = 'vh_hemisync_vol';
   var KEY_BEAT = 'vh_hemisync_beat';
 
+  /* Nature soundscapes — synthesized live from noise buffers, no files.
+     Layerable: any combination can play under (or without) a tone. */
+  var NATURE = [
+    { id: 'rain',     label: 'Rain' },
+    { id: 'ocean',    label: 'Ocean waves' },
+    { id: 'stream',   label: 'Forest stream' },
+    { id: 'wind',     label: 'Wind' },
+    { id: 'fire',     label: 'Campfire' },
+    { id: 'crickets', label: 'Night crickets' },
+  ];
+  var KEY_NVOL = 'vh_hemisync_nvol';
+  var nature = {};        // id -> handle { stop(fadeSec) }
+  var natMaster = null;
+
   var ctx = null;
   var master = null;
   var oscL = null, oscR = null, panL = null, panR = null;
@@ -118,7 +132,7 @@
     if (oscR) oscR.start();
     activeIdx = idx;
     markRows();
-    els.tabDot.style.display = 'block';
+    updateDot();
     armTimer();
   }
 
@@ -127,7 +141,7 @@
     var idx = activeIdx;
     activeIdx = -1;
     markRows();
-    els.tabDot.style.display = 'none';
+    updateDot();
     // true = instant cut (retune), undefined = normal 0.5 s, number = custom
     var fs = (fadeSec === true) ? 0 : (typeof fadeSec === 'number' ? fadeSec : 0.5);
     if (!ctx) return;
@@ -152,6 +166,258 @@
     // beat selection changed while a tone plays: rebuild the pair
     if (activeIdx !== -1) startTone(activeIdx);
   }
+
+  /* ---------- nature sounds (all synthesized, no files) ---------- */
+
+  function updateDot() {
+    if (!els || !els.tabDot) return;
+    var any = activeIdx !== -1 || Object.keys(nature).length > 0;
+    els.tabDot.style.display = any ? 'block' : 'none';
+  }
+
+  function natVol() {
+    var v = parseInt(els.nvol ? els.nvol.value : '55', 10) / 100;
+    return v * 0.5;
+  }
+
+  var _white = null, _brown = null;
+  function white() {
+    if (_white) return _white;
+    var len = ctx.sampleRate * 2;
+    var b = ctx.createBuffer(1, len, ctx.sampleRate);
+    var d = b.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    _white = b; return b;
+  }
+  function brown() {
+    if (_brown) return _brown;
+    var len = ctx.sampleRate * 2;
+    var b = ctx.createBuffer(1, len, ctx.sampleRate);
+    var d = b.getChannelData(0);
+    var last = 0;
+    for (var i = 0; i < len; i++) {
+      var w = Math.random() * 2 - 1;
+      last = (last + 0.02 * w) / 1.02;
+      d[i] = last * 3.5;
+    }
+    _brown = b; return b;
+  }
+  function loopSrc(buf, out) {
+    var s = ctx.createBufferSource();
+    s.buffer = buf; s.loop = true;
+    s.connect(out); s.start();
+    return s;
+  }
+  /* slow modulation into any AudioParam */
+  function lfoOn(hz, depth, param) {
+    var o = ctx.createOscillator();
+    o.frequency.value = hz;
+    var g = ctx.createGain();
+    g.gain.value = depth;
+    o.connect(g); g.connect(param);
+    o.start();
+    return [o, g];
+  }
+  /* one filtered noise hit — droplet, crackle */
+  function burst(buf, out, opts) {
+    var s = ctx.createBufferSource();
+    s.buffer = buf;
+    var f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.frequency.value = opts.f;
+    f.Q.value = opts.q || 1;
+    var g = ctx.createGain();
+    var t = ctx.currentTime;
+    var d = opts.dur;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(opts.g, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    s.connect(f); f.connect(g); g.connect(out);
+    s.start(t, Math.random() * 1.5, d + 0.05);
+    s.stop(t + d + 0.06);
+  }
+
+  function natureSound(id) {
+    var out = ctx.createGain();
+    out.gain.value = 1;
+    out.connect(natMaster);
+    var nodes = [], timers = [], alive = true;
+    function stopTimers() { timers.forEach(clearTimeout); timers = []; }
+    /* schedule fn now, then again at random intervals until stopped */
+    function again(fn, min, max) {
+      if (!alive) return;
+      fn();
+      timers.push(setTimeout(function () { again(fn, min, max); },
+        min + Math.random() * (max - min)));
+    }
+
+    if (id === 'rain') {
+      var lp = ctx.createBiquadFilter(); lp.type = 'lowpass';
+      lp.frequency.value = 1400; lp.Q.value = 0.4;
+      var g = ctx.createGain(); g.gain.value = 0.45;
+      loopSrc(white(), lp); lp.connect(g); g.connect(out);
+      nodes.push(lp, g);
+      again(function () {
+        burst(white(), out, { f: 3200 + Math.random() * 2600, q: 2.5,
+          g: 0.02 + Math.random() * 0.05, dur: 0.03 + Math.random() * 0.04 });
+      }, 90, 500);
+    } else if (id === 'ocean') {
+      var lp2 = ctx.createBiquadFilter(); lp2.type = 'lowpass';
+      lp2.frequency.value = 420; lp2.Q.value = 0.5;
+      var g2 = ctx.createGain(); g2.gain.value = 0.55;
+      loopSrc(brown(), lp2); lp2.connect(g2); g2.connect(out);
+      nodes.push(lp2, g2);
+      var swell = lfoOn(0.07, 0.4, g2.gain);         // the wave (~14 s swell)
+      var sway = lfoOn(0.023, 160, lp2.frequency);   // color drift
+      nodes.push(swell[0], swell[1], sway[0], sway[1]);
+    } else if (id === 'stream') {
+      var bp = ctx.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = 1600; bp.Q.value = 0.7;
+      var g3 = ctx.createGain(); g3.gain.value = 0.4;
+      loopSrc(white(), bp); bp.connect(g3); g3.connect(out);
+      nodes.push(bp, g3);
+      var wob = lfoOn(1.6, 420, bp.frequency);       // babbling wobble
+      var wob2 = lfoOn(0.31, 180, bp.frequency);
+      nodes.push(wob[0], wob[1], wob2[0], wob2[1]);
+    } else if (id === 'wind') {
+      var lp3 = ctx.createBiquadFilter(); lp3.type = 'lowpass';
+      lp3.frequency.value = 480; lp3.Q.value = 0.6;
+      var g4 = ctx.createGain(); g4.gain.value = 0.5;
+      loopSrc(brown(), lp3); lp3.connect(g4); g4.connect(out);
+      nodes.push(lp3, g4);
+      var gust = lfoOn(0.06, 0.3, g4.gain);
+      var howl = lfoOn(0.11, 240, lp3.frequency);
+      nodes.push(gust[0], gust[1], howl[0], howl[1]);
+    } else if (id === 'fire') {
+      var lp4 = ctx.createBiquadFilter(); lp4.type = 'lowpass';
+      lp4.frequency.value = 320;
+      var g5 = ctx.createGain(); g5.gain.value = 0.5;
+      loopSrc(brown(), lp4); lp4.connect(g5); g5.connect(out);
+      nodes.push(lp4, g5);
+      again(function () {
+        burst(white(), out, { f: 1400 + Math.random() * 3200, q: 1.2,
+          g: 0.05 + Math.random() * 0.22, dur: 0.015 + Math.random() * 0.03 });
+      }, 70, 420);
+    } else if (id === 'crickets') {
+      var lp5 = ctx.createBiquadFilter(); lp5.type = 'lowpass';
+      lp5.frequency.value = 180;
+      var g6 = ctx.createGain(); g6.gain.value = 0.12;
+      loopSrc(brown(), lp5); lp5.connect(g6); g6.connect(out);
+      nodes.push(lp5, g6);
+      again(function () {
+        var f = 4100 + Math.random() * 400;
+        var pulses = 3 + (Math.random() < 0.35 ? 1 : 0);
+        for (var p = 0; p < pulses; p++) {
+          timers.push(setTimeout(function () {
+            if (!alive) return;
+            var o = ctx.createOscillator();
+            o.type = 'sine'; o.frequency.value = f;
+            var cg = ctx.createGain();
+            var t = ctx.currentTime;
+            cg.gain.setValueAtTime(0.0001, t);
+            cg.gain.exponentialRampToValueAtTime(0.04 + Math.random() * 0.02, t + 0.006);
+            cg.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+            o.connect(cg); cg.connect(out);
+            o.start(); o.stop(t + 0.05);
+          }, p * 62));
+        }
+      }, 500, 1600);
+    }
+
+    return {
+      stop: function (fadeSec) {
+        alive = false;
+        stopTimers();
+        var fs = typeof fadeSec === 'number' ? fadeSec : 0.25;
+        var t = ctx.currentTime;
+        out.gain.cancelScheduledValues(t);
+        out.gain.setValueAtTime(Math.max(out.gain.value, 0.0002), t);
+        out.gain.exponentialRampToValueAtTime(0.0001, t + fs);
+        setTimeout(function () {
+          nodes.forEach(function (n) { try { n.disconnect(); } catch (e) {} });
+          try { out.disconnect(); } catch (e) {}
+        }, fs * 1000 + 80);
+      }
+    };
+  }
+
+  function natureToggle(id) {
+    ensureCtx();
+    if (nature[id]) {
+      nature[id].stop();
+      delete nature[id];
+    } else {
+      if (!natMaster) {
+        natMaster = ctx.createGain();
+        natMaster.gain.value = natVol();
+        natMaster.connect(ctx.destination);
+      }
+      nature[id] = natureSound(id);
+    }
+    if (els.natChips) markNature();
+    updateDot();
+    armTimer();
+  }
+
+  function markNature() {
+    els.natChips.forEach(function (ch) {
+      var on = !!nature[ch.id];
+      ch.el.style.borderColor = on ? 'rgba(70,196,110,.8)' : 'rgba(120,180,255,.35)';
+      ch.el.style.background = on ? 'rgba(16,40,24,.6)' : 'rgba(8,14,24,.6)';
+      ch.el.style.boxShadow = on ? '0 0 12px rgba(70,196,110,.35)' : 'none';
+    });
+  }
+
+  /* Chips + volume, renderable into any container — the panel mounts it
+     inline and hemisync.html reuses the same engine via initNatureChips. */
+  function renderNatureUI(container) {
+    var lab = document.createElement('div');
+    lab.style.cssText = 'font-size:12px;color:#7f9cbd;margin:14px 0 6px;letter-spacing:.14em';
+    lab.textContent = 'NATURE SOUNDS · layer with a tone or alone';
+    container.appendChild(lab);
+    var grid = document.createElement('div');
+    grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:7px';
+    els.natChips = [];
+    NATURE.forEach(function (n) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = n.label;
+      b.style.cssText =
+        'font:inherit;font-size:12px;letter-spacing:.06em;color:#cfe4ff;cursor:pointer;' +
+        'padding:7px 12px;border-radius:999px;background:rgba(8,14,24,.6);' +
+        'border:1px solid rgba(120,180,255,.35);transition:all .2s';
+      b.addEventListener('click', function () { blurSoon(b); natureToggle(n.id); });
+      grid.appendChild(b);
+      els.natChips.push({ id: n.id, el: b });
+    });
+    container.appendChild(grid);
+    var nlab = document.createElement('div');
+    nlab.style.cssText = 'font-size:12px;color:#7f9cbd;margin:10px 0 6px;letter-spacing:.14em';
+    nlab.textContent = 'NATURE VOLUME';
+    container.appendChild(nlab);
+    var nv = document.createElement('input');
+    nv.type = 'range'; nv.min = '0'; nv.max = '100';
+    nv.value = load(KEY_NVOL, '55');
+    nv.style.cssText = 'width:100%;accent-color:#46c46e';
+    nv.addEventListener('input', function () {
+      save(KEY_NVOL, nv.value);
+      if (natMaster) {
+        var t = ctx.currentTime;
+        natMaster.gain.cancelScheduledValues(t);
+        natMaster.gain.setValueAtTime(Math.max(natMaster.gain.value, 0.0002), t);
+        natMaster.gain.exponentialRampToValueAtTime(Math.max(natVol(), 0.0002), t + 0.15);
+      }
+    });
+    nv.addEventListener('change', function () { blurSoon(nv); });
+    container.appendChild(nv);
+    els.nvol = nv;
+  }
+
+  window.initNatureChips = function (mount) {
+    if (typeof mount === 'string') mount = document.getElementById(mount);
+    if (!mount) return;
+    renderNatureUI(mount);
+  };
 
   /* ---------- UI ---------- */
 
@@ -302,6 +568,11 @@
     panel.appendChild(volWrap);
     els.vol = vol;
 
+    /* nature sounds — synthesized, layerable, own volume */
+    var natSec = document.createElement('div');
+    panel.appendChild(natSec);
+    renderNatureUI(natSec);
+
     /* session timer: 15/30/45 min, gentle fade + chime at the end */
     var tWrap = document.createElement('div');
     tWrap.style.cssText = 'margin:10px 0 4px';
@@ -443,8 +714,8 @@
 
     var tip = document.createElement('div');
     tip.style.cssText = 'color:#6f88a8;font-size:11.5px;margin-top:14px;line-height:1.5';
-    tip.textContent = 'Tones are generated live (pure sine, no files). Muting the game track ' +
-      'frees the soundscape; the Spotify panel on the right plays your own playlist.';
+    tip.textContent = 'Tones and nature sounds are generated live — no files, no loops. ' +
+      'Muting the game track frees the soundscape; the Spotify panel on the right plays your own playlist.';
     panel.appendChild(tip);
 
     /* behaviors */
@@ -472,7 +743,7 @@
 
   function armTimer() {
     var m = timerMinutes();
-    if (m > 0 && activeIdx !== -1 && timerEnds === 0) {
+    if (m > 0 && (activeIdx !== -1 || Object.keys(nature).length > 0) && timerEnds === 0) {
       timerEnds = Date.now() + m * 60000;
       startTick();
     }
@@ -505,6 +776,10 @@
       if (els.rem.textContent.indexOf('complete') !== -1) els.rem.textContent = '';
     }, 6000);
     stopTone(9);                  // long, gentle dissolve
+    Object.keys(nature).forEach(function (id) { nature[id].stop(6); });
+    nature = {};
+    if (els.natChips) markNature();
+    updateDot();
     setTimeout(playChime, 4200);  // chime drifts in as the tone fades
   }
 

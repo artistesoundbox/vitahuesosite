@@ -228,6 +228,8 @@
       <div class="lab">Volume</div>
       <input id="vol" type="range" min="0" max="100" value="85" />
 
+      <div id="nature"></div>
+
       <div class="lab">Session timer</div>
       <select id="timer">
         <option value="0">Off — plays until I stop it</option>
@@ -238,7 +240,8 @@
       <div id="rem"></div>
 
       <div class="tip">Tones are pure sine waves generated live in your browser — no files,
-      no loops. A gentle chime ends timed sessions.</div>
+      no loops. Nature sounds are synthesized live too: layer rain on a theta drift,
+      or ocean swells under the heart chakra. A gentle chime ends timed sessions.</div>
     </div>
   </main>
 
@@ -469,5 +472,7 @@
     mark();
   })();
   </script>
+  <script src="hemisync.js?v=5"></script>
+  <script>initNatureChips('nature');</script>
 </body>
 </html>
