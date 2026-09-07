@@ -154,6 +154,31 @@
         .hs-art-link:hover #hs-art-img {
             box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
         }
+
+        /* FIT-TO-SCREEN OVERRIDES (must stay last — they win the cascade).
+           Five art buttons + banner + chip overflowed fixed-height screens:
+           the portal clips (overflow:hidden) and can't scroll. Art now scales
+           with the viewport (15vh per button), the whole stack fits typical
+           screens, and a tiny screen gets an internal scroll instead of
+           clipping. The Spotify chip uses the SAME sizing as the buttons so
+           it matches them on every device. */
+        #landing-page {
+            max-height: 100vh;
+            overflow-y: auto;
+            scrollbar-width: none;
+            padding: 10px 6px;
+        }
+        #landing-page::-webkit-scrollbar { display: none; }
+        .button-container { gap: 10px; }
+        .full-width-btn-wrapper { margin-top: 0; }
+        #site-banner-img { width: min(330px, 60vw); }
+        #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #spotify-img {
+            width: auto;
+            height: auto;
+            max-width: min(200px, 46vw);
+            max-height: clamp(88px, 15vh, 160px);
+        }
+        .spotify-link { width: auto; }
     </style>
 </head>
 <body>
