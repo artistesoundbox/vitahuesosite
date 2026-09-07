@@ -29,6 +29,7 @@
   try { muted = localStorage.getItem(KEY) === '1'; } catch (e) { /* private mode */ }
 
   var btn = null;
+  var pill = null;
   var fadeTimer = null;
 
   // expose a peek handle for diagnostics/testing
@@ -62,6 +63,7 @@
         // start now that the bytes are in memory.
         flushPending();
         updateBtn();
+        syncPill();
       })
       .catch(function () { /* network hiccup: first click retries via start() */ });
   }
@@ -90,9 +92,12 @@
     a.play().then(function () {
       if (!muted) fadeTo(BASE_VOL, 1800);
       updateBtn();
+      syncPill();
     }).catch(function () {
-      // Gesture needed after all: retry on next interaction.
+      // Gesture needed after all: retry on next interaction, and surface
+      // the rescue pill so the visitor knows one tap starts the music.
       pendingStart = true;
+      syncPill();
     });
     return true;
   }
@@ -111,6 +116,7 @@
       pendingStart = false;
       playFromBlob();
     }
+    syncPill();
   }
 
   /* ---------- toggle UI ---------- */
@@ -120,6 +126,48 @@
     btn.textContent = muted ? '🔇' : '🔊';
     btn.title = muted ? 'Play portal music' : 'Mute portal music';
     btn.style.opacity = muted ? '0.45' : '0.85';
+  }
+
+  /* Visible rescue pill: whenever music is NOT playing but the visitor
+     clearly wants it (muted in a past visit, or autoplay blocked after the
+     blob landed), a big obvious "TAP FOR MUSIC" appears. Silence never
+     becomes a mystery to debug. Hidden the moment audio is live. */
+  function syncPill() {
+    if (!pill) return;
+    var live = !!(audio && !audio.paused && !audio.ended && audio.currentTime > 0);
+    var show = !live && (muted || pendingStart);
+    pill.style.display = show ? 'flex' : 'none';
+  }
+
+  function makePill() {
+    pill = document.createElement('button');
+    pill.id = 'vh-portal-music-pill';
+    pill.textContent = '🔊 TAP FOR MUSIC';
+    pill.style.cssText = [
+      'position:fixed', 'left:50%', 'bottom:26px', 'transform:translateX(-50%)',
+      'z-index:9999', 'display:none', 'align-items:center',
+      'padding:12px 26px', 'border-radius:999px', 'cursor:pointer',
+      'background:rgba(8,14,26,0.72)', 'color:#dce8ff',
+      'border:1px solid rgba(140,180,255,0.45)', 'font-size:15px',
+      'letter-spacing:0.12em', 'font-family:inherit', 'backdrop-filter:blur(6px)'
+    ].join(';');
+    var st = document.createElement('style');
+    st.textContent = '@keyframes vhMusicPulse{0%,100%{box-shadow:0 0 10px rgba(90,150,255,0.15)}50%{box-shadow:0 0 24px rgba(90,150,255,0.5)}}';
+    document.head.appendChild(st);
+    pill.style.animation = 'vhMusicPulse 2.4s ease-in-out infinite';
+    pill.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (muted) {
+        muted = false;
+        try { localStorage.setItem(KEY, '0'); } catch (err) { /* private mode */ }
+      }
+      pendingStart = false;
+      start();
+      updateBtn();
+      syncPill();
+    });
+    document.body.appendChild(pill);
+    syncPill();
   }
 
   function makeToggle() {
@@ -146,6 +194,7 @@
         start();
       }
       updateBtn();
+      syncPill();
     });
     document.body.appendChild(btn);
     updateBtn();
@@ -175,9 +224,14 @@
   window.addEventListener('keydown', onFirst, OPTS);
   window.addEventListener('touchstart', onFirst, OPTS);
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', makeToggle);
-  } else {
+  function mountAll() {
     makeToggle();
+    makePill();
+    syncPill();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mountAll);
+  } else {
+    mountAll();
   }
 })();
