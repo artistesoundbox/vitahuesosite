@@ -100,8 +100,8 @@
             box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
         }
 
-        /* SPOTIFY artist link — small corner chip under the buttons */
-        .spotify-link {
+        /* MY MUSIC link — chip under the buttons (BandLab albums page) */
+        .music-link {
             pointer-events: auto;
             display: block;
             margin: 22px auto 0;
@@ -110,8 +110,8 @@
             opacity: 0.85;
             transition: opacity 0.2s ease, filter 0.2s ease;
         }
-        .spotify-link:hover { opacity: 1; filter: drop-shadow(0 0 12px rgba(30, 215, 96, 0.6)); }
-        #spotify-img { display: block; width: 100%; height: auto; }
+        .music-link:hover { opacity: 1; filter: drop-shadow(0 0 12px rgba(180, 90, 255, 0.6)); }
+        #music-img { display: block; width: 100%; height: auto; }
 
         /* MOVIES art button — same spec as the PLAY art button */
         .movies-art-link {
@@ -173,7 +173,7 @@
         .button-container { gap: 10px; }
         .full-width-btn-wrapper { margin-top: 0; }
         #site-banner-img { width: min(330px, 60vw); }
-        #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #spotify-img {
+        #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #music-img {
             display: block;
             margin: 0 auto;   /* keep the chip centered under the column */
             width: auto;
@@ -181,7 +181,7 @@
             max-width: min(200px, 46vw);
             max-height: clamp(88px, 15vh, 160px);
         }
-        .spotify-link { width: auto; }
+        .music-link { width: auto; }
     </style>
 </head>
 <body>
@@ -222,10 +222,10 @@
             </div>
         </div>
 
-        <!-- Artist music on BandLab (Spotify direct link pending) -->
-        <a class="spotify-link" id="spotify-artist-link" href="mymusic.html" aria-label="My Music – Anthonitus on BandLab"
+        <!-- MY MUSIC — the fivetilogy on BandLab -->
+        <a class="music-link" id="music-artist-link" href="mymusic.html" aria-label="My Music – the five albums on BandLab"
            title="My Music — the five-chapter saga on BandLab">
-            <img src="spotify.png" alt="Anthonitus on Spotify" id="spotify-img" />
+            <img src="mymusic.png" alt="My Music" id="music-img" />
         </a>
     </div>	<script type="module" src="main.js"></script>
 	<script src="portal-music.js?v=5"></script>
