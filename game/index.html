@@ -232,6 +232,122 @@ const engine = new Engine(GODOT_CONFIG);
 <script src="../spotify.js?v=3"></script>
 <script src="../hemisync.js?v=3"></script>
 <script>initSpotifyPanel();initHemisyncPanel();</script>
+
+<script>
+/*
+ * Tilt steering — device orientation -> Godot game (Over The Ice).
+ * Inlined into the web export shell by tools/patch-web-export.mjs.
+ *
+ *   - Listens to `deviceorientation` (accelerationIncludingGravity).
+ *   - Captures a NEUTRAL BASELINE the first time the readings are stable,
+ *     and re-captures after ~1.8 s of stillness (self-drift correction).
+ *   - Derives the screen's up/right directions from the baseline itself,
+ *     so portrait, landscape-left and landscape-right all steer correctly
+ *     without orientation-API convention guesswork.
+ *   - Full deflection at ~22 degrees of tilt, smoothed ~60 Hz.
+ *   - Feeds the game through window.vhTilt(x, y): x = right, y = UP,
+ *     each -1..1 (game.gd clamps and forwards to the saucer).
+ *   - iOS 13+ needs a user gesture for sensor permission: the first tap
+ *     anywhere (the start screen's TAP TO START) triggers the request.
+ *     Denied/unavailable -> tilt stays off silently; drag steering and
+ *     taps are unaffected.
+ */
+(function () {
+  'use strict';
+
+  var FULL = 3.7;            // accel delta (m/s^2) at full deflection (~22 deg)
+  var MAXX = 1.0, MAXY = 1.0;
+  var STILL_MS = 1800;       // stillness required to re-capture the baseline
+  var SMOOTH = 0.25;         // per-event lerp toward the target vector
+
+  var base = null;           // { x, y, z } neutral gravity in device frame
+  var lastStill = 0;         // epoch ms of the last near-baseline reading
+  var tx = 0, ty = 0;        // smoothed output
+  var granted = false;       // permission resolved (or not needed)
+  var asked = false;
+
+  function send() {
+    if (typeof window.vhTilt === 'function' && !document.hidden) {
+      window.vhTilt(tx, ty);
+    }
+  }
+
+  function capture(a) {
+    base = { x: a.x, y: a.y, z: a.z };
+    lastStill = Date.now();
+  }
+
+  function onOrient(e) {
+    var a = e.accelerationIncludingGravity;
+    if (!a || (a.x === null && a.y === null && a.z === null)) return;
+    var ax = a.x || 0, ay = a.y || 0, az = a.z || 0;
+    var g = Math.sqrt(ax * ax + ay * ay + az * az);
+    if (g < 4.0) return;   // free-fall / violent shake: unusable frame
+
+    if (!base) { capture({ x: ax, y: ay, z: az }); return; }
+
+    var dx = ax - base.x, dy = ay - base.y, dz = az - base.z;
+    var dev = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+    // stillness watchdog: park at neutral AND refresh the baseline (drift)
+    var now = Date.now();
+    if (dev < 1.0) {
+      if (lastStill === 0) lastStill = now;
+      if (now - lastStill > STILL_MS) {
+        capture({ x: ax, y: ay, z: az });
+        tx = 0; ty = 0; send();
+        return;
+      }
+    } else {
+      lastStill = 0;
+    }
+
+    // screen directions from the baseline: whichever device axis holds the
+    // most gravity IS the screen-up axis (screen faces the player)
+    var ux = 0, uy = 0;
+    if (Math.abs(base.x) >= Math.abs(base.y)) ux = base.x >= 0 ? 1 : -1;
+    else uy = base.y >= 0 ? 1 : -1;
+    var rx = uy, ry = -ux;   // screen-right = screen-up rotated 90 deg CW
+
+    var up = dx * ux + dy * uy;        // + = screen-top edge tipped toward player
+    var right = dx * rx + dy * ry;     // + = screen-right edge dipped down
+
+    var gx = Math.max(-MAXX, Math.min(MAXX, right / FULL));
+    var gy = Math.max(-MAXY, Math.min(MAXY, up / FULL));
+    tx += (gx - tx) * SMOOTH;
+    ty += (gy - ty) * SMOOTH;
+    send();
+  }
+
+  function start() {
+    if (granted) return;
+    granted = true;
+    window.addEventListener('deviceorientation', onOrient, { passive: true });
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && base) lastStill = 0;   // re-baseline after resume
+    });
+  }
+
+  function ask() {
+    if (asked) return;
+    asked = true;
+    var D = window.DeviceOrientationEvent;
+    if (D && typeof D.requestPermission === 'function') {
+      D.requestPermission().then(function (state) {
+        if (state === 'granted') start();
+      }).catch(function () { /* denied: drag steering still works */ });
+    } else {
+      start();   // Android / desktop: no permission gate
+    }
+  }
+
+  // permission must ride a real user gesture — first touch/click/key anywhere
+  window.addEventListener('touchend', ask, { once: false, capture: true });
+  window.addEventListener('pointerdown', ask, { once: false, capture: true });
+  window.addEventListener('keydown', ask, { once: false, capture: true });
+})();
+
+</script>
 </body>
 </html>
 
