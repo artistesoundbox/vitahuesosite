@@ -79,6 +79,40 @@
             box-shadow: 0 0 26px rgba(80, 150, 255, 0.5); /* same glow as landing .btn:hover */
         }
 
+        /* CRAZY ALGORITHM art button — same spec as the other art buttons */
+        .ca-art-link {
+            pointer-events: auto;
+            display: block;
+            text-align: center;
+            line-height: 0;
+        }
+        #ca-art-img {
+            display: block;
+            max-width: 215px;
+            width: 100%;
+            height: auto;
+            margin: 0 auto;
+            border-radius: 18px;
+            box-shadow: 0 0 22px rgba(80, 150, 255, 0.35);
+            transition: box-shadow 0.25s ease;
+        }
+        .ca-art-link:hover #ca-art-img {
+            box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
+        }
+
+        /* SPOTIFY artist link — small corner chip under the buttons */
+        .spotify-link {
+            pointer-events: auto;
+            display: block;
+            margin: 22px auto 0;
+            width: min(150px, 34vw);
+            line-height: 0;
+            opacity: 0.85;
+            transition: opacity 0.2s ease, filter 0.2s ease;
+        }
+        .spotify-link:hover { opacity: 1; filter: drop-shadow(0 0 12px rgba(30, 215, 96, 0.6)); }
+        #spotify-img { display: block; width: 100%; height: auto; }
+
         /* MOVIES art button — same spec as the PLAY art button */
         .movies-art-link {
             pointer-events: auto;
@@ -151,7 +185,20 @@
                     <img src="hemisync.png" alt="Hemisync – chakra tone sanctuary" id="hs-art-img" />
                 </a>
             </div>
+
+            <!-- Crazy Algorithm — a different way to browse YouTube -->
+            <div class="full-width-btn-wrapper">
+                <a href="crazy.html" class="ca-art-link" id="crazy-button" aria-label="Crazy Algorithm – a different way to browse YouTube">
+                    <img src="crazyalgo.png" alt="Crazy Algorithm – a different way to browse YouTube" id="ca-art-img" />
+                </a>
+            </div>
         </div>
+
+        <!-- Artist Spotify — href pending (owner resolving Spotify login) -->
+        <a class="spotify-link" id="spotify-artist-link" href="#" aria-label="Anthonitus on Spotify"
+           title="Anthonitus on Spotify — link coming soon">
+            <img src="spotify.png" alt="Anthonitus on Spotify" id="spotify-img" />
+        </a>
     </div>	<script type="module" src="main.js"></script>
 	<script src="portal-music.js?v=5"></script>
 	<script src="install.js?v=1"></script>

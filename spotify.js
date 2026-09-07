@@ -387,6 +387,63 @@ function initSpotifyPanel(opts) {
      The bridge registers LATE (after the ~310 MB pack loads), so poll for
      it instead of checking once at mount. */
   $('sp-game-row').style.display = 'none';
+
+  /* ---------- pause safety net (moved here from the retired hemisync
+     panel — this right-side widget is the only one the game mounts) ------
+
+     1. Floating RESUME GAME button: appears bottom-center whenever the
+        game reports PAUSED. Keyboard focus, device, and input quirks are
+        irrelevant — the button calls the bridge directly.
+     2. ESC rescue: Godot only hears keys while its canvas is focused;
+        when focus lives elsewhere the game never gets ESC. This handler
+        refocuses the canvas and resumes on the game's behalf. When the
+        canvas IS focused it does nothing (Godot handles ESC itself —
+        forwarding would double-toggle straight back to paused).
+     3. Canvas-click resume: clicking the game area itself resumes a
+        paused game (deliberate: widget clicks never reach the canvas). */
+  const resumeFlo = document.createElement('button');
+  resumeFlo.id = 'vh-resume-float';
+  resumeFlo.textContent = '\u25B6 RESUME GAME';
+  resumeFlo.style.cssText = [
+    'position:fixed', 'left:50%', 'bottom:9%', 'transform:translateX(-50%)',
+    'z-index:9998', 'display:none', 'align-items:center',
+    'padding:15px 38px', 'border-radius:999px', 'font-size:15px',
+    'letter-spacing:0.22em', 'font-family:inherit',
+    'color:#eaf7ff', 'background:rgba(16,34,52,0.85)',
+    'border:1px solid rgba(110,220,150,0.75)', 'cursor:pointer',
+    'box-shadow:0 0 26px rgba(70,196,110,0.35)', 'backdrop-filter:blur(6px)'
+  ].join(';');
+  resumeFlo.addEventListener('click', () => {
+    try { resumeFlo.blur(); } catch (e) { /* ignore */ }
+    if (typeof window.vhGamePause === 'function') window.vhGamePause(false);
+  });
+  document.body.appendChild(resumeFlo);
+  const syncResumeFloat = () => {
+    const show = (typeof window.vhGamePause === 'function') && window._vhLastPaused === true;
+    resumeFlo.style.display = show ? 'flex' : 'none';
+  };
+  setInterval(syncResumeFloat, 500);
+  syncResumeFloat();
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const c = document.querySelector('canvas');
+    if (c && document.activeElement === c) return;   // game is listening
+    if (c && c.focus) { try { c.focus(); } catch (err) { /* ignore */ } }
+    if (window._vhLastPaused === true && typeof window.vhGamePause === 'function') {
+      window.vhGamePause(false);   // paused AND deaf: resume for it
+    }
+  }, true);   // capture: runs before the page's other key handlers
+
+  document.addEventListener('mousedown', (e) => {
+    if (window._vhLastPaused !== true) return;
+    if (typeof window.vhGamePause !== 'function') return;
+    // only clicks that land ON the canvas (or its container) resume —
+    // panel/tab clicks pass through the target check untouched
+    if (e.target === document.querySelector('canvas')) {
+      window.vhGamePause(false);
+    }
+  }, true);
   // Pause-state sink defined at MOUNT: Godot pushes its initial state the
   // instant it registers the bridge — before the poll below can install a
   // listener — so the sink must already exist. The latest pushed value is
@@ -449,3 +506,5 @@ function initSpotifyPanel(opts) {
 }
 
 window.VH_SPOTIFY = { initSpotifyPanel, finishSpotifyLogin, spotifyLogin, spToken, spCommand, isPlaying, refreshPlaybackState, ensurePlayer };
+/* hemisync panel removed from the game page at the owner's request — the
+   sanctuary page (hemisync.html) still mounts the full engine standalone. */

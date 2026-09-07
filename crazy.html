@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Crazy Algorithm – Vitamina Hueso @ Manteca Studios</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; min-height: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #cfe4ff;
+      background: #04070d;
+    }
+    body {
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(160, 60, 200, 0.16), transparent 60%),
+        radial-gradient(900px 500px at 10% 110%, rgba(80, 150, 255, 0.10), transparent 60%),
+        #04070d;
+    }
+    a { color: #8ec2ff; }
+
+    .title-art {
+      display: block;
+      width: min(300px, 70vw);
+      height: auto;
+      margin: 0 auto 18px;
+      border-radius: 18px;
+      box-shadow: 0 0 22px rgba(180, 90, 255, 0.35);
+    }
+    header {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 46px 6vw 10px;
+    }
+    .kicker {
+      font-size: 14px; letter-spacing: 0.42em; text-transform: uppercase;
+      color: #7f9cbd; margin-bottom: 8px;
+    }
+    header h1 {
+      font-size: clamp(36px, 6vw, 62px); letter-spacing: 0.1em;
+      color: #eaf4ff; text-shadow: 0 0 30px rgba(180, 90, 255, 0.55);
+      margin-bottom: 10px;
+    }
+    header p.tag {
+      font-size: clamp(15px, 2vw, 19px); line-height: 1.55;
+      color: #9fb8d8; max-width: 860px;
+    }
+    .top-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 18px; flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-block; padding: 15px 52px; font-size: 18px;
+      letter-spacing: 0.3em; text-transform: uppercase; color: #cfe4ff;
+      background: rgba(8, 14, 24, 0.6);
+      border: 1px solid rgba(120, 180, 255, 0.6); border-radius: 999px;
+      cursor: pointer; text-decoration: none; font-family: inherit;
+      backdrop-filter: blur(6px); transition: all 0.25s ease;
+    }
+    .btn:hover {
+      color: #ffffff; background: rgba(20, 40, 70, 0.85);
+      border-color: rgba(160, 210, 255, 0.95);
+      box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
+    }
+    .btn.small { padding: 11px 34px; font-size: 14px; }
+
+    main { max-width: 1200px; margin: 0 auto; padding: 26px 6vw 80px; }
+
+    /* ---- algorithm console ---- */
+    .console {
+      display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+      padding: 16px 18px; margin-bottom: 8px;
+      border: 1px solid rgba(180, 90, 255, 0.35); border-radius: 16px;
+      background: rgba(12, 8, 24, 0.55); backdrop-filter: blur(6px);
+    }
+    #crazy-q {
+      flex: 1 1 260px; max-width: 420px; padding: 12px 18px;
+      font: inherit; font-size: 15px; color: #eaf4ff;
+      background: rgba(8, 14, 24, 0.7);
+      border: 1px solid rgba(180, 90, 255, 0.45); border-radius: 999px;
+      outline: none; transition: border-color .2s, box-shadow .2s;
+    }
+    #crazy-q::placeholder { color: #6f88a8; }
+    #crazy-q:focus { border-color: rgba(210, 150, 255, 0.9); box-shadow: 0 0 18px rgba(180, 90, 255, 0.35); }
+    .ca-btn {
+      padding: 12px 26px; font-size: 13px; letter-spacing: 0.18em;
+      text-transform: uppercase; color: #eaddff; cursor: pointer;
+      background: rgba(30, 16, 50, 0.7);
+      border: 1px solid rgba(180, 90, 255, 0.6); border-radius: 999px;
+      font-family: inherit; transition: all 0.2s ease; white-space: nowrap;
+    }
+    .ca-btn:hover {
+      color: #fff; border-color: rgba(220, 160, 255, 0.95);
+      box-shadow: 0 0 20px rgba(180, 90, 255, 0.45);
+    }
+    .ca-btn.warn {
+      color: #ffe9c9; background: rgba(50, 28, 8, 0.6);
+      border-color: rgba(255, 170, 80, 0.6);
+    }
+    .ca-btn.warn:hover { border-color: rgba(255, 200, 120, 0.95); box-shadow: 0 0 20px rgba(255, 170, 80, 0.4); }
+    .meter-wrap { display: flex; flex-direction: column; gap: 4px; min-width: 200px; flex: 1 1 200px; }
+    .meter-label { font-size: 11px; letter-spacing: 0.16em; color: #9fb8d8; text-transform: uppercase; }
+    .meter { height: 8px; border-radius: 999px; background: rgba(8, 14, 24, 0.8); overflow: hidden; }
+    .meter > div {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #46c46e, #e8c93e, #e5484d);
+      transition: width .6s ease;
+    }
+    #meter-note { font-size: 11px; color: #6f88a8; }
+
+    .flash {
+      display: none; margin: 10px 0 4px; padding: 10px 18px;
+      border-radius: 12px; font-size: 14px; letter-spacing: 0.08em;
+      color: #eaddff; background: rgba(30, 16, 50, 0.6);
+      border: 1px solid rgba(180, 90, 255, 0.5);
+    }
+
+    /* ---- video grid ---- */
+    .grid {
+      display: grid; gap: 18px;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      margin-top: 14px;
+    }
+    .card {
+      border: 1px solid rgba(120, 180, 255, 0.25); border-radius: 14px;
+      overflow: hidden; background: rgba(8, 14, 24, 0.5);
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+      display: flex; flex-direction: column;
+    }
+    .card:hover {
+      transform: translateY(-3px); border-color: rgba(180, 90, 255, 0.6);
+      box-shadow: 0 8px 26px rgba(120, 60, 200, 0.25);
+    }
+    .card .thumb { position: relative; line-height: 0; cursor: pointer; }
+    .card .thumb img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
+    .card .thumb .play {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 42px; color: rgba(234, 244, 255, 0.9); text-shadow: 0 0 18px rgba(0,0,0,0.8);
+      opacity: 0; transition: opacity .18s ease; background: rgba(4, 7, 13, 0.25);
+    }
+    .card .thumb:hover .play { opacity: 1; }
+    .card .body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+    .card .t { font-size: 15px; font-weight: 600; color: #eaf4ff; line-height: 1.3; }
+    .card .s { font-size: 12.5px; color: #8aa2c4; line-height: 1.4; }
+    .card .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 6px; }
+    .card .tag {
+      font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+      color: #9fb8d8; border: 1px solid rgba(120, 180, 255, 0.3);
+      border-radius: 999px; padding: 3px 9px;
+    }
+    .card .row { display: flex; gap: 8px; align-items: center; }
+    .icon-btn {
+      flex: 1; padding: 7px 0; font-size: 12px; letter-spacing: 0.06em;
+      color: #9fb8d8; background: rgba(8, 14, 24, 0.6);
+      border: 1px solid rgba(120, 180, 255, 0.3); border-radius: 999px;
+      cursor: pointer; font-family: inherit; transition: all .18s ease;
+    }
+    .icon-btn:hover { color: #fff; border-color: rgba(160, 210, 255, 0.8); }
+    .icon-btn.on { color: #ffd9e8; border-color: rgba(255, 120, 170, 0.8); background: rgba(50, 16, 30, 0.55); }
+    .icon-btn.save-on { color: #fff3c9; border-color: rgba(232, 201, 62, 0.8); background: rgba(50, 42, 8, 0.55); }
+
+    #empty {
+      display: none; margin-top: 40px; text-align: center;
+      color: #6f88a8; font-size: 15px; line-height: 1.6;
+    }
+
+    /* ---- history rail ---- */
+    .rail-sec { margin-top: 42px; }
+    .rail-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap; margin-bottom: 12px;
+    }
+    .rail-head h2 { font-size: 15px; letter-spacing: 0.22em; color: #9fb8d8; text-transform: uppercase; }
+    .rail { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; }
+    .rail .mini {
+      flex: 0 0 200px; border: 1px solid rgba(120, 180, 255, 0.25);
+      border-radius: 10px; overflow: hidden; background: rgba(8, 14, 24, 0.5); cursor: pointer;
+    }
+    .rail .mini img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
+    .rail .mini .mt { font-size: 12px; color: #cfe4ff; padding: 8px 10px; line-height: 1.3;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ---- theater ---- */
+    #theater {
+      position: fixed; inset: 0; z-index: 90; display: none;
+      background: rgba(2, 4, 8, 0.92); backdrop-filter: blur(8px);
+    }
+    #theater.open { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    #theater .frame {
+      width: min(1100px, 92vw); aspect-ratio: 16/9;
+      border-radius: 14px; overflow: hidden; background: #000;
+      box-shadow: 0 0 60px rgba(120, 60, 200, 0.35);
+    }
+    #theater iframe { width: 100%; height: 100%; border: 0; }
+    #theater .bar {
+      width: min(1100px, 92vw); display: flex; align-items: center;
+      justify-content: space-between; gap: 14px; padding: 14px 4px 0;
+    }
+    #now-playing { font-size: 15px; color: #eaf4ff; }
+    #theater .close {
+      padding: 10px 26px; font-size: 13px; letter-spacing: 0.2em;
+      color: #cfe4ff; background: rgba(8, 14, 24, 0.7);
+      border: 1px solid rgba(120, 180, 255, 0.5); border-radius: 999px;
+      cursor: pointer; font-family: inherit;
+    }
+    #theater .close:hover { color: #fff; border-color: rgba(160, 210, 255, 0.9); }
+
+    .footer-note {
+      max-width: 900px; margin: 46px auto 0; padding: 0 6vw;
+      color: #6f88a8; font-size: 12.5px; line-height: 1.65; text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="crazyalgo.png" alt="Crazy Algorithm" class="title-art" />
+    <div class="top-row" style="margin-top:18px">
+      <a class="btn small nav-back" href="index.html">◀ BACK</a>
+      <a class="btn small" href="index.html">⌂ HOME</a>
+    </div>
+    <h1 style="margin-top:26px">CRAZY ALGORITHM</h1>
+    <p class="tag">A YouTube sandbox that plays by <b>your</b> rules. Watch, like, and save —
+    and watch the feed narrow around you, just like the real thing. Then hit
+    <b>SCRAMBLE</b>, type anything (or nothing), and press <b>CRAZY ALGORITHM</b> for a
+    fresh, logged-out feed built from what you asked — or pure chaos.</p>
+  </header>
+
+  <main>
+    <div class="console">
+      <input id="crazy-q" type="text" spellcheck="false"
+        placeholder="Tell the algorithm anything… (optional)" />
+      <button class="ca-btn" id="go-crazy" title="Rebuild the feed from your words — or pure chaos">⚡ Crazy Algorithm</button>
+      <button class="ca-btn warn" id="scramble" title="Wipe the algorithm's memory of you">✳ Scramble</button>
+      <div class="meter-wrap">
+        <div class="meter-label">Your bubble · <span id="bubble-pct">0%</span></div>
+        <div class="meter"><div id="bubble-bar"></div></div>
+        <div id="meter-note">watch, like &amp; save — the feed follows</div>
+      </div>
+    </div>
+    <div class="flash" id="flash"></div>
+
+    <div class="grid" id="grid"></div>
+    <div id="empty">Nothing matches that ask — the algorithm shrugs.<br />Try another word, or scramble for pure chaos.</div>
+
+    <div class="rail-sec" id="hist-sec" style="display:none">
+      <div class="rail-head">
+        <h2>Your history — the algorithm's memory</h2>
+        <button class="ca-btn warn" id="clear-hist">Clear history</button>
+      </div>
+      <div class="rail" id="hist-rail"></div>
+    </div>
+
+    <p class="footer-note">The algorithm here is a honest little simulation: it runs entirely in your
+    browser, learns only from what you watch, like, and save on this page, and narrows the feed the
+    same way recommendation engines do. Scramble wipes its memory. Nothing is uploaded anywhere —
+    the videos play straight from YouTube. Every title is verified playable and hand-picked from the
+    Vitamina Hueso library.</p>
+  </main>
+
+  <div id="theater">
+    <div class="frame"><iframe id="player" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
+    <div class="bar">
+      <div id="now-playing">&nbsp;</div>
+      <button class="close" id="close-theater">CLOSE ✕</button>
+    </div>
+  </div>
+
+<script>
+'use strict';
+
+/* ---------- catalog: the verified Vitamina Hueso library ----------
+   Every id below is oEmbed-verified embeddable (same set movies.html plays).
+   Tags drive the simulated algorithm: watching/liking/saving feeds them. */
+var CAT = (function () {
+  var v = [];
+  function add(id, title, sub, tags) { v.push({ id: id, title: title, sub: sub, tags: tags }); }
+
+  // AI & alien shorts
+  add('F2av8beFltE', 'KEPLER-37B: Journey to the Alien Planet', 'AI Film · Exoplanet Research', ['ai', 'alien', 'space']);
+  add('9ERK_nnZQ3Q', 'A Cosmic Odyssey', 'AI Film · AI Retro Vision', ['ai', 'space', 'odyssey']);
+  add('6dtSqhYhcrs', 'Last Stand', 'AI Film · Hashem Al-Ghaili', ['ai', 'war', 'sci-fi']);
+  add('H6-N1v1REu8', 'Simulation', 'Award-Winning Sci-Fi · Hashem Al-Ghaili', ['ai', 'sci-fi', 'mind']);
+  add('ziw03BIcqdU', 'STRANDED: Survival Island', 'AI Film · Karma ai films', ['ai', 'survival', 'island']);
+  add('X0mhMgdI08I', 'Alien Jungle Saga', 'AI Film · Pure AI Films', ['ai', 'alien', 'jungle']);
+  add('5fco1hT4vAo', 'Humans vs. Kaaris — Final Battle', 'AI Film · ImaginaryStudio', ['ai', 'war', 'alien']);
+  add('NWe79HR3-hk', 'The Girl and the Alien Robot', 'AI Film · Neon Toad', ['ai', 'alien', 'family']);
+  add('Sgm_4WRcGRo', "R'ha", 'CGI Sci-Fi · DUST', ['cgi', 'alien', 'sci-fi']);
+  add('NLAZubEa6X4', 'WOODNUTS', 'Sci-Fi Horror · Gossip Goblin', ['horror', 'sci-fi', 'cgi']);
+  add('uWCGK4nneeU', 'The OceanMaker', 'Sci-Fi · DUST', ['sci-fi', 'drama', 'sky']);
+  add('t8LD0iUYv80', 'FTL', 'Sci-Fi · DUST', ['sci-fi', 'space', 'action']);
+  add('07eWIv-Bwmo', 'BEACON', 'Animated Sci-Fi Horror · animatrocities', ['animation', 'horror', 'sci-fi']);
+  add('amXGChr-YFI', 'LAST MAN', 'Post-Apocalyptic · Cracked Bulb Films', ['post-apoc', 'drama', 'sci-fi']);
+  add('mEVl0NS0vu8', "That's AI", 'AI-Thriller · maximise', ['ai', 'thriller', 'mind']);
+
+  // NEW EARTH series
+  add('hnub0J4BRTs', "New Earth — Prologue: Humanity's First Contact", 'AVERN PICTURES · AI series', ['series', 'ai', 'alien', 'first-contact']);
+  add('GOP_8wX8Nx0', 'New Earth E2 — Human Greed Woke the True King', 'AVERN PICTURES · AI series', ['series', 'ai', 'alien', 'king']);
+  add('9Wihw4Tgm9I', 'New Earth E3 — The Last Guardian of Nythora', 'AVERN PICTURES · AI series', ['series', 'ai', 'alien', 'guardian']);
+  add('BVZAwnQYFnw', 'New Earth E4 — Save The Guardian of Nythora', 'AVERN PICTURES · AI series', ['series', 'ai', 'alien', 'guardian']);
+  add('maSFH2JWOy4', 'New Earth E5 — King ZUGO Has Awakened', 'AVERN PICTURES · AI series', ['series', 'ai', 'alien', 'king']);
+
+  // ATROPA (DUST)
+  add('YVuZDtz-Aes', 'ATROPA E1', 'DUST · time-loop thriller', ['series', 'timeloop', 'thriller', 'dust']);
+  add('HbGZl0gqo6A', 'ATROPA E2', 'DUST · time-loop thriller', ['series', 'timeloop', 'thriller', 'dust']);
+  add('otZ_seBPIEk', 'ATROPA E3', 'DUST · time-loop thriller', ['series', 'timeloop', 'thriller', 'dust']);
+  add('ysc_reRZM5A', 'ATROPA E4', 'DUST · time-loop thriller', ['series', 'timeloop', 'thriller', 'dust']);
+  add('AxkBK5o_JL8', 'ATROPA E5', 'DUST · time-loop thriller', ['series', 'timeloop', 'thriller', 'dust']);
+  add('dpr3tzESWjM', 'ATROPA E6', 'DUST · time-loop thriller', ['series', 'timeloop', 'thriller', 'dust']);
+  add('1YQaH1JkmBA', 'ATROPA — Season Finale', 'DUST · time-loop thriller', ['series', 'timeloop', 'thriller', 'dust']);
+
+  // ORBITAL REDUX (DUST)
+  add('mR5eo1norH8', 'Orbital Redux E1 — Earth Station', 'DUST · space station series', ['series', 'space', 'comedy', 'dust']);
+  add('zV-SjE8RVG8', 'Orbital Redux E2 — Trainee', 'DUST · space station series', ['series', 'space', 'comedy', 'dust']);
+  add('i0KWSPr6AHI', 'Orbital Redux E3 — Ransomware', 'DUST · space station series', ['series', 'space', 'comedy', 'dust']);
+  add('KTc3BK-bZJU', 'Orbital Redux E4 — Autoreply', 'DUST · space station series', ['series', 'space', 'comedy', 'dust']);
+  add('UBCYmOZsf_E', 'Orbital Redux E5 — Replacement', 'DUST · space station series', ['series', 'space', 'comedy', 'dust']);
+  add('MaRSCS426CI', 'Orbital Redux E6 — Space Junk', 'DUST · space station series', ['series', 'space', 'comedy', 'dust']);
+  add('pxz-2-KMXs8', 'Orbital Redux E7 — EVA', 'DUST · space station series', ['series', 'space', 'comedy', 'dust']);
+
+  // Fantasy & Viking realms (verified ids from the movies library)
+  add('2NECdXzCY3E', 'The Fallen', 'DUST · Viking fantasy', ['viking', 'fantasy', 'myth', 'dust']);
+  add('cnrSW543Yes', 'RAGNARÖK: The Fall of Asgard', 'AI Epic · Skyline 2147', ['viking', 'fantasy', 'myth', 'ai']);
+  add('SwQlYKurDpQ', 'LAST BLOODLINE', 'AI Fantasy Action · Dolanan AI Filmmaker', ['fantasy', 'action', 'ai']);
+  add('89nMi3tUUe0', 'THE LAST BLOODLINE: She Is the Final Crestwalker', 'Dark Fantasy Movie 2026 · Mythic AI Cinema', ['fantasy', 'action', 'ai', 'feature']);
+  add('T1GE0ire454', "THE ODYSSEY — The Only Man Who Survived the Sea's Wrath", 'Epic Fantasy · 4K · Lumz Cinema', ['fantasy', 'myth', 'sea', 'epic']);
+  add('MLC6YINuiH8', 'KAVARI — The First Arc', 'Dark Fantasy · Karma ai films · saga part 1', ['fantasy', 'action', 'ai', 'saga']);
+  add('YurJFDmXDW8', 'KAVARI 2 — Frost Realm', 'Dark Fantasy · Karma ai films · saga part 2', ['fantasy', 'action', 'ai', 'saga']);
+  add('xjMeHxrubiU', 'KAVARI 3 — Frost Realm III', 'Dark Fantasy · Karma ai films · saga part 3', ['fantasy', 'action', 'ai', 'saga']);
+  add('7smkdPmX_Ok', 'KAVARI 4 — Between Worlds', 'Dark Fantasy · Karma ai films · finale', ['fantasy', 'action', 'ai', 'saga']);
+  add('r7_bvyqLlH8', 'TRACE', 'Norwegian Viking Short · Dahlslett Film', ['viking', 'fantasy', 'drama']);
+  add('_yqbowUiH-s', 'Age of Vikings: Fated', 'Viking Short · Grimfrost', ['viking', 'drama', 'myth']);
+  add('T2YnIWq683A', 'The Last Rune', 'Dark Fantasy AI Film · Fighter One', ['fantasy', 'myth', 'magic']);
+  add('EPjxqzQ-5Yw', 'Lumina: The Last Seal', 'AI Fantasy · Editing by sarah', ['fantasy', 'magic', 'drama']);
+  add('tW_B7i5YmPs', 'She Stole the Last Sunrise', 'AI Fantasy · AI Imagination', ['fantasy', 'ai', 'magic']);
+  add('QRhFnSOkqYk', 'The Last Starborn', 'Complete Fantasy Short · Estrelle Studios', ['fantasy', 'space', 'ai']);
+  add('_rfLpj45aA0', 'AGE OF KINGDOMS', 'Epic AI Short · Tech Earning Orbit', ['fantasy', 'action', 'epic']);
+  add('yAKroHNAong', 'The Last Titan Awakens', 'Mythological Fantasy · CineForge AI', ['fantasy', 'myth', 'action']);
+
+  // Biblical animated (Torchlighters + features)
+  add('FpKbsbyEPPQ', 'The Jim Elliot Story', 'Torchlighters · animated', ['faith', 'animation', 'family']);
+  add('1BYPfTej_og', 'The William Tyndale Story', 'Torchlighters · animated', ['faith', 'animation', 'family']);
+  add('nK6ZCJLq8Wc', 'The John Bunyan Story', 'Torchlighters · animated', ['faith', 'animation', 'family']);
+  add('-VtOpo0QgBg', 'The Eric Liddell Story', 'Torchlighters · animated', ['faith', 'animation', 'family']);
+  add('5TPFJYxb4q0', 'The Gladys Aylward Story', 'Torchlighters · animated', ['faith', 'animation', 'family']);
+  add('614xOxV0Rl8', 'The Richard Wurmbrand Story', 'Torchlighters · animated', ['faith', 'animation', 'family']);
+  add('cFMbuTbNDvc', 'The Perpetua Story', 'Torchlighters · animated', ['faith', 'animation', 'family']);
+  add('P0TWAuIpIJ4', 'The Amy Carmichael Story', 'Torchlighters · animated', ['faith', 'animation', 'family']);
+  add('Q9U0m9vUIOo', 'The William Booth Story', 'Torchlighters · animated', ['faith', 'animation', 'family']);
+  add('lnTE_pKV3gg', 'The Samuel Morris', 'Torchlighters · animated', ['faith', 'animation', 'family']);
+  add('ErCnSz6ILEE', 'The Augustine Story', 'Torchlighters · animated', ['faith', 'animation', 'family']);
+  add('NFL4X4csNG8', 'The Corrie ten Boom Story', 'Torchlighters · animated', ['faith', 'animation', 'family']);
+  add('gF4vkrOXw0c', 'The John Wesley Story', 'Torchlighters · animated', ['faith', 'animation', 'family']);
+  add('PwbBwi2Hqm8', 'The Robert Jermain Thomas Story', 'Torchlighters · animated', ['faith', 'animation', 'family']);
+  add('hcpoRT4WZSs', 'The Martin Luther Story', 'Torchlighters · animated', ['faith', 'animation', 'family']);
+  add('Zy2Fx5I4EOM', 'The Adoniram and Ann Judson Story', 'Torchlighters · animated', ['faith', 'animation', 'family']);
+  add('ksu-zTG9HHg', "The Pilgrim's Progress (2019)", 'Animated Feature · John Rhys-Davies', ['faith', 'animation', 'feature']);
+  add('sXeyj6EGVho', 'The Messengers', 'Animated Family Film', ['faith', 'animation', 'family']);
+  add('2o4-aVJMNKw', 'The Other Wise Man', 'Animated Christmas Classic', ['faith', 'animation', 'family']);
+  add('UdytNIZG2Ac', 'To Every Nation', 'Animated Family Film', ['faith', 'animation', 'family']);
+
+  return v;
+})();
+
+/* ---------- persistent state ---------- */
+var K_W = 'vh_crazy_weights', K_H = 'vh_crazy_history',
+    K_L = 'vh_crazy_likes', K_S = 'vh_crazy_saved';
+function load(k, d) { try { var x = localStorage.getItem(k); return x ? JSON.parse(x) : d; } catch (e) { return d; } }
+function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+var weights = load(K_W, {});          // tag -> affinity score
+var hist = load(K_H, []);             // [{id, at}] most recent first
+var liked = new Set(load(K_L, []));
+var savedSet = new Set(load(K_S, []));
+
+/* ---------- the simulated algorithm ---------- */
+function bump(tags, amount) {
+  (tags || []).forEach(function (t) { weights[t] = (weights[t] || 0) + amount; });
+  save(K_W, weights);
+}
+function bubblePct() {
+  var vals = Object.keys(weights).map(function (k) { return weights[k]; });
+  if (!vals.length) return 0;
+  var max = Math.max.apply(null, vals);
+  var sum = vals.reduce(function (a, b) { return a + b; }, 0);
+  if (sum <= 0) return 0;
+  var top = vals.filter(function (x) { return x >= max * 0.5; }).reduce(function (a, b) { return a + b; }, 0);
+  return Math.min(100, Math.round((top / sum) * 100));
+}
+function shuffle(a) {
+  a = a.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+/* current feed: affinity-ranked with jitter; zero history = pure shuffle
+   (the logged-out feeling). Watched items sink so the feed stays fresh. */
+function buildFeed(query) {
+  var watched = {};
+  hist.forEach(function (h) { watched[h.id] = true; });
+  var scored = CAT.map(function (v) {
+    var s = 0;
+    (v.tags || []).forEach(function (t) { s += (weights[t] || 0); });
+    if (watched[v.id]) s -= 8;                       // already seen: sink it
+    s += Math.random() * 3.5;                        // the chaos that keeps it alive
+    if (query) {
+      var q = query.toLowerCase();
+      var hay = (v.title + ' ' + v.sub + ' ' + (v.tags || []).join(' ')).toLowerCase();
+      if (hay.indexOf(q) !== -1) s += 100;           // the ask dominates
+      else {
+        // partial credit: any word of the ask matching
+        var words = q.split(/\s+/).filter(function (w) { return w.length > 2; });
+        words.forEach(function (w) { if (hay.indexOf(w) !== -1) s += 12; });
+      }
+    }
+    return { v: v, s: s };
+  });
+  scored.sort(function (a, b) { return b.s - a.s; });
+  return scored.map(function (x) { return x.v; });
+}
+
+/* ---------- rendering ---------- */
+var grid = document.getElementById('grid');
+var emptyEl = document.getElementById('empty');
+var histSec = document.getElementById('hist-sec');
+var histRail = document.getElementById('hist-rail');
+var flashEl = document.getElementById('flash');
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function thumb(id) { return 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg'; }
+
+function makeCard(v) {
+  var card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML =
+    '<div class="thumb"><img loading="lazy" src="' + thumb(v.id) + '" alt="">' +
+    '<div class="play">▶</div></div>' +
+    '<div class="body"><div class="t">' + esc(v.title) + '</div>' +
+    '<div class="s">' + esc(v.sub) + '</div>' +
+    '<div class="tags">' + (v.tags || []).map(function (t) { return '<span class="tag">' + esc(t) + '</span>'; }).join('') + '</div>' +
+    '<div class="row"><button class="icon-btn like' + (liked.has(v.id) ? ' on' : '') + '">♥ ' + (liked.has(v.id) ? 'Liked' : 'Like') + '</button>' +
+    '<button class="icon-btn sav' + (savedSet.has(v.id) ? ' save-on' : '') + '">☆ ' + (savedSet.has(v.id) ? 'Saved' : 'Save') + '</button></div></div>';
+  card.querySelector('.thumb').addEventListener('click', function () { watch(v); });
+  card.querySelector('.like').addEventListener('click', function () {
+    if (liked.has(v.id)) { liked.delete(v.id); bump(v.tags, -4); }
+    else { liked.add(v.id); bump(v.tags, 4); }
+    save(K_L, Array.from(liked));
+    render(feed);
+  });
+  card.querySelector('.sav').addEventListener('click', function () {
+    if (savedSet.has(v.id)) { savedSet.delete(v.id); bump(v.tags, -3); }
+    else { savedSet.add(v.id); bump(v.tags, 3); }
+    save(K_S, Array.from(savedSet));
+    render(feed);
+  });
+  return card;
+}
+
+function render(list) {
+  grid.innerHTML = '';
+  (list || []).forEach(function (v) { grid.appendChild(makeCard(v)); });
+  emptyEl.style.display = (list && list.length) ? 'none' : 'block';
+  var pct = bubblePct();
+  document.getElementById('bubble-pct').textContent = pct + '%';
+  document.getElementById('bubble-bar').style.width = pct + '%';
+  document.getElementById('meter-note').textContent =
+    pct < 15 ? 'fresh eyes — the feed is wide open' :
+    pct < 45 ? 'patterns forming — it follows your likes' :
+    pct < 75 ? 'your bubble is growing' :
+               'deep in the bubble — scramble to escape';
+  // history rail
+  if (hist.length) {
+    histSec.style.display = 'block';
+    histRail.innerHTML = '';
+    hist.slice(0, 12).forEach(function (h) {
+      var v = null;
+      CAT.forEach(function (c) { if (c.id === h.id) v = c; });
+      if (!v) return;
+      var m = document.createElement('div');
+      m.className = 'mini';
+      m.innerHTML = '<img loading="lazy" src="' + thumb(v.id) + '" alt=""><div class="mt">' + esc(v.title) + '</div>';
+      m.addEventListener('click', function () { watch(v); });
+      histRail.appendChild(m);
+    });
+  } else {
+    histSec.style.display = 'none';
+  }
+}
+
+/* ---------- watching (the strongest signal) ---------- */
+var feed = [];
+function watch(v) {
+  bump(v.tags, 2);
+  hist = hist.filter(function (h) { return h.id !== v.id; });
+  hist.unshift({ id: v.id, at: Date.now() });
+  hist = hist.slice(0, 40);
+  save(K_H, hist);
+  openTheater(v);
+  feed = buildFeed(currentQuery);
+  render(feed);
+}
+
+/* ---------- theater ---------- */
+var theater = document.getElementById('theater');
+var player = document.getElementById('player');
+var nowPlaying = document.getElementById('now-playing');
+function openTheater(v) {
+  player.src = 'https://www.youtube-nocookie.com/embed/' + v.id + '?autoplay=1&rel=0';
+  nowPlaying.textContent = '▶ ' + v.title;
+  theater.classList.add('open');
+}
+function closeTheater() {
+  player.src = '';
+  theater.classList.remove('open');
+}
+document.getElementById('close-theater').addEventListener('click', closeTheater);
+theater.addEventListener('click', function (e) { if (e.target === theater) closeTheater(); });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeTheater(); });
+
+/* ---------- the crazy button + scramble ---------- */
+var currentQuery = '';
+function flash(msg) {
+  flashEl.textContent = msg;
+  flashEl.style.display = 'block';
+  clearTimeout(flash._t);
+  flash._t = setTimeout(function () { flashEl.style.display = 'none'; }, 4200);
+}
+document.getElementById('go-crazy').addEventListener('click', function () {
+  var q = document.getElementById('crazy-q').value.trim();
+  currentQuery = q;
+  feed = buildFeed(q || null);
+  // the ask reshapes the algorithm itself, like a real interest signal
+  if (q) {
+    CAT.forEach(function (v) {
+      var hay = (v.title + ' ' + v.sub + ' ' + (v.tags || []).join(' ')).toLowerCase();
+      if (hay.indexOf(q.toLowerCase()) !== -1) bump(v.tags, 1.5);
+    });
+  }
+  render(feed);
+  flash(q ? ('⚡ FRESH FEED — tuned to "' + q + '"')
+          : '⚡ FRESH FEED — pure chaos, no memory of you');
+});
+document.getElementById('scramble').addEventListener('click', function () {
+  weights = {};
+  hist = [];
+  save(K_W, weights); save(K_H, hist);
+  currentQuery = '';
+  document.getElementById('crazy-q').value = '';
+  feed = buildFeed(null);
+  render(feed);
+  flash('✳ ALGORITHM SCRAMBLED — it no longer knows you. Fresh logged-out feed.');
+});
+document.getElementById('clear-hist').addEventListener('click', function () {
+  hist = [];
+  save(K_H, hist);
+  render(feed);
+});
+
+/* ---------- boot: fresh logged-out feed ---------- */
+feed = buildFeed(null);
+render(feed);
+</script>
+</body>
+</html>
