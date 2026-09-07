@@ -412,6 +412,35 @@
       }
     }, true);   // capture: runs before the page's other key handlers
 
+    /* Floating RESUME — the platform-proof way back into a paused game.
+       Centered, unmistakable, works regardless of where keyboard focus
+       lives, which device the player is on, or how the game was paused.
+       Appears only while the game reports PAUSED (it un-pauses via the
+       bridge; the game hides it again by pushing its new state). */
+    var resumeFlo = document.createElement('button');
+    resumeFlo.id = 'vh-resume-float';
+    resumeFlo.textContent = '\u25B6 RESUME GAME';
+    resumeFlo.style.cssText = [
+      'position:fixed', 'left:50%', 'bottom:9%', 'transform:translateX(-50%)',
+      'z-index:9998', 'display:none', 'align-items:center',
+      'padding:15px 38px', 'border-radius:999px', 'font-size:15px',
+      'letter-spacing:0.22em', 'font-family:inherit',
+      'color:#eaf7ff', 'background:rgba(16,34,52,0.85)',
+      'border:1px solid rgba(110,220,150,0.75)', 'cursor:pointer',
+      'box-shadow:0 0 26px rgba(70,196,110,0.35)', 'backdrop-filter:blur(6px)'
+    ].join(';');
+    resumeFlo.addEventListener('click', function () {
+      try { resumeFlo.blur(); } catch (e) { /* ignore */ }
+      if (typeof window.vhGamePause === 'function') window.vhGamePause(false);
+    });
+    document.body.appendChild(resumeFlo);
+    function syncResumeFloat() {
+      var show = (typeof window.vhGamePause === 'function') && window._vhLastPaused === true;
+      resumeFlo.style.display = show ? 'flex' : 'none';
+    }
+    setInterval(syncResumeFloat, 500);
+    syncResumeFloat();
+
     var tip = document.createElement('div');
     tip.style.cssText = 'color:#6f88a8;font-size:11.5px;margin-top:14px;line-height:1.5';
     tip.textContent = 'Tones are generated live (pure sine, no files). Muting the game track ' +
