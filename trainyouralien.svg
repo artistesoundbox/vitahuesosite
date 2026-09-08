@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 160">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="0%" r="130%">
+      <stop offset="0%" stop-color="#12233f"/>
+      <stop offset="100%" stop-color="#060b14"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#7fe0a8" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#7fe0a8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="2" y="2" width="426" height="156" rx="18" fill="url(#bg)" stroke="#7fe0a8" stroke-opacity="0.55" stroke-width="2"/>
+  <circle cx="60" cy="80" r="52" fill="url(#glow)"/>
+  <!-- little alien -->
+  <g transform="translate(30,28)">
+    <line x1="30" y1="12" x2="27" y2="-2" stroke="#46c46e" stroke-width="3"/>
+    <circle cx="27" cy="-4" r="5" fill="#b9ffd4"/>
+    <line x1="42" y1="12" x2="47" y2="-4" stroke="#46c46e" stroke-width="3"/>
+    <circle cx="48" cy="-6" r="5" fill="#b9ffd4"/>
+    <ellipse cx="38" cy="52" rx="30" ry="36" fill="#46c46e"/>
+    <ellipse cx="29" cy="48" rx="7.5" ry="9.5" fill="#ffffff"/>
+    <ellipse cx="47" cy="48" rx="7.5" ry="9.5" fill="#ffffff"/>
+    <ellipse cx="30.5" cy="46" rx="3.4" ry="4.4" fill="#101a2e"/>
+    <ellipse cx="45.5" cy="46" rx="3.4" ry="4.4" fill="#101a2e"/>
+    <path d="M32 68 q6 -4 12 0" stroke="#101a2e" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+    <ellipse cx="24" cy="62" rx="4" ry="2.4" fill="#b9ffd4" opacity="0.75"/>
+    <ellipse cx="52" cy="62" rx="4" ry="2.4" fill="#b9ffd4" opacity="0.75"/>
+  </g>
+  <text x="118" y="66" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700" letter-spacing="4" fill="#eaf4ff">TRAIN YOUR</text>
+  <text x="118" y="106" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="800" letter-spacing="7" fill="#b9ffd4">ALIEN</text>
+  <text x="120" y="132" font-family="Segoe UI, Arial, sans-serif" font-size="12" letter-spacing="2" fill="#8aa5c8">RAISE A LITTLE COSMIC FRIEND</text>
+  <!-- tiny stars -->
+  <circle cx="330" cy="30" r="1.6" fill="#cfe4ff" opacity="0.8"/>
+  <circle cx="392" cy="52" r="1.2" fill="#cfe4ff" opacity="0.6"/>
+  <circle cx="358" cy="120" r="1.4" fill="#cfe4ff" opacity="0.7"/>
+  <circle cx="404" cy="96" r="1" fill="#cfe4ff" opacity="0.5"/>
+</svg>

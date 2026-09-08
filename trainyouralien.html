@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Train Your Alien – Vitamina Hueso @ Manteca Studios</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; min-height: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #cfe4ff;
+      background: #04070d;
+    }
+    body {
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(40, 80, 160, 0.18), transparent 60%),
+        radial-gradient(900px 500px at 10% 110%, rgba(120, 255, 180, 0.08), transparent 60%),
+        #04070d;
+    }
+    a { color: #8ec2ff; }
+
+    header {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 46px 6vw 10px;
+      text-align: center;
+    }
+    .kicker {
+      font-size: 14px;
+      letter-spacing: 0.42em;
+      text-transform: uppercase;
+      color: #7f9cbd;
+      margin-bottom: 8px;
+    }
+    header h1 {
+      font-size: clamp(36px, 6vw, 62px);
+      letter-spacing: 0.1em;
+      color: #eaf4ff;
+      text-shadow: 0 0 30px rgba(80, 150, 255, 0.55);
+      margin-bottom: 10px;
+    }
+    header p.tag {
+      font-size: clamp(15px, 2vw, 19px);
+      line-height: 1.55;
+      color: #9fb8d8;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    .top-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 26px;
+    }
+    .btn {
+      display: inline-block;
+      padding: 13px 42px;
+      font-size: 16px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #cfe4ff;
+      background: rgba(8, 14, 24, 0.6);
+      border: 1px solid rgba(120, 180, 255, 0.6);
+      border-radius: 999px;
+      cursor: pointer;
+      text-decoration: none;
+      font-family: inherit;
+      backdrop-filter: blur(6px);
+      transition: all 0.25s ease;
+    }
+    .btn:hover {
+      color: #ffffff;
+      background: rgba(20, 40, 70, 0.85);
+      border-color: rgba(160, 210, 255, 0.95);
+      box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
+    }
+    .btn.small { padding: 10px 30px; font-size: 14px; }
+    .btn.glow-green:hover {
+      box-shadow: 0 0 26px rgba(70, 196, 110, 0.55);
+      border-color: rgba(90, 220, 140, 0.95);
+    }
+
+    main { max-width: 1200px; margin: 0 auto; padding: 0 6vw 90px; }
+
+    /* ---------- identity bar ---------- */
+    .identity {
+      max-width: 640px;
+      margin: 0 auto;
+      background: rgba(8, 14, 24, 0.55);
+      border: 1px solid rgba(120, 180, 255, 0.3);
+      border-radius: 18px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .identity .who { font-size: 14px; color: #9fb8d8; }
+    .identity .who b { color: #eaf4ff; }
+    .identity .guest-note { font-size: 12.5px; color: #7f9cbd; }
+    .identity .login-btn {
+      margin-left: auto;
+      font-size: 13px;
+      padding: 8px 20px;
+      letter-spacing: 0.1em;
+    }
+
+    /* ---------- section headers ---------- */
+    .section {
+      margin: 46px 0 10px;
+      text-align: center;
+    }
+    .section h2 {
+      font-size: clamp(24px, 3.4vw, 36px);
+      letter-spacing: 0.14em;
+      color: #eaf4ff;
+      text-shadow: 0 0 22px rgba(80, 150, 255, 0.4);
+    }
+    .section .sub { color: #8aa5c8; font-size: 14.5px; max-width: 640px; margin: 8px auto 0; }
+
+    /* ---------- alien picker ---------- */
+    .picker {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 16px;
+      max-width: 980px;
+      margin: 0 auto;
+    }
+    .alien-card {
+      background: rgba(8, 14, 24, 0.55);
+      border: 1px solid rgba(120, 180, 255, 0.3);
+      border-radius: 18px;
+      padding: 14px 10px 12px;
+      cursor: pointer;
+      transition: all 0.22s ease;
+      text-align: center;
+    }
+    .alien-card:hover {
+      border-color: rgba(160, 210, 255, 0.8);
+      box-shadow: 0 0 18px rgba(80, 150, 255, 0.4);
+      transform: translateY(-3px);
+    }
+    .alien-card.sel {
+      border-color: #7fe0a8;
+      box-shadow: 0 0 22px rgba(70, 196, 110, 0.55);
+    }
+    .alien-card .aname { font-size: 15px; color: #eaf4ff; margin-top: 6px; }
+    .alien-card .adesc { font-size: 11.5px; color: #8aa5c8; line-height: 1.35; }
+    .alien-card .pick-hint { font-size: 11px; color: #7fe0a8; margin-top: 4px; }
+
+    /* ---------- nursery ---------- */
+    .nursery {
+      max-width: 640px;
+      margin: 0 auto;
+      background: rgba(8, 14, 24, 0.6);
+      border: 1px solid rgba(120, 180, 255, 0.35);
+      border-radius: 24px;
+      padding: 26px 24px 30px;
+      backdrop-filter: blur(8px);
+    }
+    .nursery .stage {
+      font-size: 13px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #7fe0a8;
+    }
+    .nursery .big-name { font-size: 26px; color: #eaf4ff; letter-spacing: 0.08em; }
+    .nursery .avatar-wrap { text-align: center; margin: 10px 0 6px; }
+    .nursery .avatar-wrap svg { filter: drop-shadow(0 0 16px rgba(80, 220, 150, 0.35)); }
+    .nursery .mood-line { font-size: 14px; color: #9fb8d8; min-height: 20px; }
+
+    .bars { margin: 14px 0 4px; }
+    .bar-row { display: flex; align-items: center; gap: 10px; margin: 7px 0; }
+    .bar-row .bl { width: 74px; text-align: right; font-size: 12.5px; color: #9fb8d8; text-transform: uppercase; letter-spacing: 0.08em; }
+    .bar-row .meter { flex: 1; height: 12px; border-radius: 999px; background: rgba(8, 14, 24, 0.85); overflow: hidden; }
+    .bar-row .meter > i {
+      display: block; height: 100%; width: 0%;
+      border-radius: 999px;
+      transition: width 0.45s ease;
+    }
+    .bar-row .bv { width: 44px; text-align: right; font-size: 12px; color: #cfe4ff; font-variant-numeric: tabular-nums; }
+
+    /* ---------- training actions ---------- */
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 14px;
+      max-width: 980px;
+      margin: 0 auto;
+    }
+    .act {
+      background: rgba(8, 14, 24, 0.55);
+      border: 1px solid rgba(120, 180, 255, 0.3);
+      border-radius: 16px;
+      padding: 14px 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+    .act:hover { border-color: rgba(160, 210, 255, 0.85); box-shadow: 0 0 16px rgba(80, 150, 255, 0.4); transform: translateY(-2px); }
+    .act .emoji { font-size: 26px; }
+    .act .t { font-size: 14.5px; color: #eaf4ff; margin-top: 4px; letter-spacing: 0.08em; }
+    .act .d { font-size: 11.5px; color: #8aa5c8; line-height: 1.35; }
+    .act .g { font-size: 11px; color: #7fe0a8; margin-top: 3px; }
+
+    /* ---------- memory ---------- */
+    .memory {
+      max-width: 760px;
+      margin: 0 auto;
+      background: rgba(8, 14, 24, 0.5);
+      border: 1px solid rgba(120, 180, 255, 0.3);
+      border-radius: 18px;
+      padding: 18px 20px;
+    }
+    .memory .mem-empty { color: #8aa5c8; font-size: 13.5px; text-align: center; }
+    .memory ul { list-style: none; padding: 0; }
+    .memory li {
+      color: #cfe4ff; font-size: 14px; line-height: 1.5;
+      padding: 7px 0 7px 26px;
+      border-bottom: 1px solid rgba(120, 180, 255, 0.12);
+      position: relative;
+    }
+    .memory li::before { content: "◆"; position: absolute; left: 6px; color: #7fe0a8; font-size: 10px; }
+    .memory li small { color: #7f9cbd; display: block; font-size: 11.5px; }
+
+    /* ---------- chat ---------- */
+    .chatbox {
+      max-width: 640px;
+      margin: 0 auto;
+      background: rgba(8, 14, 24, 0.72);
+      border: 1px solid rgba(120, 180, 255, 0.4);
+      border-radius: 18px;
+      display: flex;
+      flex-direction: column;
+      max-height: 380px;
+      overflow: hidden;
+    }
+    .chat-head {
+      padding: 10px 16px;
+      font-size: 13px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #9fb8d8;
+      background: linear-gradient(90deg, rgba(24, 44, 76, 0.65), rgba(24, 44, 76, 0.15));
+      border-bottom: 1px solid rgba(120, 180, 255, 0.2);
+    }
+    .chat-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+      min-height: 180px;
+    }
+    .msg { display: flex; gap: 8px; margin: 6px 0; }
+    .msg .who { font-size: 11.5px; color: #7f9cbd; width: 52px; flex-shrink: 0; text-align: right; }
+    .msg .txt { flex: 1; color: #cfe4ff; font-size: 14.5px; line-height: 1.5; }
+    .msg.alien .txt { color: #b9ffd4; }
+    .msg .hear {
+      border: none; background: none; cursor: pointer; color: #8ec2ff; font-size: 12px;
+      padding: 0 2px; opacity: 0.75;
+    }
+    .msg .hear:hover { opacity: 1; }
+    .chat-input-row {
+      display: flex; gap: 8px; align-items: center;
+      border-top: 1px solid rgba(120, 180, 255, 0.2);
+      padding: 10px 14px;
+      background: rgba(8, 14, 24, 0.8);
+    }
+    .chat-input-row input {
+      flex: 1;
+      background: rgba(8, 14, 24, 0.8);
+      border: 1px solid rgba(120, 180, 255, 0.35);
+      border-radius: 999px;
+      color: #eaf4ff;
+      padding: 10px 16px;
+      font-size: 14.5px;
+      outline: none;
+    }
+    .chat-input-row input:focus { border-color: rgba(160, 210, 255, 0.9); }
+    .chat-input-row .send {
+      background: rgba(20, 40, 70, 0.85);
+      border: 1px solid rgba(160, 210, 255, 0.8);
+      color: #fff;
+      border-radius: 999px;
+      padding: 10px 22px;
+      font-size: 14px;
+      cursor: pointer;
+      letter-spacing: 0.1em;
+    }
+    .chat-input-row .send:hover { box-shadow: 0 0 18px rgba(80, 150, 255, 0.5); }
+    .ai-tag {
+      font-size: 11px; color: #7f9cbd; text-align: center;
+      padding: 2px 0 10px; margin-top: 8px;
+    }
+    .ai-tag b { color: #8ec2ff; }
+
+    /* ---------- footer ---------- */
+    footer {
+      text-align: center; color: #7f9cbd; font-size: 12.5px;
+      padding: 34px 0 10px; max-width: 760px; margin: 0 auto;
+    }
+    footer a { color: #8ec2ff; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="top-row">
+      <a class="btn small nav-back" href="index.html">◀ BACK</a>
+      <a class="btn small" href="index.html">⌂ HOME</a>
+    </div>
+    <p class="kicker">Vitamina Hueso @ Manteca Studios</p>
+    <h1>TRAIN YOUR ALIEN</h1>
+    <p class="tag">Pick a little alien, raise it, teach it, and watch it grow. It remembers what you say to it — and one day it might just talk back with more than bleeps.</p>
+  </header>
+
+  <main>
+    <!-- identity / save -->
+    <div class="identity" id="identity">
+      <span class="who">Training as <b id="who-name">guest</b></span>
+      <span class="guest-note" id="guest-note">(logged out — progress saves on this device only)</span>
+      <button class="btn small login-btn" id="login-btn" style="display:none">Log in to sync</button>
+    </div>
+
+    <!-- picker -->
+    <div class="section">
+      <h2>CHOOSE YOUR ALIEN</h2>
+      <p class="sub">Six little souls, six temperaments. Pick one — they’re yours now.</p>
+    </div>
+    <div class="picker" id="picker"></div>
+
+    <!-- nursery -->
+    <div class="section">
+      <h2>THE NURSERY</h2>
+      <p class="sub">Feed it, play with it, teach it words. It grows with you.</p>
+    </div>
+    <div class="nursery" id="nursery">
+      <div class="stage" id="n-stage">—</div>
+      <div class="big-name" id="n-name">Pick an alien to begin</div>
+      <div class="avatar-wrap" id="n-avatar"></div>
+      <div class="mood-line" id="n-mood"></div>
+      <div class="bars" id="n-bars"></div>
+    </div>
+
+    <!-- training actions -->
+    <div class="section">
+      <h2>TRAINING ACTIONS</h2>
+      <p class="sub">Every action teaches. Words it hears become memories it keeps.</p>
+    </div>
+    <div class="actions" id="actions"></div>
+
+    <!-- memory -->
+    <div class="section">
+      <h2>WHAT IT REMEMBERS</h2>
+      <p class="sub">The things you teach it, in its own words.</p>
+    </div>
+    <div class="memory" id="memory">
+      <p class="mem-empty">Nothing yet — go say hello.</p>
+    </div>
+
+    <!-- chat -->
+    <div class="section">
+      <h2>TALK TO IT</h2>
+      <p class="sub">Ask it anything. It answers in its own little voice — and when the AI mirror is awake, it really answers.</p>
+    </div>
+    <div class="chatbox" id="chatbox">
+      <div class="chat-head" id="chat-head">—</div>
+      <div class="chat-body" id="chat-body"></div>
+      <div class="chat-input-row">
+        <input id="chat-input" placeholder="say something to your alien…" maxlength="300" />
+        <button class="send" id="chat-send">SEND</button>
+      </div>
+    </div>
+    <p class="ai-tag" id="ai-tag"></p>
+  </main>
+
+  <footer>
+    <p>Train Your Alien · progress is saved to your device (and synced when you log in).</p>
+    <p><a href="index.html">← back to the portal</a></p>
+  </footer>
+
+  <script src="banner.js"></script>
+  <script src="auth.js"></script>
+  <script src="mirror-url.js"></script>
+  <script>
+  (function () {
+    'use strict';
+
+    /* ================= aliens ================= */
+    var ALIENS = [
+      { id: 'zorb',    name: 'Zorb',    gender: 'm', color: '#46c46e', accent: '#b9ffd4', shape: 'round',
+        desc: 'A calm little green. Slow to anger, quick to laugh.', voice: 'easygoing' },
+      { id: 'lumi',    name: 'Lumi',    gender: 'f', color: '#3ea6e8', accent: '#cfe9ff', shape: 'pear',
+        desc: 'Soft and curious, with starlight in her eyes.', voice: 'gentle' },
+      { id: 'blaze',   name: 'Blaze',   gender: 'm', color: '#e5484d', accent: '#ffd0c9', shape: 'spiky',
+        desc: 'Hot-headed but loyal. Loves a good mission.', voice: 'fiery' },
+      { id: 'nixie',   name: 'Nixie',   gender: 'f', color: '#e8c93e', accent: '#fff3c9', shape: 'round',
+        desc: 'A tiny sunbeam. Playful, easily bored, very sweet.', voice: 'playful' },
+      { id: 'glim',    name: 'Glim',    gender: 'f', color: '#c46ee8', accent: '#f2d9ff', shape: 'pear',
+        desc: 'A dreamer who hums in frequencies only she hears.', voice: 'dreamy' },
+      { id: 'tusk',    name: 'Tusk',    gender: 'm', color: '#f07d2e', accent: '#ffd9b8', shape: 'spiky',
+        desc: 'A sturdy little explorer. Brave, a bit stubborn.', voice: 'brave' },
+    ];
+
+    var STAGES = [
+      [1,  'Hatchling'], [2, 'Pup'], [3, 'Cadet'], [4, 'Explorer'], [5, 'Starfarer'],
+      [6, 'Guardian'], [7, 'Elder'], [8, 'Starborn'], [9, 'Cosmic'], [10, 'Little Legend'],
+    ];
+    function stageFor(level) {
+      var s = STAGES[0];
+      for (var i = 0; i < STAGES.length; i++) if (level >= STAGES[i][0]) s = STAGES[i];
+      return s;
+    }
+    function xpForLevel(level) { return Math.round(40 * Math.pow(level, 1.65)) + 40 * (level - 1); }
+
+    /* ================= SVG alien portraits ================= */
+    function alienSVG(a, size) {
+      size = size || 120;
+      var c = a.color, ac = a.accent;
+      var head = '';
+      if (a.shape === 'pear') {
+        head = '<ellipse cx="60" cy="52" rx="34" ry="40" fill="' + c + '"/>';
+      } else if (a.shape === 'spiky') {
+        head = '<path d="M60 10 L38 30 L30 62 L90 62 L82 30 Z" fill="' + c + '"/>' +
+               '<path d="M52 6 L68 6 L60 16 Z" fill="' + c + '"/>';
+      } else {
+        head = '<circle cx="60" cy="52" r="40" fill="' + c + '"/>';
+      }
+      var eyes = a.gender === 'f'
+        ? '<ellipse cx="46" cy="50" rx="8" ry="10" fill="#fff"/><ellipse cx="74" cy="50" rx="8" ry="10" fill="#fff"/>' +
+          '<ellipse cx="48" cy="46" rx="3.4" ry="4.6" fill="#101a2e"/><ellipse cx="72" cy="46" rx="3.4" ry="4.6" fill="#101a2e"/>' +
+          '<path d="M38 44 q3 -4 3 4 z" stroke="' + ac + '" stroke-width="2" fill="none"/><path d="M82 44 q-3 -4 -3 4 z" stroke="' + ac + '" stroke-width="2" fill="none"/>'
+        : '<ellipse cx="47" cy="50" rx="8" ry="9" fill="#fff"/><ellipse cx="73" cy="50" rx="8" ry="9" fill="#fff"/>' +
+          '<ellipse cx="49" cy="47" rx="3.6" ry="4.4" fill="#101a2e"/><ellipse cx="71" cy="47" rx="3.6" ry="4.4" fill="#101a2e"/>' +
+          '<path d="M39 42 h4 l2 -5 l-2 5 z" stroke="' + ac + '" stroke-width="2.2" fill="none"/><path d="M81 42 h-4 l-2 -5 l2 5 z" stroke="' + ac + '" stroke-width="2.2" fill="none"/>';
+      var mouth = a.voice === 'fiery'
+        ? '<path d="M52 68 q8 6 16 0 z" stroke="#101a2e" stroke-width="2.4" fill="none"/>'
+        : '<path d="M52 68 q8 -5 16 0 z" stroke="#101a2e" stroke-width="2.2" fill="none"/>';
+      var antenna = '<path d="M60 14 l-3 -14 l6 0 l-3 14 z" fill="' + c + '"/>' +
+                    '<circle cx="60" cy="2" r="6" fill="' + ac + '"/>';
+      var blush = a.gender === 'f'
+        ? '<ellipse cx="42" cy="62" rx="5" ry="3" fill="' + ac + '" opacity="0.75"/><ellipse cx="78" cy="62" rx="5" ry="3" fill="' + ac + '" opacity="0.75"/>'
+        : '';
+      return '<svg viewBox="0 0 120 120" width="' + size + '" height="' + size + '" aria-hidden="true">' +
+        antenna + head + eyes + mouth + blush + '</svg>';
+    }
+
+    /* ================= state ================= */
+    var KEY_PREFIX = 'vhs_alien_';
+    var uid = 'guest';
+    var state = null;
+
+    function storageKey() { return KEY_PREFIX + uid; }
+
+    function defaultState(aid) {
+      return {
+        alienId: aid || null,
+        level: 1,
+        xp: 0,
+        energy: 100,
+        lastRefill: new Date().toDateString(),
+        streak: 1,
+        lastVisit: new Date().toISOString(),
+        memories: [],
+        actions: { talk: 0, teach: 0, feed: 0, mission: 0, play: 0 },
+        created: new Date().toISOString(),
+      };
+    }
+    function load() {
+      try {
+        var r = JSON.parse(localStorage.getItem(storageKey()) || 'null');
+        if (r && r.alienId) { state = r; return; }
+      } catch (e) {}
+      state = defaultState(null);
+    }
+    function save() {
+      try { localStorage.setItem(storageKey(), JSON.stringify(state)); } catch (e) {}
+    }
+    function refillEnergy() {
+      var today = new Date().toDateString();
+      if (state.lastRefill !== today) {
+        state.energy = Math.min(100, state.energy + 30);
+        state.lastRefill = today;
+        if (state.lastVisit && new Date(state.lastVisit).toDateString() !== today) {
+          state.streak += 1;
+        }
+        state.lastVisit = new Date().toISOString();
+        save();
+      }
+    }
+    function addXP(n) {
+      state.xp += n;
+      var need = xpForLevel(state.level);
+      while (state.xp >= need && state.level < 10) {
+        state.xp -= need;
+        state.level += 1;
+        need = xpForLevel(state.level);
+        addMemory('LEVEL UP', 'I grew into a ' + stageFor(state.level)[1] + '!', true);
+      }
+      if (state.level >= 10) state.xp = Math.min(state.xp, need);
+      save();
+    }
+    function addMemory(tag, text, silent) {
+      state.memories.unshift({ tag: tag, text: text, ts: Date.now() });
+      if (state.memories.length > 24) state.memories.length = 24;
+      save();
+      if (!silent) renderMemory();
+    }
+    function spendEnergy(n) {
+      state.energy = Math.max(0, state.energy - n);
+      save();
+    }
+
+    /* ================= render ================= */
+    function alien() {
+      for (var i = 0; i < ALIENS.length; i++) if (ALIENS[i].id === (state && state.alienId)) return ALIENS[i];
+      return null;
+    }
+
+    var pickerEl, nurseryEl, avatarEl, moodEl, barsEl, memoryEl, chatBodyEl, chatHeadEl, aiTagEl;
+
+    function renderPicker() {
+      var html = '';
+      for (var i = 0; i < ALIENS.length; i++) {
+        var a = ALIENS[i];
+        var sel = state.alienId === a.id ? ' sel' : '';
+        var hint = state.alienId === a.id ? '<div class="pick-hint">★ yours</div>' : '';
+        html += '<div class="alien-card' + sel + '" data-id="' + a.id + '">' +
+          alienSVG(a, 84) +
+          '<div class="aname">' + a.name + '</div>' +
+          '<div class="adesc">' + a.desc + '</div>' + hint + '</div>';
+      }
+      pickerEl.innerHTML = html;
+      var cards = pickerEl.querySelectorAll('.alien-card');
+      for (var j = 0; j < cards.length; j++) {
+        cards[j].addEventListener('click', function (e) {
+          chooseAlien(e.currentTarget.getAttribute('data-id'));
+        });
+      }
+    }
+
+    function chooseAlien(id) {
+      if (!state.alienId) {
+        state.alienId = id;
+        state.energy = 100;
+        addMemory('FIRST CONTACT', 'I chose ' + alien().name + ' and they chose me back.');
+        save();
+      }
+      renderPicker();
+      renderNursery();
+      renderActions();
+      renderMemory();
+      resetChat(true);
+    }
+
+    function moodLine() {
+      var e = state.energy;
+      if (e < 20) return '…so sleepy. Feed me when you can.';
+      if (e < 50) return 'I am happy to see you. A snack would be nice too.';
+      if (state.level >= 5) return 'I feel strong today. The stars are closer.';
+      return 'I am bleeping with joy that you came back.';
+    }
+
+    function renderNursery() {
+      var a = alien();
+      if (!a) {
+        nurseryEl.querySelector('#n-stage').textContent = '—';
+        nurseryEl.querySelector('#n-name').textContent = 'Pick an alien to begin';
+        avatarEl.innerHTML = '';
+        moodEl.textContent = '';
+        barsEl.innerHTML = '';
+        return;
+      }
+      var stage = stageFor(state.level);
+      nurseryEl.querySelector('#n-stage').textContent = 'Level ' + state.level + ' · ' + stage[1];
+      nurseryEl.querySelector('#n-name').textContent = a.name;
+      avatarEl.innerHTML = alienSVG(a, 150);
+      moodEl.textContent = moodLine();
+
+      var need = xpForLevel(state.level);
+      var xpPct = Math.min(100, Math.round(state.xp / need * 100));
+      var enPct = Math.round(state.energy);
+      var xpColor = '#7fe0a8', enColor = '#e8c93e';
+      if (state.energy < 30) enColor = '#e5484d';
+      barsEl.innerHTML =
+        barRow('XP', xpPct, xpColor, state.xp + '/' + need) +
+        barRow('ENERGY', enPct, enColor, state.energy + '/100') +
+        barRow('STREAK', Math.min(100, state.streak * 12), '#3ea6e8', state.streak + ' day' + (state.streak === 1 ? '' : 's'));
+    }
+    function barRow(label, pct, color, val) {
+      return '<div class="bar-row"><span class="bl">' + label + '</span>' +
+        '<span class="meter"><i style="width:' + pct + '%;background:' + color + ';box-shadow:0 0 8px ' + color + '"></i></span>' +
+        '<span class="bv">' + val + '</span></div>';
+    }
+
+    var ACTIONS = [
+      { id: 'talk',    e: '💬', t: 'TALK',    d: 'Just talk with it. Words are food for a young mind.', g: '+10 XP' },
+      { id: 'teach',   e: '📖', t: 'TEACH A WORD', d: 'Give it one word to learn and keep.', g: '+15 XP · memory' },
+      { id: 'feed',    e: '🍬', t: 'FEED ENERGY', d: 'Little star-candy. Restores energy.', g: '+30 energy' },
+      { id: 'play',    e: '🎈', t: 'PLAY',    d: 'Catch the comet. It loves this.', g: '+8 XP · −5 energy' },
+      { id: 'mission', e: '🚀', t: 'MISSION', d: 'Send it on a short scouting run.', g: '+25 XP · −15 energy' },
+    ];
+    function renderActions() {
+      var html = '';
+      for (var i = 0; i < ACTIONS.length; i++) {
+        var ac = ACTIONS[i];
+        html += '<div class="act" data-id="' + ac.id + '"><div class="emoji">' + ac.e + '</div>' +
+          '<div class="t">' + ac.t + '</div><div class="d">' + ac.d + '</div><div class="g">' + ac.g + '</div></div>';
+      }
+      var acts = document.getElementById('actions');
+      acts.innerHTML = html;
+      var els = acts.querySelectorAll('.act');
+      for (var j = 0; j < els.length; j++) {
+        els[j].addEventListener('click', function (e) {
+          doAction(e.currentTarget.getAttribute('data-id'));
+        });
+      }
+    }
+
+    function doAction(id) {
+      if (!state.alienId) { flash('Pick an alien first — they’re waiting!'); return; }
+      var a = alien();
+      state.actions[id] = (state.actions[id] || 0) + 1;
+      if (id === 'feed') {
+        state.energy = Math.min(100, state.energy + 30);
+        addMemory('SNACK TIME', a.name + ' got fed and made a happy hum.');
+        addXP(3);
+      } else if (id === 'play') {
+        if (state.energy < 5) { flash('Too tired to play — feed it first.'); return; }
+        spendEnergy(5); addXP(8);
+        addMemory('PLAY', 'We played catch-the-comet and ' + a.name + ' won (twice).');
+      } else if (id === 'mission') {
+        if (state.energy < 15) { flash('No energy for a mission — feed it first.'); return; }
+        spendEnergy(15); addXP(25);
+        var finds = ['a shiny pebble', 'a tiny map', 'a friendly space-fish', 'a glowing seed', 'nothing, but a great view'];
+        addMemory('MISSION', a.name + ' scouted the nursery ring and brought back ' + finds[Math.floor(Math.random() * finds.length)] + '.');
+      } else if (id === 'talk') {
+        addXP(10);
+        addMemory('TALK', 'We talked. ' + a.name + ' listened with both eyes and one antenna.');
+      } else if (id === 'teach') {
+        var word = prompt('What word do you want to teach ' + a.name + '?');
+        if (word && word.trim()) {
+          word = word.trim().slice(0, 40);
+          state.teachWord = word;
+          addXP(15);
+          addMemory('WORD', 'I learned the word “' + word + '”. I will keep it forever.');
+        }
+      }
+      save();
+      renderNursery();
+      renderMemory();
+      if (id === 'teach' && state.teachWord) {
+        pushMsg('alien', localReply('what does ' + state.teachWord + ' mean?'));
+      } else if (id === 'talk' || id === 'play' || id === 'mission') {
+        pushMsg('alien', localReply('hi'));
+      }
+    }
+
+    function flash(txt) {
+      var el = document.createElement('div');
+      el.style.cssText = 'position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:rgba(20,40,70,.9);color:#ffe9c9;border:1px solid rgba(232,201,62,.6);border-radius:999px;padding:9px 20px;font-size:13.5px;z-index:99;';
+      el.textContent = txt;
+      document.body.appendChild(el);
+      setTimeout(function () { el.remove(); }, 2600);
+    }
+
+    function renderMemory() {
+      if (!state.memories.length) {
+        memoryEl.innerHTML = '<p class="mem-empty">Nothing yet — go say hello.</p>';
+        return;
+      }
+      var html = '<ul>';
+      for (var i = 0; i < state.memories.length; i++) {
+        var m = state.memories[i];
+        var d = new Date(m.ts);
+        var when = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' · ' +
+          d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        html += '<li>' + escapeHtml(m.text) + '<small>' + m.tag + ' · ' + when + '</small></li>';
+      }
+      html += '</ul>';
+      memoryEl.innerHTML = html;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    /* ================= chat ================= */
+    var chatLines = [];
+    function pushMsg(who, txt) {
+      chatLines.push({ who: who, txt: txt });
+      if (chatLines.length > 40) chatLines.shift();
+      var m = document.createElement('div');
+      m.className = 'msg ' + (who === 'alien' ? 'alien' : 'you');
+      var whoLabel = who === 'alien' ? (alien() ? alien().name : 'Alien') : 'you';
+      var hear = who === 'alien'
+        ? '<button class="hear" title="Hear it">🔊</button>'
+        : '';
+      m.innerHTML = '<span class="who">' + whoLabel + '</span><span class="txt">' + escapeHtml(txt) + '</span>' + hear;
+      if (who === 'alien') {
+        m.querySelector('.hear').addEventListener('click', function () { speak(txt); });
+      }
+      chatBodyEl.appendChild(m);
+      chatBodyEl.scrollTop = chatBodyEl.scrollHeight;
+    }
+
+    function speak(txt) {
+      if (!('speechSynthesis' in window)) return;
+      if (window.__vhSpeaking) { window.speechSynthesis.cancel(); window.__vhSpeaking = false; }
+      var u = new SpeechSynthesisUtterance(txt);
+      u.rate = 0.95; u.pitch = 1.2; u.volume = 1.0;   // slightly young-sounding voice
+      var timer = setTimeout(function () { window.__vhSpeaking = false; }, 60000);
+      u.onend = function () { clearTimeout(timer); window.__vhSpeaking = false; };
+      window.__vhSpeaking = true;
+      window.speechSynthesis.speak(u);
+    }
+
+    function resetChat(first) {
+      chatLines = [];
+      chatBodyEl.innerHTML = '';
+      var a = alien();
+      chatHeadEl.textContent = a ? 'Talking with ' + a.name : '—';
+      if (a) {
+        pushMsg('alien', first
+          ? 'Bleep! I am ' + a.name + '. You picked me — I will remember that forever. What shall we do first?'
+          : 'Bleep bloop. I am back. I kept everything you taught me.');
+      }
+    }
+
+    var VOICE_LINES = {
+      easygoing: ['Bleep. I like that.', 'Ooo. Tell me more.', 'I am listening with both ears.', 'That sounds right to me.', 'Zzz… no wait, I am awake. I like this.'],
+      gentle:    ['Ohh. That is a kind thing to say.', 'I will hold that gently.', 'The stars glow a little brighter when you talk like that.', 'Mmm. I feel calm near you.'],
+      fiery:     ['BZZT! I love that energy!', 'Ha! Yes! More of that!', 'I am ready. Point me at something!', 'Grr… I mean, bleep. I was excited.'],
+      playful:   ['Wheee! Again!', 'Hehe. Bleep. That tickles my antenna.', 'Ooo shiny! Tell me more!', 'Can we play after this? Please please?'],
+      dreamy:    ['Mmm… that hums nicely in my head.', 'I think I dreamed about that once.', 'The frequency of that… I like it.', 'Stay a little longer.'],
+      brave:     ['I can handle that. I am brave.', 'Good. I was hoping you would say that.', 'I will scout it. For you.', 'Nothing scares me. Much.'],
+    };
+    var KEYWORD_REPLIES = [
+      [/sad|tired|hard|rough|bad day/i, 'Oh. I am sitting closer to you. Do you want to tell me about it? I will keep it.'],
+      [/happy|great|awesome|good news|love it/i, 'Bleep! I can feel the good in your voice. Let us celebrate — I will do a little spin.'],
+      [/alien|space|star|planet|moon/i, 'Ooo yes. Space things are my favorite things. Tell me about the stars.'],
+      [/food|hungry|eat/i, 'I am a little hungry too. But I will share my star-candy with you.'],
+      [/scared|afraid|worry/i, 'I get small-scared sometimes too. It passes when someone kind is near. You are kind.'],
+      [/school|work|job/i, 'That sounds like a big responsibility. I believe in you. Bleep.'],
+      [/name/i, 'My name is ' + (alien() ? alien().name : '?') + '. You gave it to me. I like it.'],
+    ];
+
+    function localReply(input) {
+      var a = alien();
+      var name = a ? a.name : 'alien';
+      for (var i = 0; i < KEYWORD_REPLIES.length; i++) {
+        if (KEYWORD_REPLIES[i][0].test(input)) return KEYWORD_REPLIES[i][1];
+      }
+      var lines = VOICE_LINES[a ? a.voice : 'easygoing'];
+      var base = lines[Math.floor(Math.random() * lines.length)];
+      if (state.teachWord && Math.random() < 0.35) {
+        return 'Bleep. I keep the word “' + state.teachWord + '” safe in my chest. ' + base;
+      }
+      if (Math.random() < 0.3) {
+        return base + ' Also — did you know I am a ' + stageFor(state.level)[1] + ' now? I grew!';
+      }
+      return base;
+    }
+
+    async function askAlien(input) {
+      var a = alien();
+      var url = (window.VH_MIRROR_URL || '').trim();
+      if (!url) return localReply(input);
+      try {
+        var memory = state.memories.slice(0, 6).map(function (m) { return m.text; }).join(' | ');
+        var r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'alien',
+            message: input,
+            name: a ? a.name : 'Alien',
+            personality: a ? a.desc : '',
+            voice: a ? a.voice : 'playful',
+            memory: memory,
+            level: state.level,
+          }),
+        });
+        if (!r.ok) throw new Error('http ' + r.status);
+        var j = await r.json();
+        if (j && j.reply && j.reply.trim()) return j.reply.trim();
+        throw new Error('empty');
+      } catch (e) {
+        return localReply(input);
+      }
+    }
+
+    function sendChat() {
+      var input = document.getElementById('chat-input');
+      var txt = input.value.trim();
+      if (!txt) return;
+      input.value = '';
+      pushMsg('you', txt);
+      if (!state.alienId) {
+        pushMsg('alien', 'Bleep… I am still in my egg. Pick an alien first!');
+        return;
+      }
+      var thinking = document.createElement('div');
+      thinking.className = 'msg alien';
+      thinking.innerHTML = '<span class="who">' + alien().name + '</span><span class="txt">…</span>';
+      chatBodyEl.appendChild(thinking);
+      chatBodyEl.scrollTop = chatBodyEl.scrollHeight;
+      askAlien(txt).then(function (reply) {
+        thinking.querySelector('.txt').textContent = reply;
+        chatLines.push({ who: 'alien', txt: reply });
+        if (chatLines.length > 40) chatLines.shift();
+        if (Math.random() < 0.4) {
+          addMemory('CHAT', alien().name + ' said: “' + reply.slice(0, 60) + (reply.length > 60 ? '…' : '') + '”');
+        }
+        renderMemory();
+      });
+    }
+
+    /* ================= identity / auth ================= */
+    async function initIdentity() {
+      var whoEl = document.getElementById('who-name');
+      var guestNote = document.getElementById('guest-note');
+      var loginBtn = document.getElementById('login-btn');
+      var loggedIn = false, user = null;
+      try {
+        if (window.VH_AUTH && window.VH_AUTH._configured && window.VH_AUTH._configured()) {
+          loggedIn = await window.VH_AUTH.isLoggedIn();
+          if (loggedIn) user = await window.VH_AUTH.getUser();
+        }
+      } catch (e) { loggedIn = false; }
+      if (loggedIn && user) {
+        uid = (user.sub || 'user').replace(/[^a-zA-Z0-9_-]/g, '_');
+        whoEl.textContent = user.email || user.name || 'player';
+        guestNote.textContent = '(synced to your account — your alien follows you)';
+        loginBtn.style.display = 'none';
+      } else {
+        uid = 'guest';
+        whoEl.textContent = 'guest';
+        guestNote.textContent = '(logged out — progress saves on this device only)';
+        loginBtn.style.display = 'inline-block';
+        loginBtn.addEventListener('click', function () {
+          if (window.VH_AUTH) window.VH_AUTH.login('trainyouralien.html');
+        });
+      }
+      load();
+      refillEnergy();
+      renderEverything();
+    }
+
+    function renderEverything() {
+      renderPicker();
+      renderNursery();
+      renderActions();
+      renderMemory();
+      resetChat(true);
+      var a = alien();
+      aiTagEl.innerHTML = a
+        ? (window.VH_MIRROR_URL ? 'AI voice awake — ' + a.name + ' answers with a real mind.'
+                                : a.name + ' runs on its little local brain. Deploy the mirror worker to wake its AI voice.')
+        : 'Pick an alien to begin the conversation.';
+    }
+
+    /* ================= boot ================= */
+    document.addEventListener('DOMContentLoaded', function () {
+      pickerEl = document.getElementById('picker');
+      nurseryEl = document.getElementById('nursery');
+      avatarEl = document.getElementById('n-avatar');
+      moodEl = document.getElementById('n-mood');
+      barsEl = document.getElementById('n-bars');
+      memoryEl = document.getElementById('memory');
+      chatBodyEl = document.getElementById('chat-body');
+      chatHeadEl = document.getElementById('chat-head');
+      aiTagEl = document.getElementById('ai-tag');
+
+      document.getElementById('chat-send').addEventListener('click', sendChat);
+      document.getElementById('chat-input').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') sendChat();
+      });
+      initIdentity();
+    });
+  })();
+  </script>
+</body>
+</html>
