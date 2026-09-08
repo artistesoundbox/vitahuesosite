@@ -134,10 +134,14 @@
     /* ---------- alien picker ---------- */
     .picker {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      grid-template-columns: repeat(5, minmax(150px, 1fr));
       gap: 16px;
       max-width: 980px;
       margin: 0 auto;
+    }
+    /* phones: 2 comfortable rows of 3+2 */
+    @media (max-width: 700px) {
+      .picker { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
     }
     .alien-card {
       background: rgba(8, 14, 24, 0.55);
@@ -514,6 +518,11 @@
       for (var i = 0; i < STAGES.length; i++) if (level >= STAGES[i][0]) s = STAGES[i];
       return s;
     }
+    /* evolution tier: 10 levels → 5 visual stages (one every 2 levels) */
+    function evoTier(level) { return Math.min(5, 1 + Math.floor((level - 1) / 2)); }
+    function evoTierName(t) {
+      return ['', 'Nascent', 'Glowing', 'Orbiting', 'Radiant', 'Ascended'][t] || 'Nascent';
+    }
     function xpForLevel(level) { return Math.round(40 * Math.pow(level, 1.65)) + 40 * (level - 1); }
 
     /* ================= SVG alien portraits ================= */
@@ -596,9 +605,14 @@
       var need = xpForLevel(state.level);
       while (state.xp >= need && state.level < 10) {
         state.xp -= need;
+        var wasTier = evoTier(state.level);
         state.level += 1;
         need = xpForLevel(state.level);
-        addMemory('LEVEL UP', 'I grew into a ' + stageFor(state.level)[1] + '!', true);
+        if (evoTier(state.level) > wasTier) {
+          addMemory('EVOLVED', 'I am evolving! I am now a ' + evoTierName(evoTier(state.level)) + ' ' + stageFor(state.level)[1] + '!', true);
+        } else {
+          addMemory('LEVEL UP', 'I grew into a ' + stageFor(state.level)[1] + '!', true);
+        }
       }
       if (state.level >= 10) state.xp = Math.min(state.xp, need);
       save();
@@ -627,7 +641,7 @@
       for (var i = 0; i < ALIENS.length; i++) {
         var a = ALIENS[i];
         var sel = state.alienId === a.id ? ' sel' : '';
-        var hint = state.alienId === a.id ? '<div class="pick-hint">★ yours</div>' : '';
+        var hint = state.alienId === a.id ? '<div class="pick-hint">★ yours · ' + evoTierName(evoTier(state.level)) + '</div>' : '';
         html += '<div class="alien-card' + sel + '" data-id="' + a.id + '" style="' + glowVars(a) + '">' +
           '<img class="alien-img" src="' + alienImgSrc(a) + '" alt="' + a.name + '" ' +
             'onerror="__alienImgFallback(this,\'' + a.id + '\')">' +
@@ -676,10 +690,21 @@
         return;
       }
       var stage = stageFor(state.level);
-      nurseryEl.querySelector('#n-stage').textContent = 'Level ' + state.level + ' · ' + stage[1];
+      nurseryEl.querySelector('#n-stage').textContent = 'Level ' + state.level + ' · ' + stage[1] + ' · ' + evoTierName(evoTier(state.level));
       nurseryEl.querySelector('#n-name').textContent = a.name;
-      avatarEl.innerHTML = '<img class="alien-img alien-img-big" style="' + glowVars(a) + '" src="' + alienImgSrc(a) + '" alt="' + a.name + '" ' +
-        'onerror="__alienImgFallback(this,\'' + a.id + '\')">';
+      avatarEl.innerHTML = '<span class="evo-wrap evo-t' + evoTier(state.level) + '" style="' + glowVars(a) + '">' +
+        '<span class="evo-halo"></span>' +
+        '<span class="evo-pool"></span>' +
+        '<img class="alien-img alien-img-big" src="' + alienImgSrc(a) + '" alt="' + a.name + '" ' +
+          'onerror="__alienImgFallback(this,\'' + a.id + '\')">' +
+        '<span class="evo-spin">' +
+          (evoTier(state.level) >= 3 ? '<i></i>' : '') +
+          (evoTier(state.level) >= 4 ? '<i class="o2"></i>' : '') +
+        '</span>' +
+        (evoTier(state.level) >= 5
+          ? '<svg class="evo-crown" width="46" height="22" viewBox="0 0 46 22"><path d="M3 20 L3 8 L12 14 L23 3 L34 14 L43 8 L43 20 Z" fill="#ffd764" stroke="#b98a1e" stroke-width="1.4"/></svg>'
+          : '') +
+        '</span>';
       moodEl.textContent = moodLine();
 
       var need = xpForLevel(state.level);
