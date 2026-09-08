@@ -178,14 +178,26 @@
 
     html += '<div class="st-panel" id="st-panel"></div>';
 
+    html += '<div class="st-week" id="st-week"></div>';
+
+    html += '<div class="st-chart-wrap">' +
+      '<div class="st-chart-lbl">MOOD OVER TIME · last 14 check-ins</div>' +
+      '<canvas class="st-chart" id="st-chart" height="140"></canvas>' +
+      '<div class="st-chart-hint" id="st-chart-hint" style="display:none">Leave two or more check-ins to see your mood line.</div>' +
+      '<div class="st-chart-legend">' +
+      MOODS.map(function (m) { return '<span class="st-legend-chip"><i style="background:' + m.color + '"></i>' + m.label + '</span>'; }).join('') +
+      '</div></div>';
+
     html += '<div class="st-ai-note"><label>' +
       '<input type="checkbox" class="st-ai-on"> Talk with the AI mirror' +
       '</label><span class="st-ai-hint"> — sends only what you type in the chat' +
       ' (plus your recent check-ins, only if you tick this) to craft replies.</span></div>';
     html += '<div class="st-chat" id="st-chat" style="display:none"></div>';
     html += '<div class="st-chat-row" id="st-chat-row" style="display:none">' +
-      '<input type="text" class="st-chat-in" placeholder="ask your mirror anything…" maxlength="500">' +
-      '<button type="button" class="st-chat-go">Send</button></div>';
+      '<input type="text" class="st-chat-in" placeholder="ask your mirror anything — life, meaning, mystery…" maxlength="500">' +
+      '<button type="button" class="st-chat-go">Send</button>' +
+      '<button type="button" class="st-chat-clear" title="Clear the conversation">✕</button>' +
+      '</div>';
 
     html += '<div class="st-history">';
     var recent = entries.slice(-6).reverse();
@@ -202,6 +214,8 @@
     html += '</div>';
 
     mount.innerHTML = html;
+    renderWeek(entries);
+    renderChart(entries);
 
     mount.querySelectorAll('.st-mood').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -310,6 +324,18 @@
     input.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') { e.preventDefault(); send(); }
     });
+    // clear: wipes the visible conversation (and in-memory turns) and
+    // re-greets. Chat is memory-only by design, so this is instant.
+    mount.querySelector('.st-chat-clear').addEventListener('click', function (e) {
+      chat.innerHTML = '';
+      chatTurns.length = 0;
+      addMsg(chat, 'mirror', 'Cleared. A fresh page — ask again anything you carry.');
+      _blurSoonSafe(e.target);
+    });
+  }
+
+  function _blurSoonSafe(el) {
+    try { if (el && el.blur) el.blur(); } catch (e) {}
   }
 
   function addMsg(chat, who, text) {
@@ -328,6 +354,10 @@
     chat.scrollTop = chat.scrollHeight;
     return d;
   }
+
+  /* Life-mystery questions get a contemplative voice: the system prompt
+     shifts so the mirror answers like a gentle guide rather than a buddy. */
+  var MYSTERY = /(meaning of life|why am i here|purpose|who am i|what happens when|after death|soul|universe|consciousness|god|divine|destiny|fate|karma|why do we|why does anything|is there a)/i;
 
   function mirrorDigest() {
     var entries = loadEntries();
@@ -356,7 +386,11 @@
     fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: q.slice(0, 600), digest: mirrorDigest().slice(0, 1200) }),
+      body: JSON.stringify({
+        message: q.slice(0, 600),
+        digest: mirrorDigest().slice(0, 1200),
+        mode: MYSTERY.test(q) ? 'mystery' : 'chat',
+      }),
       signal: ctrl ? ctrl.signal : undefined,
     })
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
@@ -403,6 +437,157 @@
     panel.dataset.reflection = txt;
     panel.classList.add('vis');
     if (!quiet) flash(document.querySelector('.st-reflect'), 'Here is what I see');
+  }
+
+  /* ---------- weekly digest (auto, every Sunday the week is complete) ---- */
+
+  function startOfWeek(d) {
+    var x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    x.setDate(x.getDate() - x.getDay());   // Sunday
+    return x;
+  }
+
+  function renderWeek(entries) {
+    var el = document.getElementById('st-week');
+    if (!el) return;
+    var start = startOfWeek(new Date());
+    var end = new Date(start); end.setDate(end.getDate() + 7);
+    var wk = entries.filter(function (e) {
+      var t = new Date(e.ts);
+      return t >= start && t < end;
+    });
+    var isSunday = new Date().getDay() === 0;
+
+    var html = '<div class="st-week-lbl">' +
+      (isSunday ? 'SUNDAY · WEEK IN REVIEW' : 'THIS WEEK') +
+      '<span class="st-week-range">' + fmtRange(start, end) + '</span></div>';
+
+    if (!wk.length) {
+      html += '<div class="st-week-sent">No check-ins yet this week — the week is still yours to write.</div>';
+      el.innerHTML = html;
+      return;
+    }
+
+    var n = wk.length;
+    var sum = wk.reduce(function (s, e) { return s + moodById(e.mood).v; }, 0);
+    var avg = sum / n;
+    var counts = {};
+    wk.forEach(function (e) { counts[e.mood] = (counts[e.mood] || 0) + 1; });
+    var dom = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; })[0];
+    var allWords = [];
+    wk.forEach(function (e) { allWords = allWords.concat(words(e.text)); });
+    var top = topFreq(freq(allWords), 3);
+    var bh = bestHour(wk);
+    var ampm = bh < 12 ? 'mornings' : (bh < 18 ? 'afternoons' : 'evenings');
+
+    var lines = [];
+    lines.push(n + (n === 1 ? ' check-in' : ' check-ins') + ' this week');
+    lines.push('average mood: <b>' + moodLabel(avg) + '</b>');
+    lines.push('most felt: ' + moodById(dom).label.toLowerCase());
+    if (top.length) lines.push('words that returned: ' + top.join(', '));
+    lines.push('you tended to speak in the ' + ampm);
+
+    var sent = 'This week you ' +
+      (avg >= 3.6 ? 'kept a bright center' : avg >= 2.6 ? 'moved between light and shadow' : 'sat in heavier weather') +
+      (top.length ? ' — “' + top[0] + '” kept returning.' : '.');
+
+    html += '<div class="st-week-lines">' + lines.map(function (l) {
+      return '<div class="st-week-line">' + l + '</div>';
+    }).join('') + '</div>';
+    html += '<div class="st-week-sent">' + sent + '</div>';
+    el.innerHTML = html;
+  }
+
+  function moodLabel(avg) {
+    if (avg >= 4.4) return 'clear';
+    if (avg >= 3.6) return 'good';
+    if (avg >= 2.6) return 'okay';
+    if (avg >= 1.6) return 'low';
+    return 'storm';
+  }
+
+  function fmtRange(start, end) {
+    var e = new Date(end); e.setDate(e.getDate() - 1);
+    var s = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    var en = e.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return ' · ' + s + ' – ' + en;
+  }
+
+  /* ---------- mood-over-time chart (dependency-free canvas) -------------- */
+
+  function renderChart(entries) {
+    var canvas = document.getElementById('st-chart');
+    var hint = document.getElementById('st-chart-hint');
+    if (!canvas || !hint) return;
+    var recent = entries.slice(-14);
+    if (recent.length < 2) {
+      canvas.style.display = 'none';
+      hint.style.display = '';
+      return;
+    }
+    canvas.style.display = '';
+    hint.style.display = 'none';
+
+    var dpr = window.devicePixelRatio || 1;
+    var wrap = canvas.parentNode;
+    var w = Math.max(wrap.getBoundingClientRect().width - 0, 220);
+    var h = 140;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    var g = canvas.getContext('2d');
+    g.scale(dpr, dpr);
+    g.clearRect(0, 0, w, h);
+
+    var padL = 24, padR = 8, padT = 10, padB = 18;
+    var iw = w - padL - padR, ih = h - padT - padB;
+    function yOf(v) { return padT + ih * (1 - (v - 1) / 4); }
+
+    // horizontal gridlines + value labels (5..1)
+    g.font = '9px sans-serif';
+    g.textAlign = 'right';
+    for (var v = 1; v <= 5; v++) {
+      var y = yOf(v);
+      g.strokeStyle = 'rgba(120,180,255,0.10)';
+      g.lineWidth = 1;
+      g.beginPath(); g.moveTo(padL, y); g.lineTo(w - padR, y); g.stroke();
+      g.fillStyle = '#5f7a99';
+      g.fillText(String(v), padL - 5, y + 3);
+    }
+
+    var pts = recent.map(function (e, ix) {
+      var m = moodById(e.mood);
+      return {
+        x: padL + iw * ix / (recent.length - 1),
+        y: yOf(m.v),
+        c: m.color,
+      };
+    });
+
+    // connecting line
+    g.strokeStyle = 'rgba(140,194,255,0.55)';
+    g.lineWidth = 1.5;
+    g.beginPath();
+    g.moveTo(pts[0].x, pts[0].y);
+    for (var i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+    g.stroke();
+
+    // mood-colored dots with a soft glow
+    pts.forEach(function (p) {
+      g.fillStyle = p.c;
+      g.beginPath(); g.arc(p.x, p.y, 4, 0, 6.2832); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.18)';
+      g.beginPath(); g.arc(p.x, p.y, 7, 0, 6.2832); g.fill();
+    });
+
+    // first / last date labels
+    g.fillStyle = '#5f7a99';
+    g.textAlign = 'left';
+    g.fillText(fmtDate(recent[0].ts), padL, h - 5);
+    g.textAlign = 'right';
+    g.fillText(fmtDate(recent[recent.length - 1].ts), w - padR, h - 5);
   }
 
   /* ---------- helpers ---------- */
