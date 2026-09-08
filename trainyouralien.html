@@ -425,7 +425,7 @@
     <!-- picker -->
     <div class="section">
       <h2>CHOOSE YOUR ALIEN</h2>
-      <p class="sub">Six little souls, six temperaments. Pick one — they’re yours now.</p>
+      <p class="sub">Ten little souls, ten temperaments. Switch anytime — each one keeps its own memories and growth.</p>
     </div>
     <div class="picker" id="picker"></div>
 
@@ -592,7 +592,15 @@
     var uid = 'guest';
     var state = null;
 
-    function storageKey() { return KEY_PREFIX + uid; }
+    /* Storage: one save per alien (vhs_alien_<uid>_<id>) + a pointer to the
+       active one. Visitors can switch aliens freely; each keeps its own
+       memories, level, and growth. Legacy single-save format migrates. */
+    function curKey() { return 'vhs_alien_cur_' + uid; }
+    function alienKey(id) { return KEY_PREFIX + uid + '_' + id; }
+    function findById(id) {
+      for (var i = 0; i < ALIENS.length; i++) if (ALIENS[i].id === id) return ALIENS[i];
+      return null;
+    }
 
     function defaultState(aid) {
       return {
@@ -608,12 +616,32 @@
         created: new Date().toISOString(),
       };
     }
-    function load() {
+    function loadStateFor(id) {
       try {
-        var r = JSON.parse(localStorage.getItem(storageKey()) || 'null');
-        if (r && r.alienId) { state = r; return; }
+        var r = JSON.parse(localStorage.getItem(alienKey(id)) || 'null');
+        if (r && r.alienId === id) return r;
       } catch (e) {}
-      state = defaultState(null);
+      return null;
+    }
+    function migrateLegacy() {
+      try {
+        var old = JSON.parse(localStorage.getItem(KEY_PREFIX + uid) || 'null');
+        if (old && old.alienId && findById(old.alienId) && !loadStateFor(old.alienId)) {
+          localStorage.setItem(alienKey(old.alienId), JSON.stringify(old));
+          localStorage.setItem(curKey(), old.alienId);
+        }
+        localStorage.removeItem(KEY_PREFIX + uid);
+      } catch (e) {}
+    }
+    function load() {
+      migrateLegacy();
+      var cur = null;
+      try { cur = localStorage.getItem(curKey()); } catch (e) {}
+      if (cur && findById(cur)) {
+        var st = loadStateFor(cur);
+        if (st) { state = st; return; }
+      }
+      state = defaultState(null);   // no alien yet — the picker is truly open
     }
     function save() {
       try { localStorage.setItem(storageKey(), JSON.stringify(state)); } catch (e) {}
@@ -703,12 +731,13 @@
     }
 
     function chooseAlien(id) {
-      if (!state.alienId) {
-        state.alienId = id;
-        state.energy = 100;
-        addMemory('FIRST CONTACT', 'I chose ' + alien().name + ' and they chose me back.');
-        save();
-      }
+      if (!findById(id)) return;
+      var st = loadStateFor(id);
+      var fresh = !st;
+      state = fresh ? defaultState(id) : st;
+      try { localStorage.setItem(curKey(), id); } catch (e) {}
+      if (fresh) addMemory('FIRST CONTACT', 'I chose ' + findById(id).name + ' and they chose me back.');
+      refillEnergy();
       renderPicker();
       renderNursery();
       renderActions();
@@ -860,7 +889,21 @@
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    /* ================= chat ================= */
+    /* ================= voice engine =================
+       Browser TTS defaults to a female voice, which made the male aliens
+       sound female. We match browser voices to each alien's gender and
+       language: pick the user's own accent first, then fall back to any
+       accent in that language, then give up gracefully (pitch still
+       differentiates). Voice list loads async — retry briefly if empty. */
+    function __vhScanVoices() {
+      var MALE = new RegExp('male|david|daniel|mark|george|james|guy|fred|alex|aaron|arthur|oliver|thomas|ryan|diego|jorge|carlos|juan|el caldero|lorenzo', 'i');
+      var FEMALE = new RegExp('female|zira|susan|hazel|samantha|victoria|karen|moira|tessa|fiona|serena|allison|samantha|ava|nora|paulina|sabina|helena|monica|laura', 'i');
+      var vs = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+      var male = [], female = [];
+      for (var i = 0; i < vs.length; i++) {
+        var v = vs[i];
+       (FEMALE.test(v.name) ? female : (MALE.test((v.name || '') + ' ' + (v.voiceURI || '')) ? male : female)).push(v);
+ buckets add to the right list
     var chatLines = [];
     function pushMsg(who, txt) {
       chatLines.push({ who: who, txt: txt });
