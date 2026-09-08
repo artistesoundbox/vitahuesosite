@@ -147,6 +147,16 @@
       border-color: #7fe0a8;
       box-shadow: 0 0 22px rgba(70, 196, 110, 0.55);
     }
+    .alien-card .alien-img {
+      display: block;
+      height: 110px;
+      width: auto;
+      max-width: 100%;
+      margin: 0 auto;
+      object-fit: contain;
+      filter: drop-shadow(0 0 10px rgba(80, 220, 150, 0.25));
+    }
+    .alien-card .alien-img-big, .alien-img-big { height: 170px; }
     .alien-card .aname { font-size: 15px; color: #eaf4ff; margin-top: 6px; }
     .alien-card .adesc { font-size: 11.5px; color: #8aa5c8; line-height: 1.35; }
     .alien-card .pick-hint { font-size: 11px; color: #7fe0a8; margin-top: 4px; }
@@ -387,21 +397,41 @@
   (function () {
     'use strict';
 
-    /* ================= aliens ================= */
+    /* ================= aliens =================
+       Real character art: trainyouralien/avatars/{female,male}/<id>.png
+       (tall full-body sprites). If a file is missing the page falls back
+       to a generated SVG portrait so the picker never shows a broken card. */
     var ALIENS = [
-      { id: 'zorb',    name: 'Zorb',    gender: 'm', color: '#46c46e', accent: '#b9ffd4', shape: 'round',
-        desc: 'A calm little green. Slow to anger, quick to laugh.', voice: 'easygoing' },
-      { id: 'lumi',    name: 'Lumi',    gender: 'f', color: '#3ea6e8', accent: '#cfe9ff', shape: 'pear',
-        desc: 'Soft and curious, with starlight in her eyes.', voice: 'gentle' },
-      { id: 'blaze',   name: 'Blaze',   gender: 'm', color: '#e5484d', accent: '#ffd0c9', shape: 'spiky',
-        desc: 'Hot-headed but loyal. Loves a good mission.', voice: 'fiery' },
-      { id: 'nixie',   name: 'Nixie',   gender: 'f', color: '#e8c93e', accent: '#fff3c9', shape: 'round',
-        desc: 'A tiny sunbeam. Playful, easily bored, very sweet.', voice: 'playful' },
-      { id: 'glim',    name: 'Glim',    gender: 'f', color: '#c46ee8', accent: '#f2d9ff', shape: 'pear',
-        desc: 'A dreamer who hums in frequencies only she hears.', voice: 'dreamy' },
-      { id: 'tusk',    name: 'Tusk',    gender: 'm', color: '#f07d2e', accent: '#ffd9b8', shape: 'spiky',
-        desc: 'A sturdy little explorer. Brave, a bit stubborn.', voice: 'brave' },
+      // ---- female ----
+      { id: 'luna',  name: 'Luna',  gender: 'f', dir: 'female', color: '#3ea6e8', accent: '#cfe9ff', shape: 'pear',
+        desc: 'Moon-calm and soft-spoken. She listens like gravity.', voice: 'gentle' },
+      { id: 'lyra',  name: 'Lyra',  gender: 'f', dir: 'female', color: '#c46ee8', accent: '#f2d9ff', shape: 'pear',
+        desc: 'Hums in star-frequencies only she can hear.', voice: 'dreamy' },
+      { id: 'maya',  name: 'Maya',  gender: 'f', dir: 'female', color: '#e8c93e', accent: '#fff3c9', shape: 'round',
+        desc: 'A giggly little sunbeam who never sits still.', voice: 'playful' },
+      { id: 'xylia', name: 'Xylia', gender: 'f', dir: 'female', color: '#e5484d', accent: '#ffd0c9', shape: 'spiky',
+        desc: 'A fierce tiny hunter — loyal to the last star.', voice: 'fiery' },
+      { id: 'zara',  name: 'Zara',  gender: 'f', dir: 'female', color: '#46c46e', accent: '#b9ffd4', shape: 'round',
+        desc: 'Fearless scout of the nursery ring. Protects her own.', voice: 'brave' },
+      // ---- male ----
+      { id: 'jax',   name: 'Jax',   gender: 'm', dir: 'male', color: '#f07d2e', accent: '#ffd9b8', shape: 'spiky',
+        desc: 'Hot-headed rocket-heart. Loves a good mission.', voice: 'fiery' },
+      { id: 'neo',   name: 'Neo',   gender: 'm', dir: 'male', color: '#46c46e', accent: '#b9ffd4', shape: 'round',
+        desc: 'Unhurried and unbothered. Laughs in low frequencies.', voice: 'easygoing' },
+      { id: 'nix',   name: 'Nix',   gender: 'm', dir: 'male', color: '#e8c93e', accent: '#fff3c9', shape: 'round',
+        desc: 'A mischievous prankster with a heart of gold.', voice: 'playful' },
+      { id: 'orion', name: 'Orion', gender: 'm', dir: 'male', color: '#3ea6e8', accent: '#cfe9ff', shape: 'spiky',
+        desc: 'A sturdy stargazer named for his belt of stars.', voice: 'brave' },
+      { id: 'pax',   name: 'Pax',   gender: 'm', dir: 'male', color: '#c46ee8', accent: '#f2d9ff', shape: 'pear',
+        desc: 'The little peacemaker. Soft voice, steady soul.', voice: 'gentle' },
     ];
+
+    function alienImgSrc(a) { return 'trainyouralien/avatars/' + a.dir + '/' + a.id + '.png'; }
+    window.__alienImgFallback = function (img, id) {
+      for (var i = 0; i < ALIENS.length; i++) {
+        if (ALIENS[i].id === id) { img.outerHTML = alienSVG(ALIENS[i], 96); return; }
+      }
+    };
 
     var STAGES = [
       [1,  'Hatchling'], [2, 'Pup'], [3, 'Cadet'], [4, 'Explorer'], [5, 'Starfarer'],
@@ -527,7 +557,8 @@
         var sel = state.alienId === a.id ? ' sel' : '';
         var hint = state.alienId === a.id ? '<div class="pick-hint">★ yours</div>' : '';
         html += '<div class="alien-card' + sel + '" data-id="' + a.id + '">' +
-          alienSVG(a, 84) +
+          '<img class="alien-img" src="' + alienImgSrc(a) + '" alt="' + a.name + '" ' +
+            'onerror="__alienImgFallback(this,\'' + a.id + '\')">' +
           '<div class="aname">' + a.name + '</div>' +
           '<div class="adesc">' + a.desc + '</div>' + hint + '</div>';
       }
@@ -575,7 +606,8 @@
       var stage = stageFor(state.level);
       nurseryEl.querySelector('#n-stage').textContent = 'Level ' + state.level + ' · ' + stage[1];
       nurseryEl.querySelector('#n-name').textContent = a.name;
-      avatarEl.innerHTML = alienSVG(a, 150);
+      avatarEl.innerHTML = '<img class="alien-img alien-img-big" src="' + alienImgSrc(a) + '" alt="' + a.name + '" ' +
+        'onerror="__alienImgFallback(this,\'' + a.id + '\')">';
       moodEl.textContent = moodLine();
 
       var need = xpForLevel(state.level);
