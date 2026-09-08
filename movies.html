@@ -168,13 +168,17 @@
       aspect-ratio: 2 / 3;
       object-fit: cover;
       border-radius: 14px;
-      box-shadow: 0 0 18px rgba(80, 150, 255, 0.28);
-      transition: box-shadow 0.25s ease, transform 0.25s ease;
+      /* Netflix-red frame: every thumb sits in a red border with a
+         deepening red glow on hover */
+      border: 2px solid rgba(229, 9, 20, 0.55);
+      box-shadow: 0 0 18px rgba(229, 9, 20, 0.22);
+      transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
       background: #0a1220;
       display: block;
     }
     .card:hover .poster {
-      box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
+      border-color: rgba(229, 9, 20, 0.95);
+      box-shadow: 0 0 26px rgba(229, 9, 20, 0.45);
       transform: translateY(-4px);
     }
     .save-btn {
