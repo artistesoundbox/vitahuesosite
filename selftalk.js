@@ -357,7 +357,7 @@
 
   /* Life-mystery questions get a contemplative voice: the system prompt
      shifts so the mirror answers like a gentle guide rather than a buddy. */
-  var MYSTERY = /(meaning of life|why am i here|purpose|who am i|what happens when|after death|soul|universe|consciousness|god|divine|destiny|fate|karma|why do we|why does anything|is there a)/i;
+  var MYSTERY = /(meaning of life|why am i here|purpose|who am i|what happens when|after death|soul|universe|consciousness|god|divine|destiny|fate|karma|why do we|why does anything|is there a|origin|existence|exist|humanity|humans|reality|cosmos|creation|evolution|big bang|truth about|higher power|spiritual|awakening)/i;
 
   function mirrorDigest() {
     var entries = loadEntries();
