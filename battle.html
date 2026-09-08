@@ -208,7 +208,8 @@
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
-    /* ================= identity / save plumbing (mirrors trainyouralien.html) ================= */
+    /* ================= identity / save plumbing =================
+       Auth0 removed — the arena runs in guest mode; saves stay local. */
     var uid = 'guest';
     var alienId = new URLSearchParams(location.search).get('alien') || null;
     try {
@@ -217,26 +218,12 @@
     var alienName = (alienId || 'wanderer');
     alienName = alienName.charAt(0).toUpperCase() + alienName.slice(1);
 
-    async function resolveUser() {
-      try {
-        if (window.VH_AUTH && window.VH_AUTH._configured && await window.VH_AUTH.isLoggedIn()) {
-          var user = await window.VH_AUTH.getUser();
-          uid = (user.sub || 'user').replace(/[^a-zA-Z0-9_-]/g, '_');
-          if (!alienId) {
-            try { alienId = localStorage.getItem('vhs_alien_cur_' + uid); } catch (e) {}
-            alienName = alienId ? alienId.charAt(0).toUpperCase() + alienId.slice(1) : alienName;
-          }
-        }
-      } catch (e) { /* stay guest */ }
+    function resolveUser() {
       document.getElementById('who-line').textContent =
-        'Fighting as ' + alienName + (uid === 'guest' ? ' (guest)' : '');
+        'Fighting as ' + alienName + ' (guest)';
       if (!alienId) document.getElementById('no-alien-note').classList.remove('hidden');
     }
-    // auth.js is a plain script; load it lazily, it's optional
-    var s = document.createElement('script'); s.src = 'auth.js';
-    s.onload = function () { resolveUser(); };
-    s.onerror = function () { resolveUser(); };
-    document.head.appendChild(s);
+    resolveUser();
 
     /* ================= tiny synth sfx ================= */
     var AC = null, master = null;
