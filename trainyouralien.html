@@ -229,6 +229,26 @@
     .alien-card .adesc { font-size: 11.5px; color: #8aa5c8; line-height: 1.35; }
     .alien-card .pick-hint { font-size: 11px; color: #7fe0a8; margin-top: 4px; }
 
+    /* voice audition button — speaks a sample line in the alien's own voice */
+    .alien-card .audition {
+      display: inline-block;
+      margin: 7px auto 0;
+      padding: 5px 14px;
+      font-size: 11.5px;
+      letter-spacing: 0.08em;
+      color: #cfe4ff;
+      background: rgba(8, 14, 24, 0.6);
+      border: 1px solid var(--glow-solid, rgba(120, 180, 255, 0.5));
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .alien-card .audition:hover {
+      color: #fff;
+      background: rgba(20, 40, 70, 0.85);
+      box-shadow: 0 0 12px var(--glow, rgba(80, 150, 255, 0.45));
+    }
+
     /* ---------- nursery ---------- */
     .nursery {
       max-width: 640px;
@@ -473,26 +493,36 @@
     var ALIENS = [
       // ---- female ----
       { id: 'luna',  name: 'Luna',  gender: 'f', dir: 'female', color: '#3ea6e8', accent: '#cfe9ff', shape: 'pear',
-        desc: 'Moon-calm and soft-spoken. She listens like gravity.', voice: 'gentle', rate: 0.86, pitch: 1.04 },
+        desc: 'Moon-calm and soft-spoken. She listens like gravity.', voice: 'gentle', rate: 0.86, pitch: 1.04,
+        sample: 'Bleep… I am Luna. The stars feel softer when you are near.' },
       { id: 'lyra',  name: 'Lyra',  gender: 'f', dir: 'female', color: '#c46ee8', accent: '#f2d9ff', shape: 'pear',
-        desc: 'Hums in star-frequencies only she can hear.', voice: 'dreamy', rate: 0.8, pitch: 1.18 },
+        desc: 'Hums in star-frequencies only she can hear.', voice: 'dreamy', rate: 0.8, pitch: 1.18,
+        sample: 'Mmm… I am Lyra. I heard your hum before you arrived.' },
       { id: 'maya',  name: 'Maya',  gender: 'f', dir: 'female', color: '#e8c93e', accent: '#fff3c9', shape: 'round',
-        desc: 'A giggly little sunbeam who never sits still.', voice: 'playful', rate: 1.16, pitch: 1.48 },
+        desc: 'A giggly little sunbeam who never sits still.', voice: 'playful', rate: 1.16, pitch: 1.48,
+        sample: 'Bleep bleep! Maya! Ooo can we play RIGHT NOW please please?' },
       { id: 'xylia', name: 'Xylia', gender: 'f', dir: 'female', color: '#e5484d', accent: '#ffd0c9', shape: 'spiky',
-        desc: 'A fierce tiny hunter — loyal to the last star.', voice: 'fiery', rate: 1.12, pitch: 1.12 },
+        desc: 'A fierce tiny hunter — loyal to the last star.', voice: 'fiery', rate: 1.12, pitch: 1.12,
+        sample: 'Xylia here! Point me at something and WATCH this!' },
       { id: 'zara',  name: 'Zara',  gender: 'f', dir: 'female', color: '#46c46e', accent: '#b9ffd4', shape: 'round',
-        desc: 'Fearless scout of the nursery ring. Protects her own.', voice: 'brave', rate: 0.94, pitch: 0.9 },
+        desc: 'Fearless scout of the nursery ring. Protects her own.', voice: 'brave', rate: 0.94, pitch: 0.9,
+        sample: 'Zara. I scouted the whole ring before breakfast. Safe with me.' },
       // ---- male ----
       { id: 'jax',   name: 'Jax',   gender: 'm', dir: 'male', color: '#f07d2e', accent: '#ffd9b8', shape: 'spiky',
-        desc: 'Hot-headed rocket-heart. Loves a good mission.', voice: 'fiery', rate: 1.14, pitch: 0.96 },
+        desc: 'Hot-headed rocket-heart. Loves a good mission.', voice: 'fiery', rate: 1.14, pitch: 0.96,
+        sample: 'JAX! Ready for launch! Where are we going first?' },
       { id: 'neo',   name: 'Neo',   gender: 'm', dir: 'male', color: '#46c46e', accent: '#b9ffd4', shape: 'round',
-        desc: 'Unhurried and unbothered. Laughs in low frequencies.', voice: 'easygoing', rate: 0.82, pitch: 0.84 },
+        desc: 'Unhurried and unbothered. Laughs in low frequencies.', voice: 'easygoing', rate: 0.82, pitch: 0.84,
+        sample: 'Hey… Neo here. No rush. The stars are not going anywhere.' },
       { id: 'nix',   name: 'Nix',   gender: 'm', dir: 'male', color: '#e8c93e', accent: '#fff3c9', shape: 'round',
-        desc: 'A mischievous prankster with a heart of gold.', voice: 'playful', rate: 1.2, pitch: 1.32 },
+        desc: 'A mischievous prankster with a heart of gold.', voice: 'playful', rate: 1.2, pitch: 1.32,
+        sample: 'Hehe… Nix! I hid your star-candy. Bleep! Just kidding. Mostly.' },
       { id: 'orion', name: 'Orion', gender: 'm', dir: 'male', color: '#3ea6e8', accent: '#cfe9ff', shape: 'spiky',
-        desc: 'A sturdy stargazer named for his belt of stars.', voice: 'brave', rate: 0.9, pitch: 0.95 },
+        desc: 'A sturdy stargazer named for his belt of stars.', voice: 'brave', rate: 0.9, pitch: 0.95,
+        sample: 'Orion. Three stars in my belt and room for one more friend.' },
       { id: 'pax',   name: 'Pax',   gender: 'm', dir: 'male', color: '#c46ee8', accent: '#f2d9ff', shape: 'pear',
-        desc: 'The little peacemaker. Soft voice, steady soul.', voice: 'gentle', rate: 0.88, pitch: 1.0 },
+        desc: 'The little peacemaker. Soft voice, steady soul.', voice: 'gentle', rate: 0.88, pitch: 1.0,
+        sample: 'Hello… Pax. Everything is going to be okay. I can feel it.' },
     ];
 
     function alienImgSrc(a) { return 'trainyouralien/avatars/' + a.dir + '/' + a.id + '.png'; }
@@ -646,13 +676,28 @@
           '<img class="alien-img" src="' + alienImgSrc(a) + '" alt="' + a.name + '" ' +
             'onerror="__alienImgFallback(this,\'' + a.id + '\')">' +
           '<div class="aname">' + a.name + '</div>' +
-          '<div class="adesc">' + a.desc + '</div>' + hint + '</div>';
+          '<div class="adesc">' + a.desc + '</div>' +
+          '<button type="button" class="audition" data-id="' + a.id + '">🔊 hear voice</button>' + hint + '</div>';
       }
       pickerEl.innerHTML = html;
       var cards = pickerEl.querySelectorAll('.alien-card');
       for (var j = 0; j < cards.length; j++) {
         cards[j].addEventListener('click', function (e) {
+          if (e.target.closest('.audition')) return;   // audition button handles itself
           chooseAlien(e.currentTarget.getAttribute('data-id'));
+        });
+      }
+      var auds = pickerEl.querySelectorAll('.audition');
+      for (var k = 0; k < auds.length; k++) {
+        auds[k].addEventListener('click', function (e) {
+          e.stopPropagation();
+          var id = e.currentTarget.getAttribute('data-id');
+          for (var m = 0; m < ALIENS.length; m++) {
+            if (ALIENS[m].id === id) {
+              speak(ALIENS[m].sample || ('Bleep! I am ' + ALIENS[m].name + '.'), ALIENS[m]);
+              break;
+            }
+          }
         });
       }
     }
@@ -834,10 +879,10 @@
       chatBodyEl.scrollTop = chatBodyEl.scrollHeight;
     }
 
-    function speak(txt) {
+    function speak(txt, who) {
       if (!('speechSynthesis' in window)) return;
       if (window.__vhSpeaking) { window.speechSynthesis.cancel(); window.__vhSpeaking = false; }
-      var a = alien() || {};   // each alien speaks with its own voice signature
+      var a = who || alien() || {};   // each alien speaks with its own voice signature
       var u = new SpeechSynthesisUtterance(txt);
       u.rate = a.rate || 0.95;
       u.pitch = a.pitch || 1.2;
