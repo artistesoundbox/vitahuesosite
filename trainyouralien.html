@@ -20,6 +20,16 @@
     }
     a { color: #8ec2ff; }
 
+    /* ---- title art ---- */
+    .title-art {
+      display: block;
+      width: min(300px, 70vw);
+      height: auto;
+      margin: 0 auto 18px;
+      border-radius: 18px;
+      box-shadow: 0 0 22px rgba(80, 150, 255, 0.35);
+    }
+
     header {
       max-width: 1200px;
       margin: 0 auto;
@@ -144,9 +154,11 @@
       transform: translateY(-3px);
     }
     .alien-card.sel {
-      border-color: #7fe0a8;
-      box-shadow: 0 0 22px rgba(70, 196, 110, 0.55);
+      border-color: var(--glow-solid, #7fe0a8);
+      box-shadow: 0 0 22px var(--glow, rgba(70, 196, 110, 0.55));
     }
+    /* portrait glow: each card sets --glow (with alpha) + --glow-solid from
+       the alien's signature color, so every portrait glows in its own hue */
     .alien-card .alien-img {
       display: block;
       height: 110px;
@@ -154,9 +166,16 @@
       max-width: 100%;
       margin: 0 auto;
       object-fit: contain;
-      filter: drop-shadow(0 0 10px rgba(80, 220, 150, 0.25));
+      filter: drop-shadow(0 0 10px var(--glow, rgba(80, 220, 150, 0.25)));
+      transition: filter 0.25s ease;
     }
-    .alien-card .alien-img-big, .alien-img-big { height: 170px; }
+    .alien-card:hover .alien-img {
+      filter: drop-shadow(0 0 16px var(--glow, rgba(80, 220, 150, 0.35)));
+    }
+    .alien-card .alien-img-big, .alien-img-big {
+      height: 170px;
+      filter: drop-shadow(0 0 16px var(--glow, rgba(80, 220, 150, 0.35)));
+    }
     .alien-card .aname { font-size: 15px; color: #eaf4ff; margin-top: 6px; }
     .alien-card .adesc { font-size: 11.5px; color: #8aa5c8; line-height: 1.35; }
     .alien-card .pick-hint { font-size: 11px; color: #7fe0a8; margin-top: 4px; }
@@ -315,6 +334,7 @@
   </style>
 </head>
 <body>
+  <img src="trainyouralien/trainyouralien.png" alt="Train Your Alien" class="title-art" />
   <header>
     <div class="top-row">
       <a class="btn small nav-back" href="index.html">◀ BACK</a>
@@ -427,9 +447,16 @@
     ];
 
     function alienImgSrc(a) { return 'trainyouralien/avatars/' + a.dir + '/' + a.id + '.png'; }
+    function glowVars(a) { return '--glow:' + a.color + '99;--glow-solid:' + a.color; }
     window.__alienImgFallback = function (img, id) {
       for (var i = 0; i < ALIENS.length; i++) {
-        if (ALIENS[i].id === id) { img.outerHTML = alienSVG(ALIENS[i], 96); return; }
+        if (ALIENS[i].id === id) {
+          var a = ALIENS[i];
+          var cls = img.className || 'alien-img';
+          img.outerHTML = alienSVG(a, 96).replace('<svg ',
+            '<svg class="' + cls + '" style="' + glowVars(a) + '" ');
+          return;
+        }
       }
     };
 
@@ -556,7 +583,7 @@
         var a = ALIENS[i];
         var sel = state.alienId === a.id ? ' sel' : '';
         var hint = state.alienId === a.id ? '<div class="pick-hint">★ yours</div>' : '';
-        html += '<div class="alien-card' + sel + '" data-id="' + a.id + '">' +
+        html += '<div class="alien-card' + sel + '" data-id="' + a.id + '" style="' + glowVars(a) + '">' +
           '<img class="alien-img" src="' + alienImgSrc(a) + '" alt="' + a.name + '" ' +
             'onerror="__alienImgFallback(this,\'' + a.id + '\')">' +
           '<div class="aname">' + a.name + '</div>' +
@@ -606,7 +633,7 @@
       var stage = stageFor(state.level);
       nurseryEl.querySelector('#n-stage').textContent = 'Level ' + state.level + ' · ' + stage[1];
       nurseryEl.querySelector('#n-name').textContent = a.name;
-      avatarEl.innerHTML = '<img class="alien-img alien-img-big" src="' + alienImgSrc(a) + '" alt="' + a.name + '" ' +
+      avatarEl.innerHTML = '<img class="alien-img alien-img-big" style="' + glowVars(a) + '" src="' + alienImgSrc(a) + '" alt="' + a.name + '" ' +
         'onerror="__alienImgFallback(this,\'' + a.id + '\')">';
       moodEl.textContent = moodLine();
 
