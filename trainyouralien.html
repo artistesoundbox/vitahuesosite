@@ -271,6 +271,23 @@
     .nursery .mood-line { font-size: 14px; color: #9fb8d8; min-height: 20px; }
 
     .bars { margin: 14px 0 4px; }
+
+    /* ---------- battle gate / graduation ---------- */
+    .battle-gate {
+      margin-top: 18px; padding: 16px 18px; border-radius: 16px;
+      border: 1px solid rgba(255, 170, 110, 0.45);
+      background: rgba(40, 20, 8, 0.45);
+      text-align: center;
+    }
+    .battle-gate.graduated {
+      border-color: rgba(125, 255, 196, 0.5);
+      background: rgba(8, 34, 22, 0.5);
+    }
+    .battle-gate .bg-title {
+      font-size: 15px; letter-spacing: 0.18em; color: #ffd2a8; margin-bottom: 6px;
+    }
+    .battle-gate.graduated .bg-title { color: #7dffc4; }
+    .battle-gate p { font-size: 14px; color: #9fb8d8; line-height: 1.55; margin-bottom: 12px; }
     .bar-row { display: flex; align-items: center; gap: 10px; margin: 7px 0; }
     .bar-row .bl { width: 74px; text-align: right; font-size: 12.5px; color: #9fb8d8; text-transform: uppercase; letter-spacing: 0.08em; }
     .bar-row .meter { flex: 1; height: 12px; border-radius: 999px; background: rgba(8, 14, 24, 0.85); overflow: hidden; }
@@ -440,6 +457,16 @@
       <div class="avatar-wrap" id="n-avatar"></div>
       <div class="mood-line" id="n-mood"></div>
       <div class="bars" id="n-bars"></div>
+      <div class="battle-gate" id="battle-gate" style="display:none">
+        <div class="bg-title">⚔ FIRST TRIAL UNLOCKED</div>
+        <p>Your alien is strong enough to enter the arena. Survive five waves
+        of the shambling dead to graduate — battle glory becomes training XP.</p>
+        <a class="btn" href="battle.html">Enter the arena</a>
+      </div>
+      <div class="battle-gate graduated" id="graduated-note" style="display:none">
+        <div class="bg-title">🏆 WELCOME BACK, GRADUATE</div>
+        <p id="graduated-body">Your battle spoils have been added.</p>
+      </div>
     </div>
 
     <!-- training actions -->
@@ -790,6 +817,28 @@
         barRow('XP', xpPct, xpColor, state.xp + '/' + need) +
         barRow('ENERGY', enPct, enColor, state.energy + '/100') +
         barRow('STREAK', Math.min(100, state.streak * 12), '#3ea6e8', state.streak + ' day' + (state.streak === 1 ? '' : 's'));
+
+      // First Trial gate: visible at Level 5+
+      var gate = nurseryEl.querySelector('#battle-gate');
+      if (gate) gate.style.display = state.level >= 5 ? '' : 'none';
+    }
+
+    function showGraduationNote() {
+      var note = document.getElementById('graduated-note');
+      if (!note) return;
+      // read what the battle wrote, then surface it warmly
+      var st = loadStateFor(state.alienId);
+      var lastBattle = null;
+      if (st && st.memories && st.memories.length) {
+        for (var i = 0; i < st.memories.length; i++) {
+          if (st.memories[i].tag === 'BATTLE') { lastBattle = st.memories[i]; break; }
+        }
+      }
+      document.getElementById('graduated-body').textContent = lastBattle
+        ? lastBattle.text + ' The elders are impressed.'
+        : 'Your battle spoils have been added.';
+      note.style.display = '';
+      history.replaceState(null, '', location.pathname);   // clean the #graduated hash
     }
     function barRow(label, pct, color, val) {
       return '<div class="bar-row"><span class="bl">' + label + '</span>' +
@@ -1125,6 +1174,16 @@
         if (e.key === 'Enter') sendChat();
       });
       initIdentity();
+
+      // returning from the arena with spoils? (initIdentity is async — wait for state)
+      if (location.hash === '#graduated') {
+        var gradTries = 0;
+        var gradPoll = function () {
+          if (state && state.alienId) showGraduationNote();
+          else if (gradTries++ < 40) setTimeout(gradPoll, 100);
+        };
+        setTimeout(gradPoll, 80);
+      }
     });
   })();
   </script>

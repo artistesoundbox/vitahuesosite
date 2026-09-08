@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>First Trial – Train Your Alien – Vitamina Hueso @ Manteca Studios</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; min-height: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #cfe4ff; background: #04070d;
+      overflow-x: hidden;
+    }
+    body {
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(40, 80, 160, 0.18), transparent 60%),
+        radial-gradient(900px 500px at 10% 110%, rgba(120, 255, 180, 0.08), transparent 60%),
+        #04070d;
+    }
+    a { color: #8ec2ff; }
+    .title-art {
+      display: block; width: min(240px, 60vw); height: auto;
+      margin: 14px auto 8px; border-radius: 18px;
+      box-shadow: 0 0 22px rgba(80, 150, 255, 0.35);
+    }
+    header { max-width: 1200px; margin: 0 auto; padding: 10px 6vw 0; text-align: center; }
+    .kicker { font-size: 13px; letter-spacing: 0.42em; text-transform: uppercase; color: #7f9cbd; margin-bottom: 6px; }
+    header h1 {
+      font-size: clamp(28px, 5vw, 46px); letter-spacing: 0.12em; color: #eaf4ff;
+      text-shadow: 0 0 30px rgba(80, 150, 255, 0.55);
+    }
+    header p.tag { font-size: clamp(13px, 2vw, 16px); line-height: 1.5; color: #9fb8d8; max-width: 720px; margin: 6px auto 0; }
+    .top-row { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+    .btn {
+      display: inline-block; padding: 11px 34px; font-size: 14px; letter-spacing: 0.22em;
+      text-transform: uppercase; color: #cfe4ff; background: rgba(8, 14, 24, 0.6);
+      border: 1px solid rgba(120, 180, 255, 0.35); border-radius: 999px;
+      text-decoration: none; transition: all .25s; cursor: pointer;
+    }
+    .btn:hover { border-color: rgba(140, 255, 200, 0.8); box-shadow: 0 0 18px rgba(80, 200, 255, 0.35); color: #fff; }
+    .btn.small { padding: 8px 22px; font-size: 12px; }
+
+    /* ---------- arena shell ---------- */
+    #arena-wrap {
+      position: relative; max-width: 1200px; margin: 0 auto; padding: 0 6vw;
+    }
+    #stage {
+      position: relative; width: 100%; height: min(72vh, 640px);
+      border-radius: 18px; overflow: hidden;
+      border: 1px solid rgba(120, 180, 255, 0.25);
+      box-shadow: 0 0 34px rgba(60, 120, 220, 0.25), inset 0 0 60px rgba(0,0,0,0.4);
+      background: #060a12;
+      touch-action: none;
+    }
+    #stage canvas { display: block; width: 100%; height: 100%; }
+
+    /* HUD */
+    #hud {
+      position: absolute; inset: 0; pointer-events: none;
+      font-size: 14px;
+    }
+    #hud .tl {
+      position: absolute; top: 12px; left: 14px; line-height: 1.7;
+      text-shadow: 0 1px 4px #000;
+    }
+    #hearts { color: #ff5d6a; letter-spacing: 3px; font-size: 17px; }
+    #hud .tr {
+      position: absolute; top: 12px; right: 14px; text-align: right; line-height: 1.7;
+      text-shadow: 0 1px 4px #000;
+    }
+    #hud .wave-line { color: #ffd97a; font-weight: 600; letter-spacing: .1em; }
+    #hud .who-line { color: #9fe8b5; }
+    #center-msg {
+      position: absolute; top: 38%; left: 0; right: 0; text-align: center;
+      font-size: clamp(26px, 5vw, 44px); font-weight: 800; letter-spacing: 0.18em;
+      color: #fff; text-shadow: 0 0 26px rgba(120, 200, 255, .9), 0 2px 10px #000;
+      opacity: 0; transition: opacity .35s;
+    }
+    #center-msg.show { opacity: 1; }
+    #hint {
+      position: absolute; bottom: 10px; left: 0; right: 0; text-align: center;
+      color: #8aa5c8; font-size: 12px; letter-spacing: .08em;
+      text-shadow: 0 1px 3px #000;
+    }
+    #dmg-flash {
+      position: absolute; inset: 0; background: radial-gradient(ellipse at center,
+        transparent 40%, rgba(255, 30, 50, 0.45) 100%);
+      opacity: 0; transition: opacity .12s; pointer-events: none;
+    }
+
+    /* mobile controls */
+    #stick {
+      position: absolute; left: 18px; bottom: 18px; width: 108px; height: 108px;
+      border-radius: 50%; border: 1px solid rgba(140, 190, 255, 0.4);
+      background: rgba(10, 18, 32, 0.35); pointer-events: none; opacity: 0; transition: opacity .2s;
+    }
+    #stick .knob {
+      position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px;
+      border-radius: 50%; background: rgba(140, 200, 255, 0.5);
+      box-shadow: 0 0 14px rgba(120, 200, 255, 0.6);
+    }
+    #atk-btn {
+      position: absolute; right: 20px; bottom: 22px; width: 84px; height: 84px;
+      border-radius: 50%; border: 1px solid rgba(255, 170, 120, 0.55);
+      background: rgba(40, 16, 8, 0.5); color: #ffd2a8; font-size: 13px; letter-spacing: .12em;
+      pointer-events: auto; cursor: pointer; opacity: 0; transition: opacity .2s;
+      text-transform: uppercase;
+    }
+    body.touch #stick, body.touch #atk-btn { opacity: 1; }
+
+    /* loading / overlay panels */
+    #overlay {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px;
+      background: rgba(4, 7, 13, 0.88); z-index: 5; text-align: center; padding: 20px;
+    }
+    #overlay h2 { font-size: clamp(20px, 4vw, 30px); letter-spacing: .16em; color: #eaf4ff; }
+    #overlay p { color: #9fb8d8; max-width: 480px; line-height: 1.55; }
+    #load-bar {
+      width: min(360px, 70vw); height: 8px; border-radius: 99px;
+      background: rgba(120, 180, 255, 0.15); overflow: hidden;
+    }
+    #load-fill { height: 100%; width: 0%; border-radius: 99px;
+      background: linear-gradient(90deg, #4f8cff, #7dffc4); transition: width .25s; }
+    #load-pct { color: #7f9cbd; font-size: 12px; letter-spacing: .18em; }
+    #overlay .btn { pointer-events: auto; }
+    .hidden { display: none !important; }
+
+    /* result card under the arena */
+    #result {
+      max-width: 640px; margin: 26px auto 60px; padding: 26px 28px;
+      border: 1px solid rgba(120, 200, 255, 0.35); border-radius: 18px;
+      background: rgba(8, 14, 24, 0.6); text-align: center;
+    }
+    #result h3 { letter-spacing: .2em; margin-bottom: 10px; color: #eaf4ff; }
+    #result p { color: #9fb8d8; line-height: 1.6; margin-bottom: 16px; }
+    #result .big { font-size: 30px; color: #7dffc4; font-weight: 800; letter-spacing: .1em; }
+    #result .row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <img src="trainyouralien/trainyouralien.png" alt="Train Your Alien" class="title-art" />
+  <header>
+    <div class="top-row">
+      <a class="btn small nav-back" href="trainyouralien.html">&#9664; BACK</a>
+      <a class="btn small" href="index.html">&#8962; HOME</a>
+    </div>
+    <p class="kicker">Vitamina Hueso @ Manteca Studios</p>
+    <h1>THE FIRST TRIAL</h1>
+    <p class="tag">Your alien steps into the arena. Survive five waves of the shambling dead
+    to graduate — every strike and every wave cleared becomes training XP your alien keeps forever.</p>
+  </header>
+
+  <div id="arena-wrap">
+    <div id="stage">
+      <div id="hud">
+        <div class="tl">
+          <div id="hearts">&#10084;&#10084;&#10084;&#10084;&#10084;</div>
+          <div id="kills-line">Slain: 0</div>
+        </div>
+        <div class="tr">
+          <div class="wave-line" id="wave-line">WAVE 0 / 5</div>
+          <div class="who-line" id="who-line"></div>
+          <div id="xp-line" style="color:#7dffc4">+0 XP</div>
+        </div>
+        <div id="center-msg"></div>
+        <div id="hint">WASD / arrows to move &nbsp;·&nbsp; SPACE to strike &nbsp;·&nbsp; or drag left side + tap STRIKE</div>
+        <div id="dmg-flash"></div>
+        <div id="stick"><div class="knob" id="knob"></div></div>
+        <button id="atk-btn">strike</button>
+      </div>
+      <div id="overlay">
+        <h2>THE FIRST TRIAL</h2>
+        <p id="overlay-text">Summoning the arena…</p>
+        <div id="load-bar"><div id="load-fill"></div></div>
+        <div id="load-pct">0%</div>
+        <button class="btn hidden" id="start-btn">Enter the arena</button>
+        <p class="hidden" id="no-alien-note" style="color:#ffd97a">
+          You haven't chosen an alien yet — you may still fight as a wandering spirit, but
+          only a chosen alien can keep the XP. <a href="trainyouralien.html">Choose one first &rarr;</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div id="result" class="hidden">
+    <h3 id="result-title">TRIAL COMPLETE</h3>
+    <p id="result-body"></p>
+    <div class="big" id="result-xp">+0 XP</div>
+    <p id="result-note"></p>
+    <div class="row">
+      <button class="btn" id="claim-btn">Claim &amp; return to training</button>
+      <button class="btn small" id="retry-btn">Fight again</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+    /* ================= identity / save plumbing (mirrors trainyouralien.html) ================= */
+    var uid = 'guest';
+    var alienId = new URLSearchParams(location.search).get('alien') || null;
+    try {
+      if (!alienId) alienId = localStorage.getItem('vhs_alien_cur_' + uid);
+    } catch (e) {}
+    var alienName = (alienId || 'wanderer');
+    alienName = alienName.charAt(0).toUpperCase() + alienName.slice(1);
+
+    async function resolveUser() {
+      try {
+        if (window.VH_AUTH && window.VH_AUTH._configured && await window.VH_AUTH.isLoggedIn()) {
+          var user = await window.VH_AUTH.getUser();
+          uid = (user.sub || 'user').replace(/[^a-zA-Z0-9_-]/g, '_');
+          if (!alienId) {
+            try { alienId = localStorage.getItem('vhs_alien_cur_' + uid); } catch (e) {}
+            alienName = alienId ? alienId.charAt(0).toUpperCase() + alienId.slice(1) : alienName;
+          }
+        }
+      } catch (e) { /* stay guest */ }
+      document.getElementById('who-line').textContent =
+        'Fighting as ' + alienName + (uid === 'guest' ? ' (guest)' : '');
+      if (!alienId) document.getElementById('no-alien-note').classList.remove('hidden');
+    }
+    // auth.js is a plain script; load it lazily, it's optional
+    var s = document.createElement('script'); s.src = 'auth.js';
+    s.onload = function () { resolveUser(); };
+    s.onerror = function () { resolveUser(); };
+    document.head.appendChild(s);
+
+    /* ================= tiny synth sfx ================= */
+    var AC = null, master = null;
+    function audio() {
+      if (!AC) {
+        try {
+          AC = new (window.AudioContext || window.webkitAudioContext)();
+          master = AC.createGain(); master.gain.value = 0.5; master.connect(AC.destination);
+        } catch (e) { AC = null; }
+      }
+      if (AC && AC.state === 'suspended') AC.resume();
+      return AC;
+    }
+    function tone(f0, f1, dur, type, vol) {
+      var ac = audio(); if (!ac) return;
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type = type || 'sine';
+      o.frequency.setValueAtTime(f0, ac.currentTime);
+      o.frequency.exponentialRampToValueAtTime(Math.max(f1, 1), ac.currentTime + dur);
+      g.gain.setValueAtTime(vol || 0.2, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+      o.connect(g); g.connect(master);
+      o.start(); o.stop(ac.currentTime + dur + 0.02);
+    }
+    var sfx = {
+      swing: function () { tone(340, 90, 0.14, 'sawtooth', 0.14); },
+      hit:   function () { tone(160, 60, 0.1, 'square', 0.22); tone(90, 50, 0.16, 'sine', 0.18); },
+      groan: function () { tone(82, 46, 0.5, 'sawtooth', 0.07); },
+      hurt:  function () { tone(220, 110, 0.22, 'square', 0.16); },
+      die:   function () { tone(120, 40, 0.35, 'sawtooth', 0.16); },
+      wave:  function () { tone(440, 660, 0.16, 'sine', 0.16); tone(660, 990, 0.2, 'sine', 0.1); },
+      win:   function () { [523, 659, 784, 1047].forEach(function (f, i) {
+              setTimeout(function () { tone(f, f * 1.01, 0.35, 'sine', 0.18); }, i * 160); }); },
+      lose:  function () { tone(300, 80, 0.8, 'sawtooth', 0.18); }
+    };
+
+    /* ================= game state ================= */
+    var G = {
+      hp: 5, maxHp: 5, wave: 0, maxWaves: 5,
+      kills: 0, xp: 0, running: false, over: false, won: false
+    };
+    var WAVES = [
+      { count: 3, speed: 1.7, hp: 1 },
+      { count: 5, speed: 1.9, hp: 1 },
+      { count: 7, speed: 2.1, hp: 1, champ: 1 },
+      { count: 9, speed: 2.3, hp: 1, champ: 1 },
+      { count: 11, speed: 2.5, hp: 2, champ: 2 }
+    ];
+
+    /* ================= three.js scene ================= */
+    var stage = document.getElementById('stage');
+    var renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    stage.appendChild(renderer.domElement);
+
+    var scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0f1a);
+    scene.fog = new THREE.Fog(0x0a0f1a, 30, 90);
+
+    var camera = new THREE.PerspectiveCamera(55, 1, 0.1, 300);
+
+    var hemi = new THREE.HemisphereLight(0x9db8e8, 0x3a2f24, 1.0);
+    scene.add(hemi);
+    var sun = new THREE.DirectionalLight(0xffe8c0, 1.6);
+    sun.position.set(18, 30, 10);
+    scene.add(sun);
+    var rim = new THREE.DirectionalLight(0x5f8fff, 0.55);
+    rim.position.set(-16, 12, -14);
+    scene.add(rim);
+
+    function resize() {
+      var w = stage.clientWidth, h = stage.clientHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h; camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', resize); resize();
+
+    /* ---------- load assets ---------- */
+    var BASE = 'trainyouralien/battle/';
+    var loader = new GLTFLoader();
+    var loadPct = { arena: 0, luna: 0, zombie: 0 };
+    function loadGlb(name, onProg) {
+      return new Promise(function (res, rej) {
+        loader.load(BASE + name, res, function (ev) {
+          if (ev.total) onProg(ev.loaded / ev.total);
+        }, rej);
+      });
+    }
+    function progress() {
+      var t = (loadPct.arena + loadPct.luna + loadPct.zombie) / 3;
+      document.getElementById('load-fill').style.width = Math.round(t * 100) + '%';
+      document.getElementById('load-pct').textContent = Math.round(t * 100) + '%';
+    }
+
+    function bboxOf(root) {
+      var box = new THREE.Box3().setFromObject(root);
+      return box;
+    }
+    function normalizeHeight(root, target) {
+      var box = bboxOf(root);
+      var h = Math.max(0.001, box.max.y - box.min.y);
+      var s = target / h;
+      root.scale.setScalar(s);
+      var b2 = bboxOf(root);
+      return { scale: s, floorY: b2.min.y, size: b2.getSize(new THREE.Vector3()) };
+    }
+
+    var arena, arenaCenter, arenaHalf, floorY = 0;
+    var luna, lunaMix, clipsL = {};
+    var zombieProto, zombieClips = {};
+
+    var overlayText = document.getElementById('overlay-text');
+
+    Promise.all([
+      loadGlb('arena.glb', function (p) { loadPct.arena = p; progress(); }),
+      loadGlb('luna.glb', function (p) { loadPct.luna = p; progress(); }),
+      loadGlb('zombie.glb', function (p) { loadPct.zombie = p; progress(); })
+    ]).then(function (gs) {
+      // ---- arena ----
+      arena = gs[0].scene;
+      var ab = bboxOf(arena);
+      arenaCenter = ab.getCenter(new THREE.Vector3());
+      var size = ab.getSize(new THREE.Vector3());
+      arenaHalf = { x: size.x * 0.40, z: size.z * 0.40 };   // stay inside walls
+      floorY = ab.min.y + 0.05;
+      scene.add(arena);
+
+      // ---- luna (player) ----
+      luna = gs[1].scene;
+      var nl = normalizeHeight(luna, 2.3);
+      luna.position.set(arenaCenter.x, floorY - nl.floorY + 0.02, arenaCenter.z + 6);
+      scene.add(luna);
+      lunaMix = new THREE.AnimationMixer(luna);
+      gs[1].animations.forEach(function (a) { clipsL[a.name] = a; });
+
+      // ---- zombie prototype ----
+      zombieProto = gs[2].scene;
+      var nz = normalizeHeight(zombieProto, 2.05);
+      zombieProto.visible = false;
+      scene.add(zombieProto);
+      gs[2].animations.forEach(function (a) { zombieClips[a.name] = a; });
+
+      overlayText.textContent = 'The arena stands silent. Ready when you are.';
+      var btn = document.getElementById('start-btn');
+      btn.classList.remove('hidden');
+      btn.addEventListener('click', startGame);
+    }).catch(function (err) {
+      console.error(err);
+      overlayText.innerHTML = 'The arena failed to summon.<br><small>' + (err.message || err) + '</small>';
+    });
+
+    /* ---------- animation helpers ---------- */
+    function fade(mixer, from, to, dur) {
+      var next = mixer.clipAction(to);
+      next.reset().play();
+      if (from && from !== to) {
+        var prev = mixer.clipAction(from);
+        prev.crossFadeTo(next, dur, false);
+      }
+      return next;
+    }
+
+    /* ---------- player control state ---------- */
+    var input = { x: 0, z: 0, attack: false };
+    var keys = {};
+    window.addEventListener('keydown', function (e) {
+      keys[e.code] = true;
+      if (e.code === 'Space') { e.preventDefault(); tryAttack(); }
+      audio();
+    });
+    window.addEventListener('keyup', function (e) { keys[e.code] = false; });
+
+    // virtual joystick (left half) + strike button
+    var isTouch = ('ontouchstart' in window);
+    if (isTouch) document.body.classList.add('touch');
+    var stick = document.getElementById('stick'), knob = document.getElementById('knob');
+    var stickId = null, stickCx = 0, stickCy = 0;
+    stage.addEventListener('touchstart', function (e) {
+      audio();
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        if (stickId === null && t.clientX - stage.getBoundingClientRect().left < stage.clientWidth * 0.5) {
+          stickId = t.identifier;
+          var r = stage.getBoundingClientRect();
+          stickCx = t.clientX; stickCy = t.clientY;
+          stick.style.left = (t.clientX - r.left - 54) + 'px';
+          stick.style.bottom = (r.bottom - t.clientY - 54) + 'px';
+          stick.style.opacity = 1;
+        }
+      }
+    }, { passive: true });
+    stage.addEventListener('touchmove', function (e) {
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        if (t.identifier === stickId) {
+          var dx = t.clientX - stickCx, dy = t.clientY - stickCy;
+          var len = Math.hypot(dx, dy), max = 46;
+          var k = len > max ? max / len : 1;
+          knob.style.transform = 'translate(' + dx * k + 'px,' + dy * k + 'px)';
+          input.x = (dx * k) / max; input.z = (dy * k) / max;
+        }
+      }
+    }, { passive: true });
+    function endTouch(e) {
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === stickId) {
+          stickId = null; input.x = input.z = 0;
+          knob.style.transform = 'translate(0,0)'; stick.style.opacity = 0;
+        }
+      }
+    }
+    stage.addEventListener('touchend', endTouch);
+    stage.addEventListener('touchcancel', endTouch);
+    document.getElementById('atk-btn').addEventListener('touchstart', function (e) {
+      e.preventDefault(); tryAttack();
+    });
+
+    /* ---------- combat ---------- */
+    var zombies = [];
+    var attacking = false, attackT = 0, didHit = false;
+    var ATK_DUR = 1.03, ATK_HIT_FROM = 0.25, ATK_HIT_TO = 0.6;
+    var playerVel = new THREE.Vector3();
+    var PLAYER_SPEED = 5.2;
+
+    function tryAttack() {
+      if (!G.running || attacking || G.over) return;
+      attacking = true; attackT = 0; didHit = false;
+      fade(lunaMix, curLuna, clipsL['attack'], 0.08);
+      curLuna = 'attack';
+      sfx.swing();
+    }
+
+    function spawnWave(n) {
+      var w = WAVES[n];
+      var made = 0, champs = 0;
+      var spawnRing = Math.max(arenaHalf.x, arenaHalf.z) * 0.92;
+      var total = w.count + (w.champ || 0);
+      var t = 0;
+      for (var i = 0; i < total; i++) {
+        (function (i) {
+          var isChamp = champs < (w.champ || 0) && i % 3 === 2;
+          if (isChamp) champs++;
+          var ang = (i / total) * Math.PI * 2 + Math.random() * 0.4;
+          var z = SkeletonUtils.clone(zombieProto);
+          z.visible = true;
+          z.scale.setScalar(zombieProto.scale.x * (isChamp ? 1.35 : 1));
+          var px = arenaCenter.x + Math.cos(ang) * spawnRing * 0.8;
+          var pz = arenaCenter.z + Math.sin(ang) * spawnRing * 0.8;
+          var zb = new THREE.Box3().setFromObject(z);
+          z.position.set(px, floorY - zb.min.y, pz);
+          scene.add(z);
+          var mixer = new THREE.AnimationMixer(z);
+          var st = {
+            root: z, mixer: mixer, hp: isChamp ? 3 : w.hp,
+            champ: isChamp, speed: w.speed * (isChamp ? 0.85 : 1) * (0.9 + Math.random() * 0.25),
+            state: 'walk', atkT: 0, didHit: false, cooldown: 0,
+            dead: false, deadT: 0, sepT: Math.random()
+          };
+          mixer.clipAction(zombieClips['walk']).play();
+          zombies.push(st);
+          // groan on spawn (staggered)
+          setTimeout(function () { sfx.groan(); }, t);
+          t += 120;
+        })(i);
+      }
+    }
+
+    function damagePlayer() {
+      if (G.over) return;
+      G.hp -= 1;
+      sfx.hurt();
+      var f = document.getElementById('dmg-flash');
+      f.style.opacity = 1; setTimeout(function () { f.style.opacity = 0; }, 140);
+      renderHud();
+      if (G.hp <= 0) endGame(false);
+    }
+
+    function killZombie(st) {
+      st.dead = true; st.deadT = 0; st.mixer.stopAllAction();
+      G.kills += 1;
+      var gain = st.champ ? 20 : 10;
+      G.xp += gain;
+      sfx.die();
+      renderHud();
+    }
+
+    function centerMsg(txt, hold) {
+      var el = document.getElementById('center-msg');
+      el.textContent = txt; el.classList.add('show');
+      clearTimeout(centerMsg._t);
+      centerMsg._t = setTimeout(function () { el.classList.remove('show'); }, hold || 1400);
+    }
+
+    function renderHud() {
+      var h = '';
+      for (var i = 0; i < G.maxHp; i++) h += i < G.hp ? '&#10084;' : '&#9760;';
+      document.getElementById('hearts').innerHTML = h;
+      document.getElementById('kills-line').textContent = 'Slain: ' + G.kills;
+      document.getElementById('wave-line').textContent = 'WAVE ' + Math.max(1, G.wave + 1) + ' / ' + G.maxWaves;
+      document.getElementById('xp-line').textContent = '+' + G.xp + ' XP';
+    }
+
+    /* ---------- main loop ---------- */
+    var curLuna = null;
+    var clock = new THREE.Clock();
+    var camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      var dt = Math.min(clock.getDelta(), 0.05);
+      var t = clock.elapsedTime;
+
+      if (lunaMix) lunaMix.update(dt);
+
+      // keyboard → input vector
+      var ix = input.x, iz = input.z;
+      if (keys['KeyA'] || keys['ArrowLeft']) ix -= 1;
+      if (keys['KeyD'] || keys['ArrowRight']) ix += 1;
+      if (keys['KeyW'] || keys['ArrowUp']) iz -= 1;
+      if (keys['KeyS'] || keys['ArrowDown']) iz += 1;
+      var mag = Math.hypot(ix, iz);
+      if (mag > 1) { ix /= mag; iz /= mag; }
+
+      if (luna && G.running && !G.over) {
+        // camera-relative move (camera yaw fixed at -45°)
+        var cy = -Math.PI / 4;
+        var fwd = new THREE.Vector3(Math.sin(cy), 0, Math.cos(cy));  // up-screen
+        var right = new THREE.Vector3(fwd.z, 0, -fwd.x);
+        // screen-up = -Z world when yaw -45: use forward = (sin cy, 0, cos cy) rotated:
+        // simpler: forward = (0,0,-1) rotated by cy around Y
+        fwd.set(Math.sin(cy) * -1, 0, Math.cos(cy) * -1);
+        right.set(-fwd.z, 0, fwd.x);
+        var move = new THREE.Vector3()
+          .addScaledVector(fwd, -iz)
+          .addScaledVector(right, ix);
+        var mLen = move.length();
+        if (mLen > 0.01) {
+          move.normalize();
+          playerVel.lerp(move.multiplyScalar(PLAYER_SPEED), 0.22);
+        } else {
+          playerVel.lerp(new THREE.Vector3(), 0.25);
+        }
+        luna.position.addScaledVector(playerVel, dt);
+        // clamp inside arena
+        luna.position.x = THREE.MathUtils.clamp(luna.position.x,
+          arenaCenter.x - arenaHalf.x, arenaCenter.x + arenaHalf.x);
+        luna.position.z = THREE.MathUtils.clamp(luna.position.z,
+          arenaCenter.z - arenaHalf.z, arenaCenter.z + arenaHalf.z);
+        luna.position.y = floorY + 0.02;
+
+        // face movement direction
+        var sp2d = Math.hypot(playerVel.x, playerVel.z);
+        if (sp2d > 0.4) {
+          var targetRot = Math.atan2(playerVel.x, playerVel.z);
+          var d = ((targetRot - luna.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+          luna.rotation.y += d * Math.min(1, dt * 10);
+        }
+
+        // locomotion animation
+        if (!attacking) {
+          var want = sp2d > 0.6 ? 'move' : 'idle';
+          if (want !== curLuna) { fade(lunaMix, curLuna, clipsL[want], 0.22); curLuna = want; }
+        }
+
+        // attack timing
+        if (attacking) {
+          attackT += dt;
+          if (!didHit && attackT >= ATK_HIT_FROM && attackT <= ATK_HIT_TO) {
+            didHit = true;
+            var fw = new THREE.Vector3(Math.sin(luna.rotation.y), 0, Math.cos(luna.rotation.y));
+            for (var i = 0; i < zombies.length; i++) {
+              var st = zombies[i];
+              if (st.dead) continue;
+              var dv = st.root.position.clone().sub(luna.position); dv.y = 0;
+              var dist = dv.length();
+              if (dist < 2.9 && dv.normalize().dot(fw) > 0.25) {
+                st.hp -= 1;
+                sfx.hit();
+                if (st.hp <= 0) killZombie(st);
+              }
+            }
+          }
+          if (attackT >= ATK_DUR) { attacking = false; curLuna = null; }
+        }
+      }
+
+      // zombies
+      for (var i = 0; i < zombies.length; i++) {
+        var st = zombies[i];
+        if (st.dead) {
+          st.deadT += dt;
+          st.root.rotation.x = Math.min(Math.PI / 2, st.deadT * 2.4);
+          st.root.position.y -= dt * 0.8;
+          if (st.deadT > 1.6) { scene.remove(st.root); zombies.splice(i, 1); i--; }
+          continue;
+        }
+        st.mixer.update(dt);
+        st.cooldown -= dt;
+        if (G.running && !G.over && luna) {
+          var dv2 = luna.position.clone().sub(st.root.position); dv2.y = 0;
+          var dist2 = dv2.length();
+          if (st.state === 'walk') {
+            if (dist2 > 1.9) {
+              dv2.normalize();
+              // separation from other zombies
+              for (var j = 0; j < zombies.length; j++) {
+                if (j === i || zombies[j].dead) continue;
+                var sv = st.root.position.clone().sub(zombies[j].root.position); sv.y = 0;
+                var sl = sv.length();
+                if (sl < 1.4 && sl > 0.001) dv2.addScaledVector(sv.normalize(), (1.4 - sl) * 1.2);
+              }
+              dv2.normalize();
+              st.root.position.addScaledVector(dv2, st.speed * dt);
+              st.root.rotation.y = Math.atan2(dv2.x, dv2.z);
+            } else if (st.cooldown <= 0) {
+              st.state = 'attack'; st.atkT = 0; st.didHit = false;
+              st.mixer.stopAllAction();
+              st.mixer.clipAction(zombieClips['attack']).reset().play();
+              sfx.groan();
+            } else {
+              // shuffle in place
+              st.root.rotation.y = Math.atan2(dv2.x, dv2.z);
+            }
+          } else { // attacking
+            st.atkT += dt;
+            if (!st.didHit && st.atkT > 0.55) {
+              st.didHit = true;
+              if (dist2 < 2.3) damagePlayer();
+            }
+            if (st.atkT >= 1.43) {
+              st.state = 'walk'; st.cooldown = 1.4;
+              st.mixer.stopAllAction();
+              st.mixer.clipAction(zombieClips['walk']).reset().play();
+            }
+          }
+        }
+      }
+
+      // wave progression
+      if (G.running && !G.over) {
+        var alive = zombies.filter(function (z) { return !z.dead; }).length;
+        if (G._waveActive && alive === 0 && zombies.every(function (z) { return z.dead; })) {
+          G._waveActive = false;
+          if (G.wave + 1 >= G.maxWaves) { endGame(true); }
+          else {
+            var bonus = 15 + G.wave * 5;
+            G.xp += bonus;
+            centerMsg('WAVE CLEARED  +' + bonus + ' XP', 1600);
+            sfx.wave();
+            renderHud();
+            setTimeout(function () {
+              if (!G.over) { G.wave += 1; spawnWave(G.wave); G._waveActive = true; renderHud(); }
+            }, 2000);
+          }
+        }
+      }
+
+      // camera: fixed 3/4 view following luna
+      if (luna) {
+        var camTarget = new THREE.Vector3(
+          luna.position.x + 10.5, floorY + 8.2, luna.position.z + 10.5);
+        camPos.lerp(camTarget, 0.06);
+        camera.position.copy(camPos);
+        camLook.lerp(new THREE.Vector3(luna.position.x, floorY + 1.4, luna.position.z), 0.09);
+        camera.lookAt(camLook);
+      }
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    /* ---------- flow ---------- */
+    function startGame() {
+      audio();
+      document.getElementById('overlay').classList.add('hidden');
+      G.running = true;
+      curLuna = 'idle';
+      if (lunaMix && clipsL['idle']) lunaMix.clipAction(clipsL['idle']).play();
+      G.wave = 0;
+      spawnWave(0);
+      G._waveActive = true;
+      centerMsg('WAVE 1', 1400);
+      renderHud();
+    }
+
+    function endGame(won) {
+      G.over = true; G.won = won; G.running = false;
+      if (won) { sfx.win(); centerMsg('GRADUATED', 2600); }
+      else { sfx.lose(); centerMsg('FALLEN', 2400); }
+      setTimeout(showResult, 1800);
+    }
+
+    function showResult() {
+      var r = document.getElementById('result');
+      var kept = G.won ? G.xp : Math.floor(G.xp * 0.5);
+      document.getElementById('result-title').textContent = G.won ? 'THE FIRST TRIAL IS COMPLETE' : 'THE ARENA CLAIMS YOU… THIS TIME';
+      document.getElementById('result-body').textContent = G.won
+        ? 'Five waves of the dead could not stop ' + alienName + '. The elders nod: the training was real.'
+        : 'The dead were many. But every scar is a lesson — half the earned XP survives.';
+      document.getElementById('result-xp').textContent = '+' + kept + ' XP';
+      document.getElementById('result-note').textContent = alienId
+        ? 'Claiming will add this XP to ' + alienName + "'s training and record the battle in its memories."
+        : 'No alien chosen yet — claim will be credited once you pick one.';
+      document.getElementById('claim-btn').textContent = alienId ? 'Claim & return to training' : 'Choose an alien first';
+      r.classList.remove('hidden');
+      r.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      G._kept = kept;
+    }
+
+    document.getElementById('retry-btn').addEventListener('click', function () {
+      // reset
+      for (var i = zombies.length - 1; i >= 0; i--) scene.remove(zombies[i].root);
+      zombies.length = 0;
+      G.hp = G.maxHp; G.kills = 0; G.xp = 0; G.wave = 0; G.over = false; G.running = false;
+      document.getElementById('result').classList.add('hidden');
+      if (luna) { luna.position.set(arenaCenter.x, floorY + 0.02, arenaCenter.z + 6); }
+      startGame();
+    });
+
+    document.getElementById('claim-btn').addEventListener('click', function () {
+      var kept = G._kept || 0;
+      if (!alienId) { location.href = 'trainyouralien.html'; return; }
+      var key = 'vhs_alien_' + uid + '_' + alienId;
+      var save = null;
+      try { save = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) {}
+      if (!save) { location.href = 'trainyouralien.html'; return; }
+
+      // add XP using the training page's exact leveling math
+      function xpForLevel(level) {
+        return Math.round(40 * Math.pow(level, 1.65)) + 40 * (level - 1);
+      }
+      save.xp = (save.xp || 0) + kept;
+      var leveled = 0;
+      var need = xpForLevel(save.level || 1);
+      while (save.xp >= need && (save.level || 1) < 10) {
+        save.xp -= need;
+        save.level = (save.level || 1) + 1;
+        leveled++;
+        need = xpForLevel(save.level);
+      }
+      // memory of the battle (newest first, cap 24 — same as training page)
+      save.memories = save.memories || [];
+      save.memories.unshift({
+        tag: 'BATTLE',
+        text: leveled > 0
+          ? 'I survived the First Trial! +' + kept + ' XP and I grew ' + leveled + ' level' + (leveled > 1 ? 's' : '') + '!'
+          : 'I fought in the arena and earned +' + kept + ' XP!',
+        ts: Date.now()
+      });
+      if (save.memories.length > 24) save.memories.length = 24;
+      try { localStorage.setItem(key, JSON.stringify(save)); } catch (e) {}
+      location.href = 'trainyouralien.html#graduated';
+    });
+
+    /* debug hooks for automated testing */
+    window.__battle = {
+      state: function () { return { hp: G.hp, wave: G.wave, kills: G.kills, xp: G.xp, zombies: zombies.length }; },
+      start: function () { startGame(); },
+      strike: function () { tryAttack(); },
+      hurt: function () { damagePlayer(); },
+      clearWave: function () { zombies.forEach(function (z) { if (!z.dead) killZombie(z); }); },
+      loaded: function () { return !!(arena && luna && zombieProto); },
+      god: function (on) { G.maxHp = on ? 9999 : 5; G.hp = on ? 9999 : Math.min(G.hp, 5); renderHud(); },
+      move: function (x, z) { input.x = x; input.z = z; }
+    };
+  </script>
+</body>
+</html>
