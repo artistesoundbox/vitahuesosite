@@ -96,6 +96,50 @@
       max-width: 760px; margin: 50px auto 0; padding: 0 6vw;
       color: #6f88a8; font-size: 12.5px; line-height: 1.65; text-align: center;
     }
+    /* ---- YouTube channel link ------------------------------------------- */
+    .yt-row {
+      max-width: 760px;
+      margin: 26px auto 0;
+      padding: 0 6vw;
+      display: flex;
+      justify-content: center;
+    }
+    .yt-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 30px 12px 16px;
+      font: inherit;
+      font-size: 15px;
+      letter-spacing: 0.12em;
+      color: #eaf4ff;
+      background: rgba(8, 14, 24, 0.6);
+      border: 1px solid rgba(255, 82, 82, 0.55);
+      border-radius: 999px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.25s ease;
+      backdrop-filter: blur(6px);
+    }
+    .yt-btn img {
+      width: 34px;
+      height: 34px;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+    .yt-btn:hover {
+      color: #fff;
+      border-color: rgba(255, 82, 82, 0.95);
+      box-shadow: 0 0 24px rgba(255, 60, 60, 0.4);
+      transform: translateY(-2px);
+    }
+    .yt-btn span small {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      color: #8aa2c4;
+      margin-top: 2px;
+    }
     @media (max-width: 640px) {
       .album { flex-direction: column; }
       .album .cover { flex: none; }
@@ -119,6 +163,13 @@
     <!-- albums injected by script below -->
     <div id="albums"></div>
   </main>
+
+  <div class="yt-row">
+    <a class="yt-btn" href="https://www.youtube.com/@AnthonitusArtiste" target="_blank" rel="noopener">
+      <img src="ytlogo.jpg" alt="YouTube" />
+      <span>Anthonitus Artiste<small>on YouTube ↗</small></span>
+    </a>
+  </div>
 
   <p class="footer-note">All five chapters stream straight from BandLab — press play on any album
   to open its player right here. The full catalog, singles, and new releases live on the

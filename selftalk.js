@@ -329,38 +329,41 @@
     return d;
   }
 
-  function mirrorPrompt(q) {
+  function mirrorDigest() {
     var entries = loadEntries();
-    var digest = '';
-    if (entries.length) {
-      digest = entries.slice(-6).map(function (e) {
-        return '[' + moodById(e.mood).label + '] ' + e.text;
-      }).join(' | ');
-    }
-    var turns = chatTurns.slice(-3).map(function (t) {
-      return 'You said: ' + t.you + '\nMirror: ' + t.mirror;
-    }).join('\n');
-    return 'You are "Speak to Yourself" — a warm, honest mirror on a meditation ' +
-      'site. Speak in second person ("you"). Be specific and grounded, never ' +
-      'preachy. 2-4 short sentences. Never give medical advice; if someone is ' +
-      'in crisis, gently mention calling or texting 988 (US). The user has ' +
-      'been checking in like this: ' + (digest || '(no entries yet)') + '. ' +
-      (turns ? 'Recent conversation:\n' + turns + '\n' : '') +
-      'They now say: ' + q;
+    if (!entries.length) return '';
+    return entries.slice(-6).map(function (e) {
+      return '[' + moodById(e.mood).label + '] ' + e.text;
+    }).join(' | ');
   }
 
+  /* The AI mirror talks to our Cloudflare Worker (mirror-url.js). The key
+     lives server-side; the client only sends the message + a short digest
+     of recent check-ins. Not configured yet -> graceful offline message;
+     the local reflection keeps working either way. */
   function askMirror(chat, q, go) {
     addMsg(chat, 'you', q);
     var thinking = addMsg(chat, 'mirror', '…');
     go.disabled = true;
+    var url = window.VH_MIRROR_URL || '';
+    if (!url) {
+      thinking.textContent = 'The AI mirror is not connected yet — but your words are safe here, and the local reflection still works. (Paste your Worker URL into mirror-url.js to wake it.)';
+      go.disabled = false;
+      return;
+    }
     var ctrl = ('AbortController' in window) ? new AbortController() : null;
     var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 30000);
-    fetch('https://text.pollinations.ai/' + encodeURIComponent(mirrorPrompt(q)),
-      { signal: ctrl ? ctrl.signal : undefined })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
-      .then(function (txt) {
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: q.slice(0, 600), digest: mirrorDigest().slice(0, 1200) }),
+      signal: ctrl ? ctrl.signal : undefined,
+    })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (data) {
         clearTimeout(timer);
-        var reply = (txt || '').trim() || 'Something went quiet. Try again shortly.';
+        var reply = String(data.reply || '').trim();
+        if (!reply) throw new Error('empty reply');
         thinking.textContent = reply;
         var say = document.createElement('span');
         say.className = 'st-say'; say.textContent = '\uD83D\uDD0A'; say.title = 'Read aloud';
