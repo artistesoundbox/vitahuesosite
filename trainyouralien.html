@@ -176,6 +176,51 @@
       height: 170px;
       filter: drop-shadow(0 0 16px var(--glow, rgba(80, 220, 150, 0.35)));
     }
+
+    /* ---------- visual evolution (portrait changes as it levels) ----------
+       10 levels → 5 evolution tiers, one every 2 levels:
+       t1 Nascent · t2 Glowing (light pool) · t3 Orbiting (star orbit)
+       t4 Radiant (twin orbits) · t5 Ascended (crown + halo) */
+    .evo-wrap { position: relative; display: inline-block; padding: 6px 14px 14px; }
+    .evo-wrap .alien-img-big { position: relative; z-index: 2; transition: transform 0.5s ease; }
+    .evo-t1 .alien-img-big { transform: scale(1); }
+    .evo-t2 .alien-img-big { transform: scale(1.03); }
+    .evo-t3 .alien-img-big { transform: scale(1.06); }
+    .evo-t4 .alien-img-big { transform: scale(1.09); }
+    .evo-t5 .alien-img-big { transform: scale(1.12); filter: drop-shadow(0 0 22px var(--glow, rgba(80, 220, 150, 0.4))) drop-shadow(0 0 44px var(--glow, rgba(80, 220, 150, 0.25))); }
+    .evo-pool {
+      position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+      width: 150px; height: 30px; border-radius: 50%; z-index: 1; opacity: 0;
+      background: radial-gradient(ellipse at center, var(--glow, rgba(80, 220, 150, 0.5)), transparent 70%);
+      transition: opacity 0.6s ease;
+    }
+    .evo-t2 .evo-pool, .evo-t3 .evo-pool, .evo-t4 .evo-pool, .evo-t5 .evo-pool { opacity: 0.9; }
+    .evo-spin {
+      position: absolute; top: 50%; left: 50%; width: 190px; height: 190px;
+      margin: -95px 0 0 -95px; z-index: 3; pointer-events: none;
+      animation: evospin 8s linear infinite;
+    }
+    .evo-spin i {
+      position: absolute; top: 0; left: 50%; margin-left: -4px;
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--glow-solid, #7fe0a8); box-shadow: 0 0 10px var(--glow-solid, #7fe0a8);
+    }
+    .evo-spin i.o2 { top: auto; bottom: 0; }
+    .evo-t4 .evo-spin, .evo-t5 .evo-spin { animation-duration: 5.5s; }
+    .evo-halo {
+      position: absolute; top: 50%; left: 50%; width: 205px; height: 205px;
+      margin: -102px 0 0 -102px; border-radius: 50%; z-index: 1; opacity: 0.35;
+      border: 1px solid var(--glow-solid, #7fe0a8);
+      animation: evopulse 4s ease-in-out infinite;
+    }
+    .evo-crown {
+      position: absolute; top: -4px; left: 50%; transform: translateX(-50%); z-index: 4;
+      filter: drop-shadow(0 0 6px rgba(255, 215, 100, 0.9));
+      animation: evofloat 3s ease-in-out infinite;
+    }
+    @keyframes evospin { to { transform: rotate(360deg); } }
+    @keyframes evopulse { 50% { opacity: 0.6; transform: scale(1.05); } }
+    @keyframes evofloat { 50% { transform: translateX(-50%) translateY(-4px); } }
     .alien-card .aname { font-size: 15px; color: #eaf4ff; margin-top: 6px; }
     .alien-card .adesc { font-size: 11.5px; color: #8aa5c8; line-height: 1.35; }
     .alien-card .pick-hint { font-size: 11px; color: #7fe0a8; margin-top: 4px; }
