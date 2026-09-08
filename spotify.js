@@ -449,20 +449,32 @@ function initSpotifyPanel(opts) {
   // listener — so the sink must already exist. The latest pushed value is
   // buffered and consumed at discovery; no lost updates, no console errors.
   window._vhLastPaused = null;
+  window._vhLastMusic = null;
   window.vhGamePausedState = function (paused) { window._vhLastPaused = paused; };
+  const musicLabel = (muted) => muted ? '&#9834; GAME TRACK: OFF' : 'MUTE GAME TRACK';
+  window.vhGameMusicState = function (muted) {
+    window._vhLastMusic = muted;
+    const b = $('sp-gamemusic');
+    if (b) b.innerHTML = musicLabel(muted);
+  };
   const bridgeTimer = setInterval(() => {
     if (!window.vhGamePause) return;
     clearInterval(bridgeTimer);
     $('sp-game-row').style.display = 'flex';
     $('sp-pause').addEventListener('click', (e) => {
-      window.vhGamePause(); // no args = toggle
+      // Explicit booleans only: the bridge reads a missing/undefined arg as
+      // bool(false) = "resume", a silent no-op while running — so a bare
+      // call made the pause button do nothing. Ask for the opposite of the
+      // last known state (defaulting to pause when unknown).
+      window.vhGamePause(window._vhLastPaused !== true);
       _blurSoon(e.target);
     });
     $('sp-gamemusic').addEventListener('click', (e) => {
       if (window.vhGameMusic) window.vhGameMusic();
-      // widget owns this label (Godot only pushes pause state)
-      e.target.textContent = e.target.textContent.indexOf('MUTE') !== -1
-        ? 'GAME TRACK: OFF' : 'MUTE GAME TRACK';
+      // optimistic label; Godot's vhGameMusicState push corrects it to truth
+      const muted = window._vhLastMusic !== true;
+      window._vhLastMusic = muted;
+      e.target.innerHTML = musicLabel(muted);
       _blurSoon(e.target);
     });
     // Godot pushes pause state on every change (Esc pauses too) — keep the
@@ -472,11 +484,15 @@ function initSpotifyPanel(opts) {
       $('sp-pause').innerHTML = paused ? '&#9654; RESUME GAME' : '&#10074;&#10074; PAUSE GAME';
     };
     // consume whatever Godot pushed before we discovered the bridge, then
-    // double-check with a fresh query
+    // double-check with fresh queries
     if (window._vhLastPaused !== null) {
       $('sp-pause').innerHTML = window._vhLastPaused ? '&#9654; RESUME GAME' : '&#10074;&#10074; PAUSE GAME';
     }
+    if (window._vhLastMusic !== null) {
+      $('sp-gamemusic').innerHTML = musicLabel(window._vhLastMusic);
+    }
     if (window.vhGamePauseQuery) window.vhGamePauseQuery(); // fetch current state
+    if (window.vhGameMusicQuery) window.vhGameMusicQuery();
   }, 1000);
 
   /* premium transport */

@@ -567,9 +567,18 @@
 
   /* Chips + volume, renderable into any container — the panel mounts it
      inline and hemisync.html reuses the same engine via initNatureChips. */
+
+  /* Section headers injected by renderNatureUI() share one banner style so
+     every block (nature / drones / beats / ambience volume) reads as its
+     own distinct section — mirrors the .lab banner style in hemisync.html. */
+  var SECTION_LAB = 'font-size:12.5px;letter-spacing:.2em;text-transform:uppercase;color:#b9d4f2;' +
+    'margin:26px 0 10px;padding:8px 12px;text-align:left;' +
+    'background:linear-gradient(90deg,rgba(24,44,76,.65),rgba(24,44,76,.15));' +
+    'border:1px solid rgba(120,180,255,.3);border-left:3px solid #3ea6e8;border-radius:9px';
+
   function renderNatureUI(container) {
     var lab = document.createElement('div');
-    lab.style.cssText = 'font-size:12px;color:#7f9cbd;margin:14px 0 6px;letter-spacing:.14em';
+    lab.style.cssText = SECTION_LAB;
     lab.textContent = 'NATURE SOUNDS · layer with a tone or alone';
     container.appendChild(lab);
     var grid = document.createElement('div');
@@ -591,7 +600,7 @@
 
     /* meditation drones */
     var dlab = document.createElement('div');
-    dlab.style.cssText = 'font-size:12px;color:#7f9cbd;margin:14px 0 6px;letter-spacing:.14em';
+    dlab.style.cssText = SECTION_LAB;
     dlab.textContent = 'MEDITATION DRONES · layer freely';
     container.appendChild(dlab);
     var dgrid = document.createElement('div');
@@ -613,7 +622,7 @@
 
     /* standalone binaural beats (radio behavior: one at a time) */
     var blab = document.createElement('div');
-    blab.style.cssText = 'font-size:12px;color:#7f9cbd;margin:14px 0 6px;letter-spacing:.14em';
+    blab.style.cssText = SECTION_LAB;
     blab.textContent = 'BINAURAL BEATS · headphones required · one at a time';
     container.appendChild(blab);
     var bgrid = document.createElement('div');
@@ -634,7 +643,7 @@
     container.appendChild(bgrid);
 
     var nlab = document.createElement('div');
-    nlab.style.cssText = 'font-size:12px;color:#7f9cbd;margin:10px 0 6px;letter-spacing:.14em';
+    nlab.style.cssText = SECTION_LAB;
     nlab.textContent = 'AMBIENCE VOLUME · nature · drones · beats';
     container.appendChild(nlab);
     var nv = document.createElement('input');
