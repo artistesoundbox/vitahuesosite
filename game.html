@@ -87,56 +87,6 @@
       0%, 100% { box-shadow: 0 0 8px rgba(80, 150, 255, 0.15); }
       50%      { box-shadow: 0 0 22px rgba(80, 150, 255, 0.45); }
     }
-    /* Shown only while Auth0 is unconfigured (dev mode) */
-    #dev-note {
-      display: none;
-      margin-top: 14px;
-      font-size: 12px;
-      color: #d8b46f;
-      letter-spacing: 0.04em;
-    }
-    /* Email-verification card: holds LAUNCH until Auth0 confirms the address */
-    #verify-card {
-      display: none; /* auth.js reveals it only for unverified accounts */
-      margin-top: 26px;
-      padding: 16px 18px;
-      max-width: 440px;
-      border: 1px solid rgba(216, 180, 111, 0.45);
-      border-radius: 14px;
-      background: rgba(30, 24, 10, 0.55);
-      backdrop-filter: blur(6px);
-      font-size: 14px;
-      line-height: 1.55;
-      color: #d8c9a5;
-    }
-    #verify-card .vh-verify-title {
-      font-size: 13px;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: #e8d5a3;
-      margin-bottom: 8px;
-    }
-    #verify-card b { color: #fff3d6; }
-    #verify-recheck {
-      margin-top: 12px;
-      padding: 9px 20px;
-      font-size: 12px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: #e8d5a3;
-      background: transparent;
-      border: 1px solid rgba(216, 180, 111, 0.6);
-      border-radius: 999px;
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.2s ease;
-    }
-    #verify-recheck:hover {
-      color: #fff8e8;
-      border-color: rgba(240, 215, 150, 0.95);
-      box-shadow: 0 0 16px rgba(216, 180, 111, 0.35);
-    }
-    #verify-recheck:disabled { opacity: 0.55; cursor: wait; }
     #verify-recheck.loading::after {
       content: '…';
     }
@@ -214,50 +164,6 @@
       box-shadow: 0 0 22px rgba(80, 150, 255, 0.35);
     }
 
-    /* Welcome-back bar: shown after login, top-right */
-    #welcome {
-      display: none; /* auth.js reveals it once the session is verified */
-      position: fixed;
-      top: 22px;
-      right: 26px;
-      z-index: 5;
-      align-items: center;
-      gap: 12px;
-      padding: 8px 10px 8px 16px;
-      border: 1px solid rgba(120, 180, 255, 0.25);
-      border-radius: 999px;
-      background: rgba(8, 14, 24, 0.55);
-      backdrop-filter: blur(6px);
-      font-size: 13px;
-      letter-spacing: 0.05em;
-      color: #9fb8d8;
-      white-space: nowrap;
-    }
-    #welcome .vh-email {
-      color: #eaf4ff;
-      font-weight: 600;
-      max-width: 220px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    #logout-btn {
-      padding: 6px 16px;
-      font-size: 11px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: #9fb8d8;
-      background: transparent;
-      border: 1px solid rgba(120, 180, 255, 0.35);
-      border-radius: 999px;
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.2s ease;
-    }
-    #logout-btn:hover {
-      color: #ffffff;
-      border-color: rgba(160, 210, 255, 0.95);
-      box-shadow: 0 0 14px rgba(80, 150, 255, 0.35);
-    }
   </style>
 </head>
 <body>
@@ -267,11 +173,6 @@
   <div id="nav-row">
     <a id="back-link" href="index.html">&larr; Back</a>
     <a id="home-link" href="index.html">⌂ Portal</a>
-  </div>
-
-  <div id="welcome" role="group" aria-label="Account">
-    <span>Welcome back, <b class="vh-email"></b></span>
-    <button id="logout-btn" type="button">Log Out</button>
   </div>
 
   <div id="panel">
@@ -285,23 +186,7 @@
 
     <img src="playovertheicebutton.png" alt="Play Over The Ice" id="play-art-img" />
 
-    <!-- Login gate: login → verify-email → launch, one visible at a time -->
-    <button class="btn" id="login-btn">Log in to Play</button>
-    <a class="btn" id="launch" href="game/index.html" style="display:none">Launch Game</a>
-
-    <div id="verify-card" style="display:none">
-      <div class="vh-verify-title">Confirm your email to unlock the game</div>
-      <p>
-        We sent a verification link to <b class="vh-verify-email"></b>.<br />
-        Click it, then press the button below — no need to log in again.
-      </p>
-      <button id="verify-recheck" type="button">I've Verified &mdash; Check Again</button>
-    </div>
-
-    <div id="dev-note">
-      Auth0 not configured yet &mdash; gate is open for development.
-      Fill in <b>auth.js &rarr; VH_CONFIG</b> to enable the login.
-    </div>
+    <a class="btn" id="launch" href="game/index.html">Launch Game</a>
 
     <div id="load-note">First launch downloads the game pack (~310 MB). After that, your browser keeps it.</div>
 
@@ -318,11 +203,7 @@
   </div>
 
   <script src="banner.js"></script>
-  <script src="auth.js"></script>
   <script>
-    wireGate('login-btn', 'launch', 'dev-note', 'welcome', 'verify-card');
-    document.getElementById('logout-btn').addEventListener('click', logout);
-
     // ---- Mobile heads-up: warn phones about the big first download -------
     // iPadOS masquerades as desktop Mac — catch it via multi-touch.
     function _isMobile() {
@@ -349,22 +230,6 @@
     // remember that the pack was fetched, so future visits get the soft message
     document.getElementById('launch').addEventListener('click', () => {
       localStorage.setItem('vh_game_launched', '1');
-    });
-
-    // "I've verified — check again": pull a fresh session from Auth0 (which
-    // carries the updated email_verified claim), then re-run the gate logic.
-    document.getElementById('verify-recheck').addEventListener('click', async (e) => {
-      const btn = e.target;
-      btn.disabled = true;
-      btn.classList.add('loading');
-      const ok = await refreshSession();
-      btn.disabled = false;
-      btn.classList.remove('loading');
-      if (!ok) return; // offline / transient — leave the card up
-      document.getElementById('verify-card').style.display = 'none';
-      document.getElementById('login-btn').style.display = '';  // gate re-decides
-      document.getElementById('launch').style.display = 'none';
-      wireGate('login-btn', 'launch', 'dev-note', 'welcome', 'verify-card');
     });
   </script>
   <script>

@@ -499,15 +499,12 @@
       </div>
     </div>
     <p class="ai-tag" id="ai-tag"></p>
-  </main>
-
-  <footer>
-    <p>Train Your Alien · progress is saved to your device (and synced when you log in).</p>
+  </main>    <footer>
+    <p>Train Your Alien · progress is saved to your device.</p>
     <p><a href="index.html">← back to the portal</a></p>
   </footer>
 
   <script src="banner.js"></script>
-  <script src="auth.js"></script>
   <script src="mirror-url.js"></script>
   <script>
   (function () {
@@ -1113,32 +1110,14 @@
       });
     }
 
-    /* ================= identity / auth ================= */
-    async function initIdentity() {
-      var whoEl = document.getElementById('who-name');
-      var guestNote = document.getElementById('guest-note');
+    /* ================= identity =================
+       Auth0 removed — saves are per-browser, always on this device. */
+    function initIdentity() {
+      document.getElementById('who-name').textContent = 'guest';
+      document.getElementById('guest-note').textContent =
+        '(progress saves on this device)';
       var loginBtn = document.getElementById('login-btn');
-      var loggedIn = false, user = null;
-      try {
-        if (window.VH_AUTH && window.VH_AUTH._configured && window.VH_AUTH._configured()) {
-          loggedIn = await window.VH_AUTH.isLoggedIn();
-          if (loggedIn) user = await window.VH_AUTH.getUser();
-        }
-      } catch (e) { loggedIn = false; }
-      if (loggedIn && user) {
-        uid = (user.sub || 'user').replace(/[^a-zA-Z0-9_-]/g, '_');
-        whoEl.textContent = user.email || user.name || 'player';
-        guestNote.textContent = '(synced to your account — your alien follows you)';
-        loginBtn.style.display = 'none';
-      } else {
-        uid = 'guest';
-        whoEl.textContent = 'guest';
-        guestNote.textContent = '(logged out — progress saves on this device only)';
-        loginBtn.style.display = 'inline-block';
-        loginBtn.addEventListener('click', function () {
-          if (window.VH_AUTH) window.VH_AUTH.login('trainyouralien.html');
-        });
-      }
+      if (loginBtn) loginBtn.remove();
       load();
       refillEnergy();
       renderEverything();
