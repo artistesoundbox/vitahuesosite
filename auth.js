@@ -6,11 +6,12 @@
  *   Fill the URL lists in Applications -> "anthonitus" -> Settings:
  *
  *   Allowed Callback URLs — the code PINS this exact value (paste it):
- *        https://anthonitus.com/callback
- *      (www logins also land there — the pin makes every origin behave
- *      identically, so no per-origin entries are needed. /callback is a
- *      shim forwarding the query to /auth/callback.html; the long form
- *      keeps working if it is also listed.)
+ *        https://anthonitus.com/callback.html
+ *      (+ legacy https://anthonitus.com/callback may stay listed too).
+ *      /callback.html is a REAL FILE at the site root (GitHub Pages cannot
+ *      serve extensionless paths): it finishes the login and returns the
+ *      player to the page that started it. auth/callback.html still works
+ *      for same-page flows.
  *
  *   Allowed Web Origins (for silent token renewal):
  *        https://anthonitus.com
@@ -27,6 +28,10 @@
  *
  *   The code needs NO other changes — every URL it builds is relative and
  *   follows whichever origin serves the page.
+ *   NOTE: the repo carries a CNAME file so GitHub Pages serves
+ *   anthonitus.com directly. Without it, Pages 302-bounces EVERY request
+ *   (callback included) back to artistesoundbox.github.io — which kills
+ *   the login flow. Never delete CNAME while the domain is live.
  */
 
 const VH_CONFIG = {
@@ -34,10 +39,10 @@ const VH_CONFIG = {
   domain: 'dev-um47bcoddy6kauvl.us.auth0.com',
   clientId: 'aDiPGXEuqimOCyv5Keaq0oiTWcCQlCp9',
   // Redirect URI is PINNED to the production domain (was origin-relative):
-  // every login lands at https://anthonitus.com/callback no matter which
-  // host serves the page (anthonitus.com, github.io, localhost). The
-  // dashboard needs exactly this value in Allowed Callback URLs.
-  redirectUri: 'https://anthonitus.com/callback',
+  // every login lands at https://anthonitus.com/callback.html — a REAL FILE
+  // at the site root (Pages cannot serve extensionless paths). Same value
+  // from every host, so the dashboard allow-list can never mismatch.
+  redirectUri: 'https://anthonitus.com/callback.html',
 };
 
 // Pages logout may return the player to. MUST mirror the dashboard's
@@ -156,10 +161,10 @@ async function login(returnTo = 'game.html') {
   const c = await _auth();
   await c.loginWithRedirect({
     authorizationParams: {
-      // PINNED to the production domain (see VH_CONFIG.redirectUri):
-      // https://anthonitus.com/callback — a shim that forwards the query
-      // to /auth/callback.html. Same value from every host, so the
-      // dashboard allow-list can never mismatch.
+    // PINNED to the production domain (see VH_CONFIG.redirectUri):
+    // https://anthonitus.com/callback.html — the real callback page at the
+    // site root. Same value from every host, so the dashboard allow-list
+    // can never mismatch.
       redirect_uri: VH_CONFIG.redirectUri,
     },
     appState: { returnTo: new URL(returnTo, window.location.href).href },
