@@ -335,8 +335,25 @@
     }
 
     var arena, arenaCenter, arenaHalf, floorY = 0;
-    var luna, lunaMix, clipsL = {};
-    var zombieProto, zombieClips = {};
+    var luna, lunaMix, clipsL = {}, lunaFootY = 0;
+    var zombieProto, zombieClips = {}, zombieFootY = 0;
+
+    // Skinned meshes must never be frustum-culled: three.js builds the cull
+    // sphere from the BIND pose, and Luna's Mixamo bind puts the hips ~110
+    // armature-units from the render position — she gets culled while on
+    // screen (the classic "invisible skinned character" bug).
+    function noCull(root) {
+      root.traverse(function (o) { if (o.isSkinnedMesh || o.isMesh) o.frustumCulled = false; });
+    }
+    // Real feet height: box around the actual BONE positions (skinning-aware),
+    // measured with the model standing at y=0 after one idle frame.
+    function boneBox(root) {
+      root.updateMatrixWorld(true);
+      var b = new THREE.Box3();
+      var v = new THREE.Vector3();
+      root.traverse(function (o) { if (o.isBone) b.expandByPoint(o.getWorldPosition(v)); });
+      return b;
+    }
 
     var overlayText = document.getElementById('overlay-text');
 
@@ -356,17 +373,30 @@
 
       // ---- luna (player) ----
       luna = gs[1].scene;
+      noCull(luna);
       var nl = normalizeHeight(luna, 2.3);
-      luna.position.set(arenaCenter.x, floorY - nl.floorY + 0.02, arenaCenter.z + 6);
       scene.add(luna);
       lunaMix = new THREE.AnimationMixer(luna);
       gs[1].animations.forEach(function (a) { clipsL[a.name] = a; });
+      // play one idle frame so bones sit where they render, then measure feet
+      if (clipsL['idle']) lunaMix.clipAction(clipsL['idle']).play();
+      lunaMix.update(0.016);
+      luna.position.set(0, 0, 0);
+      var lb = boneBox(luna);
+      lunaFootY = lb.min.y;                       // feet offset below origin
+      luna.position.set(arenaCenter.x, floorY - lunaFootY + 0.02, arenaCenter.z + 6);
 
       // ---- zombie prototype ----
       zombieProto = gs[2].scene;
+      noCull(zombieProto);
       var nz = normalizeHeight(zombieProto, 2.05);
       zombieProto.visible = false;
       scene.add(zombieProto);
+      // bone-based foot offset for clones (bind-pose boxes lie)
+      var zmTmp = new THREE.AnimationMixer(zombieProto);
+      if (zombieClips['walk']) zmTmp.clipAction(zombieClips['walk']).play();
+      zmTmp.update(0.016);
+      zombieFootY = boneBox(zombieProto).min.y;
       gs[2].animations.forEach(function (a) { zombieClips[a.name] = a; });
 
       overlayText.textContent = 'The arena stands silent. Ready when you are.';
@@ -462,7 +492,11 @@
     function spawnWave(n) {
       var w = WAVES[n];
       var made = 0, champs = 0;
-      var spawnRing = Math.max(arenaHalf.x, arenaHalf.z) * 0.92;
+      // Spawn on an ELLIPSE inside the playfield, not on the arena's total
+      // bounding box — the bbox includes bleachers/towers, and ring-spawning
+      // there put zombies inside the seating. 0.5 of the clamped play halves
+      // keeps them on the sand, clear of seats and never on top of the player.
+      var spawnEx = arenaHalf.x * 0.5, spawnEz = arenaHalf.z * 0.5;
       var total = w.count + (w.champ || 0);
       var t = 0;
       for (var i = 0; i < total; i++) {
@@ -470,13 +504,14 @@
           var isChamp = champs < (w.champ || 0) && i % 3 === 2;
           if (isChamp) champs++;
           var ang = (i / total) * Math.PI * 2 + Math.random() * 0.4;
+          var rad = 0.7 + Math.random() * 0.25;
           var z = SkeletonUtils.clone(zombieProto);
           z.visible = true;
+          noCull(z);
           z.scale.setScalar(zombieProto.scale.x * (isChamp ? 1.35 : 1));
-          var px = arenaCenter.x + Math.cos(ang) * spawnRing * 0.8;
-          var pz = arenaCenter.z + Math.sin(ang) * spawnRing * 0.8;
-          var zb = new THREE.Box3().setFromObject(z);
-          z.position.set(px, floorY - zb.min.y, pz);
+          var px = arenaCenter.x + Math.cos(ang) * spawnEx * rad;
+          var pz = arenaCenter.z + Math.sin(ang) * spawnEz * rad;
+          z.position.set(px, floorY - zombieFootY * (isChamp ? 1.35 : 1), pz);
           scene.add(z);
           var mixer = new THREE.AnimationMixer(z);
           var st = {
@@ -575,7 +610,7 @@
           arenaCenter.x - arenaHalf.x, arenaCenter.x + arenaHalf.x);
         luna.position.z = THREE.MathUtils.clamp(luna.position.z,
           arenaCenter.z - arenaHalf.z, arenaCenter.z + arenaHalf.z);
-        luna.position.y = floorY + 0.02;
+        luna.position.y = floorY - lunaFootY + 0.02;
 
         // face movement direction
         var sp2d = Math.hypot(playerVel.x, playerVel.z);
@@ -742,7 +777,7 @@
       zombies.length = 0;
       G.hp = G.maxHp; G.kills = 0; G.xp = 0; G.wave = 0; G.over = false; G.running = false;
       document.getElementById('result').classList.add('hidden');
-      if (luna) { luna.position.set(arenaCenter.x, floorY + 0.02, arenaCenter.z + 6); }
+      if (luna) { luna.position.set(arenaCenter.x, floorY - lunaFootY + 0.02, arenaCenter.z + 6); }
       startGame();
     });
 
@@ -783,7 +818,16 @@
 
     /* debug hooks for automated testing */
     window.__battle = {
-      state: function () { return { hp: G.hp, wave: G.wave, kills: G.kills, xp: G.xp, zombies: zombies.length }; },
+      state: function () {
+        return {
+          hp: G.hp, wave: G.wave, kills: G.kills, xp: G.xp, zombies: zombies.length,
+          zs: zombies.map(function (z) {
+            return [+z.root.position.x.toFixed(1), +z.root.position.z.toFixed(1), z.champ ? 1 : 0];
+          }),
+          luna: luna ? [+luna.position.x.toFixed(1), +luna.position.y.toFixed(2), +luna.position.z.toFixed(1)] : null,
+          visible: luna ? (luna.visible && (function () { var v = false; luna.traverse(function (o) { if (o.isSkinnedMesh && o.visible) v = true; }); return v; })()) : false
+        };
+      },
       start: function () { startGame(); },
       strike: function () { tryAttack(); },
       hurt: function () { damagePlayer(); },

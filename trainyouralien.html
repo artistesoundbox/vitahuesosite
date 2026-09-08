@@ -458,9 +458,9 @@
       <div class="mood-line" id="n-mood"></div>
       <div class="bars" id="n-bars"></div>
       <div class="battle-gate" id="battle-gate" style="display:none">
-        <div class="bg-title">⚔ FIRST TRIAL UNLOCKED</div>
-        <p>Your alien is strong enough to enter the arena. Survive five waves
-        of the shambling dead to graduate — battle glory becomes training XP.</p>
+        <div class="bg-title" id="bg-title">⚔ THE FIRST TRIAL</div>
+        <p id="bg-body">Step into the arena and face the shambling dead —
+        battle glory becomes training XP.</p>
         <a class="btn" href="battle.html">Enter the arena</a>
       </div>
       <div class="battle-gate graduated" id="graduated-note" style="display:none">
@@ -815,9 +815,20 @@
         barRow('ENERGY', enPct, enColor, state.energy + '/100') +
         barRow('STREAK', Math.min(100, state.streak * 12), '#3ea6e8', state.streak + ' day' + (state.streak === 1 ? '' : 's'));
 
-      // First Trial gate: visible at Level 5+
+      // First Trial gate: ALWAYS visible once an alien is chosen. Level 5+
+      // gets the graduation framing; lower levels get a sparring framing —
+      // but the arena is never hidden (it was invisible below L5 before).
       var gate = nurseryEl.querySelector('#battle-gate');
-      if (gate) gate.style.display = state.level >= 5 ? '' : 'none';
+      if (gate) {
+        gate.style.display = '';
+        var grad = (state.level || 1) >= 5;
+        var bt = document.getElementById('bg-title');
+        var bp = document.getElementById('bg-body');
+        if (bt) bt.textContent = grad ? '⚔ FIRST TRIAL UNLOCKED' : '⚔ THE FIRST TRIAL — SPARRING RUN';
+        if (bp) bp.textContent = grad
+          ? 'Your alien is strong enough to graduate. Survive five waves of the shambling dead — battle glory becomes training XP.'
+          : 'Your alien can spar before graduation. Fight the shambling dead for bonus XP — every point carries into training.';
+      }
     }
 
     function showGraduationNote() {
