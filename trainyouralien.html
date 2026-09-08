@@ -644,7 +644,7 @@
       state = defaultState(null);   // no alien yet — the picker is truly open
     }
     function save() {
-      try { localStorage.setItem(storageKey(), JSON.stringify(state)); } catch (e) {}
+      try { localStorage.setItem(alienKey(state.alienId), JSON.stringify(state)); } catch (e) {}
     }
     function refillEnergy() {
       var today = new Date().toDateString();
@@ -891,19 +891,44 @@
 
     /* ================= voice engine =================
        Browser TTS defaults to a female voice, which made the male aliens
-       sound female. We match browser voices to each alien's gender and
-       language: pick the user's own accent first, then fall back to any
-       accent in that language, then give up gracefully (pitch still
-       differentiates). Voice list loads async — retry briefly if empty. */
+       sound female. Match browser voices to each alien's gender: prefer
+       the visitor's own language/accent, then any voice of the right
+       gender, else fall back to pitch alone. The voice list loads async —
+       cache it and refresh on voiceschanged. NOTE: test FEMALE names
+       first — 'female' contains 'male' as a substring. */
+    var __vhVoiceCache = null;
     function __vhScanVoices() {
-      var MALE = new RegExp('male|david|daniel|mark|george|james|guy|fred|alex|aaron|arthur|oliver|thomas|ryan|diego|jorge|carlos|juan|el caldero|lorenzo', 'i');
-      var FEMALE = new RegExp('female|zira|susan|hazel|samantha|victoria|karen|moira|tessa|fiona|serena|allison|samantha|ava|nora|paulina|sabina|helena|monica|laura', 'i');
       var vs = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+      if (!vs || !vs.length) return null;
+      var femaleNames = /female|zira|susan|hazel|samantha|victoria|karen|moira|tessa|fiona|serena|allison|ava|nora|paulina|sabina|helena|monica|laura|aria|jenny|emma|mia|sonia|libby|sonia/i;
+      var maleNames = /\bmale\b|david|daniel|mark(?!o)|george|james|guy|fred|alex|aaron|arthur|oliver|thomas|ryan|diego|jorge|carlos|juan|lorenzo|matthew|brian|eric|christopher|roger|steffan|william/i;
       var male = [], female = [];
       for (var i = 0; i < vs.length; i++) {
         var v = vs[i];
-       (FEMALE.test(v.name) ? female : (MALE.test((v.name || '') + ' ' + (v.voiceURI || '')) ? male : female)).push(v);
- buckets add to the right list
+        var hay = (v.name || '') + ' ' + (v.voiceURI || '');
+        if (femaleNames.test(hay)) female.push(v);
+        else if (maleNames.test(hay)) male.push(v);
+        else female.push(v);   // unknown names: TTS defaults read female-ish
+      }
+      return { male: male, female: female, all: vs };
+    }
+    if (window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = function () { __vhVoiceCache = __vhScanVoices(); };
+      __vhVoiceCache = __vhScanVoices();
+    }
+    function __vhPickVoice(a) {
+      if (!__vhVoiceCache) __vhVoiceCache = __vhScanVoices();
+      var c = __vhVoiceCache;
+      if (!c) return null;
+      var want = (a.gender === 'm') ? c.male : c.female;
+      if (!want.length) return null;
+      var userLang = (navigator.language || 'en').slice(0, 2).toLowerCase();
+      for (var i = 0; i < want.length; i++) {
+        if ((want[i].lang || '').slice(0, 2).toLowerCase() === userLang) return want[i];
+      }
+      return want[0];
+    }
+
     var chatLines = [];
     function pushMsg(who, txt) {
       chatLines.push({ who: who, txt: txt });
@@ -925,11 +950,13 @@
     function speak(txt, who) {
       if (!('speechSynthesis' in window)) return;
       if (window.__vhSpeaking) { window.speechSynthesis.cancel(); window.__vhSpeaking = false; }
-      var a = who || alien() || {};   // each alien speaks with its own voice signature
+      var a = who || alien() || {};   // each alien speaks with its own voice selection + signature
       var u = new SpeechSynthesisUtterance(txt);
       u.rate = a.rate || 0.95;
       u.pitch = a.pitch || 1.2;
       u.volume = 1.0;
+      var v = __vhPickVoice(a);      // gender-matched browser voice
+      if (v) u.voice = v;
       var timer = setTimeout(function () { window.__vhSpeaking = false; }, 60000);
       u.onend = function () { clearTimeout(timer); window.__vhSpeaking = false; };
       window.__vhSpeaking = true;
