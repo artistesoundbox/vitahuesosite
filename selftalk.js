@@ -170,12 +170,22 @@
 
     html += '<textarea class="st-txt" rows="2" placeholder="one honest line… what is true right now?"></textarea>';
     html += '<div class="st-send-row">' +
-      '<button type="button" class="st-send">Speak</button>' +
+      '<button type="button" class="st-dictate" style="display:none" title="Say your check-in out loud — it types itself">\uD83C\uDFA4 Dictate</button>' +
+      '<button type="button" class="st-send">Save</button>' +
       '<button type="button" class="st-reflect">Reflect back to me</button>' +
       '<button type="button" class="st-listen">Hear it</button>' +
       '</div>';
 
     html += '<div class="st-panel" id="st-panel"></div>';
+
+    html += '<div class="st-ai-note"><label>' +
+      '<input type="checkbox" class="st-ai-on"> Talk with the AI mirror' +
+      '</label><span class="st-ai-hint"> — sends only what you type in the chat' +
+      ' (plus your recent check-ins, only if you tick this) to craft replies.</span></div>';
+    html += '<div class="st-chat" id="st-chat" style="display:none"></div>';
+    html += '<div class="st-chat-row" id="st-chat-row" style="display:none">' +
+      '<input type="text" class="st-chat-in" placeholder="ask your mirror anything…" maxlength="500">' +
+      '<button type="button" class="st-chat-go">Send</button></div>';
 
     html += '<div class="st-history">';
     var recent = entries.slice(-6).reverse();
@@ -205,6 +215,166 @@
       var p = document.getElementById('st-panel');
       if (p && p.dataset.reflection) speak(p.dataset.reflection, this);
     });
+    wireDictate(mount);
+    wireChat(mount);
+  }
+
+  /* ---------- voice dictation (chat-style mic) ----------
+     Web Speech API: Chrome, Edge, Safari. Hidden entirely where
+     unsupported (Firefox) so the row never shows a dead button. */
+
+  var rec = null, recActive = false, recBase = '';
+
+  function wireDictate(mount) {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var btn = mount.querySelector('.st-dictate');
+    if (!SR || !btn) return;               // Firefox & friends: no mic button
+    btn.style.display = '';
+    btn.addEventListener('click', function () {
+      if (recActive) { try { rec.stop(); } catch (e) {} return; }
+      startDictation(btn, mount);
+    });
+  }
+
+  function startDictation(btn, mount) {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var ta = mount.querySelector('.st-txt');
+    try { rec = new SR(); } catch (e) { flash(btn, 'Mic unavailable'); return; }
+    rec.lang = navigator.language || 'en-US';
+    rec.interimResults = true;
+    rec.continuous = false;
+    recBase = ta.value.trim();
+    recActive = true;
+    btn.classList.add('rec');
+    flash(btn, 'Listening…');
+
+    rec.onresult = function (e) {
+      var fin = '', interim = '';
+      for (var i = 0; i < e.results.length; i++) {
+        var r = e.results[i];
+        if (r.isFinal) fin += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      var said = (fin || interim).trim();
+      if (said) ta.value = (recBase ? recBase + ' ' : '') + said;
+    };
+    rec.onerror = function (e) {
+      var msg = e.error === 'not-allowed' ? 'Mic blocked'
+        : e.error === 'no-speech' ? 'Nothing heard'
+        : e.error === 'network' ? 'Speech service unreachable'
+        : 'Try again';
+      flash(btn, '\uD83C\uDFA4 ' + msg);
+    };
+    rec.onend = function () {
+      recActive = false;
+      btn.classList.remove('rec');
+      if (btn.textContent.indexOf('Listening') !== -1) btn.textContent = '\uD83C\uDFA4 Dictate';
+    };
+    try { rec.start(); } catch (err) {
+      recActive = false;
+      btn.classList.remove('rec');
+      flash(btn, '\uD83C\uDFA4 Try again');
+    }
+  }
+
+  /* ---------- AI mirror (keyless public endpoint, CORS-open) ----------
+     pollinations.ai text API: free, no key, Access-Control-Allow-Origin: *.
+     Because there is no key, there is nothing to steal — snoopers can only
+     use the same free public endpoint any visitor could. Chat turns live in
+     memory only (never localStorage, never sent anywhere else). */
+
+  var chatTurns = [];   // [{you, mirror}] — memory only
+
+  function wireChat(mount) {
+    var box = mount.querySelector('.st-ai-on');
+    var chat = mount.querySelector('#st-chat');
+    var row = mount.querySelector('#st-chat-row');
+    if (!box) return;
+    box.addEventListener('change', function () {
+      var on = box.checked;
+      chat.style.display = on ? 'flex' : 'none';
+      row.style.display = on ? 'flex' : 'none';
+      if (on && !chat.children.length) {
+        addMsg(chat, 'mirror', 'I am here. Ask me anything about what you have been carrying — or just say hello.');
+      }
+    });
+    var input = mount.querySelector('.st-chat-in');
+    var go = mount.querySelector('.st-chat-go');
+    function send() {
+      var q = input.value.trim();
+      if (!q || go.disabled) return;
+      input.value = '';
+      askMirror(chat, q, go);
+    }
+    go.addEventListener('click', send);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); send(); }
+    });
+  }
+
+  function addMsg(chat, who, text) {
+    var d = document.createElement('div');
+    d.className = 'st-msg ' + who;
+    d.textContent = text;
+    if (who === 'mirror') {
+      var say = document.createElement('span');
+      say.className = 'st-say';
+      say.textContent = '\uD83D\uDD0A';
+      say.title = 'Read aloud';
+      say.addEventListener('click', function () { speak(text, say); });
+      d.appendChild(say);
+    }
+    chat.appendChild(d);
+    chat.scrollTop = chat.scrollHeight;
+    return d;
+  }
+
+  function mirrorPrompt(q) {
+    var entries = loadEntries();
+    var digest = '';
+    if (entries.length) {
+      digest = entries.slice(-6).map(function (e) {
+        return '[' + moodById(e.mood).label + '] ' + e.text;
+      }).join(' | ');
+    }
+    var turns = chatTurns.slice(-3).map(function (t) {
+      return 'You said: ' + t.you + '\nMirror: ' + t.mirror;
+    }).join('\n');
+    return 'You are "Speak to Yourself" — a warm, honest mirror on a meditation ' +
+      'site. Speak in second person ("you"). Be specific and grounded, never ' +
+      'preachy. 2-4 short sentences. Never give medical advice; if someone is ' +
+      'in crisis, gently mention calling or texting 988 (US). The user has ' +
+      'been checking in like this: ' + (digest || '(no entries yet)') + '. ' +
+      (turns ? 'Recent conversation:\n' + turns + '\n' : '') +
+      'They now say: ' + q;
+  }
+
+  function askMirror(chat, q, go) {
+    addMsg(chat, 'you', q);
+    var thinking = addMsg(chat, 'mirror', '…');
+    go.disabled = true;
+    var ctrl = ('AbortController' in window) ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 30000);
+    fetch('https://text.pollinations.ai/' + encodeURIComponent(mirrorPrompt(q)),
+      { signal: ctrl ? ctrl.signal : undefined })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+      .then(function (txt) {
+        clearTimeout(timer);
+        var reply = (txt || '').trim() || 'Something went quiet. Try again shortly.';
+        thinking.textContent = reply;
+        var say = document.createElement('span');
+        say.className = 'st-say'; say.textContent = '\uD83D\uDD0A'; say.title = 'Read aloud';
+        say.addEventListener('click', function () { speak(reply, say); });
+        thinking.appendChild(say);
+        chatTurns.push({ you: q, mirror: reply });
+        if (chatTurns.length > 6) chatTurns.shift();
+        go.disabled = false;
+      })
+      .catch(function () {
+        clearTimeout(timer);
+        thinking.textContent = 'The mirror could not reach its voice just now — your words are still safe here. Try again in a moment.';
+        go.disabled = false;
+      });
   }
 
   function addEntry() {
