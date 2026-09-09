@@ -549,11 +549,12 @@
 
     /* ---------- animation helpers ---------- */
     function fade(mixer, from, to, dur) {
+      if (!to) return null;                     // missing clip: never crash the loop
       var next = mixer.clipAction(to);
       next.reset().play();
-      if (from && from !== to) {
-        var prev = mixer.clipAction(from);
-        prev.crossFadeTo(next, dur, false);
+      if (from && from !== to && clipsL[from]) {
+        var prev = mixer.clipAction(clipsL[from]);
+        if (prev) prev.crossFadeTo(next, dur, false);
       }
       return next;
     }

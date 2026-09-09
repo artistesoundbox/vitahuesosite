@@ -304,6 +304,8 @@
       vision: function () { tone(300, 900, 0.35, 'sine', 0.12); tone(600, 1400, 0.3, 'sine', 0.07); },
       wisp:   function () { tone(880, 1320, 0.18, 'sine', 0.12); tone(1320, 1760, 0.14, 'sine', 0.08); },
       possess:function () { tone(200, 700, 0.4, 'triangle', 0.14); tone(400, 900, 0.35, 'sine', 0.08); },
+      rescue: function () { tone(660, 990, 0.14, 'sine', 0.10); tone(990, 1480, 0.20, 'sine', 0.08); tone(1480, 1980, 0.24, 'sine', 0.05); },
+      taken:  function () { tone(330, 82, 0.7, 'sawtooth', 0.10); tone(165, 55, 0.9, 'square', 0.06); },
       stomp:  function () { tone(70, 28, 0.6, 'sawtooth', 0.3); tone(140, 40, 0.5, 'square', 0.16); },
       collapse:function(){ tone(50, 20, 1.1, 'sawtooth', 0.28); },
       warn:   function () { tone(980, 980, 0.09, 'square', 0.08); setTimeout(function(){ tone(980, 980, 0.09, 'square', 0.08); }, 160); },
@@ -314,7 +316,7 @@
     /* ================= game state ================= */
     var G = {
       running: false, over: false,
-      t: 0, best: 0, viewers: 12,
+      t: 0, best: 0, viewers: 12, rescued: 0, taken: 0,
       essence: 100, maxEssence: 100,
       seen: false, seenT: 0,
       dashCd: 0, dashT: 0,
@@ -509,7 +511,7 @@
     var NPC_SOULS = [];
     var NPC_COLORS = [0x8fd8ff, 0xa8ffe2, 0xffe2a8, 0xd8b0ff, 0xffb0c8, 0xbfffd0, 0xc8d8ff];
     (function makeNpcSouls() {
-      for (var i = 0; i < 12; i++) {
+      for (var i = 0; i < 22; i++) {
         var g = new THREE.Group();
         var c = NPC_COLORS[i % NPC_COLORS.length];
         var h = new THREE.Mesh(
@@ -529,20 +531,98 @@
         NPC_SOULS.push({ grp: g, orb: orb, halo: h, yaw: Math.random() * Math.PI * 2,
                          speed: 1.6 + Math.random() * 2.6, turn: (Math.random() - 0.5) * 0.9,
                          bobPh: Math.random() * Math.PI * 2,
-                         baseY: (i % 3 === 0) ? 8 + Math.random() * 16 : 0.9 });   // every third soul drifts high
+                         baseY: (i % 2 === 0) ? 7 + Math.random() * 19 : 0.9,   // half the multitude drifts high
+                         state: 'roam', t: 0, respawn: 0 });
       }
     })();
+    /* THE RESCUE RACE: roam → doomed (a god's reach) → consumed, unless the
+       player swoops in first (rescue = essence + tally). Souls respawn to
+       keep the field stocked. */
+    var RESCUE_R = 2.7, PULL_TIME = 1.25;
     function updateNpcSouls(dt, t) {
       for (var i = 0; i < NPC_SOULS.length; i++) {
         var n = NPC_SOULS[i];
-        n.yaw += n.turn * dt;
-        n.grp.position.x += Math.sin(n.yaw) * n.speed * dt;
-        n.grp.position.z += Math.cos(n.yaw) * n.speed * dt;
-        var dx = n.grp.position.x, dz = n.grp.position.z + 40;
-        if (dx * dx + dz * dz > 130 * 130) n.yaw += Math.PI * (0.7 + Math.random() * 0.6);
-        n.grp.position.y = n.baseY + Math.sin(t * 1.7 + n.bobPh) * 0.6;
+        var P = n.grp.position;
+
+        if (n.state === 'gone') {
+          n.respawn -= dt;
+          if (n.respawn <= 0) {                       // a new lost soul wanders in
+            n.state = 'roam'; n.t = 0;
+            var a0 = Math.random() * Math.PI * 2, r0 = 25 + Math.random() * 85;
+            P.set(Math.cos(a0) * r0, n.baseY, Math.sin(a0) * r0 - 40);
+            n.grp.scale.setScalar(1);
+            n.halo.material.color.setHex(0xffffff);
+            n.grp.visible = true;
+          }
+          continue;
+        }
+        if (n.state === 'saved') {                    // rewarded: rise and fade
+          n.t += dt;
+          P.y += dt * 7; n.grp.scale.multiplyScalar(1 - dt * 1.8);
+          if (n.t > 0.55) { n.state = 'gone'; n.respawn = 6 + Math.random() * 5; n.grp.visible = false; }
+          continue;
+        }
+        if (n.state === 'consumed') {                 // dragged into the god: shrink toward it
+          n.t += dt;
+          P.lerp(n.pullTo, dt * 4.5); P.y += dt * 5 * (1 - n.t / PULL_TIME);
+          n.grp.scale.multiplyScalar(1 - dt * 1.5);
+          if (n.t > PULL_TIME * 0.8) { n.state = 'gone'; n.respawn = 7 + Math.random() * 6; n.grp.visible = false; }
+          continue;
+        }
+
+        // nearest god by XZ reach
+        var gdNear = null, dNear = 1e9;
+        for (var gi = 0; gi < gods.length; gi++) {
+          var gp = gods[gi].root.position;
+          var dd = Math.hypot(P.x - gp.x, P.z - gp.z);
+          if (dd < dNear) { dNear = dd; gdNear = gods[gi]; }
+        }
+        var reach = TIERS[G.tier].aura;
+
+        // player rescue check (3D — flying collects everywhere)
+        if (G.running && !G.over && P.distanceTo(soul.position) < RESCUE_R) {
+          n.state = 'saved'; n.t = 0;
+          n.halo.material.color.setHex(0xfff2b0);
+          G.rescued++;
+          G.essence = Math.min(G.maxEssence, G.essence + 10);
+          G.viewers = Math.floor(G.viewers * 1.015) + 4;
+          sfx.rescue();
+          if (G.rescued === 1) chyron('A SOUL SAVED — THE FEED LOVES A RESCUE');
+          else if (G.rescued % 5 === 0) chyron(G.rescued + ' SOULS SAVED — THE CROWD CHANTS YOUR NAME');
+          continue;
+        }
+
+        // doom check: inside a god's ground reach
+        if (gdNear && dNear < reach && P.y < 26 && G.running) {
+          if (n.state !== 'doomed') { n.state = 'doomed'; n.t = 0; n.halo.material.color.setHex(0xff6a55); }
+          var gp2 = gdNear.root.position;
+          // panic-flee: steer away, faster
+          var away = Math.atan2(P.x - gp2.x, P.z - gp2.z);
+          n.yaw += ((away - n.yaw + Math.PI * 3) % (Math.PI * 2) - Math.PI) * Math.min(1, dt * 6);
+          n.grp.position.x += Math.sin(n.yaw) * n.speed * 2.1 * dt;
+          n.grp.position.z += Math.cos(n.yaw) * n.speed * 2.1 * dt;
+          n.t += dt;
+          if (dNear < reach * 0.75) {                 // gripped: dragged to the god
+            n.state = 'consumed'; n.t = 0;
+            n.pullTo = new THREE.Vector3(gp2.x, 14 + Math.random() * 8, gp2.z);
+            G.taken++;
+            G.viewers += 20 + Math.floor(Math.random() * 30);
+            sfx.taken();
+            if (G.taken === 1) chyron('THE GODS FEED — DO NOT LET THEM');
+          }
+        } else {
+          if (n.state === 'doomed') { n.state = 'roam'; n.halo.material.color.setHex(0xffffff); }
+          // ordinary wander
+          n.yaw += n.turn * dt;
+          n.grp.position.x += Math.sin(n.yaw) * n.speed * dt;
+          n.grp.position.z += Math.cos(n.yaw) * n.speed * dt;
+          var dx = P.x, dz = P.z + 40;
+          if (dx * dx + dz * dz > 130 * 130) n.yaw += Math.PI * (0.7 + Math.random() * 0.6);
+        }
+
+        P.y = n.baseY + Math.sin(t * 1.7 + n.bobPh) * 0.6;
         n.orb.rotation.y += dt * 2;
-        n.halo.material.opacity = 0.12 + Math.sin(t * 2.2 + n.bobPh) * 0.05;
+        n.halo.material.opacity = (n.state === 'doomed' ? 0.3 : 0.12) + Math.sin(t * (n.state === 'doomed' ? 9 : 2.2) + n.bobPh) * 0.06;
       }
     }
 
@@ -894,7 +974,8 @@
     }
     function renderHud() {
       document.getElementById('alive-line').textContent = G.t.toFixed(1) + 's ALIVE';
-      document.getElementById('viewers-line').innerHTML = '👁 <b>' + fmtViewers(G.viewers) + '</b> watching';
+      document.getElementById('viewers-line').innerHTML = '👁 <b>' + fmtViewers(G.viewers) + '</b> watching' +
+        (G.rescued || G.taken ? ' · <span style="color:#9fe8c8">✦' + G.rescued + '</span>/<span style="color:#ff8a80">☠' + G.taken + '</span> souls' : '');
       document.getElementById('essence-fill').style.width = (G.essence / G.maxEssence * 100) + '%';
       document.getElementById('best-line').textContent = 'best: ' + (G.best > 0 ? G.best.toFixed(1) + 's' : '—');
       var seen = document.getElementById('seen-tag');
@@ -1306,6 +1387,7 @@
       }
       G.running = true; G.over = false;
       G.t = 0; G.essence = G.maxEssence; G.seen = false; G.seenT = 0; G.viewers = 12; G.flewOnce = false;
+      G.rescued = 0; G.taken = 0;
       G.tier = 0; G.collapseT = 18; G.visionT = 0; G.visionCd = 0; G.echoT = 0; G.echoCd = 0;
       sfx.start();
       centerMsg('RUN, SMALL SOUL', 2000);
@@ -1337,8 +1419,9 @@
       var r = document.getElementById('result');
       document.getElementById('result-rank').textContent = 'RANK: ' + rankFor(G.t);
       document.getElementById('result-body').textContent =
-        'The gods noticed you tonight, for ' + G.t.toFixed(1) +
-        ' seconds. The broadcast cuts to a commercial. Somewhere, a rating spikes.';
+        'The gods noticed you tonight, for ' + G.t.toFixed(1) + ' seconds. ' +
+        'You saved ' + G.rescued + ' lost soul' + (G.rescued === 1 ? '' : 's') + '; the gods took ' + G.taken + '. ' +
+        'The broadcast cuts to a commercial. Somewhere, a rating spikes.';
       document.getElementById('result-score').textContent =
         G.t.toFixed(1) + 's · ' + fmtViewers(G.viewers) + ' viewers · ' + TIERS[G.tier].name;
       document.getElementById('result-note').textContent =
@@ -1359,13 +1442,27 @@
     window.__hunters = {
       state: function () {
         return { running: G.running, over: G.over, t: +G.t.toFixed(1), essence: +G.essence.toFixed(0),
-                 viewers: G.viewers, seen: G.seen, tier: G.tier, gods: gods.length,
+                 viewers: G.viewers, seen: G.seen, tier: G.tier, gods: gods.length, rescued: G.rescued, taken: G.taken,
                  wisps: WISPS.filter(function (w) { return !w.taken; }).length,
                  waves: WAVES.length, collapses: COLLAPSES.length,
                  npcs: NPC_SOULS.length,
                  soul: [+soul.position.x.toFixed(1), +soul.position.y.toFixed(1), +soul.position.z.toFixed(1)] };
       },
       start: startGame,
+      rescueAtPlayer: function () {   // test hook: teleport a roaming soul onto the player
+        for (var i = 0; i < NPC_SOULS.length; i++) {
+          if (NPC_SOULS[i].state === 'roam' || NPC_SOULS[i].state === 'doomed') {
+            NPC_SOULS[i].grp.position.set(soul.position.x, soul.position.y, soul.position.z);
+            return 'soul #' + i + ' delivered';
+          }
+        }
+        return 'no soul available';
+      },
+      npcStates: function () {
+        var c = {};
+        for (var i = 0; i < NPC_SOULS.length; i++) { var s2 = NPC_SOULS[i].state; c[s2] = (c[s2] || 0) + 1; }
+        return c;
+      },
       hasModel: function () { return !!soulBody; },
       clips: function () { return gods.map(function (g) { return Object.keys(g.clips).filter(function (k) { return g.clips[k]; }); }); },
       moveTo: function (x, z) { soul.position.set(x, 0, z); },
