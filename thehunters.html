@@ -305,6 +305,9 @@
       wisp:   function () { tone(880, 1320, 0.18, 'sine', 0.12); tone(1320, 1760, 0.14, 'sine', 0.08); },
       possess:function () { tone(200, 700, 0.4, 'triangle', 0.14); tone(400, 900, 0.35, 'sine', 0.08); },
       rescue: function () { tone(660, 990, 0.14, 'sine', 0.10); tone(990, 1480, 0.20, 'sine', 0.08); tone(1480, 1980, 0.24, 'sine', 0.05); },
+      powerup: function () {  // saucer-style pickup chime for rescuing a lost soul
+        tone(523, 784, 0.12, 'triangle', 0.12); tone(784, 1047, 0.16, 'triangle', 0.10);
+        tone(1568, 2093, 0.22, 'sine', 0.07); },
       taken:  function () { tone(330, 82, 0.7, 'sawtooth', 0.10); tone(165, 55, 0.9, 'square', 0.06); },
       stomp:  function () { tone(70, 28, 0.6, 'sawtooth', 0.3); tone(140, 40, 0.5, 'square', 0.16); },
       collapse:function(){ tone(50, 20, 1.1, 'sawtooth', 0.28); },
@@ -586,7 +589,7 @@
           G.rescued++;
           G.essence = Math.min(G.maxEssence, G.essence + 10);
           G.viewers = Math.floor(G.viewers * 1.015) + 4;
-          sfx.rescue();
+          sfx.powerup();   // pickup chime — same juice as the saucer's powerups
           if (G.rescued === 1) chyron('A SOUL SAVED — THE FEED LOVES A RESCUE');
           else if (G.rescued % 5 === 0) chyron(G.rescued + ' SOULS SAVED — THE CROWD CHANTS YOUR NAME');
           continue;
@@ -794,6 +797,13 @@
       audio();
     });
     window.addEventListener('keyup', function (e) { keys[e.code] = false; });
+    // stuck-key / stale-touch safety on focus loss — never coast on a phantom
+    window.addEventListener('blur', function () {
+      keys = {}; input.x = input.z = 0;
+      stickId = null; flyHold.up = flyHold.down = false;
+      var st = document.getElementById('stick');
+      if (st) { st.style.opacity = 0; var kn = document.getElementById('knob'); if (kn) kn.style.transform = 'translate(0,0)'; }
+    });
 
     var _prevPad = [false, false, false, false];
     window.addEventListener('gamepadconnected', function () {
@@ -1293,6 +1303,10 @@
         var mag = Math.hypot(ix, iz);
         if (mag > 1) { ix /= mag; iz /= mag; }
 
+        // screen-relative steering (saucer-style), verified live: this camera
+        // looks down −Z, so world +X IS screen-right and stick-up (−Z) is
+        // screen-up-depth — no axis swap needed, keyboard W/A/S/D, stick and
+        // touch drag all read as direct screen-direction motion.
         var dashK = G.dashT > 0 ? DASH_MULT : 1;
         var altK = 1 + (soul.position.y / 55) * 0.5;   // thin air: up to +50% speed
         var move = new THREE.Vector3(ix, iy, iz);

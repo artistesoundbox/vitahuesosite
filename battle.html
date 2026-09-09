@@ -580,6 +580,13 @@
       audio();
     });
     window.addEventListener('keyup', function (e) { keys[e.code] = false; });
+    // stuck-key / stuck-touch safety: losing focus releases everything so
+    // Luna never coasts off on a phantom heading
+    window.addEventListener('blur', function () {
+      keys = {}; input.x = input.z = 0;
+      stickId = null; input.x = input.z = 0; stick.style.opacity = 0;
+      pinchId = null;
+    });
     // Gamepad: left stick moves, A / RT strikes (polled every frame below).
     var _prevPadA = false, _prevPadRT = false;
     window.addEventListener('gamepadconnected', function () {
@@ -601,6 +608,13 @@
     /* touch: finger anywhere on the stage = floating move stick (no zone) */
     stage.addEventListener('touchstart', function (e) {
       audio();
+      // self-heal stale touches: a finger lifted outside the page (edge swipe,
+      // notification pull) would otherwise own the stick forever and freeze
+      // Luna's steering on her last heading
+      var alive = {};
+      for (var a = 0; a < e.touches.length; a++) alive[e.touches[a].identifier] = true;
+      if (stickId !== null && !alive[stickId]) { stickId = null; input.x = input.z = 0; stick.style.opacity = 0; }
+      if (pinchId !== null && !alive[pinchId]) pinchId = null;
       for (var i = 0; i < e.changedTouches.length; i++) {
         var t = e.changedTouches[i];
         if (stickId === null) {
@@ -841,7 +855,10 @@
         // the world diagonal away from it: (-1,0,-1). Fixed basis, no math
         // games — W runs up-screen, S down-screen, A/D across.
         var fwd = new THREE.Vector3(-1, 0, -1).normalize();
-        var right = new THREE.Vector3(fwd.z, 0, -fwd.x);
+        // screen-right for this camera: (-fwd.z, 0, fwd.x). The old sign was
+        // inverted — dragging/pressing right pushed Luna LEFT, which felt
+        // like "stuck, can't turn or go right".
+        var right = new THREE.Vector3(-fwd.z, 0, fwd.x);
         var move = new THREE.Vector3()
           .addScaledVector(fwd, -iz)
           .addScaledVector(right, ix);
@@ -982,10 +999,14 @@
         }
       }
 
-      // camera: fixed 3/4 view following luna, zoomable (wheel / right stick)
+      // camera: fixed 3/4 view following luna, zoomable (wheel / right stick /
+      // pinch). Closer framing now that the models sit at sane scale, and the
+      // target is clamped so the view never slides behind the bleachers.
       if (luna) {
         var camTarget = new THREE.Vector3(
-          luna.position.x + 13.5 * camZoom, floorY + 10.6 * camZoom, luna.position.z + 13.5 * camZoom);
+          luna.position.x + 10.8 * camZoom, floorY + 8.4 * camZoom, luna.position.z + 10.8 * camZoom);
+        camTarget.x = THREE.MathUtils.clamp(camTarget.x, arenaCenter.x - arenaHalf.x * 0.6, arenaCenter.x + arenaHalf.x * 0.6);
+        camTarget.z = THREE.MathUtils.clamp(camTarget.z, arenaCenter.z - arenaHalf.z * 0.85, arenaCenter.z + arenaHalf.z * 0.6);
         camPos.lerp(camTarget, 0.06);
         camera.position.copy(camPos);
         camLook.lerp(new THREE.Vector3(luna.position.x, floorY + 1.4, luna.position.z), 0.09);
