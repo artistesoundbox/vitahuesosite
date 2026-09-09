@@ -61,7 +61,7 @@
       border: 1px solid rgba(255, 120, 120, 0.25);
       box-shadow: 0 0 34px rgba(180, 40, 60, 0.25), inset 0 0 60px rgba(0,0,0,0.5);
       background: #05070c;
-      touch-action: pan-y;
+      touch-action: none;   /* the stage owns every touch: full stick range on phones */
     }
     #stage canvas { display: block; width: 100%; height: 100%; }
 
@@ -153,6 +153,14 @@
       pointer-events: auto; cursor: pointer;
     }
     #dash-btn { width: 84px !important; height: 84px !important; }
+    #fly-btns { position: absolute; left: 16px; bottom: 130px; display: none; flex-direction: column; gap: 10px; }
+    body.touch #fly-btns { display: flex; }
+    #fly-btns button {
+      width: 66px; height: 66px; border-radius: 50%;
+      border: 1px solid rgba(140, 220, 255, 0.55); background: rgba(10, 26, 38, 0.5);
+      color: #cfeaff; font-size: 18px;
+      pointer-events: auto; cursor: pointer;
+    }
     #vision-btn { border-color: rgba(120, 220, 255, 0.55) !important; color: #bfeaff !important; background: rgba(8, 26, 40, 0.5) !important; }
     #echo-btn   { border-color: rgba(180, 140, 255, 0.55) !important; color: #e4d6ff !important; background: rgba(24, 12, 46, 0.5) !important; }
 
@@ -227,7 +235,7 @@
         <div id="chyron"></div>
         <div id="essence-label">ESSENCE</div>
         <div id="essence-bar"><div id="essence-fill"></div></div>
-        <div id="hint">WASD move · SHIFT/SPACE dash · Q soul vision · E echo possess</div>
+        <div id="hint">WASD move · R/F fly up/down · SHIFT/SPACE dash · Q soul vision · E echo possess</div>
         <div id="dmg-flash"></div>
         <div id="riot-vignette"></div>
         <div id="stick"><div class="knob" id="knob"></div></div>
@@ -235,6 +243,10 @@
           <button id="dash-btn">dash</button>
           <button id="vision-btn">vision</button>
           <button id="echo-btn">echo</button>
+        </div>
+        <div id="fly-btns">
+          <button id="up-btn">▲</button>
+          <button id="down-btn">▼</button>
         </div>
       </div>
       <div id="overlay">
@@ -342,24 +354,24 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 1.25;
     stage.appendChild(renderer.domElement);
 
     var scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x05070c);
-    scene.fog = new THREE.Fog(0x05070c, 55, 380);   // far — the gods must loom
+    scene.background = new THREE.Color(0x11141c);
+    scene.fog = new THREE.Fog(0x11141c, 55, 420);   // lifted + lightened — the gods must loom, not drown
 
     var camera = new THREE.PerspectiveCamera(55, 1, 0.1, 500);
 
-    var hemi = new THREE.HemisphereLight(0x8ea6d8, 0x2a1f28, 0.85);
+    var hemi = new THREE.HemisphereLight(0x8ea6d8, 0x2a1f28, 1.5);
     scene.add(hemi);
-    var moon = new THREE.DirectionalLight(0xbfd0ff, 0.9);
+    var moon = new THREE.DirectionalLight(0xbfd0ff, 1.5);
     moon.position.set(-40, 60, -30);
     scene.add(moon);
-    var neonA = new THREE.PointLight(0xff4055, 260, 220, 1.8);
+    var neonA = new THREE.PointLight(0xff4055, 500, 240, 1.7);
     neonA.position.set(-60, 26, -70);
     scene.add(neonA);
-    var neonB = new THREE.PointLight(0x30d0ff, 180, 220, 1.8);
+    var neonB = new THREE.PointLight(0x30d0ff, 380, 240, 1.7);
     neonB.position.set(70, 20, -60);
     scene.add(neonB);
 
@@ -376,7 +388,7 @@
     (function dress() {
       var ground = new THREE.Mesh(
         new THREE.PlaneGeometry(700, 700),
-        new THREE.MeshStandardMaterial({ color: 0x14100f, roughness: 0.96 })
+        new THREE.MeshStandardMaterial({ color: 0x2a2622, roughness: 0.95 })
       );
       ground.rotation.x = -Math.PI / 2;
       ground.position.y = -0.02;
@@ -699,6 +711,7 @@
 
     /* ---------- input ---------- */
     var input = { x: 0, z: 0 };
+    var flyHold = { up: false, down: false };
     var keys = {};
     window.addEventListener('keydown', function (e) {
       keys[e.code] = true;
@@ -759,6 +772,14 @@
     document.getElementById('dash-btn').addEventListener('touchstart', function (e) { e.preventDefault(); tryDash(); });
     document.getElementById('vision-btn').addEventListener('touchstart', function (e) { e.preventDefault(); tryVision(); });
     document.getElementById('echo-btn').addEventListener('touchstart', function (e) { e.preventDefault(); tryPossess(); });
+    function bindFly(id, up) {   // hold-to-rise / hold-to-sink buttons
+      var el = document.getElementById(id);
+      el.addEventListener('touchstart', function (e) { e.preventDefault(); if (up) flyHold.up = true; else flyHold.down = true; });
+      el.addEventListener('touchend', function (e) { e.preventDefault(); if (up) flyHold.up = false; else flyHold.down = false; });
+      el.addEventListener('touchcancel', function () { if (up) flyHold.up = false; else flyHold.down = false; });
+    }
+    bindFly('up-btn', true);
+    bindFly('down-btn', false);
 
     function tryDash() {
       if (!G.running || G.over || G.dashCd > 0 || G.essence < 12) return;
@@ -1111,18 +1132,22 @@
           centerMsg(TIERS[nt].name, 1500);
         }
 
-        // input: touch + keyboard + gamepad
+        // input: touch + keyboard + gamepad (vertical = fly)
         var ix = input.x, iz = input.z;
+        var iy = (flyHold.up ? 1 : 0) - (flyHold.down ? 1 : 0);
         if (keys['KeyA'] || keys['ArrowLeft']) ix -= 1;
         if (keys['KeyD'] || keys['ArrowRight']) ix += 1;
         if (keys['KeyW'] || keys['ArrowUp']) iz -= 1;
         if (keys['KeyS'] || keys['ArrowDown']) iz += 1;
+        if (keys['KeyR']) iy += 1;   // hold R to rise
+        if (keys['KeyF']) iy -= 1;   // hold F to descend
         var pads = navigator.getGamepads ? navigator.getGamepads() : [];
         for (var pi = 0; pi < pads.length; pi++) {
           var gp = pads[pi]; if (!gp) continue;
           if (gp.axes.length > 1) {
             if (Math.abs(gp.axes[0]) > 0.18) ix += gp.axes[0];
             if (Math.abs(gp.axes[1]) > 0.18) iz += gp.axes[1];
+            if (gp.axes.length > 3 && Math.abs(gp.axes[3]) > 0.18) iy += gp.axes[3];   // right stick = altitude
           }
           var aD = !!(gp.buttons[0] && gp.buttons[0].pressed);
           var xD = !!(gp.buttons[2] && gp.buttons[2].pressed);
@@ -1138,7 +1163,7 @@
         if (mag > 1) { ix /= mag; iz /= mag; }
 
         var dashK = G.dashT > 0 ? DASH_MULT : 1;
-        var move = new THREE.Vector3(ix, 0, iz);
+        var move = new THREE.Vector3(ix, iy, iz);
         if (move.lengthSq() > 0.01) {
           vel.lerp(move.multiplyScalar(SPEED * dashK), 0.2);
         } else {
@@ -1147,6 +1172,7 @@
         soul.position.addScaledVector(vel, dt);
         soul.position.x = THREE.MathUtils.clamp(soul.position.x, -110, 110);
         soul.position.z = THREE.MathUtils.clamp(soul.position.z, -190, 16);
+        soul.position.y = THREE.MathUtils.clamp(soul.position.y, 0, 42);   // flight ceiling — chin height of the gods
 
         updateGods(dt);
 
@@ -1156,7 +1182,7 @@
           wave.r += wave.maxR * dt * 1.4;
           wave.mesh.scale.setScalar(wave.r);
           wave.mesh.material.opacity = Math.max(0, 0.85 * (1 - wave.r / wave.maxR));
-          if (!wave.hit) {
+          if (!wave.hit && soul.position.y <= 4.5) {   // flying high clears ground shockwaves
             var dw = soul.position.clone().sub(wave.mesh.position); dw.y = 0;
             if (dw.length() < wave.r + 1 && dw.length() > wave.r - 3.2) {
               wave.hit = true;
@@ -1316,7 +1342,7 @@
                  wisps: WISPS.filter(function (w) { return !w.taken; }).length,
                  waves: WAVES.length, collapses: COLLAPSES.length,
                  npcs: NPC_SOULS.length,
-                 soul: [+soul.position.x.toFixed(1), +soul.position.z.toFixed(1)] };
+                 soul: [+soul.position.x.toFixed(1), +soul.position.y.toFixed(1), +soul.position.z.toFixed(1)] };
       },
       start: startGame,
       hasModel: function () { return !!soulBody; },
