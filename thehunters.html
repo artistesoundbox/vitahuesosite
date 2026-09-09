@@ -538,7 +538,8 @@
         scene.add(g);
         NPC_SOULS.push({ grp: g, orb: orb, halo: h, yaw: Math.random() * Math.PI * 2,
                          speed: 1.6 + Math.random() * 2.6, turn: (Math.random() - 0.5) * 0.9,
-                         bobPh: Math.random() * Math.PI * 2 });
+                         bobPh: Math.random() * Math.PI * 2,
+                         baseY: (i % 3 === 0) ? 8 + Math.random() * 16 : 0.9 });   // every third soul drifts high
       }
     })();
     function updateNpcSouls(dt, t) {
@@ -549,7 +550,7 @@
         n.grp.position.z += Math.cos(n.yaw) * n.speed * dt;
         var dx = n.grp.position.x, dz = n.grp.position.z + 40;
         if (dx * dx + dz * dz > 130 * 130) n.yaw += Math.PI * (0.7 + Math.random() * 0.6);
-        n.grp.position.y = 0.9 + Math.sin(t * 1.7 + n.bobPh) * 0.3;
+        n.grp.position.y = n.baseY + Math.sin(t * 1.7 + n.bobPh) * 0.6;
         n.orb.rotation.y += dt * 2;
         n.halo.material.opacity = 0.12 + Math.sin(t * 2.2 + n.bobPh) * 0.05;
       }
@@ -874,7 +875,7 @@
       var seenBy = null;
       for (var i = 0; i < gods.length; i++) {
         var gd = gods[i];
-        var to = sp.clone().sub(gd.root.position); to.y = 0;
+        var to = sp.clone().sub(gd.root.position);   // true 3D: altitude escapes the kill-aura
         var dist = to.length();
         if (dist < TIERS[G.tier].aura) return { god: gd, aura: true, dist: dist };
         var S = godSight(gd);
@@ -1059,6 +1060,7 @@
     var camLook = new THREE.Vector3(0, 3, 0);
     var vel = new THREE.Vector3();
     var SPEED = 10.5, DASH_MULT = 3.1;
+    var bank = 0, pitchA = 0;   // flight attitude (radians)
 
     function animate() {
       requestAnimationFrame(animate);
@@ -1076,6 +1078,20 @@
 
       if (soulBody) soulBody.position.y = Math.sin(t * 2.4) * 0.12;
       halo.material.opacity = 0.16 + Math.sin(t * 3.1) * 0.06;
+
+      // flight attitude: bank into strafes, pitch into climbs, face the drift
+      var bankT = THREE.MathUtils.clamp(-vel.x * 0.045, -0.85, 0.85);
+      var pitchT = THREE.MathUtils.clamp(-vel.y * 0.05, -0.5, 0.5);
+      bank += (bankT - bank) * Math.min(1, dt * 6);
+      pitchA += (pitchT - pitchA) * Math.min(1, dt * 5);
+      if (soulBody) { soulBody.rotation.z = bank; soulBody.rotation.x = pitchA; }
+      var hSpeed = Math.hypot(vel.x, vel.z);
+      if (hSpeed > 3) {
+        var tyaw = Math.atan2(vel.x, vel.z);
+        var dyaw = ((tyaw - soul.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+        soul.rotation.y += dyaw * Math.min(1, dt * 4);
+      }
+
       updateNpcSouls(dt, t);
 
       // wisps bob; reveal when vision active or soul close
@@ -1163,16 +1179,21 @@
         if (mag > 1) { ix /= mag; iz /= mag; }
 
         var dashK = G.dashT > 0 ? DASH_MULT : 1;
+        var altK = 1 + (soul.position.y / 55) * 0.5;   // thin air: up to +50% speed
         var move = new THREE.Vector3(ix, iy, iz);
         if (move.lengthSq() > 0.01) {
-          vel.lerp(move.multiplyScalar(SPEED * dashK), 0.2);
+          vel.lerp(move.multiplyScalar(SPEED * dashK * altK), 0.2);
         } else {
           vel.lerp(new THREE.Vector3(), 0.22);
         }
         soul.position.addScaledVector(vel, dt);
         soul.position.x = THREE.MathUtils.clamp(soul.position.x, -110, 110);
         soul.position.z = THREE.MathUtils.clamp(soul.position.z, -190, 16);
-        soul.position.y = THREE.MathUtils.clamp(soul.position.y, 0, 42);   // flight ceiling — chin height of the gods
+        soul.position.y = THREE.MathUtils.clamp(soul.position.y, 0, 55);   // ceiling: top the gods' heads
+        if (!G.flewOnce && soul.position.y > 8) {
+          G.flewOnce = true;
+          chyron('AIRBORNE — THE CAMERAS LOVE AN AERIAL SHOT');
+        }
 
         updateGods(dt);
 
@@ -1254,8 +1275,9 @@
       // camera: chase cam + shake
       var shakeX = G.shake > 0 ? (Math.random() - 0.5) * G.shake * 2 : 0;
       var shakeY = G.shake > 0 ? (Math.random() - 0.5) * G.shake * 2 : 0;
+      var alt = Math.max(0, soul.position.y);   // camera pulls up+back when airborne: keep the field in frame
       var camTarget = new THREE.Vector3(
-        soul.position.x * 0.9 + shakeX, soul.position.y + 7.5 + shakeY, soul.position.z + 13);
+        soul.position.x * 0.9 + shakeX, soul.position.y + 7.5 + alt * 0.35 + shakeY, soul.position.z + 13 + alt * 0.55);
       camPos.lerp(camTarget, 0.07);
       camera.position.copy(camPos);
       camLook.lerp(new THREE.Vector3(soul.position.x, soul.position.y + 2.5, soul.position.z - 6), 0.1);
@@ -1284,7 +1306,7 @@
         setGodAnim(gd, 'idle');
       }
       G.running = true; G.over = false;
-      G.t = 0; G.essence = G.maxEssence; G.seen = false; G.seenT = 0; G.viewers = 12;
+      G.t = 0; G.essence = G.maxEssence; G.seen = false; G.seenT = 0; G.viewers = 12; G.flewOnce = false;
       G.tier = 0; G.collapseT = 18; G.visionT = 0; G.visionCd = 0; G.echoT = 0; G.echoCd = 0;
       sfx.start();
       centerMsg('RUN, SMALL SOUL', 2000);
