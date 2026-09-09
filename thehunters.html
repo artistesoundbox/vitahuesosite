@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>THE HUNTERS – Vitamina Hueso @ Manteca Studios</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; min-height: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #cfe4ff; background: #04060b;
+      overflow-x: hidden;
+    }
+    body {
+      background:
+        radial-gradient(1100px 560px at 85% -8%, rgba(255, 40, 60, 0.10), transparent 60%),
+        radial-gradient(900px 500px at 8% 108%, rgba(255, 170, 40, 0.07), transparent 60%),
+        #04060b;
+    }
+    a { color: #8ec2ff; }
+    .title-art {
+      display: block; width: min(260px, 62vw); height: auto;
+      margin: 14px auto 8px; border-radius: 18px;
+      box-shadow: 0 0 26px rgba(255, 60, 60, 0.30);
+    }
+    header { max-width: 1200px; margin: 0 auto; padding: 10px 6vw 0; text-align: center; }
+    .kicker { font-size: 13px; letter-spacing: 0.42em; text-transform: uppercase; color: #a07f8c; margin-bottom: 6px; }
+    header h1 {
+      font-size: clamp(26px, 4.6vw, 44px); letter-spacing: 0.14em; color: #ffe9ec;
+      text-shadow: 0 0 30px rgba(255, 70, 70, 0.5);
+    }
+    header .sub {
+      font-size: clamp(12px, 2vw, 15px); letter-spacing: 0.18em; text-transform: uppercase;
+      color: #d8a5a5; margin-top: 4px;
+    }
+    header p.tag { font-size: clamp(13px, 2vw, 16px); line-height: 1.55; color: #b89fb0; max-width: 760px; margin: 8px auto 0; }
+    .top-row { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+    .btn {
+      display: inline-block; padding: 11px 34px; font-size: 14px; letter-spacing: 0.22em;
+      text-transform: uppercase; color: #e8cfd4; background: rgba(20, 8, 14, 0.6);
+      border: 1px solid rgba(255, 120, 120, 0.35); border-radius: 999px;
+      text-decoration: none; transition: all .25s; cursor: pointer;
+    }
+    .btn:hover { border-color: rgba(255, 170, 160, 0.85); box-shadow: 0 0 18px rgba(255, 90, 90, 0.35); color: #fff; }
+    .btn.small { padding: 8px 22px; font-size: 12px; }
+
+    /* ---------- arena shell ---------- */
+    #arena-wrap { position: relative; max-width: 1200px; margin: 0 auto; padding: 0 6vw; }
+    #stage {
+      position: relative; width: 100%; height: min(72vh, 660px);
+      border-radius: 18px; overflow: hidden;
+      border: 1px solid rgba(255, 120, 120, 0.25);
+      box-shadow: 0 0 34px rgba(180, 40, 60, 0.25), inset 0 0 60px rgba(0,0,0,0.5);
+      background: #05070c;
+      touch-action: pan-y;
+    }
+    #stage canvas { display: block; width: 100%; height: 100%; }
+
+    /* HUD */
+    #hud { position: absolute; inset: 0; pointer-events: none; font-size: 14px; }
+    #hud .tl { position: absolute; top: 12px; left: 14px; line-height: 1.7; text-shadow: 0 1px 4px #000; }
+    #hud .tr { position: absolute; top: 12px; right: 14px; text-align: right; line-height: 1.7; text-shadow: 0 1px 4px #000; }
+    #alive-line { color: #ffd0d0; font-weight: 700; letter-spacing: .12em; font-size: 17px; }
+    #viewers-line { color: #7de8ff; }
+    #viewers-line b { color: #c2f2ff; }
+    #essence-bar {
+      position: absolute; left: 14px; bottom: 14px; width: min(240px, 42vw); height: 8px;
+      border: 1px solid rgba(255, 140, 140, 0.5); border-radius: 99px; overflow: hidden;
+      background: rgba(10, 4, 6, 0.6);
+    }
+    #essence-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #ff5d6a, #ffb46a); transition: width .15s; }
+    #essence-label { position: absolute; left: 16px; bottom: 26px; font-size: 10px; letter-spacing: .3em; color: #d8a5a5; text-shadow: 0 1px 3px #000; }
+    #seen-tag {
+      position: absolute; top: 42%; left: 0; right: 0; text-align: center;
+      font-size: clamp(18px, 4vw, 30px); font-weight: 800; letter-spacing: .3em;
+      color: #ff4d5e; text-shadow: 0 0 22px rgba(255, 60, 60, .9);
+      opacity: 0; transition: opacity .25s;
+    }
+    #seen-tag.show { opacity: 1; }
+    #center-msg {
+      position: absolute; top: 30%; left: 0; right: 0; text-align: center;
+      font-size: clamp(26px, 5vw, 46px); font-weight: 800; letter-spacing: 0.2em;
+      color: #fff; text-shadow: 0 0 26px rgba(255, 120, 120, .95), 0 2px 10px #000;
+      opacity: 0; transition: opacity .35s;
+    }
+    #center-msg.show { opacity: 1; }
+    #hint {
+      position: absolute; bottom: 10px; left: 0; right: 0; text-align: center;
+      color: #a08898; font-size: 12px; letter-spacing: .08em; text-shadow: 0 1px 3px #000;
+    }
+    #dmg-flash {
+      position: absolute; inset: 0; background: radial-gradient(ellipse at center,
+        transparent 35%, rgba(255, 30, 50, 0.5) 100%);
+      opacity: 0; transition: opacity .12s; pointer-events: none;
+    }
+
+    /* mobile controls */
+    #stick {
+      position: absolute; left: 18px; bottom: 18px; width: 108px; height: 108px;
+      border-radius: 50%; border: 1px solid rgba(200, 160, 170, 0.4);
+      background: rgba(16, 8, 12, 0.35); pointer-events: none; opacity: 0; transition: opacity .2s;
+    }
+    #stick .knob {
+      position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px;
+      border-radius: 50%; background: rgba(255, 170, 170, 0.5);
+      box-shadow: 0 0 14px rgba(255, 120, 120, 0.6);
+    }
+    #dash-btn {
+      position: absolute; right: 20px; bottom: 22px; width: 84px; height: 84px;
+      border-radius: 50%; border: 1px solid rgba(255, 190, 120, 0.55);
+      background: rgba(40, 22, 8, 0.5); color: #ffe2b8; font-size: 13px; letter-spacing: .12em;
+      pointer-events: auto; cursor: pointer; opacity: 0; transition: opacity .2s;
+      text-transform: uppercase;
+    }
+    body.touch #stick, body.touch #dash-btn { opacity: 1; }
+
+    /* loading / overlay panels */
+    #overlay {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px;
+      background: rgba(4, 6, 11, 0.9); z-index: 5; text-align: center; padding: 20px;
+    }
+    #overlay h2 { font-size: clamp(20px, 4vw, 30px); letter-spacing: .16em; color: #ffe9ec; }
+    #overlay p { color: #b89fb0; max-width: 520px; line-height: 1.6; }
+    #load-bar {
+      width: min(360px, 70vw); height: 8px; border-radius: 99px;
+      background: rgba(255, 140, 140, 0.15); overflow: hidden;
+    }
+    #load-fill { height: 100%; width: 0%; border-radius: 99px;
+      background: linear-gradient(90deg, #ff5d6a, #ffd06a); transition: width .25s; }
+    #load-pct { color: #a08898; font-size: 12px; letter-spacing: .18em; }
+    #overlay .btn { pointer-events: auto; }
+    .hidden { display: none !important; }
+
+    /* result card */
+    #result {
+      max-width: 640px; margin: 26px auto 60px; padding: 26px 28px;
+      border: 1px solid rgba(255, 120, 120, 0.35); border-radius: 18px;
+      background: rgba(16, 8, 12, 0.6); text-align: center;
+    }
+    #result h3 { letter-spacing: .2em; margin-bottom: 10px; color: #ffe9ec; }
+    #result p { color: #b89fb0; line-height: 1.6; margin-bottom: 16px; }
+    #result .big { font-size: 30px; color: #7de8ff; font-weight: 800; letter-spacing: .1em; margin-bottom: 12px; }
+    #result .row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+    footer { max-width: 900px; margin: 30px auto 50px; padding: 0 6vw; text-align: center; color: #7f6f7d; font-size: 13px; line-height: 1.7; }
+  </style>
+</head>
+<body>
+  <img src="thehunters/thehunters.jpg" alt="The Hunters" class="title-art" />
+  <header>
+    <div class="top-row">
+      <a class="btn small nav-back" href="index.html">&#9664; BACK</a>
+      <a class="btn small" href="index.html">&#8962; HOME</a>
+    </div>
+    <p class="kicker">Vitamina Hueso @ Manteca Studios</p>
+    <h1>THE HUNTERS</h1>
+    <div class="sub">A Game Made For Giant Gods, That Hunt Small Souls</div>
+    <p class="tag">
+      The gods came down on a dead Hollywood and turned the hunt into prime time.
+      You are one small soul on the killing field. The cameras are always on.
+      The longer you last, the more of them watch.
+    </p>
+  </header>
+
+  <div id="arena-wrap">
+    <div id="stage">
+      <div id="hud">
+        <div class="tl">
+          <div id="alive-line">0.0s ALIVE</div>
+          <div id="status-line" style="color:#8aa5c8">UNSEEN</div>
+        </div>
+        <div class="tr">
+          <div id="viewers-line">👁 <b>12</b> watching</div>
+          <div id="best-line" style="color:#a08898">best: —</div>
+        </div>
+        <div id="center-msg"></div>
+        <div id="seen-tag">S E E N</div>
+        <div id="essence-label">ESSENCE</div>
+        <div id="essence-bar"><div id="essence-fill"></div></div>
+        <div id="hint">WASD / arrows to drift · SHIFT or SPACE to dash · or drag left side + tap DASH</div>
+        <div id="dmg-flash"></div>
+        <div id="stick"><div class="knob" id="knob"></div></div>
+        <button id="dash-btn">dash</button>
+      </div>
+      <div id="overlay">
+        <h2>THE HUNT BEGINS</h2>
+        <p id="overlay-text">Waking the gods…</p>
+        <div id="load-bar"><div id="load-fill"></div></div>
+        <div id="load-pct">0%</div>
+        <button class="btn hidden" id="start-btn">Be let loose</button>
+        <p class="hidden" id="fail-note" style="color:#ffd97a"></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="result" class="hidden">
+    <h3 id="result-title">CONSUMED</h3>
+    <p id="result-body"></p>
+    <div class="big" id="result-score">0.0s · 12 viewers</div>
+    <p id="result-note"></p>
+    <div class="row">
+      <button class="btn" id="retry-btn">Be let loose again</button>
+      <a class="btn small" href="index.html">Return to the portal</a>
+    </div>
+  </div>
+
+  <footer>
+    The Hunters · a neon-dystopia spectacle. The gods do not chase you because they hate you —<br />
+    hate requires noticing. You are simply what tonight's episode needed.
+  </footer>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    /* ================= tiny synth sfx ================= */
+    var AC = null, master = null;
+    function audio() {
+      if (!AC) {
+        try {
+          AC = new (window.AudioContext || window.webkitAudioContext)();
+          master = AC.createGain(); master.gain.value = 0.5; master.connect(AC.destination);
+        } catch (e) { AC = null; }
+      }
+      if (AC && AC.state === 'suspended') AC.resume();
+      return AC;
+    }
+    function tone(f0, f1, dur, type, vol) {
+      var ac = audio(); if (!ac) return;
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type = type || 'sine';
+      o.frequency.setValueAtTime(f0, ac.currentTime);
+      o.frequency.exponentialRampToValueAtTime(Math.max(f1, 1), ac.currentTime + dur);
+      g.gain.setValueAtTime(vol || 0.2, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+      o.connect(g); g.connect(master);
+      o.start(); o.stop(ac.currentTime + dur + 0.02);
+    }
+    var sfx = {
+      dash:  function () { tone(700, 180, 0.16, 'sawtooth', 0.12); },
+      seen:  function () { tone(90, 240, 0.5, 'sawtooth', 0.14); tone(180, 480, 0.5, 'square', 0.06); },
+      hurt:  function () { tone(160, 55, 0.3, 'square', 0.2); },
+      start: function () { tone(60, 32, 1.2, 'sawtooth', 0.2); tone(45, 24, 1.6, 'sine', 0.25); },
+      die:   function () { tone(220, 30, 1.4, 'sawtooth', 0.22); tone(440, 60, 1.1, 'square', 0.12); },
+      tick:  function () { tone(1200, 900, 0.05, 'sine', 0.05); }
+    };
+
+    /* ================= game state ================= */
+    var G = {
+      running: false, over: false,
+      t: 0, best: 0, viewers: 12,
+      essence: 100, maxEssence: 100,
+      seen: false, dashCd: 0, dashT: 0
+    };
+    try { G.best = parseFloat(localStorage.getItem('vh_hunters_best') || '0') || 0; } catch (e) {}
+
+    /* ================= three.js scene ================= */
+    var stage = document.getElementById('stage');
+    var renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    stage.appendChild(renderer.domElement);
+
+    var scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x05070c);
+    scene.fog = new THREE.Fog(0x05070c, 40, 160);
+
+    var camera = new THREE.PerspectiveCamera(55, 1, 0.1, 500);
+
+    var hemi = new THREE.HemisphereLight(0x8ea6d8, 0x2a1f28, 0.85);
+    scene.add(hemi);
+    var moon = new THREE.DirectionalLight(0xbfd0ff, 0.9);
+    moon.position.set(-40, 60, -30);
+    scene.add(moon);
+    // failing neon wash from the megatrons (warm red, from the strip side)
+    var neonA = new THREE.PointLight(0xff4055, 260, 220, 1.8);
+    neonA.position.set(-60, 26, -70);
+    scene.add(neonA);
+    var neonB = new THREE.PointLight(0x30d0ff, 180, 220, 1.8);
+    neonB.position.set(70, 20, -60);
+    scene.add(neonB);
+
+    function resize() {
+      var w = stage.clientWidth, h = stage.clientHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h; camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', resize); resize();
+
+    /* ---------- world dressing: dead boulevard ---------- */
+    var DRESS = new THREE.Group();
+    (function dress() {
+      // cracked ground plane (huge, dark)
+      var ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(700, 700),
+        new THREE.MeshStandardMaterial({ color: 0x14100f, roughness: 0.96 })
+      );
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.y = -0.02;
+      DRESS.add(ground);
+
+      // failing megatron screens — flickering emissive slabs along the strip
+      var screenMats = [];
+      var scrGeo = new THREE.PlaneGeometry(34, 16);
+      for (var i = 0; i < 7; i++) {
+        var m = new THREE.MeshBasicMaterial({ color: 0x0a0d12 });
+        screenMats.push(m);
+        var s = new THREE.Mesh(scrGeo, m);
+        var side = i % 2 === 0 ? -1 : 1;
+        s.position.set(side * (60 + Math.random() * 70), 10 + Math.random() * 14, -90 - (i * 55) + Math.random() * 30);
+        s.rotation.y = (side < 0 ? 1 : -1) * (0.5 + Math.random() * 0.25);
+        DRESS.add(s);
+        // scaffold behind each screen
+        var post = new THREE.Mesh(
+          new THREE.BoxGeometry(0.8, 18, 0.8),
+          new THREE.MeshStandardMaterial({ color: 0x2b2f38, roughness: 0.8, metalness: 0.6 })
+        );
+        post.position.copy(s.position); post.position.y -= 9;
+        DRESS.add(post);
+      }
+      DRESS.userData.screenMats = screenMats;
+
+      // neon sign glow strips hanging over the field
+      for (var j = 0; j < 10; j++) {
+        var strip = new THREE.Mesh(
+          new THREE.BoxGeometry(0.5, 0.5, 6 + Math.random() * 10),
+          new THREE.MeshBasicMaterial({
+            color: j % 3 === 0 ? 0x30d0ff : (j % 3 === 1 ? 0xff4055 : 0xffb040),
+            transparent: true, opacity: 0.75
+          })
+        );
+        strip.position.set((Math.random() - 0.5) * 260, 8 + Math.random() * 18, -40 - Math.random() * 220);
+        DRESS.add(strip);
+      }
+
+      // rusted Hollywood letters (9 slabs scattered, half-fallen)
+      var letterMat = new THREE.MeshStandardMaterial({ color: 0x4a4038, roughness: 0.85, metalness: 0.55 });
+      for (var k = 0; k < 9; k++) {
+        var L = new THREE.Mesh(new THREE.BoxGeometry(4, 14, 1.2), letterMat);
+        var fall = Math.random() * 0.5;
+        L.position.set(-70 + k * 17 + Math.random() * 6, fall > 0.25 ? 5 : 1.5, -150 - Math.random() * 60);
+        L.rotation.z = fall; L.rotation.y = Math.random() * 0.4;
+        DRESS.add(L);
+      }
+
+      // drifting dust (souls' ashes)
+      var dustGeo = new THREE.BufferGeometry();
+      var DN = 900, dp = new Float32Array(DN * 3);
+      for (var d = 0; d < DN; d++) {
+        dp[d * 3] = (Math.random() - 0.5) * 320;
+        dp[d * 3 + 1] = Math.random() * 40;
+        dp[d * 3 + 2] = (Math.random() - 0.5) * 320 - 40;
+      }
+      dustGeo.setAttribute('position', new THREE.BufferAttribute(dp, 3));
+      var dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({
+        color: 0xc8b8a8, size: 0.35, transparent: true, opacity: 0.5, depthWrite: false
+      }));
+      DRESS.add(dust);
+      DRESS.userData.dust = dust;
+
+      // concept-art backdrop at the far end of the killing field
+      new THREE.TextureLoader().load('thehunters/thehuntersbackground.jpg', function (tex) {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        var hgt = 150, wid = hgt * (tex.image.width / tex.image.height);
+        var back = new THREE.Mesh(
+          new THREE.PlaneGeometry(wid, hgt),
+          new THREE.MeshBasicMaterial({ map: tex, fog: false })
+        );
+        back.position.set(0, hgt * 0.5 - 4, -300);
+        DRESS.add(back);
+      });
+    })();
+    scene.add(DRESS);
+
+    /* ---------- the soul (player) ---------- */
+    var soul = new THREE.Group();
+    var soulBody = null;                 // the loaded soul.glb model
+    var halo = new THREE.Mesh(
+      new THREE.SphereGeometry(1.05, 24, 18),
+      new THREE.MeshBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0.20, blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    soul.add(halo);
+    var soulLight = new THREE.PointLight(0x66ccff, 30, 26, 2.0);
+    soul.add(soulLight);
+    scene.add(soul);
+
+    /* ---------- loading the gods ---------- */
+    var BASE = 'thehunters/';
+    var loader = new GLTFLoader();
+    var loadPct = { soul: 0, g1: 0, g2: 0, g3: 0 };
+    function loadGlb(name, key) {
+      return new Promise(function (res, rej) {
+        loader.load(BASE + name, res, function (ev) {
+          if (ev.total) { loadPct[key] = ev.loaded / ev.total; progress(); }
+        }, rej);
+      });
+    }
+    function progress() {
+      var t = (loadPct.soul + loadPct.g1 + loadPct.g2 + loadPct.g3) / 4;
+      document.getElementById('load-fill').style.width = Math.round(t * 100) + '%';
+      document.getElementById('load-pct').textContent = Math.round(t * 100) + '%';
+    }
+
+    var overlayText = document.getElementById('overlay-text');
+
+    // skinned meshes must never frustum-cull (bind-pose boxes lie)
+    function noCull(root) {
+      root.traverse(function (o) { if (o.isSkinnedMesh || o.isMesh) o.frustumCulled = false; });
+    }
+    function skinnedFeet(root) {
+      // lowest animated vertex Y with root parked at y=0 (one-time measure)
+      root.updateMatrixWorld(true);
+      var pos = root.position.clone();
+      root.position.set(0, 0, 0);
+      root.updateMatrixWorld(true);
+      var lowest = Infinity;
+      var v = new THREE.Vector3();
+      root.traverse(function (o) {
+        if (!o.isSkinnedMesh || !o.geometry || !o.geometry.getVertexPosition) return;
+        var sk = o.skeleton; if (sk) sk.update();
+        var bm = o.bindMatrix || new THREE.Matrix4();
+        var bmi = o.bindMatrixInverse || new THREE.Matrix4();
+        var si = o.geometry.attributes.skinIndex, sw = o.geometry.attributes.skinWeight;
+        var n = Math.min(o.geometry.attributes.position.count, 1000);
+        for (var i = 0; i < n; i++) {
+          o.geometry.getVertexPosition(i, v);
+          v.applyMatrix4(bm);
+          if (sk) {
+            var x = 0, y = 0, z = 0;
+            var idx = [si.getX(i), si.getY(i), si.getZ(i), si.getW(i)];
+            var wts = [sw.getX(i), sw.getY(i), sw.getZ(i), sw.getW(i)];
+            var m = sk.boneMatrices;
+            for (var k = 0; k < 4; k++) {
+              var w = wts[k]; if (!w) continue;
+              var off = idx[k] * 16;
+              x += w * (v.x * m[off]    + v.y * m[off+4]  + v.z * m[off+8]  + m[off+12]);
+              y += w * (v.x * m[off+1]  + v.y * m[off+5]  + v.z * m[off+9]  + m[off+13]);
+              z += w * (v.x * m[off+2]  + v.y * m[off+6]  + v.z * m[off+10] + m[off+14]);
+            }
+            v.set(x, y, z).applyMatrix4(bmi);
+          }
+          v.applyMatrix4(o.matrixWorld);
+          lowest = Math.min(lowest, v.y);
+        }
+      });
+      root.position.copy(pos);
+      root.updateMatrixWorld(true);
+      return isFinite(lowest) ? lowest : 0;
+    }
+
+    var gods = [];
+    var GOD_DEFS = [
+      { file: 'god1.glb', key: 'g1', clipPref: 'Armature|', height: 42, x: -46, z: -88, yaw:  0.28, tint: 0xff4055 },
+      { file: 'god2.glb', key: 'g2', clipPref: 'mixamo.com',  height: 42, x:   0, z: -70, yaw:  0.0,  tint: 0xffb040 },
+      { file: 'god3.glb', key: 'g3', clipPref: 'mixamo.com.001', height: 46, x: 48, z: -95, yaw: -0.3, tint: 0x30d0ff }
+    ];
+
+    Promise.all([
+      loadGlb('soul.glb', 'soul'),
+      loadGlb('god1.glb', 'g1'),
+      loadGlb('god2.glb', 'g2'),
+      loadGlb('god3.glb', 'g3')
+    ]).then(function (gltfs) {
+      // ---- the soul model ----
+      var sm = gltfs[0].scene;
+      noCull(sm);
+      var sb = new THREE.Box3().setFromObject(sm);
+      var sh = Math.max(0.001, sb.max.y - sb.min.y);
+      sm.scale.setScalar(1.5 / sh);           // soul stands ~1.5 units
+      sb.setFromObject(sm);
+      var sc = sb.getCenter(new THREE.Vector3());
+      sm.position.x -= sc.x; sm.position.z -= sc.z; sm.position.y -= sb.min.y;
+      soul.add(sm);
+      soulBody = sm;
+
+      // ---- the gods ----
+      gltfs.slice(1).forEach(function (g, i) {
+        var def = GOD_DEFS[i];
+        var root = g.scene;
+        noCull(root);
+
+        // normalize height (bbox in bind pose is fine for colossi sizing)
+        var box = new THREE.Box3().setFromObject(root);
+        var h = Math.max(0.001, box.max.y - box.min.y);
+        var s = def.height / h;
+        root.scale.setScalar(s);
+
+        scene.add(root);
+        // measure feet AFTER scale, then place
+        var feet = skinnedFeet(root);
+        root.position.set(def.x, -feet, def.z);
+        root.rotation.y = def.yaw;
+
+        var mixer = new THREE.AnimationMixer(root);
+        var clip = null;
+        if (g.animations.length) {
+          clip = g.animations.find(function (a) { return a.name.indexOf(def.clipPref) === 0; }) || g.animations[0];
+        }
+        if (clip) mixer.clipAction(clip).play();
+
+        // dread aura light under each god
+        var aura = new THREE.PointLight(def.tint, 60, 90, 2.0);
+        aura.position.set(def.x, 6, def.z);
+        scene.add(aura);
+
+        gods.push({ root: root, mixer: mixer, def: def, feet: feet });
+      });
+
+      overlayText.textContent = 'The gods stand. The cameras are rolling.';
+      var btn = document.getElementById('start-btn');
+      btn.classList.remove('hidden');
+      btn.addEventListener('click', startGame);
+    }).catch(function (err) {
+      console.error(err);
+      overlayText.innerHTML = 'The gods refused to wake.<br><small>' + (err.message || err) + '</small>';
+    });
+
+    /* ---------- input ---------- */
+    var input = { x: 0, z: 0, dash: false };
+    var keys = {};
+    window.addEventListener('keydown', function (e) {
+      keys[e.code] = true;
+      if (e.code === 'Space') { e.preventDefault(); tryDash(); }
+      audio();
+    });
+    window.addEventListener('keyup', function (e) { keys[e.code] = false; });
+
+    var _prevPadA = false, _prevPadX = false;
+    window.addEventListener('gamepadconnected', function () {
+      document.getElementById('hint').textContent =
+        'WASD / LEFT STICK to drift · SPACE / A / X to dash';
+    });
+
+    // touch: joystick on the left 45%, dash button
+    var isTouch = ('ontouchstart' in window);
+    if (isTouch) document.body.classList.add('touch');
+    var stick = document.getElementById('stick'), knob = document.getElementById('knob');
+    var stickId = null, stickCx = 0, stickCy = 0;
+    stage.addEventListener('touchstart', function (e) {
+      audio();
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        if (stickId === null && t.clientX - stage.getBoundingClientRect().left < stage.clientWidth * 0.45) {
+          stickId = t.identifier;
+          var r = stage.getBoundingClientRect();
+          stickCx = t.clientX; stickCy = t.clientY;
+          stick.style.left = (t.clientX - r.left - 54) + 'px';
+          stick.style.bottom = (r.bottom - t.clientY - 54) + 'px';
+          stick.style.opacity = 1;
+        }
+      }
+    }, { passive: true });
+    stage.addEventListener('touchmove', function (e) {
+      if (stickId === null) return;
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        if (t.identifier === stickId) {
+          var dx = t.clientX - stickCx, dy = t.clientY - stickCy;
+          var len = Math.hypot(dx, dy), max = 46;
+          var k = len > max ? max / len : 1;
+          knob.style.transform = 'translate(' + dx * k + 'px,' + dy * k + 'px)';
+          input.x = (dx * k) / max; input.z = (dy * k) / max;
+        }
+      }
+    }, { passive: true });
+    function endTouch(e) {
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === stickId) {
+          stickId = null; input.x = input.z = 0;
+          knob.style.transform = 'translate(0,0)'; stick.style.opacity = 0;
+        }
+      }
+    }
+    stage.addEventListener('touchend', endTouch);
+    stage.addEventListener('touchcancel', endTouch);
+    document.getElementById('dash-btn').addEventListener('touchstart', function (e) {
+      e.preventDefault(); tryDash();
+    });
+
+    function tryDash() {
+      if (!G.running || G.over || G.dashCd > 0 || G.essence < 12) return;
+      G.dashCd = 1.6; G.dashT = 0.28; G.essence = Math.max(1, G.essence - 12);
+      sfx.dash();
+    }
+
+    /* ---------- hunt logic: sight cones + stomp danger ---------- */
+    // A god "sees" the soul if it is within its forward cone and distance.
+    // SEEN drains essence; essence also drains slowly inside a god's aura.
+    var GOD_SIGHT = { dist: 46, angle: 0.52 };   // forward-cone params
+    var AURA_DIST = 16;
+
+    function godForward(gd) {
+      // gods face +Z toward the boulevard center, rotated by def.yaw
+      return new THREE.Vector3(Math.sin(gd.root.rotation.y), 0, Math.cos(gd.root.rotation.y));
+    }
+
+    function evaluateSeen() {
+      var sp = soul.position;
+      var seenBy = null;
+      for (var i = 0; i < gods.length; i++) {
+        var gd = gods[i];
+        var to = sp.clone().sub(gd.root.position); to.y = 0;
+        var dist = to.length();
+        if (dist < AURA_DIST) return { god: gd, aura: true, dist: dist };
+        var fwd = godForward(gd);
+        if (dist < GOD_SIGHT.dist) {
+          var dot = to.normalize().dot(fwd);
+          if (dot > Math.cos(GOD_SIGHT.angle)) seenBy = { god: gd, aura: false, dist: dist };
+        }
+      }
+      return seenBy;
+    }
+
+    /* ---------- HUD ---------- */
+    function fmtViewers(n) {
+      if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+      if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+      return '' + Math.round(n);
+    }
+    function renderHud() {
+      document.getElementById('alive-line').textContent = G.t.toFixed(1) + 's ALIVE';
+      document.getElementById('viewers-line').innerHTML = '👁 <b>' + fmtViewers(G.viewers) + '</b> watching';
+      document.getElementById('essence-fill').style.width = (G.essence / G.maxEssence * 100) + '%';
+      document.getElementById('best-line').textContent = 'best: ' + (G.best > 0 ? G.best.toFixed(1) + 's' : '—');
+      var seen = document.getElementById('seen-tag');
+      if (G.seen) seen.classList.add('show'); else seen.classList.remove('show');
+      var status = document.getElementById('status-line');
+      status.textContent = G.seen ? 'SEEN — RUN' : 'UNSEEN';
+      status.style.color = G.seen ? '#ff4d5e' : '#8aa5c8';
+    }
+    function centerMsg(txt, hold) {
+      var el = document.getElementById('center-msg');
+      el.textContent = txt; el.classList.add('show');
+      clearTimeout(centerMsg._t);
+      centerMsg._t = setTimeout(function () { el.classList.remove('show'); }, hold || 1600);
+    }
+
+    /* ---------- main loop ---------- */
+    var clock = new THREE.Clock();
+    var camPos = new THREE.Vector3(0, 6, 30);
+    var camLook = new THREE.Vector3(0, 3, 0);
+    var vel = new THREE.Vector3();
+    var SPEED = 10.5, DASH_MULT = 3.1;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      var dt = Math.min(clock.getDelta(), 0.05);
+      var t = clock.elapsedTime;
+
+      // gods idle-animate always (even on menu — they loom)
+      for (var i = 0; i < gods.length; i++) gods[i].mixer.update(dt);
+
+      // flicker the megatrons + neon
+      DRESS.userData.screenMats.forEach(function (m, k) {
+        var f = 0.12 + 0.10 * Math.sin(t * (2 + k) + k * 7) + (Math.random() < 0.02 ? -0.5 : 0);
+        m.color.setRGB(0.04 + f * 1.2, 0.05 + f * 0.5, 0.07 + f * 0.3);
+      });
+      neonA.intensity = 220 + Math.sin(t * 13) * 60 + (Math.random() < 0.03 ? -160 : 0);
+      DRESS.userData.dust.rotation.y += dt * 0.004;
+
+      // soul bob + halo pulse
+      if (soulBody) soulBody.position.y = Math.sin(t * 2.4) * 0.12;
+      halo.material.opacity = 0.16 + Math.sin(t * 3.1) * 0.06;
+
+      if (G.running && !G.over) {
+        G.t += dt;
+        // viewers tick up with survival (spectacle economics)
+        G.viewers = 12 + Math.floor(G.t * 37 + Math.pow(G.t, 1.8));
+
+        // input: touch + keyboard + gamepad
+        var ix = input.x, iz = input.z;
+        if (keys['KeyA'] || keys['ArrowLeft']) ix -= 1;
+        if (keys['KeyD'] || keys['ArrowRight']) ix += 1;
+        if (keys['KeyW'] || keys['ArrowUp']) iz -= 1;
+        if (keys['KeyS'] || keys['ArrowDown']) iz += 1;
+        var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+        for (var pi = 0; pi < pads.length; pi++) {
+          var gp = pads[pi]; if (!gp) continue;
+          if (gp.axes.length > 1) {
+            if (Math.abs(gp.axes[0]) > 0.18) ix += gp.axes[0];
+            if (Math.abs(gp.axes[1]) > 0.18) iz += gp.axes[1];
+          }
+          var aD = !!(gp.buttons[0] && gp.buttons[0].pressed);
+          var xD = !!(gp.buttons[2] && gp.buttons[2].pressed);
+          if ((aD && !_prevPadA) || (xD && !_prevPadX)) tryDash();
+          _prevPadA = aD; _prevPadX = xD;
+        }
+        var mag = Math.hypot(ix, iz);
+        if (mag > 1) { ix /= mag; iz /= mag; }
+
+        // move: camera-relative (camera looks down -Z from behind the soul)
+        var dashK = G.dashT > 0 ? DASH_MULT : 1;
+        var move = new THREE.Vector3(ix, 0, iz);
+        if (move.lengthSq() > 0.01) {
+          vel.lerp(move.multiplyScalar(SPEED * dashK), 0.2);
+        } else {
+          vel.lerp(new THREE.Vector3(), 0.22);
+        }
+        if (G.dashT > 0) G.dashT -= dt;
+        if (G.dashCd > 0) G.dashCd -= dt;
+        soul.position.addScaledVector(vel, dt);
+        soul.position.x = THREE.MathUtils.clamp(soul.position.x, -110, 110);
+        soul.position.z = THREE.MathUtils.clamp(soul.position.z, -190, 16);
+
+        // hunt: essence economy
+        var seenRes = evaluateSeen();
+        var wasSeen = G.seen;
+        G.seen = !!seenRes;
+        if (G.seen) {
+          var drain = seenRes.aura ? 26 : 14;
+          G.essence -= drain * dt;
+          if (!wasSeen) sfx.seen();
+          if (seenRes.aura) {
+            // brushed by a god — flash
+            var f = document.getElementById('dmg-flash');
+            f.style.opacity = 0.7; setTimeout(function () { f.style.opacity = 0; }, 130);
+          }
+        }
+        // death check BEFORE regen — regen must never mask a hit to zero
+        if (G.essence <= 0) { G.essence = 0; endGame(); }
+        else if (!G.seen) {
+          G.essence = Math.min(G.maxEssence, G.essence + 7 * dt);   // recover in the open
+        }
+
+        // heartbeat tick when SEEN
+        if (G.seen && Math.floor(G.t * 2) !== Math.floor((G.t - dt) * 2)) sfx.tick();
+
+        renderHud();
+      }
+
+      // camera: chase cam behind the soul, slight lag
+      var camTarget = new THREE.Vector3(
+        soul.position.x * 0.9, soul.position.y + 7.5, soul.position.z + 13);
+      camPos.lerp(camTarget, 0.07);
+      camera.position.copy(camPos);
+      camLook.lerp(new THREE.Vector3(soul.position.x, soul.position.y + 2.5, soul.position.z - 6), 0.1);
+      camera.lookAt(camLook);
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    /* ---------- flow ---------- */
+    function startGame() {
+      audio();
+      document.getElementById('overlay').classList.add('hidden');
+      soul.position.set(0, 0, 8);
+      vel.set(0, 0, 0);
+      G.running = true; G.over = false;
+      G.t = 0; G.essence = G.maxEssence; G.seen = false; G.viewers = 12;
+      sfx.start();
+      centerMsg('RUN, SMALL SOUL', 2000);
+      renderHud();
+    }
+
+    function endGame() {
+      G.over = true; G.running = false;
+      sfx.die();
+      centerMsg('CONSUMED', 2400);
+      if (G.t > G.best) {
+        G.best = G.t;
+        try { localStorage.setItem('vh_hunters_best', String(G.best)); } catch (e) {}
+      }
+      setTimeout(showResult, 1700);
+    }
+
+    function showResult() {
+      var r = document.getElementById('result');
+      document.getElementById('result-body').textContent =
+        'The gods noticed you tonight, for ' + G.t.toFixed(1) +
+        ' seconds. The broadcast cuts to a commercial. Somewhere, a rating spikes.';
+      document.getElementById('result-score').textContent =
+        G.t.toFixed(1) + 's · ' + fmtViewers(G.viewers) + ' viewers';
+      document.getElementById('result-note').textContent =
+        G.t >= G.best ? 'That was your longest life. The gods were entertained.'
+                      : 'Best: ' + G.best.toFixed(1) + 's. Die better next time, soul.';
+      r.classList.remove('hidden');
+      r.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    document.getElementById('retry-btn').addEventListener('click', function () {
+      document.getElementById('result').classList.add('hidden');
+      startGame();
+    });
+
+    renderHud();
+
+    /* debug hooks for automated testing */
+    window.__hunters = {
+      state: function () {
+        return { running: G.running, over: G.over, t: +G.t.toFixed(1), essence: +G.essence.toFixed(0),
+                 viewers: G.viewers, seen: G.seen, gods: gods.length,
+                 soul: [+soul.position.x.toFixed(1), +soul.position.z.toFixed(1)] };
+      },
+      start: startGame,
+      hasModel: function () { return !!soulBody; },
+      moveTo: function (x, z) { soul.position.set(x, 0, z); },
+      dash: tryDash,
+      drain: function (n) { G.essence = Math.max(0, G.essence - n); },
+      time: function (n) { G.t = n; }
+    };
+  </script>
+</body>
+</html>
