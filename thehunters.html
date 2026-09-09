@@ -72,6 +72,22 @@
     #alive-line { color: #ffd0d0; font-weight: 700; letter-spacing: .12em; font-size: 17px; }
     #viewers-line { color: #7de8ff; }
     #viewers-line b { color: #c2f2ff; }
+
+    /* crowd meter — top center */
+    #crowd-wrap {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      width: min(240px, 34vw); text-align: center;
+    }
+    #crowd-tier {
+      font-size: 11px; letter-spacing: .34em; color: #ffd0a0; margin-bottom: 4px;
+      text-shadow: 0 1px 4px #000;
+    }
+    #crowd-bar {
+      height: 6px; border: 1px solid rgba(255, 190, 130, 0.4); border-radius: 99px;
+      overflow: hidden; background: rgba(10, 4, 6, 0.6);
+    }
+    #crowd-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #6a4a2a, #ffb040, #ff4055); transition: width .4s; }
+
     #essence-bar {
       position: absolute; left: 14px; bottom: 14px; width: min(240px, 42vw); height: 8px;
       border: 1px solid rgba(255, 140, 140, 0.5); border-radius: 99px; overflow: hidden;
@@ -93,6 +109,16 @@
       opacity: 0; transition: opacity .35s;
     }
     #center-msg.show { opacity: 1; }
+    /* broadcast chyron */
+    #chyron {
+      position: absolute; bottom: 44px; left: 50%; transform: translateX(-50%);
+      max-width: 84%; padding: 5px 18px; border-radius: 6px;
+      background: rgba(12, 4, 8, 0.78); border-left: 3px solid #ff4d5e;
+      color: #ffd9d9; font-size: 12.5px; letter-spacing: .08em; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+      opacity: 0; transition: opacity .3s;
+    }
+    #chyron.show { opacity: 1; }
     #hint {
       position: absolute; bottom: 10px; left: 0; right: 0; text-align: center;
       color: #a08898; font-size: 12px; letter-spacing: .08em; text-shadow: 0 1px 3px #000;
@@ -101,6 +127,10 @@
       position: absolute; inset: 0; background: radial-gradient(ellipse at center,
         transparent 35%, rgba(255, 30, 50, 0.5) 100%);
       opacity: 0; transition: opacity .12s; pointer-events: none;
+    }
+    #riot-vignette {
+      position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .6s;
+      background: radial-gradient(ellipse at center, transparent 45%, rgba(255, 20, 40, 0.28) 100%);
     }
 
     /* mobile controls */
@@ -114,14 +144,17 @@
       border-radius: 50%; background: rgba(255, 170, 170, 0.5);
       box-shadow: 0 0 14px rgba(255, 120, 120, 0.6);
     }
-    #dash-btn {
-      position: absolute; right: 20px; bottom: 22px; width: 84px; height: 84px;
-      border-radius: 50%; border: 1px solid rgba(255, 190, 120, 0.55);
-      background: rgba(40, 22, 8, 0.5); color: #ffe2b8; font-size: 13px; letter-spacing: .12em;
-      pointer-events: auto; cursor: pointer; opacity: 0; transition: opacity .2s;
-      text-transform: uppercase;
+    #touch-btns { position: absolute; right: 16px; bottom: 18px; display: none; flex-direction: column; gap: 10px; }
+    body.touch #touch-btns { display: flex; }
+    #touch-btns button {
+      width: 66px; height: 66px; border-radius: 50%;
+      border: 1px solid rgba(255, 190, 120, 0.55); background: rgba(40, 22, 8, 0.5);
+      color: #ffe2b8; font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+      pointer-events: auto; cursor: pointer;
     }
-    body.touch #stick, body.touch #dash-btn { opacity: 1; }
+    #dash-btn { width: 84px !important; height: 84px !important; }
+    #vision-btn { border-color: rgba(120, 220, 255, 0.55) !important; color: #bfeaff !important; background: rgba(8, 26, 40, 0.5) !important; }
+    #echo-btn   { border-color: rgba(180, 140, 255, 0.55) !important; color: #e4d6ff !important; background: rgba(24, 12, 46, 0.5) !important; }
 
     /* loading / overlay panels */
     #overlay {
@@ -130,7 +163,7 @@
       background: rgba(4, 6, 11, 0.9); z-index: 5; text-align: center; padding: 20px;
     }
     #overlay h2 { font-size: clamp(20px, 4vw, 30px); letter-spacing: .16em; color: #ffe9ec; }
-    #overlay p { color: #b89fb0; max-width: 520px; line-height: 1.6; }
+    #overlay p { color: #b89fb0; max-width: 540px; line-height: 1.6; }
     #load-bar {
       width: min(360px, 70vw); height: 8px; border-radius: 99px;
       background: rgba(255, 140, 140, 0.15); overflow: hidden;
@@ -148,6 +181,7 @@
       background: rgba(16, 8, 12, 0.6); text-align: center;
     }
     #result h3 { letter-spacing: .2em; margin-bottom: 10px; color: #ffe9ec; }
+    #result .rank { font-size: 13px; letter-spacing: .3em; color: #ffd0a0; text-transform: uppercase; margin-bottom: 8px; }
     #result p { color: #b89fb0; line-height: 1.6; margin-bottom: 16px; }
     #result .big { font-size: 30px; color: #7de8ff; font-weight: 800; letter-spacing: .1em; margin-bottom: 12px; }
     #result .row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
@@ -156,7 +190,7 @@
   </style>
 </head>
 <body>
-  <img src="thehunters/thehunters.jpg" alt="The Hunters" class="title-art" />
+  <img src="thehunters/thehuntersicon.jpg" alt="The Hunters" class="title-art" />
   <header>
     <div class="top-row">
       <a class="btn small nav-back" href="index.html">&#9664; BACK</a>
@@ -167,8 +201,9 @@
     <div class="sub">A Game Made For Giant Gods, That Hunt Small Souls</div>
     <p class="tag">
       The gods came down on a dead Hollywood and turned the hunt into prime time.
-      You are one small soul on the killing field. The cameras are always on.
-      The longer you last, the more of them watch.
+      You are one small soul on the killing field. The crowd feeds them —
+      the screens fall, the ground collapses, and the gaze of giants sweeps the dust.
+      Possess the relics. Read the light. Outlive the episode.
     </p>
   </header>
 
@@ -179,18 +214,28 @@
           <div id="alive-line">0.0s ALIVE</div>
           <div id="status-line" style="color:#8aa5c8">UNSEEN</div>
         </div>
+        <div id="crowd-wrap">
+          <div id="crowd-tier">DEAD AIR</div>
+          <div id="crowd-bar"><div id="crowd-fill"></div></div>
+        </div>
         <div class="tr">
           <div id="viewers-line">👁 <b>12</b> watching</div>
           <div id="best-line" style="color:#a08898">best: —</div>
         </div>
         <div id="center-msg"></div>
         <div id="seen-tag">S E E N</div>
+        <div id="chyron"></div>
         <div id="essence-label">ESSENCE</div>
         <div id="essence-bar"><div id="essence-fill"></div></div>
-        <div id="hint">WASD / arrows to drift · SHIFT or SPACE to dash · or drag left side + tap DASH</div>
+        <div id="hint">WASD move · SHIFT/SPACE dash · Q soul vision · E echo possess</div>
         <div id="dmg-flash"></div>
+        <div id="riot-vignette"></div>
         <div id="stick"><div class="knob" id="knob"></div></div>
-        <button id="dash-btn">dash</button>
+        <div id="touch-btns">
+          <button id="dash-btn">dash</button>
+          <button id="vision-btn">vision</button>
+          <button id="echo-btn">echo</button>
+        </div>
       </div>
       <div id="overlay">
         <h2>THE HUNT BEGINS</h2>
@@ -205,6 +250,7 @@
 
   <div id="result" class="hidden">
     <h3 id="result-title">CONSUMED</h3>
+    <div class="rank" id="result-rank">RANK: EXTRA</div>
     <p id="result-body"></p>
     <div class="big" id="result-score">0.0s · 12 viewers</div>
     <p id="result-note"></p>
@@ -247,12 +293,20 @@
       o.start(); o.stop(ac.currentTime + dur + 0.02);
     }
     var sfx = {
-      dash:  function () { tone(700, 180, 0.16, 'sawtooth', 0.12); },
-      seen:  function () { tone(90, 240, 0.5, 'sawtooth', 0.14); tone(180, 480, 0.5, 'square', 0.06); },
-      hurt:  function () { tone(160, 55, 0.3, 'square', 0.2); },
-      start: function () { tone(60, 32, 1.2, 'sawtooth', 0.2); tone(45, 24, 1.6, 'sine', 0.25); },
-      die:   function () { tone(220, 30, 1.4, 'sawtooth', 0.22); tone(440, 60, 1.1, 'square', 0.12); },
-      tick:  function () { tone(1200, 900, 0.05, 'sine', 0.05); }
+      dash:   function () { tone(700, 180, 0.16, 'sawtooth', 0.12); },
+      seen:   function () { tone(90, 240, 0.5, 'sawtooth', 0.14); tone(180, 480, 0.5, 'square', 0.06); },
+      hurt:   function () { tone(160, 55, 0.3, 'square', 0.2); },
+      start:  function () { tone(60, 32, 1.2, 'sawtooth', 0.2); tone(45, 24, 1.6, 'sine', 0.25); },
+      die:    function () { tone(220, 30, 1.4, 'sawtooth', 0.22); tone(440, 60, 1.1, 'square', 0.12); },
+      tick:   function () { tone(1200, 900, 0.05, 'sine', 0.05); },
+      vision: function () { tone(300, 900, 0.35, 'sine', 0.12); tone(600, 1400, 0.3, 'sine', 0.07); },
+      wisp:   function () { tone(880, 1320, 0.18, 'sine', 0.12); tone(1320, 1760, 0.14, 'sine', 0.08); },
+      possess:function () { tone(200, 700, 0.4, 'triangle', 0.14); tone(400, 900, 0.35, 'sine', 0.08); },
+      stomp:  function () { tone(70, 28, 0.6, 'sawtooth', 0.3); tone(140, 40, 0.5, 'square', 0.16); },
+      collapse:function(){ tone(50, 20, 1.1, 'sawtooth', 0.28); },
+      warn:   function () { tone(980, 980, 0.09, 'square', 0.08); setTimeout(function(){ tone(980, 980, 0.09, 'square', 0.08); }, 160); },
+      tierUp: function () { [440, 554, 659, 880].forEach(function (f, i) {
+                setTimeout(function () { tone(f, f * 1.01, 0.22, 'sine', 0.14); }, i * 110); }); }
     };
 
     /* ================= game state ================= */
@@ -260,9 +314,27 @@
       running: false, over: false,
       t: 0, best: 0, viewers: 12,
       essence: 100, maxEssence: 100,
-      seen: false, dashCd: 0, dashT: 0
+      seen: false, seenT: 0,
+      dashCd: 0, dashT: 0,
+      visionCd: 0, visionT: 0,
+      echoCd: 0, echoT: 0, echoPoint: null,
+      tier: 0, tierT: 0,
+      collapseT: 20, shake: 0
     };
     try { G.best = parseFloat(localStorage.getItem('vh_hunters_best') || '0') || 0; } catch (e) {}
+
+    /* ---------- crowd tiers (Crowd Meter) ---------- */
+    var TIERS = [
+      { name: 'DEAD AIR',    v: 0,     cone: 0.44, aura: 13, walk: 0,   collapse: [26, 34], col: '#9fb8d8' },
+      { name: 'WARMING UP',  v: 600,   cone: 0.52, aura: 15, walk: 1.1, collapse: [20, 28], col: '#ffd0a0' },
+      { name: 'PRIMETIME',   v: 4000,  cone: 0.60, aura: 17, walk: 1.6, collapse: [14, 20], col: '#ffb040' },
+      { name: 'RIOT',        v: 18000, cone: 0.68, aura: 19, walk: 2.2, collapse: [9, 14],  col: '#ff4055' }
+    ];
+    function tierForViewers(v) {
+      var t = 0;
+      for (var i = 0; i < TIERS.length; i++) if (v >= TIERS[i].v) t = i;
+      return t;
+    }
 
     /* ================= three.js scene ================= */
     var stage = document.getElementById('stage');
@@ -284,7 +356,6 @@
     var moon = new THREE.DirectionalLight(0xbfd0ff, 0.9);
     moon.position.set(-40, 60, -30);
     scene.add(moon);
-    // failing neon wash from the megatrons (warm red, from the strip side)
     var neonA = new THREE.PointLight(0xff4055, 260, 220, 1.8);
     neonA.position.set(-60, 26, -70);
     scene.add(neonA);
@@ -301,8 +372,8 @@
 
     /* ---------- world dressing: dead boulevard ---------- */
     var DRESS = new THREE.Group();
+    var HOLOGRAMS = [];   // possessible billboards
     (function dress() {
-      // cracked ground plane (huge, dark)
       var ground = new THREE.Mesh(
         new THREE.PlaneGeometry(700, 700),
         new THREE.MeshStandardMaterial({ color: 0x14100f, roughness: 0.96 })
@@ -311,7 +382,6 @@
       ground.position.y = -0.02;
       DRESS.add(ground);
 
-      // failing megatron screens — flickering emissive slabs along the strip
       var screenMats = [];
       var scrGeo = new THREE.PlaneGeometry(34, 16);
       for (var i = 0; i < 7; i++) {
@@ -322,7 +392,6 @@
         s.position.set(side * (60 + Math.random() * 70), 10 + Math.random() * 14, -90 - (i * 55) + Math.random() * 30);
         s.rotation.y = (side < 0 ? 1 : -1) * (0.5 + Math.random() * 0.25);
         DRESS.add(s);
-        // scaffold behind each screen
         var post = new THREE.Mesh(
           new THREE.BoxGeometry(0.8, 18, 0.8),
           new THREE.MeshStandardMaterial({ color: 0x2b2f38, roughness: 0.8, metalness: 0.6 })
@@ -332,7 +401,30 @@
       }
       DRESS.userData.screenMats = screenMats;
 
-      // neon sign glow strips hanging over the field
+      // possessible relic-billboards: three broken holo-boards on the field
+      var holoSpots = [[-30, -30, 0.4], [26, -52, -0.5], [2, -110, 0.05]];
+      for (var h = 0; h < holoSpots.length; h++) {
+        var hs = holoSpots[h];
+        var frame = new THREE.Mesh(
+          new THREE.BoxGeometry(10, 6, 0.7),
+          new THREE.MeshStandardMaterial({ color: 0x232833, roughness: 0.7, metalness: 0.5 })
+        );
+        frame.position.set(hs[0], 4.4, hs[1]);
+        frame.rotation.y = hs[2];
+        DRESS.add(frame);
+        var faceMat = new THREE.MeshBasicMaterial({ color: 0x0e1a24, transparent: true, opacity: 0.85 });
+        var face = new THREE.Mesh(new THREE.PlaneGeometry(9, 5), faceMat);
+        face.position.set(0, 0, 0.4);
+        frame.add(face);
+        var pole = new THREE.Mesh(
+          new THREE.BoxGeometry(1, 4.4, 1),
+          new THREE.MeshStandardMaterial({ color: 0x2b2f38, roughness: 0.85 })
+        );
+        pole.position.set(hs[0], 2.2 - 0.02, hs[1]);
+        DRESS.add(pole);
+        HOLOGRAMS.push({ mesh: frame, face: face, mat: faceMat, pos: frame.position.clone() });
+      }
+
       for (var j = 0; j < 10; j++) {
         var strip = new THREE.Mesh(
           new THREE.BoxGeometry(0.5, 0.5, 6 + Math.random() * 10),
@@ -345,7 +437,6 @@
         DRESS.add(strip);
       }
 
-      // rusted Hollywood letters (9 slabs scattered, half-fallen)
       var letterMat = new THREE.MeshStandardMaterial({ color: 0x4a4038, roughness: 0.85, metalness: 0.55 });
       for (var k = 0; k < 9; k++) {
         var L = new THREE.Mesh(new THREE.BoxGeometry(4, 14, 1.2), letterMat);
@@ -355,7 +446,6 @@
         DRESS.add(L);
       }
 
-      // drifting dust (souls' ashes)
       var dustGeo = new THREE.BufferGeometry();
       var DN = 900, dp = new Float32Array(DN * 3);
       for (var d = 0; d < DN; d++) {
@@ -370,7 +460,6 @@
       DRESS.add(dust);
       DRESS.userData.dust = dust;
 
-      // concept-art backdrop at the far end of the killing field
       new THREE.TextureLoader().load('thehunters/thehuntersbackground.jpg', function (tex) {
         tex.colorSpace = THREE.SRGBColorSpace;
         var hgt = 150, wid = hgt * (tex.image.width / tex.image.height);
@@ -386,7 +475,7 @@
 
     /* ---------- the soul (player) ---------- */
     var soul = new THREE.Group();
-    var soulBody = null;                 // the loaded soul.glb model
+    var soulBody = null;
     var halo = new THREE.Mesh(
       new THREE.SphereGeometry(1.05, 24, 18),
       new THREE.MeshBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0.20, blending: THREE.AdditiveBlending, depthWrite: false })
@@ -395,6 +484,24 @@
     var soulLight = new THREE.PointLight(0x66ccff, 30, 26, 2.0);
     soul.add(soulLight);
     scene.add(soul);
+
+    /* ---------- essence wisps (Soul Vision pickups) ---------- */
+    var WISPS = [];
+    (function makeWisps() {
+      var spots = [[-60, -80], [55, -95], [0, -20], [-45, -140], [70, -40], [-15, -60]];
+      for (var i = 0; i < spots.length; i++) {
+        var w = new THREE.Mesh(
+          new THREE.IcosahedronGeometry(0.5, 1),
+          new THREE.MeshBasicMaterial({ color: 0x7de8ff, transparent: true, opacity: 0.9 })
+        );
+        var glow = new THREE.PointLight(0x7de8ff, 8, 8, 2.0);
+        w.add(glow);
+        w.position.set(spots[i][0], 1.6, spots[i][1]);
+        w.visible = false;   // revealed by Soul Vision (or proximity)
+        scene.add(w);
+        WISPS.push({ mesh: w, taken: false, respawn: 0, spot: spots[i] });
+      }
+    })();
 
     /* ---------- loading the gods ---------- */
     var BASE = 'thehunters/';
@@ -415,12 +522,10 @@
 
     var overlayText = document.getElementById('overlay-text');
 
-    // skinned meshes must never frustum-cull (bind-pose boxes lie)
     function noCull(root) {
       root.traverse(function (o) { if (o.isSkinnedMesh || o.isMesh) o.frustumCulled = false; });
     }
     function skinnedFeet(root) {
-      // lowest animated vertex Y with root parked at y=0 (one-time measure)
       root.updateMatrixWorld(true);
       var pos = root.position.clone();
       root.position.set(0, 0, 0);
@@ -461,10 +566,14 @@
     }
 
     var gods = [];
+    // per-god behavior. cone = sight half-angle; personality drives the AI.
     var GOD_DEFS = [
-      { file: 'god1.glb', key: 'g1', clipPref: 'Armature|', height: 44, x: -40, z: -72, yaw:  0.3, tint: 0xff4055 },
-      { file: 'god2.glb', key: 'g2', clipPref: 'mixamo.com',  height: 44, x:   0, z: -58, yaw:  0.0,  tint: 0xffb040 },
-      { file: 'god3.glb', key: 'g3', clipPref: 'mixamo.com.001', height: 48, x: 42, z: -80, yaw: -0.32, tint: 0x30d0ff }
+      { file: 'god1.glb', key: 'g1', height: 44, x: -40, z: -72, tint: 0xff4055, name: 'THE GLADIATOR',
+        ai: 'patrol',  patrol: { cx: -30, cz: -80, rx: 55, rz: 34, speed: 1.0 } },
+      { file: 'god2.glb', key: 'g2', height: 44, x:   0, z: -58, tint: 0xffb040, name: 'THE EXECUTIONER',
+        ai: 'hunt',    stompRange: 15, stompCd: 5.5 },
+      { file: 'god3.glb', key: 'g3', height: 48, x:  42, z: -80, tint: 0x30d0ff, name: 'THE WATCHER',
+        ai: 'scan',    scan: { cx: 40, cz: -80, span: 60, speed: 0.45 }, stompRange: 20, stompCd: 7 }
     ];
 
     Promise.all([
@@ -478,13 +587,12 @@
       noCull(sm);
       var sb = new THREE.Box3().setFromObject(sm);
       var sh = Math.max(0.001, sb.max.y - sb.min.y);
-      sm.scale.setScalar(1.5 / sh);           // soul stands ~1.5 units
+      sm.scale.setScalar(1.5 / sh);
       sb.setFromObject(sm);
       var sc = sb.getCenter(new THREE.Vector3());
       sm.position.x -= sc.x; sm.position.z -= sc.z; sm.position.y -= sb.min.y;
       soul.add(sm);
       soulBody = sm;
-      // the soul is a lantern of essence — give the model its own glow
       sm.traverse(function (o) {
         if (o.isMesh && o.material) {
           var mats = Array.isArray(o.material) ? o.material : [o.material];
@@ -500,31 +608,44 @@
         var root = g.scene;
         noCull(root);
 
-        // normalize height (bbox in bind pose is fine for colossi sizing)
         var box = new THREE.Box3().setFromObject(root);
         var h = Math.max(0.001, box.max.y - box.min.y);
-        var s = def.height / h;
-        root.scale.setScalar(s);
+        root.scale.setScalar(def.height / h);
 
         scene.add(root);
-        // measure feet AFTER scale, then place
         var feet = skinnedFeet(root);
         root.position.set(def.x, -feet, def.z);
-        root.rotation.y = def.yaw;
 
+        // clips: idle / walk / attack (clean names from the exporter)
         var mixer = new THREE.AnimationMixer(root);
-        var clip = null;
-        if (g.animations.length) {
-          clip = g.animations.find(function (a) { return a.name.indexOf(def.clipPref) === 0; }) || g.animations[0];
-        }
-        if (clip) mixer.clipAction(clip).play();
+        var acts = {};
+        g.animations.forEach(function (a) { acts[a.name] = a; });
+        var idleC = acts['idle'] || g.animations[0];
+        var walkC = acts['walk'];
+        var atkC  = acts['attack'];
+        if (idleC) mixer.clipAction(idleC).play();
 
         // dread aura light under each god
         var aura = new THREE.PointLight(def.tint, 60, 90, 2.0);
-        aura.position.set(def.x, 6, def.z);
+        aura.position.copy(root.position); aura.position.y = 6;
         scene.add(aura);
 
-        gods.push({ root: root, mixer: mixer, def: def, feet: feet });
+        // sight-cone footprint (revealed by Soul Vision)
+        var coneFoot = new THREE.Mesh(
+          new THREE.RingGeometry(2, 46, 22, 1, Math.PI - 0.44, 0.88),
+          new THREE.MeshBasicMaterial({ color: def.tint, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false })
+        );
+        coneFoot.rotation.x = -Math.PI / 2;
+        coneFoot.visible = false;
+        scene.add(coneFoot);
+
+        gods.push({
+          root: root, mixer: mixer, def: def, feet: feet, aura: aura,
+          clips: { idle: idleC, walk: walkC, attack: atkC },
+          state: 'idle', stateT: 0, yaw: def.yaw || 0, targetYaw: def.yaw || 0,
+          coneFoot: coneFoot, stompCd: 0, attackDone: false,
+          patrolPhase: Math.random() * Math.PI * 2
+        });
       });
 
       overlayText.textContent = 'The gods stand. The cameras are rolling.';
@@ -537,22 +658,23 @@
     });
 
     /* ---------- input ---------- */
-    var input = { x: 0, z: 0, dash: false };
+    var input = { x: 0, z: 0 };
     var keys = {};
     window.addEventListener('keydown', function (e) {
       keys[e.code] = true;
       if (e.code === 'Space') { e.preventDefault(); tryDash(); }
+      if (e.code === 'KeyQ') tryVision();
+      if (e.code === 'KeyE') tryPossess();
       audio();
     });
     window.addEventListener('keyup', function (e) { keys[e.code] = false; });
 
-    var _prevPadA = false, _prevPadX = false;
+    var _prevPad = [false, false, false, false];
     window.addEventListener('gamepadconnected', function () {
       document.getElementById('hint').textContent =
-        'WASD / LEFT STICK to drift · SPACE / A / X to dash';
+        'WASD / LEFT STICK move · A dash · X vision · B echo';
     });
 
-    // touch: joystick on the left 45%, dash button
     var isTouch = ('ontouchstart' in window);
     if (isTouch) document.body.classList.add('touch');
     var stick = document.getElementById('stick'), knob = document.getElementById('knob');
@@ -594,25 +716,96 @@
     }
     stage.addEventListener('touchend', endTouch);
     stage.addEventListener('touchcancel', endTouch);
-    document.getElementById('dash-btn').addEventListener('touchstart', function (e) {
-      e.preventDefault(); tryDash();
-    });
+    document.getElementById('dash-btn').addEventListener('touchstart', function (e) { e.preventDefault(); tryDash(); });
+    document.getElementById('vision-btn').addEventListener('touchstart', function (e) { e.preventDefault(); tryVision(); });
+    document.getElementById('echo-btn').addEventListener('touchstart', function (e) { e.preventDefault(); tryPossess(); });
 
     function tryDash() {
       if (!G.running || G.over || G.dashCd > 0 || G.essence < 12) return;
       G.dashCd = 1.6; G.dashT = 0.28; G.essence = Math.max(1, G.essence - 12);
       sfx.dash();
     }
+    function tryVision() {
+      if (!G.running || G.over || G.visionCd > 0) return;
+      G.visionCd = 6; G.visionT = 3.2;
+      sfx.vision();
+    }
+    function tryPossess() {
+      if (!G.running || G.over || G.echoCd > 0) return;
+      var best = null, bd = 30;
+      for (var i = 0; i < HOLOGRAMS.length; i++) {
+        var d = soul.position.distanceTo(HOLOGRAMS[i].pos);
+        if (d < bd) { bd = d; best = HOLOGRAMS[i]; }
+      }
+      if (!best) { tone(160, 120, 0.2, 'square', 0.08); return; }
+      G.echoCd = 12; G.echoT = 5.5; G.echoPoint = best.pos.clone();
+      sfx.possess();
+      chyron('ECHO POSSESSION — THE GAZE TURNS TO THE LIGHT');
+    }
 
-    /* ---------- hunt logic: sight cones + stomp danger ---------- */
-    // A god "sees" the soul if it is within its forward cone and distance.
-    // SEEN drains essence; essence also drains slowly inside a god's aura.
-    var GOD_SIGHT = { dist: 46, angle: 0.52 };   // forward-cone params
-    var AURA_DIST = 16;
+    /* ---------- shockwaves / collapse ---------- */
+    var WAVES = [];    // expanding ground rings that hurt
+    var RUBBLE = [];   // landed debris
+    function spawnWave(pos, maxR, dmg) {
+      var ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.9, 1.6, 40),
+        new THREE.MeshBasicMaterial({ color: 0xffb040, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(pos.x, 0.12, pos.z);
+      scene.add(ring);
+      WAVES.push({ mesh: ring, r: 1, maxR: maxR, dmg: dmg, hit: false });
+      sfx.stomp();
+      G.shake = Math.max(G.shake, 0.55);
+    }
+    function spawnCollapse(nearPlayer) {
+      var px, pz;
+      if (nearPlayer && Math.random() < 0.6) {
+        px = soul.position.x + (Math.random() - 0.5) * 26;
+        pz = soul.position.z + (Math.random() - 0.5) * 26;
+      } else {
+        px = (Math.random() - 0.5) * 180;
+        pz = 10 - Math.random() * 190;
+      }
+      px = THREE.MathUtils.clamp(px, -110, 110);
+      pz = THREE.MathUtils.clamp(pz, -190, 16);
+      var warn = new THREE.Mesh(
+        new THREE.RingGeometry(4.6, 6, 36),
+        new THREE.MeshBasicMaterial({ color: 0xff4055, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false })
+      );
+      warn.rotation.x = -Math.PI / 2;
+      warn.position.set(px, 0.1, pz);
+      scene.add(warn);
+      var slab = new THREE.Mesh(
+        new THREE.BoxGeometry(3 + Math.random() * 3, 1.2, 2 + Math.random() * 3),
+        new THREE.MeshStandardMaterial({ color: 0x2a2622, roughness: 0.9 })
+      );
+      slab.position.set(px + (Math.random() - 0.5) * 4, 70, pz + (Math.random() - 0.5) * 4);
+      slab.rotation.set(Math.random(), Math.random(), Math.random());
+      scene.add(slab);
+      COLLAPSES.push({ warn: warn, slab: slab, t: 0, x: px, z: pz });
+      sfx.warn();
+      chyron('STRUCTURAL COLLAPSE — SPONSORS SEND REGARDS');
+    }
+    var COLLAPSES = [];
 
-    function godForward(gd) {
-      // gods face +Z toward the boulevard center, rotated by def.yaw
-      return new THREE.Vector3(Math.sin(gd.root.rotation.y), 0, Math.cos(gd.root.rotation.y));
+    /* ---------- hunt logic ---------- */
+    var AURA_HIT_DRAIN = 30, SEEN_DRAIN = 13, REGEN = 7;
+
+    function godSight(gd) {
+      var t = TIERS[G.tier];
+      var dist = 46 + G.tier * 3;
+      var angle = t.cone;
+      // echo possession: gaze pulled to the hologram
+      var look = null;
+      if (G.echoT > 0 && G.echoPoint) look = G.echoPoint;
+      var fwd;
+      if (look) {
+        fwd = look.clone().sub(gd.root.position); fwd.y = 0; fwd.normalize();
+      } else {
+        fwd = new THREE.Vector3(Math.sin(gd.root.rotation.y), 0, Math.cos(gd.root.rotation.y));
+      }
+      return { dist: dist, angle: angle, fwd: fwd };
     }
 
     function evaluateSeen() {
@@ -622,11 +815,11 @@
         var gd = gods[i];
         var to = sp.clone().sub(gd.root.position); to.y = 0;
         var dist = to.length();
-        if (dist < AURA_DIST) return { god: gd, aura: true, dist: dist };
-        var fwd = godForward(gd);
-        if (dist < GOD_SIGHT.dist) {
-          var dot = to.normalize().dot(fwd);
-          if (dot > Math.cos(GOD_SIGHT.angle)) seenBy = { god: gd, aura: false, dist: dist };
+        if (dist < TIERS[G.tier].aura) return { god: gd, aura: true, dist: dist };
+        var S = godSight(gd);
+        if (dist < S.dist) {
+          var dot = to.normalize().dot(S.fwd);
+          if (dot > Math.cos(S.angle)) seenBy = { god: gd, aura: false, dist: dist };
         }
       }
       return seenBy;
@@ -648,12 +841,143 @@
       var status = document.getElementById('status-line');
       status.textContent = G.seen ? 'SEEN — RUN' : 'UNSEEN';
       status.style.color = G.seen ? '#ff4d5e' : '#8aa5c8';
+      var tier = TIERS[G.tier];
+      document.getElementById('crowd-tier').textContent = tier.name;
+      document.getElementById('crowd-tier').style.color = tier.col;
+      var frac = G.tier / (TIERS.length - 1);
+      document.getElementById('crowd-fill').style.width = Math.round(18 + frac * 82) + '%';
+      document.getElementById('riot-vignette').style.opacity = G.tier >= 3 ? 0.85 : 0;
     }
     function centerMsg(txt, hold) {
       var el = document.getElementById('center-msg');
       el.textContent = txt; el.classList.add('show');
       clearTimeout(centerMsg._t);
       centerMsg._t = setTimeout(function () { el.classList.remove('show'); }, hold || 1600);
+    }
+    var TAUNTS = [
+      'DO NOT BLINK, LITTLE SOUL — THE FEED IS LIVE',
+      'RATINGS SPIKE WHEN YOU SCREAM',
+      'THE GODS THANK YOU FOR YOUR VIEWERSHIP',
+      'TONIGHT\'S EPISODE: YOU',
+      'A SPONSOR WANTS YOUR LAST MOMENT IN SLOW MOTION',
+      'THE CROWD DEMANDS A CHASE',
+      'YOU ARE THE COMMERCIAL BREAK'
+    ];
+    function chyron(txt) {
+      var el = document.getElementById('chyron');
+      el.textContent = txt; el.classList.add('show');
+      clearTimeout(chyron._t);
+      chyron._t = setTimeout(function () { el.classList.remove('show'); }, 2600);
+    }
+
+    /* ---------- god AI ---------- */
+    function setGodAnim(gd, name) {
+      if (!gd.clips[name] || gd._anim === name) return;
+      gd._anim = name;
+      gd.mixer.stopAllAction();
+      gd.mixer.clipAction(gd.clips[name]).reset().play();
+    }
+
+    function updateGods(dt) {
+      var tier = TIERS[G.tier];
+      for (var i = 0; i < gods.length; i++) {
+        var gd = gods[i];
+        var def = gd.def;
+        var pos = gd.root.position;
+        gd.stompCd -= dt;
+        gd.stateT += dt;
+
+        // gaze target during echo possession: face the hologram
+        if (G.echoT > 0 && G.echoPoint) {
+          gd.targetYaw = Math.atan2(G.echoPoint.x - pos.x, G.echoPoint.z - pos.z);
+        }
+
+        if (def.ai === 'patrol') {
+          // THE GLADIATOR: roving elliptical patrol; gait speed scales with tier
+          if (G.echoT <= 0) {
+            gd.patrolPhase += dt * 0.11 * (0.6 + tier.walk * 0.35);
+            var tx = def.patrol.cx + Math.cos(gd.patrolPhase) * def.patrol.rx;
+            var tz = def.patrol.cz + Math.sin(gd.patrolPhase) * def.patrol.rz;
+            var dx = tx - pos.x, dz = tz - pos.z;
+            var d = Math.hypot(dx, dz);
+            if (d > 1) {
+              gd.targetYaw = Math.atan2(dx, dz);
+              var sp = 3.2 + tier.walk * 2.4;
+              pos.x += (dx / d) * sp * dt;
+              pos.z += (dz / d) * sp * dt;
+              setGodAnim(gd, 'walk');
+            } else setGodAnim(gd, 'idle');
+          } else setGodAnim(gd, 'walk');
+
+        } else if (def.ai === 'hunt') {
+          // THE EXECUTIONER: closes on the player when they draw attention
+          var d2 = soul.position.clone().sub(pos); d2.y = 0;
+          var dist2 = d2.length();
+          var alerted = G.seen || dist2 < 70;
+          if (gd.state !== 'attack') {
+            if (alerted && dist2 > def.stompRange * 0.8) {
+              d2.normalize();
+              gd.targetYaw = Math.atan2(d2.x, d2.z);
+              var hs = 4.4 + tier.walk * 2.6;
+              pos.x += d2.x * hs * dt;
+              pos.z += d2.z * hs * dt;
+              setGodAnim(gd, 'walk');
+            } else if (alerted && dist2 <= def.stompRange && gd.stompCd <= 0) {
+              gd.state = 'attack'; gd.stateT = 0; gd.attackDone = false;
+              setGodAnim(gd, 'attack');
+            } else setGodAnim(gd, 'idle');
+          }
+          if (gd.state === 'attack') {
+            // hit moment mid-anim (~0.8s of the 1.67s clip): shockwave
+            if (!gd.attackDone && gd.stateT >= 0.8) {
+              gd.attackDone = true;
+              spawnWave(pos, 20, 30);
+              gd.stompCd = def.stompCd;
+            }
+            if (gd.stateT >= 1.67) { gd.state = 'idle'; }
+          }
+
+        } else { // scan — THE WATCHER: slow traverse, wide gaze, close-range slam
+          if (G.echoT <= 0) {
+            var sx = def.scan.cx + Math.sin(clock.elapsedTime * def.scan.speed * 0.22) * def.scan.span * 0.5;
+            var dx3 = sx - pos.x;
+            if (Math.abs(dx3) > 0.6) {
+              pos.x += Math.sign(dx3) * Math.min(Math.abs(dx3), (2.6 + tier.walk * 1.8) * dt);
+              gd.targetYaw = Math.atan2(dx3, 0.0001) * 0.25;   // gentle angle while sliding
+              setGodAnim(gd, 'walk');
+            } else setGodAnim(gd, 'idle');
+          } else setGodAnim(gd, 'idle');
+          var d3 = soul.position.clone().sub(pos); d3.y = 0;
+          var dist3 = d3.length();
+          if (dist3 < def.stompRange && gd.stompCd <= 0 && gd.state !== 'attack') {
+            gd.state = 'attack'; gd.stateT = 0; gd.attackDone = false;
+            setGodAnim(gd, 'attack');
+          }
+          if (gd.state === 'attack') {
+            if (!gd.attackDone && gd.stateT >= 0.8) {
+              gd.attackDone = true;
+              spawnWave(pos, 15, 24);
+              gd.stompCd = def.stompCd;
+            }
+            if (gd.stateT >= 1.67) gd.state = 'idle';
+          }
+        }
+
+        // smooth turn toward target yaw
+        var dy = ((gd.targetYaw - gd.root.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+        gd.root.rotation.y += dy * Math.min(1, dt * 1.6);
+        pos.y = -gd.feet;
+
+        gd.aura.position.set(pos.x, 6, pos.z);
+
+        // sight-cone footprint follows the god (visible during Soul Vision)
+        var S = godSight(gd);
+        gd.coneFoot.position.set(pos.x, 0.14, pos.z);
+        gd.coneFoot.rotation.z = -gd.root.rotation.y;
+        gd.coneFoot.scale.setScalar(S.dist / 46);
+        gd.coneFoot.material.opacity = G.visionT > 0 ? 0.20 : 0;
+        gd.coneFoot.visible = G.visionT > 0;
+      }
     }
 
     /* ---------- main loop ---------- */
@@ -668,10 +992,8 @@
       var dt = Math.min(clock.getDelta(), 0.05);
       var t = clock.elapsedTime;
 
-      // gods idle-animate always (even on menu — they loom)
       for (var i = 0; i < gods.length; i++) gods[i].mixer.update(dt);
 
-      // flicker the megatrons + neon
       DRESS.userData.screenMats.forEach(function (m, k) {
         var f = 0.12 + 0.10 * Math.sin(t * (2 + k) + k * 7) + (Math.random() < 0.02 ? -0.5 : 0);
         m.color.setRGB(0.04 + f * 1.2, 0.05 + f * 0.5, 0.07 + f * 0.3);
@@ -679,14 +1001,62 @@
       neonA.intensity = 220 + Math.sin(t * 13) * 60 + (Math.random() < 0.03 ? -160 : 0);
       DRESS.userData.dust.rotation.y += dt * 0.004;
 
-      // soul bob + halo pulse
       if (soulBody) soulBody.position.y = Math.sin(t * 2.4) * 0.12;
       halo.material.opacity = 0.16 + Math.sin(t * 3.1) * 0.06;
 
+      // wisps bob; reveal when vision active or soul close
+      for (var w = 0; w < WISPS.length; w++) {
+        var wp = WISPS[w];
+        if (wp.taken) {
+          wp.respawn -= dt;
+          if (wp.respawn <= 0) {
+            wp.taken = false;
+            wp.mesh.position.set(wp.spot[0] + (Math.random() - 0.5) * 12, 1.6, wp.spot[1] + (Math.random() - 0.5) * 12);
+            wp.mesh.visible = false;
+          }
+          continue;
+        }
+        wp.mesh.rotation.y += dt * 2;
+        wp.mesh.position.y = 1.6 + Math.sin(t * 2 + w) * 0.35;
+        var near = wp.mesh.position.distanceTo(soul.position) < 7;
+        wp.mesh.visible = G.visionT > 0 || near;
+        if (near && G.running && !G.over) {
+          wp.taken = true; wp.respawn = 15;
+          wp.mesh.visible = false;
+          G.essence = Math.min(G.maxEssence, G.essence + 8);
+          sfx.wisp();
+        }
+      }
+
+      // hologram flare during possession
+      for (var hh = 0; hh < HOLOGRAMS.length; hh++) {
+        var hg = HOLOGRAMS[hh];
+        var active = G.echoT > 0 && G.echoPoint && hg.pos.distanceTo(G.echoPoint) < 1;
+        hg.mat.color.setHex(active ? 0x66e0ff : 0x0e1a24);
+        hg.mat.opacity = active ? 0.5 + Math.sin(t * 9) * 0.25 : 0.85;
+      }
+
+      // timers
+      if (G.dashT > 0) G.dashT -= dt;
+      if (G.dashCd > 0) G.dashCd -= dt;
+      if (G.visionT > 0) G.visionT -= dt;
+      if (G.visionCd > 0) G.visionCd -= dt;
+      if (G.echoT > 0) G.echoT -= dt;
+      if (G.echoCd > 0) G.echoCd -= dt;
+      if (G.shake > 0) G.shake = Math.max(0, G.shake - dt * 1.8);
+
       if (G.running && !G.over) {
         G.t += dt;
-        // viewers tick up with survival (spectacle economics)
         G.viewers = 12 + Math.floor(G.t * 37 + Math.pow(G.t, 1.8));
+
+        // crowd tier progression
+        var nt = tierForViewers(G.viewers);
+        if (nt !== G.tier) {
+          G.tier = nt;
+          sfx.tierUp();
+          chyron(TIERS[nt].name + ' — THE CROWD ' + (nt >= 3 ? 'RIOTS' : 'GROWS'));
+          centerMsg(TIERS[nt].name, 1500);
+        }
 
         // input: touch + keyboard + gamepad
         var ix = input.x, iz = input.z;
@@ -703,13 +1073,17 @@
           }
           var aD = !!(gp.buttons[0] && gp.buttons[0].pressed);
           var xD = !!(gp.buttons[2] && gp.buttons[2].pressed);
-          if ((aD && !_prevPadA) || (xD && !_prevPadX)) tryDash();
-          _prevPadA = aD; _prevPadX = xD;
+          var bD = !!(gp.buttons[1] && gp.buttons[1].pressed);
+          var yD = !!(gp.buttons[3] && gp.buttons[3].pressed);
+          if (aD && !_prevPad[0]) tryDash();
+          if (xD && !_prevPad[1]) tryVision();
+          if (bD && !_prevPad[2]) tryPossess();
+          if (yD && !_prevPad[3]) tryVision();
+          _prevPad = [aD, xD, bD, yD];
         }
         var mag = Math.hypot(ix, iz);
         if (mag > 1) { ix /= mag; iz /= mag; }
 
-        // move: camera-relative (camera looks down -Z from behind the soul)
         var dashK = G.dashT > 0 ? DASH_MULT : 1;
         var move = new THREE.Vector3(ix, 0, iz);
         if (move.lengthSq() > 0.01) {
@@ -717,41 +1091,92 @@
         } else {
           vel.lerp(new THREE.Vector3(), 0.22);
         }
-        if (G.dashT > 0) G.dashT -= dt;
-        if (G.dashCd > 0) G.dashCd -= dt;
         soul.position.addScaledVector(vel, dt);
         soul.position.x = THREE.MathUtils.clamp(soul.position.x, -110, 110);
         soul.position.z = THREE.MathUtils.clamp(soul.position.z, -190, 16);
+
+        updateGods(dt);
+
+        // shockwaves
+        for (var wv = WAVES.length - 1; wv >= 0; wv--) {
+          var wave = WAVES[wv];
+          wave.r += wave.maxR * dt * 1.4;
+          wave.mesh.scale.setScalar(wave.r);
+          wave.mesh.material.opacity = Math.max(0, 0.85 * (1 - wave.r / wave.maxR));
+          if (!wave.hit) {
+            var dw = soul.position.clone().sub(wave.mesh.position); dw.y = 0;
+            if (dw.length() < wave.r + 1 && dw.length() > wave.r - 3.2) {
+              wave.hit = true;
+              G.essence -= wave.dmg;
+              sfx.hurt();
+              var fl = document.getElementById('dmg-flash');
+              fl.style.opacity = 0.85; setTimeout(function () { fl.style.opacity = 0; }, 150);
+              G.shake = Math.max(G.shake, 0.5);
+            }
+          }
+          if (wave.r >= wave.maxR) { scene.remove(wave.mesh); WAVES.splice(wv, 1); }
+        }
+
+        // collapse events
+        if (G.collapseT > 0) G.collapseT -= dt;
+        var tier2 = TIERS[G.tier];
+        if (G.collapseT <= 0) {
+          spawnCollapse(true);
+          var c0 = tier2.collapse;
+          G.collapseT = c0[0] + Math.random() * (c0[1] - c0[0]);
+        }
+        for (var cc = COLLAPSES.length - 1; cc >= 0; cc--) {
+          var c = COLLAPSES[cc];
+          c.t += dt;
+          c.warn.material.opacity = 0.4 + Math.sin(c.t * 14) * 0.3;
+          if (c.t < 1.4) {
+            c.slab.position.y = 70 * (1 - c.t / 1.4) + 1;
+          } else if (!c.landed) {
+            c.landed = true;
+            c.slab.position.y = 0.6;
+            spawnWave(new THREE.Vector3(c.x, 0, c.z), 12, 22);
+            sfx.collapse();
+          }
+          if (c.t > 1.4) c.warn.visible = false;
+          if (c.t > 8 && !c.sink) { c.sink = true; }
+          if (c.sink) {
+            c.slab.position.y -= dt * 0.8;
+            if (c.slab.position.y < -4) { scene.remove(c.slab); COLLAPSES.splice(cc, 1); }
+          }
+        }
 
         // hunt: essence economy
         var seenRes = evaluateSeen();
         var wasSeen = G.seen;
         G.seen = !!seenRes;
         if (G.seen) {
-          var drain = seenRes.aura ? 26 : 14;
-          G.essence -= drain * dt;
-          if (!wasSeen) sfx.seen();
+          G.seenT += dt;
+          G.essence -= (seenRes.aura ? AURA_HIT_DRAIN : SEEN_DRAIN) * dt;
+          if (!wasSeen) { sfx.seen(); if (G.seenT > 4) chyron(TAUNTS[Math.floor(Math.random() * TAUNTS.length)]); }
           if (seenRes.aura) {
-            // brushed by a god — flash
             var f = document.getElementById('dmg-flash');
-            f.style.opacity = 0.7; setTimeout(function () { f.style.opacity = 0; }, 130);
+            f.style.opacity = 0.7; setTimeout(function () { fl.style.opacity = 0; }, 130);
           }
+        } else {
+          G.seenT = 0;
         }
-        // death check BEFORE regen — regen must never mask a hit to zero
         if (G.essence <= 0) { G.essence = 0; endGame(); }
         else if (!G.seen) {
-          G.essence = Math.min(G.maxEssence, G.essence + 7 * dt);   // recover in the open
+          G.essence = Math.min(G.maxEssence, G.essence + REGEN * dt);
         }
 
-        // heartbeat tick when SEEN
         if (G.seen && Math.floor(G.t * 2) !== Math.floor((G.t - dt) * 2)) sfx.tick();
 
         renderHud();
+      } else {
+        updateGods(dt);   // gods roam even on the menu — they loom
       }
 
-      // camera: chase cam behind the soul, slight lag
+      // camera: chase cam + shake
+      var shakeX = G.shake > 0 ? (Math.random() - 0.5) * G.shake * 2 : 0;
+      var shakeY = G.shake > 0 ? (Math.random() - 0.5) * G.shake * 2 : 0;
       var camTarget = new THREE.Vector3(
-        soul.position.x * 0.9, soul.position.y + 7.5, soul.position.z + 13);
+        soul.position.x * 0.9 + shakeX, soul.position.y + 7.5 + shakeY, soul.position.z + 13);
       camPos.lerp(camTarget, 0.07);
       camera.position.copy(camPos);
       camLook.lerp(new THREE.Vector3(soul.position.x, soul.position.y + 2.5, soul.position.z - 6), 0.1);
@@ -768,10 +1193,21 @@
       soul.position.set(0, 0, 8);
       vel.set(0, 0, 0);
       G.running = true; G.over = false;
-      G.t = 0; G.essence = G.maxEssence; G.seen = false; G.viewers = 12;
+      G.t = 0; G.essence = G.maxEssence; G.seen = false; G.seenT = 0; G.viewers = 12;
+      G.tier = 0; G.collapseT = 18; G.visionT = 0; G.visionCd = 0; G.echoT = 0; G.echoCd = 0;
       sfx.start();
       centerMsg('RUN, SMALL SOUL', 2000);
+      chyron('LIVE FROM DEAD HOLLYWOOD — 12 VIEWERS');
       renderHud();
+    }
+
+    function rankFor(t) {
+      if (t < 10) return 'EXTRA';
+      if (t < 25) return 'STUNT DOUBLE';
+      if (t < 45) return 'GUEST STAR';
+      if (t < 75) return 'SEASON REGULAR';
+      if (t < 120) return 'FRANCHISE FACE';
+      return 'PRIMETIME LEGEND';
     }
 
     function endGame() {
@@ -787,11 +1223,12 @@
 
     function showResult() {
       var r = document.getElementById('result');
+      document.getElementById('result-rank').textContent = 'RANK: ' + rankFor(G.t);
       document.getElementById('result-body').textContent =
         'The gods noticed you tonight, for ' + G.t.toFixed(1) +
         ' seconds. The broadcast cuts to a commercial. Somewhere, a rating spikes.';
       document.getElementById('result-score').textContent =
-        G.t.toFixed(1) + 's · ' + fmtViewers(G.viewers) + ' viewers';
+        G.t.toFixed(1) + 's · ' + fmtViewers(G.viewers) + ' viewers · ' + TIERS[G.tier].name;
       document.getElementById('result-note').textContent =
         G.t >= G.best ? 'That was your longest life. The gods were entertained.'
                       : 'Best: ' + G.best.toFixed(1) + 's. Die better next time, soul.';
@@ -810,15 +1247,20 @@
     window.__hunters = {
       state: function () {
         return { running: G.running, over: G.over, t: +G.t.toFixed(1), essence: +G.essence.toFixed(0),
-                 viewers: G.viewers, seen: G.seen, gods: gods.length,
+                 viewers: G.viewers, seen: G.seen, tier: G.tier, gods: gods.length,
+                 wisps: WISPS.filter(function (w) { return !w.taken; }).length,
+                 waves: WAVES.length, collapses: COLLAPSES.length,
                  soul: [+soul.position.x.toFixed(1), +soul.position.z.toFixed(1)] };
       },
       start: startGame,
       hasModel: function () { return !!soulBody; },
+      clips: function () { return gods.map(function (g) { return Object.keys(g.clips).filter(function (k) { return g.clips[k]; }); }); },
       moveTo: function (x, z) { soul.position.set(x, 0, z); },
-      dash: tryDash,
+      dash: tryDash, vision: tryVision, possess: tryPossess,
       drain: function (n) { G.essence = Math.max(0, G.essence - n); },
-      time: function (n) { G.t = n; }
+      time: function (n) { G.t = n; G.viewers = 12 + Math.floor(G.t * 37 + Math.pow(G.t, 1.8)); },
+      collapse: function () { spawnCollapse(false); },
+      godPos: function (i) { var p = gods[i].root.position; return [+p.x.toFixed(1), +p.z.toFixed(1)]; }
     };
   </script>
 </body>
