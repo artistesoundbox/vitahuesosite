@@ -267,7 +267,7 @@
     };
     // Character heights (world units). Luna 1.7 / zombie 1.5 — the arena
     // reads better with smaller fighters and the camera pulled back.
-    var LUNA_H = 1.7, ZOMBIE_H = 1.5;
+    var LUNA_H = 1.55, ZOMBIE_H = 1.5;
     var WAVES = [
       { count: 3, speed: 1.7, hp: 1 },
       { count: 5, speed: 1.9, hp: 1 },
@@ -338,6 +338,34 @@
     }
 
     var arena, arenaCenter, arenaHalf, floorY = 0;
+    // Sand-level grounding: the arena GLB contains net/fence geometry ("setka")
+    // that dips BELOW the sand, so the scene-wide bbox min is a lie. Ground on
+    // what's actually underfoot via a downward raycast instead.
+    var sandY = 0;
+    var ray = new THREE.Raycaster();
+    var DOWN = new THREE.Vector3(0, -1, 0);
+    // Sample a 7x7 grid of downward rays over the central playfield once at
+    // load, keep the first FINITE face hit per column (the arena contains
+    // degenerate net geometry whose intersections return NaN), and take the
+    // median — the flat sand floor dominates, nets and NaN faces lose.
+    function computeSandY() {
+      var ys = [];
+      for (var gx = -3; gx <= 3; gx++) {
+        for (var gz = -3; gz <= 3; gz++) {
+          var x = arenaCenter.x + gx * (arenaHalf.x / 3);
+          var z = arenaCenter.z + gz * (arenaHalf.z / 3);
+          ray.set(new THREE.Vector3(x, arenaCenter.y + arenaHalf.y + 5, z), DOWN);
+          var hits = ray.intersectObject(arena, true);
+          for (var i = 0; i < hits.length; i++) {
+            if (hits[i].face && isFinite(hits[i].point.y)) { ys.push(hits[i].point.y); break; }
+          }
+        }
+      }
+      if (!ys.length) return floorY;
+      ys.sort(function (a, b) { return a - b; });
+      return ys[Math.floor(ys.length / 2)] + 0.02;
+    }
+    function groundY(x, z) { return sandY; }   // flat colosseum floor → constant
     var luna, lunaMix, clipsL = {}, lunaFootY = 0;
     var zombieProto, zombieClips = {}, zombieFootY = 0;
 
@@ -419,6 +447,7 @@
       arenaHalf = { x: size.x * 0.40, z: size.z * 0.40 };   // stay inside walls
       floorY = ab.min.y + 0.05;
       scene.add(arena);
+      sandY = computeSandY();   // true sand height (bbox min is a lie: nets dip below)
 
       // ---- luna (player) ----
       luna = gs[1].scene;
@@ -431,7 +460,7 @@
       lunaMix.update(0.016);
       luna.position.set(0, 0, 0);
       lunaFootY = measureFeet(luna);           // true skinned-feet offset
-      luna.position.set(arenaCenter.x, floorY - lunaFootY + 0.02, arenaCenter.z + 6);
+      luna.position.set(arenaCenter.x, groundY(arenaCenter.x, arenaCenter.z + 6) - lunaFootY + 0.02, arenaCenter.z + 6);
 
       // ---- zombie prototype ----
       zombieProto = gs[2].scene;
@@ -565,7 +594,7 @@
           z.scale.setScalar(zombieProto.scale.x * (isChamp ? 1.35 : 1));
           var px = arenaCenter.x + Math.cos(ang) * spawnEx * rad;
           var pz = arenaCenter.z + Math.sin(ang) * spawnEz * rad;
-          z.position.set(px, floorY - zombieFootY * (isChamp ? 1.35 : 1), pz);
+          z.position.set(px, groundY(px, pz) - zombieFootY * (isChamp ? 1.35 : 1), pz);
           scene.add(z);
           var mixer = new THREE.AnimationMixer(z);
           var st = {
@@ -622,6 +651,12 @@
     var curLuna = null;
     var clock = new THREE.Clock();
     var camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
+    var camZoom = 1;   // 0.6 close ↔ 2.4 pulled way back
+    window.addEventListener('wheel', function (e) {
+      if (!luna) return;
+      e.preventDefault();
+      camZoom = THREE.MathUtils.clamp(camZoom + (e.deltaY > 0 ? 0.12 : -0.12), 0.6, 2.4);
+    }, { passive: false });
 
     function animate() {
       requestAnimationFrame(animate);
@@ -648,6 +683,8 @@
         var rtDown = !!(gp.buttons[7] && gp.buttons[7].pressed);
         if ((aDown && !_prevPadA) || (rtDown && !_prevPadRT)) tryAttack();
         _prevPadA = aDown; _prevPadRT = rtDown;
+        if (gp.axes.length > 3 && Math.abs(gp.axes[3]) > 0.25)
+          camZoom = THREE.MathUtils.clamp(camZoom + gp.axes[3] * dt * 1.6, 0.6, 2.4);
       }
       var mag = Math.hypot(ix, iz);
       if (mag > 1) { ix /= mag; iz /= mag; }
@@ -674,7 +711,7 @@
           arenaCenter.x - arenaHalf.x, arenaCenter.x + arenaHalf.x);
         luna.position.z = THREE.MathUtils.clamp(luna.position.z,
           arenaCenter.z - arenaHalf.z, arenaCenter.z + arenaHalf.z);
-        luna.position.y = floorY - lunaFootY + 0.02;   // true feet on the sand
+        luna.position.y = groundY(luna.position.x, luna.position.z) - lunaFootY + 0.02;   // stand on what's beneath her
 
         // face movement direction
         var sp2d = Math.hypot(playerVel.x, playerVel.z);
@@ -783,10 +820,10 @@
         }
       }
 
-      // camera: fixed 3/4 view following luna
+      // camera: fixed 3/4 view following luna, zoomable (wheel / right stick)
       if (luna) {
         var camTarget = new THREE.Vector3(
-          luna.position.x + 13.5, floorY + 10.6, luna.position.z + 13.5);
+          luna.position.x + 13.5 * camZoom, floorY + 10.6 * camZoom, luna.position.z + 13.5 * camZoom);
         camPos.lerp(camTarget, 0.06);
         camera.position.copy(camPos);
         camLook.lerp(new THREE.Vector3(luna.position.x, floorY + 1.4, luna.position.z), 0.09);
@@ -841,7 +878,7 @@
       zombies.length = 0;
       G.hp = G.maxHp; G.kills = 0; G.xp = 0; G.wave = 0; G.over = false; G.running = false;
       document.getElementById('result').classList.add('hidden');
-      if (luna) { luna.position.set(arenaCenter.x, floorY - lunaFootY + 0.02, arenaCenter.z + 6); }
+      if (luna) { luna.position.set(arenaCenter.x, groundY(arenaCenter.x, arenaCenter.z + 6) - lunaFootY + 0.02, arenaCenter.z + 6); }
       startGame();
     });
 
@@ -889,6 +926,9 @@
             return [+z.root.position.x.toFixed(1), +z.root.position.z.toFixed(1), z.champ ? 1 : 0];
           }),
           luna: luna ? [+luna.position.x.toFixed(1), +luna.position.y.toFixed(2), +luna.position.z.toFixed(1)] : null,
+          dbg: { lunaFootY: +lunaFootY.toFixed(3), floorY: +floorY.toFixed(3), sandY: +sandY.toFixed(3),
+                 gSpawn: isFinite(groundY(arenaCenter.x, arenaCenter.z + 6)) ? +groundY(arenaCenter.x, arenaCenter.z + 6).toFixed(3) : 'NaN',
+                 hits: (function () { ray.set(new THREE.Vector3(arenaCenter.x, arenaCenter.y + arenaHalf.y + 5, arenaCenter.z + 6), DOWN); var h = ray.intersectObject(arena, true); return h.length + ' hits, first-y=' + (h[0] ? h[0].point.y : '-'); })() },
           visible: luna ? (luna.visible && (function () { var v = false; luna.traverse(function (o) { if (o.isSkinnedMesh && o.visible) v = true; }); return v; })()) : false
         };
       },
