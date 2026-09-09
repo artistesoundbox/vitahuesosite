@@ -281,11 +281,11 @@
     // reads better with smaller fighters and the camera pulled back.
     var LUNA_H = 1.55, ZOMBIE_H = 1.5;
     var WAVES = [
-      { count: 3, speed: 1.7, hp: 1 },
-      { count: 5, speed: 1.9, hp: 1 },
-      { count: 7, speed: 2.1, hp: 1, champ: 1 },
-      { count: 9, speed: 2.3, hp: 1, champ: 1 },
-      { count: 11, speed: 2.5, hp: 2, champ: 2 }
+      { count: 3, speed: 2.6, hp: 1 },
+      { count: 5, speed: 2.9, hp: 1 },
+      { count: 7, speed: 3.2, hp: 1, champ: 1 },
+      { count: 9, speed: 3.5, hp: 1, champ: 1 },
+      { count: 11, speed: 3.8, hp: 2, champ: 2 }
     ];
 
     /* ================= three.js scene ================= */
@@ -501,11 +501,39 @@
 
     var overlayText = document.getElementById('overlay-text');
 
+    /* Mixamo clips carry baked root motion: the walk's Hips drift around a
+       closed loop (marches forward, then snaps back to start each cycle) and
+       attack/move clips launch the Hips dozens of units up. Pinning every
+       Hips translation track to its bind pose turns them into clean
+       in-place animations — legs, arms and spine still animate fully. */
+    function pinHipsInPlace(gltf) {
+      if (!gltf || !gltf.animations) return;
+      var byName = {};
+      gltf.scene.traverse(function (o) { byName[o.name] = o; });
+      gltf.animations.forEach(function (clip) {
+        clip.tracks.forEach(function (tr) {
+          var dot = tr.name.lastIndexOf('.');
+          if (dot < 0 || tr.name.slice(dot) !== '.position') return;
+          var node = byName[tr.name.slice(0, dot)];
+          if (!node || !/Hips/i.test(node.name || '')) return;
+          var n = tr.times.length;
+          var vals = new Float32Array(n * 3);
+          for (var i = 0; i < n; i++) {
+            vals[i * 3] = node.position.x; vals[i * 3 + 1] = node.position.y; vals[i * 3 + 2] = node.position.z;
+          }
+          tr.values = vals;
+        });
+      });
+    }
+
     Promise.all([
       loadGlb('arena.glb', function (p) { loadPct.arena = p; progress(); }),
       loadGlb('luna.glb', function (p) { loadPct.luna = p; progress(); }),
       loadGlb('zombie.glb', function (p) { loadPct.zombie = p; progress(); })
     ]).then(function (gs) {
+      pinHipsInPlace(gs[1]);   // luna: walk-in-place, grounded attacks
+      pinHipsInPlace(gs[2]);   // zombie: march forward for real, no loop-snap
+
       // ---- arena ----
       arena = gs[0].scene;
       var ab = bboxOf(arena);
@@ -1151,7 +1179,16 @@
       },
       strike: function () { tryAttack(); },
       fast: function () {   // cheap probe: no raycast-heavy dbg work
+        var nd = null;
+        if (luna && zombies.length) {
+          for (var i = 0; i < zombies.length; i++) {
+            if (zombies[i].dead) continue;
+            var d = Math.hypot(zombies[i].root.position.x - luna.position.x, zombies[i].root.position.z - luna.position.z);
+            if (nd === null || d < nd) nd = d;
+          }
+        }
         return { atk: attacking, running: G.running, hp: G.hp, kills: G.kills, xp: G.xp, camZoom: +camZoom.toFixed(2),
+                 zNear: nd === null ? null : +nd.toFixed(2),
                  combo: { stage: combo.stage, window: +combo.window.toFixed(2), cooldown: +combo.cooldown.toFixed(2) } };
       },
       tune: function (patch) {

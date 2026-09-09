@@ -534,7 +534,7 @@
         NPC_SOULS.push({ grp: g, orb: orb, halo: h, yaw: Math.random() * Math.PI * 2,
                          speed: 1.6 + Math.random() * 2.6, turn: (Math.random() - 0.5) * 0.9,
                          bobPh: Math.random() * Math.PI * 2,
-                         baseY: (i % 2 === 0) ? 7 + Math.random() * 19 : 0.9,   // half the multitude drifts high
+                         baseY: (i % 2 === 0) ? 7 + Math.random() * 52 : 0.9,   // half the multitude drifts high — all the way up to near-orbit
                          state: 'roam', t: 0, respawn: 0 });
       }
     })();
@@ -596,7 +596,7 @@
         }
 
         // doom check: inside a god's ground reach
-        if (gdNear && dNear < reach && P.y < 26 && G.running) {
+        if (gdNear && dNear < reach && P.y < 46 && G.running) {   // high-flying souls escape the ground reach
           if (n.state !== 'doomed') { n.state = 'doomed'; n.t = 0; n.halo.material.color.setHex(0xff6a55); }
           var gp2 = gdNear.root.position;
           // panic-flee: steer away, faster
@@ -632,6 +632,31 @@
     /* ---------- loading the gods ---------- */
     var BASE = 'thehunters/';
     var loader = new GLTFLoader();
+
+    /* Mixamo clips carry baked root motion: walks drift around a closed loop
+       (march, then snap back to start each cycle) and attacks launch the
+       Hips dozens of units skyward. Pinning every Hips translation track to
+       its bind pose turns them into clean in-place animations — limbs still
+       animate fully. */
+    function pinHipsInPlace(gltf) {
+      if (!gltf || !gltf.animations) return;
+      var byName = {};
+      gltf.scene.traverse(function (o) { byName[o.name] = o; });
+      gltf.animations.forEach(function (clip) {
+        clip.tracks.forEach(function (tr) {
+          var dot = tr.name.lastIndexOf('.');
+          if (dot < 0 || tr.name.slice(dot) !== '.position') return;
+          var node = byName[tr.name.slice(0, dot)];
+          if (!node || !/Hips/i.test(node.name || '')) return;
+          var n = tr.times.length;
+          var vals = new Float32Array(n * 3);
+          for (var i = 0; i < n; i++) {
+            vals[i * 3] = node.position.x; vals[i * 3 + 1] = node.position.y; vals[i * 3 + 2] = node.position.z;
+          }
+          tr.values = vals;
+        });
+      });
+    }
     var loadPct = { soul: 0, g1: 0, g2: 0, g3: 0 };
     function loadGlb(name, key) {
       return new Promise(function (res, rej) {
@@ -708,6 +733,10 @@
       loadGlb('god2.glb', 'g2'),
       loadGlb('god3.glb', 'g3')
     ]).then(function (gltfs) {
+      pinHipsInPlace(gltfs[1]);   // gods: in-place walks, grounded attacks
+      pinHipsInPlace(gltfs[2]);
+      pinHipsInPlace(gltfs[3]);
+
       // ---- the soul model ----
       var sm = gltfs[0].scene;
       noCull(sm);
@@ -1308,7 +1337,7 @@
         // screen-up-depth — no axis swap needed, keyboard W/A/S/D, stick and
         // touch drag all read as direct screen-direction motion.
         var dashK = G.dashT > 0 ? DASH_MULT : 1;
-        var altK = 1 + (soul.position.y / 55) * 0.5;   // thin air: up to +50% speed
+        var altK = 1 + (soul.position.y / 75) * 0.5;   // thin air: up to +50% speed
         var move = new THREE.Vector3(ix, iy, iz);
         if (move.lengthSq() > 0.01) {
           vel.lerp(move.multiplyScalar(SPEED * dashK * altK), 0.2);
@@ -1318,7 +1347,7 @@
         soul.position.addScaledVector(vel, dt);
         soul.position.x = THREE.MathUtils.clamp(soul.position.x, -110, 110);
         soul.position.z = THREE.MathUtils.clamp(soul.position.z, -190, 16);
-        soul.position.y = THREE.MathUtils.clamp(soul.position.y, 0, 55);   // ceiling: top the gods' heads
+        soul.position.y = THREE.MathUtils.clamp(soul.position.y, 0, 75);   // ceiling: orbit the gods' faces (~45) and climb above them
         if (!G.flewOnce && soul.position.y > 8) {
           G.flewOnce = true;
           chyron('AIRBORNE — THE CAMERAS LOVE AN AERIAL SHOT');
