@@ -275,7 +275,7 @@
 
     var scene = new THREE.Scene();
     scene.background = new THREE.Color(0x05070c);
-    scene.fog = new THREE.Fog(0x05070c, 40, 160);
+    scene.fog = new THREE.Fog(0x05070c, 55, 380);   // far — the gods must loom
 
     var camera = new THREE.PerspectiveCamera(55, 1, 0.1, 500);
 
@@ -462,9 +462,9 @@
 
     var gods = [];
     var GOD_DEFS = [
-      { file: 'god1.glb', key: 'g1', clipPref: 'Armature|', height: 42, x: -46, z: -88, yaw:  0.28, tint: 0xff4055 },
-      { file: 'god2.glb', key: 'g2', clipPref: 'mixamo.com',  height: 42, x:   0, z: -70, yaw:  0.0,  tint: 0xffb040 },
-      { file: 'god3.glb', key: 'g3', clipPref: 'mixamo.com.001', height: 46, x: 48, z: -95, yaw: -0.3, tint: 0x30d0ff }
+      { file: 'god1.glb', key: 'g1', clipPref: 'Armature|', height: 44, x: -40, z: -72, yaw:  0.3, tint: 0xff4055 },
+      { file: 'god2.glb', key: 'g2', clipPref: 'mixamo.com',  height: 44, x:   0, z: -58, yaw:  0.0,  tint: 0xffb040 },
+      { file: 'god3.glb', key: 'g3', clipPref: 'mixamo.com.001', height: 48, x: 42, z: -80, yaw: -0.32, tint: 0x30d0ff }
     ];
 
     Promise.all([
@@ -484,6 +484,15 @@
       sm.position.x -= sc.x; sm.position.z -= sc.z; sm.position.y -= sb.min.y;
       soul.add(sm);
       soulBody = sm;
+      // the soul is a lantern of essence — give the model its own glow
+      sm.traverse(function (o) {
+        if (o.isMesh && o.material) {
+          var mats = Array.isArray(o.material) ? o.material : [o.material];
+          mats.forEach(function (m) {
+            if (m.emissive) { m.emissive = new THREE.Color(0x2a4d66); m.emissiveIntensity = 1.6; }
+          });
+        }
+      });
 
       // ---- the gods ----
       gltfs.slice(1).forEach(function (g, i) {
