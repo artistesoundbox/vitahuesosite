@@ -580,6 +580,7 @@
     if (isTouch) document.body.classList.add('touch');
     var stick = document.getElementById('stick'), knob = document.getElementById('knob');
     var stickId = null, stickCx = 0, stickCy = 0;
+    var tapStart = 0;   // quick, still touch on the stage = attack (tap to strike)
     /* touch: finger anywhere on the stage = floating move stick (no zone) */
     stage.addEventListener('touchstart', function (e) {
       audio();
@@ -589,6 +590,7 @@
           stickId = t.identifier;
           var r = stage.getBoundingClientRect();
           stickCx = t.clientX; stickCy = t.clientY;
+          tapStart = performance.now();
           stick.style.left = (t.clientX - r.left - 54) + 'px';
           stick.style.bottom = (r.bottom - t.clientY - 54) + 'px';
           stick.style.opacity = 1;
@@ -610,8 +612,12 @@
     function endTouch(e) {
       for (var i = 0; i < e.changedTouches.length; i++) {
         if (e.changedTouches[i].identifier === stickId) {
+          // short + still = a TAP → strike; a drag moved too far to count
+          var isTap = performance.now() - tapStart < 220 &&
+                      Math.hypot(input.x, input.z) < 0.28;
           stickId = null; input.x = input.z = 0;
           knob.style.transform = 'translate(0,0)'; stick.style.opacity = 0;
+          if (isTap) tryAttack();
         }
       }
     }
@@ -985,7 +991,7 @@
     window.__battle = {
       state: function () {
         return {
-          hp: G.hp, wave: G.wave, kills: G.kills, xp: G.xp, zombies: zombies.length,
+          hp: G.hp, wave: G.wave, kills: G.kills, xp: G.xp, zombies: zombies.length, atk: attacking,
           zs: zombies.map(function (z) {
             return [+z.root.position.x.toFixed(1), +z.root.position.z.toFixed(1), z.champ ? 1 : 0];
           }),
