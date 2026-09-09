@@ -153,12 +153,12 @@
       pointer-events: auto; cursor: pointer;
     }
     #dash-btn { width: 84px !important; height: 84px !important; }
-    #fly-btns { position: absolute; left: 16px; bottom: 130px; display: none; flex-direction: column; gap: 10px; }
+    #fly-btns { position: absolute; right: 16px; bottom: 264px; display: none; flex-direction: column; gap: 10px; }
     body.touch #fly-btns { display: flex; }
     #fly-btns button {
-      width: 66px; height: 66px; border-radius: 50%;
+      width: 56px; height: 56px; border-radius: 50%;
       border: 1px solid rgba(140, 220, 255, 0.55); background: rgba(10, 26, 38, 0.5);
-      color: #cfeaff; font-size: 18px;
+      color: #cfeaff; font-size: 16px;
       pointer-events: auto; cursor: pointer;
     }
     #vision-btn { border-color: rgba(120, 220, 255, 0.55) !important; color: #bfeaff !important; background: rgba(8, 26, 40, 0.5) !important; }
@@ -775,8 +775,10 @@
     document.getElementById('echo-btn').addEventListener('touchstart', function (e) { e.preventDefault(); tryPossess(); });
     function bindFly(id, up) {   // hold-to-rise / hold-to-sink buttons
       var el = document.getElementById(id);
-      el.addEventListener('touchstart', function (e) { e.preventDefault(); if (up) flyHold.up = true; else flyHold.down = true; });
-      el.addEventListener('touchend', function (e) { e.preventDefault(); if (up) flyHold.up = false; else flyHold.down = false; });
+      // stopPropagation keeps the stage's virtual-stick handler from claiming
+      // this touch too (the buttons sit inside the left 45% stick zone)
+      el.addEventListener('touchstart', function (e) { e.preventDefault(); e.stopPropagation(); if (up) flyHold.up = true; else flyHold.down = true; });
+      el.addEventListener('touchend', function (e) { e.preventDefault(); e.stopPropagation(); if (up) flyHold.up = false; else flyHold.down = false; });
       el.addEventListener('touchcancel', function () { if (up) flyHold.up = false; else flyHold.down = false; });
     }
     bindFly('up-btn', true);
