@@ -153,14 +153,7 @@
       pointer-events: auto; cursor: pointer;
     }
     #dash-btn { width: 84px !important; height: 84px !important; }
-    #fly-btns { position: absolute; right: 16px; bottom: 264px; display: none; flex-direction: column; gap: 10px; }
-    body.touch #fly-btns { display: flex; }
-    #fly-btns button {
-      width: 56px; height: 56px; border-radius: 50%;
-      border: 1px solid rgba(140, 220, 255, 0.55); background: rgba(10, 26, 38, 0.5);
-      color: #cfeaff; font-size: 16px;
-      pointer-events: auto; cursor: pointer;
-    }
+    #fly-btns { display: none; }   /* retired: altitude is now the second finger */
     #vision-btn { border-color: rgba(120, 220, 255, 0.55) !important; color: #bfeaff !important; background: rgba(8, 26, 40, 0.5) !important; }
     #echo-btn   { border-color: rgba(180, 140, 255, 0.55) !important; color: #e4d6ff !important; background: rgba(24, 12, 46, 0.5) !important; }
 
@@ -244,10 +237,7 @@
           <button id="vision-btn">vision</button>
           <button id="echo-btn">echo</button>
         </div>
-        <div id="fly-btns">
-          <button id="up-btn">▲</button>
-          <button id="down-btn">▼</button>
-        </div>
+        <div id="fly-btns" hidden></div>
       </div>
       <div id="overlay">
         <h2>THE HUNT BEGINS</h2>
@@ -730,25 +720,33 @@
     });
 
     var isTouch = ('ontouchstart' in window);
-    if (isTouch) document.body.classList.add('touch');
+    if (isTouch) {
+      document.body.classList.add('touch');
+      document.getElementById('hint').textContent =
+        'drag anywhere to move · second finger slides up/down to fly · tap dash / vision / echo';
+    }
     var stick = document.getElementById('stick'), knob = document.getElementById('knob');
     var stickId = null, stickCx = 0, stickCy = 0;
+    var flyId = null, flyY = 0;   // second finger: altitude slider
+    /* ---------- touch: finger 1 anywhere = move · finger 2 slide = fly ---------- */
     stage.addEventListener('touchstart', function (e) {
       audio();
       for (var i = 0; i < e.changedTouches.length; i++) {
         var t = e.changedTouches[i];
-        if (stickId === null && t.clientX - stage.getBoundingClientRect().left < stage.clientWidth * 0.45) {
+        if (stickId === null) {              // FIRST finger: floating stick, anywhere on the stage
           stickId = t.identifier;
           var r = stage.getBoundingClientRect();
           stickCx = t.clientX; stickCy = t.clientY;
           stick.style.left = (t.clientX - r.left - 54) + 'px';
           stick.style.bottom = (r.bottom - t.clientY - 54) + 'px';
           stick.style.opacity = 1;
+        } else if (flyId === null) {         // SECOND finger: slide up/down for altitude
+          flyId = t.identifier;
+          flyY = t.clientY;
         }
       }
     }, { passive: true });
     stage.addEventListener('touchmove', function (e) {
-      if (stickId === null) return;
       for (var i = 0; i < e.changedTouches.length; i++) {
         var t = e.changedTouches[i];
         if (t.identifier === stickId) {
@@ -757,32 +755,31 @@
           var k = len > max ? max / len : 1;
           knob.style.transform = 'translate(' + dx * k + 'px,' + dy * k + 'px)';
           input.x = (dx * k) / max; input.z = (dy * k) / max;
+        } else if (t.identifier === flyId) {
+          flyHold.up = false; flyHold.down = false;
+          var dY = t.clientY - flyY;
+          if (dY < -6) flyHold.up = true;        // slide up → rise
+          else if (dY > 6) flyHold.down = true;  // slide down → sink
         }
       }
     }, { passive: true });
     function endTouch(e) {
       for (var i = 0; i < e.changedTouches.length; i++) {
-        if (e.changedTouches[i].identifier === stickId) {
+        var id = e.changedTouches[i].identifier;
+        if (id === stickId) {
           stickId = null; input.x = input.z = 0;
           knob.style.transform = 'translate(0,0)'; stick.style.opacity = 0;
+        } else if (id === flyId) {
+          flyId = null; flyHold.up = false; flyHold.down = false;
         }
       }
     }
     stage.addEventListener('touchend', endTouch);
     stage.addEventListener('touchcancel', endTouch);
-    document.getElementById('dash-btn').addEventListener('touchstart', function (e) { e.preventDefault(); tryDash(); });
-    document.getElementById('vision-btn').addEventListener('touchstart', function (e) { e.preventDefault(); tryVision(); });
-    document.getElementById('echo-btn').addEventListener('touchstart', function (e) { e.preventDefault(); tryPossess(); });
-    function bindFly(id, up) {   // hold-to-rise / hold-to-sink buttons
-      var el = document.getElementById(id);
-      // stopPropagation keeps the stage's virtual-stick handler from claiming
-      // this touch too (the buttons sit inside the left 45% stick zone)
-      el.addEventListener('touchstart', function (e) { e.preventDefault(); e.stopPropagation(); if (up) flyHold.up = true; else flyHold.down = true; });
-      el.addEventListener('touchend', function (e) { e.preventDefault(); e.stopPropagation(); if (up) flyHold.up = false; else flyHold.down = false; });
-      el.addEventListener('touchcancel', function () { if (up) flyHold.up = false; else flyHold.down = false; });
-    }
-    bindFly('up-btn', true);
-    bindFly('down-btn', false);
+    // action buttons claim their own touches so they never spawn the stick
+    document.getElementById('dash-btn').addEventListener('touchstart', function (e) { e.preventDefault(); e.stopPropagation(); tryDash(); });
+    document.getElementById('vision-btn').addEventListener('touchstart', function (e) { e.preventDefault(); e.stopPropagation(); tryVision(); });
+    document.getElementById('echo-btn').addEventListener('touchstart', function (e) { e.preventDefault(); e.stopPropagation(); tryPossess(); });
 
     function tryDash() {
       if (!G.running || G.over || G.dashCd > 0 || G.essence < 12) return;

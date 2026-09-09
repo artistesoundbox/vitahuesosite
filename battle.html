@@ -59,7 +59,7 @@
       border: 1px solid rgba(120, 180, 255, 0.25);
       box-shadow: 0 0 34px rgba(60, 120, 220, 0.25), inset 0 0 60px rgba(0,0,0,0.4);
       background: #060a12;
-      touch-action: pan-y;  /* pan-y keeps page scrolling alive on phones */
+      touch-action: none;   /* the stage owns its touches: finger anywhere steers Luna (page scrolls outside the canvas) */
     }
     #stage canvas { display: block; width: 100%; height: 100%; }
 
@@ -344,26 +344,34 @@
     var sandY = 0;
     var ray = new THREE.Raycaster();
     var DOWN = new THREE.Vector3(0, -1, 0);
-    // Sample a 7x7 grid of downward rays over the central playfield once at
-    // load, keep the first FINITE face hit per column (the arena contains
-    // degenerate net geometry whose intersections return NaN), and take the
-    // median — the flat sand floor dominates, nets and NaN faces lose.
+    // The arena GLB's nets/fences dip below the sand (bbox min lies), and its
+    // dense degenerate triangles poison raycasts (NaN points, 197k hits).
+    // So: find the FLOOR MESH itself — the mesh with the largest horizontal
+    // footprint whose center sits in the arena's lower half — and stand on
+    // its top surface.
     function computeSandY() {
-      var ys = [];
-      for (var gx = -3; gx <= 3; gx++) {
-        for (var gz = -3; gz <= 3; gz++) {
-          var x = arenaCenter.x + gx * (arenaHalf.x / 3);
-          var z = arenaCenter.z + gz * (arenaHalf.z / 3);
-          ray.set(new THREE.Vector3(x, arenaCenter.y + arenaHalf.y + 5, z), DOWN);
-          var hits = ray.intersectObject(arena, true);
-          for (var i = 0; i < hits.length; i++) {
-            if (hits[i].face && isFinite(hits[i].point.y)) { ys.push(hits[i].point.y); break; }
-          }
+      // Every Box3 in this GLB lies (NaN degenerate verts, nets below sand,
+      // junk planes above). Vertex-histogram instead: read raw vertex Ys
+      // under the real "world" node, skip non-finite, bucket at 0.05 —
+      // the flat sand floor dominates the count, nets/walls spread thin.
+      var floorRoot = arena;   // all meshes live directly under the scene (verified live: the 'world' GLB node is empty)
+      var counts = {};
+      var v = new THREE.Vector3();
+      floorRoot.traverse(function (o) {
+        if (!o.isMesh || !o.geometry || !o.geometry.attributes || !o.geometry.attributes.position) return;
+        o.updateWorldMatrix(true, false);
+        var pos = o.geometry.attributes.position;
+        var step = Math.max(1, Math.floor(pos.count / 8000));
+        for (var i = 0; i < pos.count; i += step) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+          if (!isFinite(v.y) || v.y > arenaCenter.y) continue;
+          var key = Math.round(v.y * 20) / 20;
+          counts[key] = (counts[key] || 0) + 1;
         }
-      }
-      if (!ys.length) return floorY;
-      ys.sort(function (a, b) { return a - b; });
-      return ys[Math.floor(ys.length / 2)] + 0.02;
+      });
+      var bestK = null, bestC = 0;
+      for (var k in counts) if (counts[k] > bestC) { bestC = counts[k]; bestK = parseFloat(k); }
+      return bestK !== null ? bestK + 0.02 : floorY;
     }
     function groundY(x, z) { return sandY; }   // flat colosseum floor → constant
     var luna, lunaMix, clipsL = {}, lunaFootY = 0;
@@ -432,6 +440,53 @@
       return isFinite(lowest) ? lowest : 0;
     }
 
+    // CPU-skin the animated mesh and return the true world-space vertical
+    // extent of the RENDERED character (bind boxes lie for Luna's rig).
+    // Returns null when the mesh gives us garbage.
+    function skinnedExtent(root) {
+      root.updateMatrixWorld(true);
+      var pos = root.position.clone();
+      root.position.set(0, 0, 0);
+      root.updateMatrixWorld(true);
+      var minY = Infinity, maxY = -Infinity;
+      var v = new THREE.Vector3();
+      root.traverse(function (o) {
+        if (!o.isSkinnedMesh || !o.geometry || !o.geometry.getVertexPosition) return;
+        var sk = o.skeleton;
+        if (sk) sk.update();
+        var bm = o.bindMatrix || new THREE.Matrix4();
+        var bmi = o.bindMatrixInverse || new THREE.Matrix4();
+        var si = o.geometry.attributes.skinIndex;
+        var sw = o.geometry.attributes.skinWeight;
+        if (!si || !sw) return;
+        var n = Math.min(o.geometry.attributes.position.count, 1500);
+        for (var i = 0; i < n; i++) {
+          o.geometry.getVertexPosition(i, v);
+          v.applyMatrix4(bm);
+          if (sk) {
+            var x = 0, y = 0, z = 0;
+            var idx = [si.getX(i), si.getY(i), si.getZ(i), si.getW(i)];
+            var wts = [sw.getX(i), sw.getY(i), sw.getZ(i), sw.getW(i)];
+            var m = sk.boneMatrices;
+            for (var k = 0; k < 4; k++) {
+              var w = wts[k]; if (!w) continue;
+              var off = idx[k] * 16;
+              x += w * (v.x * m[off]    + v.y * m[off+4]  + v.z * m[off+8]  + m[off+12]);
+              y += w * (v.x * m[off+1]  + v.y * m[off+5]  + v.z * m[off+9]  + m[off+13]);
+              z += w * (v.x * m[off+2]  + v.y * m[off+6]  + v.z * m[off+10] + m[off+14]);
+            }
+            v.set(x, y, z).applyMatrix4(bmi);
+          }
+          v.applyMatrix4(o.matrixWorld);
+          if (!isFinite(v.y)) continue;
+          minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y);
+        }
+      });
+      root.position.copy(pos);
+      root.updateMatrixWorld(true);
+      return (isFinite(minY) && isFinite(maxY) && maxY > minY) ? { minY: minY, maxY: maxY } : null;
+    }
+
     var overlayText = document.getElementById('overlay-text');
 
     Promise.all([
@@ -450,16 +505,24 @@
       sandY = computeSandY();   // true sand height (bbox min is a lie: nets dip below)
 
       // ---- luna (player) ----
+      // Her Mixamo bind pose lies to Box3 (huge model, wrong floor), so size
+      // and grounding both come from the REAL rendered skin, not the bbox.
       luna = gs[1].scene;
       noCull(luna);
-      var nl = normalizeHeight(luna, LUNA_H);
       scene.add(luna);
       lunaMix = new THREE.AnimationMixer(luna);
       gs[1].animations.forEach(function (a) { clipsL[a.name] = a; });
       if (clipsL['idle']) lunaMix.clipAction(clipsL['idle']).play();
       lunaMix.update(0.016);
       luna.position.set(0, 0, 0);
-      lunaFootY = measureFeet(luna);           // true skinned-feet offset
+      var ext = skinnedExtent(luna);
+      var bh = bboxOf(luna);                   // fallback measurement
+      var rawH = ext ? (ext.maxY - ext.minY) : Math.max(0.001, bh.max.y - bh.min.y);
+      var s = LUNA_H / rawH;
+      luna.scale.setScalar(s);
+      lunaMix.update(0.016);                   // re-pose bones at final scale
+      ext = skinnedExtent(luna);               // re-measure scaled feet
+      lunaFootY = ext ? ext.minY : (bboxOf(luna).min.y);
       luna.position.set(arenaCenter.x, groundY(arenaCenter.x, arenaCenter.z + 6) - lunaFootY + 0.02, arenaCenter.z + 6);
 
       // ---- zombie prototype ----
@@ -516,11 +579,12 @@
     if (isTouch) document.body.classList.add('touch');
     var stick = document.getElementById('stick'), knob = document.getElementById('knob');
     var stickId = null, stickCx = 0, stickCy = 0;
+    /* touch: finger anywhere on the stage = floating move stick (no zone) */
     stage.addEventListener('touchstart', function (e) {
       audio();
       for (var i = 0; i < e.changedTouches.length; i++) {
         var t = e.changedTouches[i];
-        if (stickId === null && t.clientX - stage.getBoundingClientRect().left < stage.clientWidth * 0.45) {
+        if (stickId === null) {
           stickId = t.identifier;
           var r = stage.getBoundingClientRect();
           stickCx = t.clientX; stickCy = t.clientY;
@@ -531,7 +595,6 @@
       }
     }, { passive: true });
     stage.addEventListener('touchmove', function (e) {
-      if (stickId === null) return;   // no stick drag → let the page pan
       for (var i = 0; i < e.changedTouches.length; i++) {
         var t = e.changedTouches[i];
         if (t.identifier === stickId) {
@@ -554,7 +617,7 @@
     stage.addEventListener('touchend', endTouch);
     stage.addEventListener('touchcancel', endTouch);
     document.getElementById('atk-btn').addEventListener('touchstart', function (e) {
-      e.preventDefault(); tryAttack();
+      e.preventDefault(); e.stopPropagation(); tryAttack();   // never spawns the stick
     });
 
     /* ---------- combat ---------- */
@@ -926,13 +989,42 @@
             return [+z.root.position.x.toFixed(1), +z.root.position.z.toFixed(1), z.champ ? 1 : 0];
           }),
           luna: luna ? [+luna.position.x.toFixed(1), +luna.position.y.toFixed(2), +luna.position.z.toFixed(1)] : null,
-          dbg: { lunaFootY: +lunaFootY.toFixed(3), floorY: +floorY.toFixed(3), sandY: +sandY.toFixed(3),
+          dbg: { lunaFootY: +lunaFootY.toFixed(3), floorY: +floorY.toFixed(3), sandY: +sandY.toFixed(3), lunaScale: luna ? +luna.scale.x.toFixed(3) : 0,
                  gSpawn: isFinite(groundY(arenaCenter.x, arenaCenter.z + 6)) ? +groundY(arenaCenter.x, arenaCenter.z + 6).toFixed(3) : 'NaN',
                  hits: (function () { ray.set(new THREE.Vector3(arenaCenter.x, arenaCenter.y + arenaHalf.y + 5, arenaCenter.z + 6), DOWN); var h = ray.intersectObject(arena, true); return h.length + ' hits, first-y=' + (h[0] ? h[0].point.y : '-'); })() },
           visible: luna ? (luna.visible && (function () { var v = false; luna.traverse(function (o) { if (o.isSkinnedMesh && o.visible) v = true; }); return v; })()) : false
         };
       },
       start: function () { startGame(); },
+      hist: function () {
+        // live probe: bucket all vertex Ys under arena (whole scene), report
+        var counts = {}; var meshes = 0, skipped = 0;
+        var v = new THREE.Vector3();
+        var roots = { arena: arena, world: arena.getObjectByName('world') };
+        var out = {};
+        Object.keys(roots).forEach(function (rn) {
+          var root = roots[rn]; if (!root) { out[rn] = 'missing'; return; }
+          var c = {}; var m = 0, sk = 0;
+          root.traverse(function (o) {
+            if (!o.isMesh || !o.geometry || !o.geometry.attributes || !o.geometry.attributes.position) return;
+            m++;
+            o.updateWorldMatrix(true, false);
+            var pos = o.geometry.attributes.position;
+            var step = Math.max(1, Math.floor(pos.count / 6000));
+            for (var i = 0; i < pos.count; i += step) {
+              v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+              if (!isFinite(v.y)) { sk++; continue; }
+              var key = Math.round(v.y * 4) / 4;
+              c[key] = (c[key] || 0) + 1;
+            }
+          });
+          meshes += m; skipped += sk;
+          var top = Object.keys(c).map(function (k) { return [+k, c[k]]; })
+            .sort(function (a, b) { return b[1] - a[1]; }).slice(0, 8);
+          out[rn] = { meshes: m, nonFinite: sk, topBuckets: top };
+        });
+        return { out: out, totalMeshes: meshes, totalNonFinite: skipped, arenaCenterY: +arenaCenter.y.toFixed(2) };
+      },
       strike: function () { tryAttack(); },
       hurt: function () { damagePlayer(); },
       clearWave: function () { zombies.forEach(function (z) { if (!z.dead) killZombie(z); }); },
