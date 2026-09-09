@@ -503,6 +503,46 @@
       }
     })();
 
+    /* ---------- the multitude: little roaming souls ---------- */
+    var NPC_SOULS = [];
+    var NPC_COLORS = [0x8fd8ff, 0xa8ffe2, 0xffe2a8, 0xd8b0ff, 0xffb0c8, 0xbfffd0, 0xc8d8ff];
+    (function makeNpcSouls() {
+      for (var i = 0; i < 12; i++) {
+        var g = new THREE.Group();
+        var c = NPC_COLORS[i % NPC_COLORS.length];
+        var h = new THREE.Mesh(
+          new THREE.SphereGeometry(0.75, 16, 12),
+          new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false })
+        );
+        g.add(h);
+        var orb = new THREE.Mesh(
+          new THREE.SphereGeometry(0.28, 12, 10),
+          new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.75 })
+        );
+        g.add(orb);
+        g.add(new THREE.PointLight(c, 7, 10, 2.0));
+        var a = Math.random() * Math.PI * 2, r = 20 + Math.random() * 90;
+        g.position.set(Math.cos(a) * r, 0, Math.sin(a) * r - 40);
+        scene.add(g);
+        NPC_SOULS.push({ grp: g, orb: orb, halo: h, yaw: Math.random() * Math.PI * 2,
+                         speed: 1.6 + Math.random() * 2.6, turn: (Math.random() - 0.5) * 0.9,
+                         bobPh: Math.random() * Math.PI * 2 });
+      }
+    })();
+    function updateNpcSouls(dt, t) {
+      for (var i = 0; i < NPC_SOULS.length; i++) {
+        var n = NPC_SOULS[i];
+        n.yaw += n.turn * dt;
+        n.grp.position.x += Math.sin(n.yaw) * n.speed * dt;
+        n.grp.position.z += Math.cos(n.yaw) * n.speed * dt;
+        var dx = n.grp.position.x, dz = n.grp.position.z + 40;
+        if (dx * dx + dz * dz > 130 * 130) n.yaw += Math.PI * (0.7 + Math.random() * 0.6);
+        n.grp.position.y = 0.9 + Math.sin(t * 1.7 + n.bobPh) * 0.3;
+        n.orb.rotation.y += dt * 2;
+        n.halo.material.opacity = 0.12 + Math.sin(t * 2.2 + n.bobPh) * 0.05;
+      }
+    }
+
     /* ---------- loading the gods ---------- */
     var BASE = 'thehunters/';
     var loader = new GLTFLoader();
@@ -893,8 +933,9 @@
         }
 
         if (def.ai === 'patrol') {
-          // THE GLADIATOR: roving elliptical patrol; gait speed scales with tier
-          if (G.echoT <= 0) {
+          // THE GLADIATOR: roving elliptical patrol; gait speed scales with tier.
+          // DEAD AIR (tier.walk 0): statues loom — only their gaze follows you.
+          if (G.echoT <= 0 && tier.walk > 0) {
             gd.patrolPhase += dt * 0.11 * (0.6 + tier.walk * 0.35);
             var tx = def.patrol.cx + Math.cos(gd.patrolPhase) * def.patrol.rx;
             var tz = def.patrol.cz + Math.sin(gd.patrolPhase) * def.patrol.rz;
@@ -907,13 +948,17 @@
               pos.z += (dz / d) * sp * dt;
               setGodAnim(gd, 'walk');
             } else setGodAnim(gd, 'idle');
-          } else setGodAnim(gd, 'walk');
+          } else {
+            gd.targetYaw = Math.atan2(soul.position.x - pos.x, soul.position.z - pos.z);
+            setGodAnim(gd, G.echoT > 0 ? 'walk' : 'idle');
+          }
 
         } else if (def.ai === 'hunt') {
-          // THE EXECUTIONER: closes on the player when they draw attention
+          // THE EXECUTIONER: closes on the player when they draw attention —
+          // but only once the crowd gives him legs (tier.walk > 0).
           var d2 = soul.position.clone().sub(pos); d2.y = 0;
           var dist2 = d2.length();
-          var alerted = G.seen || dist2 < 70;
+          var alerted = tier.walk > 0 && (G.seen || dist2 < 70);
           if (gd.state !== 'attack') {
             if (alerted && dist2 > def.stompRange * 0.8) {
               d2.normalize();
@@ -925,7 +970,10 @@
             } else if (alerted && dist2 <= def.stompRange && gd.stompCd <= 0) {
               gd.state = 'attack'; gd.stateT = 0; gd.attackDone = false;
               setGodAnim(gd, 'attack');
-            } else setGodAnim(gd, 'idle');
+            } else {
+              gd.targetYaw = Math.atan2(soul.position.x - pos.x, soul.position.z - pos.z);
+              setGodAnim(gd, 'idle');
+            }
           }
           if (gd.state === 'attack') {
             // hit moment mid-anim (~0.8s of the 1.67s clip): shockwave
@@ -938,15 +986,19 @@
           }
 
         } else { // scan — THE WATCHER: slow traverse, wide gaze, close-range slam
+          var slide = tier.walk > 0 ? (2.6 + tier.walk * 1.8) : 0;
           if (G.echoT <= 0) {
             var sx = def.scan.cx + Math.sin(clock.elapsedTime * def.scan.speed * 0.22) * def.scan.span * 0.5;
             var dx3 = sx - pos.x;
-            if (Math.abs(dx3) > 0.6) {
-              pos.x += Math.sign(dx3) * Math.min(Math.abs(dx3), (2.6 + tier.walk * 1.8) * dt);
+            if (Math.abs(dx3) > 0.6 && slide > 0) {
+              pos.x += Math.sign(dx3) * Math.min(Math.abs(dx3), slide * dt);
               gd.targetYaw = Math.atan2(dx3, 0.0001) * 0.25;   // gentle angle while sliding
               setGodAnim(gd, 'walk');
-            } else setGodAnim(gd, 'idle');
-          } else setGodAnim(gd, 'idle');
+            } else {
+              gd.targetYaw = Math.atan2(soul.position.x - pos.x, soul.position.z - pos.z);
+              setGodAnim(gd, 'idle');
+            }
+          } else setGodAnim(gd, 'walk');
           var d3 = soul.position.clone().sub(pos); d3.y = 0;
           var dist3 = d3.length();
           if (dist3 < def.stompRange && gd.stompCd <= 0 && gd.state !== 'attack') {
@@ -1003,6 +1055,7 @@
 
       if (soulBody) soulBody.position.y = Math.sin(t * 2.4) * 0.12;
       halo.material.opacity = 0.16 + Math.sin(t * 3.1) * 0.06;
+      updateNpcSouls(dt, t);
 
       // wisps bob; reveal when vision active or soul close
       for (var w = 0; w < WISPS.length; w++) {
@@ -1151,11 +1204,11 @@
         G.seen = !!seenRes;
         if (G.seen) {
           G.seenT += dt;
-          G.essence -= (seenRes.aura ? AURA_HIT_DRAIN : SEEN_DRAIN) * dt;
+          if (G.t > 2) G.essence -= (seenRes.aura ? AURA_HIT_DRAIN : SEEN_DRAIN) * dt;   // 2s spawn grace
           if (!wasSeen) { sfx.seen(); if (G.seenT > 4) chyron(TAUNTS[Math.floor(Math.random() * TAUNTS.length)]); }
           if (seenRes.aura) {
             var f = document.getElementById('dmg-flash');
-            f.style.opacity = 0.7; setTimeout(function () { fl.style.opacity = 0; }, 130);
+            f.style.opacity = 0.7; setTimeout(function () { f.style.opacity = 0; }, 130);
           }
         } else {
           G.seenT = 0;
@@ -1192,6 +1245,18 @@
       document.getElementById('overlay').classList.add('hidden');
       soul.position.set(0, 0, 8);
       vel.set(0, 0, 0);
+      while (WAVES.length) {                      // clear stale shockwaves from the last life
+        var wv = WAVES.pop(); scene.remove(wv.mesh);
+      }
+      while (COLLAPSES.length) {                  // and any pending/landed collapse slabs
+        var cl = COLLAPSES.pop(); scene.remove(cl.warn); scene.remove(cl.slab);
+      }
+      for (var gi = 0; gi < gods.length; gi++) {   // herd the gods back to their marks
+        var gd = gods[gi], def0 = GOD_DEFS[gi];
+        gd.root.position.set(def0.x, -gd.feet, def0.z);
+        gd.state = 'idle'; gd.stateT = 0; gd.stompCd = 4; gd.attackDone = false;
+        setGodAnim(gd, 'idle');
+      }
       G.running = true; G.over = false;
       G.t = 0; G.essence = G.maxEssence; G.seen = false; G.seenT = 0; G.viewers = 12;
       G.tier = 0; G.collapseT = 18; G.visionT = 0; G.visionCd = 0; G.echoT = 0; G.echoCd = 0;
@@ -1250,6 +1315,7 @@
                  viewers: G.viewers, seen: G.seen, tier: G.tier, gods: gods.length,
                  wisps: WISPS.filter(function (w) { return !w.taken; }).length,
                  waves: WAVES.length, collapses: COLLAPSES.length,
+                 npcs: NPC_SOULS.length,
                  soul: [+soul.position.x.toFixed(1), +soul.position.z.toFixed(1)] };
       },
       start: startGame,
