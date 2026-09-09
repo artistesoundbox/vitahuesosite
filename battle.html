@@ -183,7 +183,7 @@
         </div>
         <div id="center-msg"></div>
         <div id="combo-chip"></div>
-        <div id="hint">WASD / arrows to move &nbsp;·&nbsp; SPACE to strike — tap in rhythm to chain x2 → x3 → FINISHER</div>
+        <div id="hint">WASD / arrows to move · SPACE to strike — tap in rhythm to chain x2 → x3 → FINISHER · pinch to zoom</div>
         <div id="dmg-flash"></div>
         <div id="stick"><div class="knob" id="knob"></div></div>
         <button id="atk-btn">strike</button>
@@ -592,7 +592,12 @@
     if (isTouch) document.body.classList.add('touch');
     var stick = document.getElementById('stick'), knob = document.getElementById('knob');
     var stickId = null, stickCx = 0, stickCy = 0;
+    var stickX = 0, stickY = 0;                            // stick finger's live position (pinch baseline)
     var tapStart = 0, tapX = 0, tapY = 0, maxDrift = 0;   // phone-thumb tap detection
+    /* pinch-to-zoom: second finger while the first steers — squeeze in,
+       spread out. Multiplicative ratio against camZoom so it feels like
+       the wheel; suppressed taps so a pinch never triggers a strike. */
+    var pinchId = null, pinchBase = 1, camZoomBase = 1, pinchActive = false;
     /* touch: finger anywhere on the stage = floating move stick (no zone) */
     stage.addEventListener('touchstart', function (e) {
       audio();
@@ -600,12 +605,19 @@
         var t = e.changedTouches[i];
         if (stickId === null) {
           stickId = t.identifier;
+          stickX = t.clientX; stickY = t.clientY;
           var r = stage.getBoundingClientRect();
           stickCx = t.clientX; stickCy = t.clientY;
           tapStart = performance.now(); tapX = t.clientX; tapY = t.clientY; maxDrift = 0;
           stick.style.left = (t.clientX - r.left - 54) + 'px';
           stick.style.bottom = (r.bottom - t.clientY - 54) + 'px';
           stick.style.opacity = 1;
+        } else if (pinchId === null && t.identifier !== stickId) {
+          // second finger: anchor the zoom gesture
+          pinchId = t.identifier;
+          pinchBase = Math.max(1, Math.hypot(t.clientX - stickX, t.clientY - stickY));
+          camZoomBase = camZoom;
+          pinchActive = true;
         }
       }
     }, { passive: true });
@@ -613,27 +625,37 @@
       for (var i = 0; i < e.changedTouches.length; i++) {
         var t = e.changedTouches[i];
         if (t.identifier === stickId) {
+          stickX = t.clientX; stickY = t.clientY;
           var dx = t.clientX - stickCx, dy = t.clientY - stickCy;
           maxDrift = Math.max(maxDrift, Math.hypot(t.clientX - tapX, t.clientY - tapY));
           var len = Math.hypot(dx, dy), max = 46;
           var k = len > max ? max / len : 1;
           knob.style.transform = 'translate(' + dx * k + 'px,' + dy * k + 'px)';
           input.x = (dx * k) / max; input.z = (dy * k) / max;
+        } else if (t.identifier === pinchId) {
+          // live pinch: spread wider than the anchor -> zoom out, squeeze -> in
+          var d = Math.max(1, Math.hypot(t.clientX - stickX, t.clientY - stickY));
+          camZoom = THREE.MathUtils.clamp(camZoomBase * (d / pinchBase), 0.6, 2.4);
         }
       }
     }, { passive: true });
     function endTouch(e) {
       for (var i = 0; i < e.changedTouches.length; i++) {
-        if (e.changedTouches[i].identifier === stickId) {
-          // TAP = quick AND the finger never really traveled. Absolute pixel
-          // drift (not stick strength) — a sloppy thumb tap drifts ~8-12px
-          // but a deliberate move drag crosses 14px fast.
-          var isTap = performance.now() - tapStart < 260 && maxDrift < 14;
+        var t = e.changedTouches[i];
+        if (t.identifier === pinchId) {
+          pinchId = null;   // pinch finger left; zoom stays where it landed
+        }
+        if (t.identifier === stickId) {
+          // TAP = quick AND the finger never really traveled AND no pinch
+          // ever joined (a two-finger gesture is a zoom, never a strike).
+          var isTap = performance.now() - tapStart < 260 && maxDrift < 14 && !pinchActive;
           stickId = null; input.x = input.z = 0;
+          pinchId = null; pinchActive = false;   // lone fingers can't zoom
           knob.style.transform = 'translate(0,0)'; stick.style.opacity = 0;
           if (isTap) tryAttack();
         }
       }
+      if (e.touches.length === 0) pinchActive = false;   // field fully clear
     }
     stage.addEventListener('touchend', endTouch);
     stage.addEventListener('touchcancel', endTouch);
@@ -1108,7 +1130,7 @@
       },
       strike: function () { tryAttack(); },
       fast: function () {   // cheap probe: no raycast-heavy dbg work
-        return { atk: attacking, running: G.running, hp: G.hp, kills: G.kills, xp: G.xp,
+        return { atk: attacking, running: G.running, hp: G.hp, kills: G.kills, xp: G.xp, camZoom: +camZoom.toFixed(2),
                  combo: { stage: combo.stage, window: +combo.window.toFixed(2), cooldown: +combo.cooldown.toFixed(2) } };
       },
       tune: function (patch) {
