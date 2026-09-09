@@ -528,7 +528,7 @@
               if (o.material.emissive) { o.material.emissive = new THREE.Color(c); o.material.emissiveIntensity = 1.2; }
             }
           });
-          body.scale.setScalar(1.15);   // lost souls: near the hero's size
+          body.scale.multiplyScalar(1.15);   // lost souls: near the hero's size (multiply keeps the model's normalization!)
           g.add(body);
         }
         var h = new THREE.Mesh(
@@ -733,12 +733,12 @@
     var gods = [];
     // per-god behavior. cone = sight half-angle; personality drives the AI.
     var GOD_DEFS = [
-      { file: 'god1.glb', key: 'g1', height: 44, x: -40, z: -64, tint: 0xff4055, name: 'THE GLADIATOR',
-        ai: 'patrol',  patrol: { cx: -30, cz: -70, rx: 14, rz: 8, speed: 1.0 } },   // leashed: gods prowl a small patch
-      { file: 'god2.glb', key: 'g2', height: 44, x:   0, z: -64, tint: 0xffb040, name: 'THE EXECUTIONER',
-        ai: 'hunt',    stompRange: 26, stompCd: 5.5 },
-      { file: 'god3.glb', key: 'g3', height: 48, x:  42, z: -64, tint: 0x30d0ff, name: 'THE WATCHER',
-        ai: 'scan',    scan: { cx: 40, cz: -64, span: 18, speed: 0.45 }, stompRange: 26, stompCd: 7 }
+      { file: 'god1.glb', key: 'g1', height: 44, x: -40, z: -85, tint: 0xff4055, name: 'THE GLADIATOR',
+        ai: 'patrol',  patrol: { cx: -30, cz: -90, rx: 14, rz: 8, speed: 1.0 } },   // leashed: gods prowl a small patch, far up the field
+      { file: 'god2.glb', key: 'g2', height: 44, x:   0, z: -85, tint: 0xffb040, name: 'THE EXECUTIONER',
+        ai: 'hunt',    stompRange: 50, stompCd: 5.5 },
+      { file: 'god3.glb', key: 'g3', height: 48, x:  42, z: -85, tint: 0x30d0ff, name: 'THE WATCHER',
+        ai: 'scan',    scan: { cx: 40, cz: -85, span: 18, speed: 0.45 }, stompRange: 48, stompCd: 7 }
     ];
 
     Promise.all([
@@ -1132,9 +1132,9 @@
           // reach during patrol (crowd-powered, like his legs).
           var dp = soul.position.clone().sub(pos); dp.y = 0;
           var dpd = dp.length();
-          if (tier.walk > 0 && dpd < 22 && gd.stompCd <= 0 && gd.state !== 'attack') {
+          if (tier.walk > 0 && dpd < 48 && gd.stompCd <= 0 && gd.state !== 'attack') {
             gd.targetYaw = Math.atan2(dp.x, dp.z);
-            godStrike(gd, 30, 34);   // sword wave reaches deep into the fly zone
+            godStrike(gd, 52, 38);   // sword wave crosses the whole gap into the fly zone
           }
           if (gd.state === 'attack') {
             if (!gd.attackDone && gd.stateT >= gd.atkHitAt) {
@@ -1163,7 +1163,7 @@
               // melee swing with the real attack armature — facing locks so
               // the blade lands where the player was
               gd.targetYaw = Math.atan2(d2.x, d2.z);
-              godStrike(gd, 26, 30);
+              godStrike(gd, 48, 36);
             } else {
               gd.targetYaw = Math.atan2(soul.position.x - pos.x, soul.position.z - pos.z);
               setGodAnim(gd, 'idle');
@@ -1198,7 +1198,7 @@
           if (dist3 < def.stompRange && gd.stompCd <= 0 && gd.state !== 'attack') {
             // close-range slam with the real attack clip
             gd.targetYaw = Math.atan2(d3.x, d3.z);
-            godStrike(gd, 24, 24);
+            godStrike(gd, 46, 30);
           }
           if (gd.state === 'attack') {
             if (!gd.attackDone && gd.stateT >= gd.atkHitAt) {
@@ -1215,7 +1215,7 @@
         dy = Math.max(-Math.PI * 0.5, Math.min(Math.PI * 0.5, dy));
         gd.root.rotation.y += dy * Math.min(1, dt * 1.6);
         pos.y = -gd.feet;
-        pos.z = Math.min(pos.z, -56);   // hard leash: gods hold the 18-unit gap to the fly zone
+        pos.z = Math.min(pos.z, -80);   // hard leash: gods hold the huge gap to the fly zone
 
         gd.aura.position.set(pos.x, 6, pos.z);
 
@@ -1404,6 +1404,22 @@
               var fl = document.getElementById('dmg-flash');
               fl.style.opacity = 0.85; setTimeout(function () { fl.style.opacity = 0; }, 150);
               G.shake = Math.max(G.shake, 0.5);
+            }
+          }
+          // the sweep harvests low-flying lost souls — rescue them before the ring arrives
+          for (var ni = 0; ni < NPC_SOULS.length; ni++) {
+            var nn = NPC_SOULS[ni];
+            if (nn.state !== 'roam' && nn.state !== 'doomed') continue;
+            var np = nn.grp.position;
+            if (np.y > 12) continue;
+            var dwx = np.x - wave.mesh.position.x, dwz = np.z - wave.mesh.position.z;
+            var ddw = Math.hypot(dwx, dwz);
+            if (Math.abs(ddw - wave.r) < 2.6) {
+              nn.state = 'consumed'; nn.t = 0;
+              nn.pullTo = new THREE.Vector3(wave.mesh.position.x, 14 + Math.random() * 8, wave.mesh.position.z);
+              G.taken++;
+              G.viewers += 20 + Math.floor(Math.random() * 30);
+              if (G.taken === 1) chyron('THE GODS FEED — DO NOT LET THEM');
             }
           }
           if (wave.r >= wave.maxR) { scene.remove(wave.mesh); WAVES.splice(wv, 1); }
