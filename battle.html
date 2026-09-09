@@ -86,6 +86,15 @@
       opacity: 0; transition: opacity .35s;
     }
     #center-msg.show { opacity: 1; }
+    #combo-chip {
+      position: absolute; top: 46%; left: 0; right: 0; text-align: center;
+      font-size: clamp(18px, 3.4vw, 30px); font-weight: 800; letter-spacing: 0.22em;
+      color: #ffd97a; text-shadow: 0 0 18px rgba(255, 160, 40, .8), 0 2px 8px #000;
+      opacity: 0; transition: opacity .18s, transform .18s; transform: scale(.85);
+      pointer-events: none;
+    }
+    #combo-chip.show { opacity: 1; transform: scale(1); }
+    #combo-chip.fin { color: #ff9d5c; text-shadow: 0 0 26px rgba(255, 80, 30, .95), 0 2px 10px #000; }
     #hint {
       position: absolute; bottom: 10px; left: 0; right: 0; text-align: center;
       color: #8aa5c8; font-size: 12px; letter-spacing: .08em;
@@ -173,7 +182,8 @@
           <div id="xp-line" style="color:#7dffc4">+0 XP</div>
         </div>
         <div id="center-msg"></div>
-        <div id="hint">WASD / arrows to move &nbsp;·&nbsp; SPACE to strike &nbsp;·&nbsp; or drag left side + tap STRIKE</div>
+        <div id="combo-chip"></div>
+        <div id="hint">WASD / arrows to move &nbsp;·&nbsp; SPACE to strike — tap in rhythm to chain x2 → x3 → FINISHER</div>
         <div id="dmg-flash"></div>
         <div id="stick"><div class="knob" id="knob"></div></div>
         <button id="atk-btn">strike</button>
@@ -250,6 +260,8 @@
     }
     var sfx = {
       swing: function () { tone(340, 90, 0.14, 'sawtooth', 0.14); },
+      swing2: function () { tone(420, 130, 0.12, 'sawtooth', 0.15); },   // combo chain: brighter, quicker
+      finisher: function () { tone(140, 38, 0.34, 'sawtooth', 0.24); tone(70, 30, 0.5, 'sine', 0.26); },
       hit:   function () { tone(160, 60, 0.1, 'square', 0.22); tone(90, 50, 0.16, 'sine', 0.18); },
       groan: function () { tone(82, 46, 0.5, 'sawtooth', 0.07); },
       hurt:  function () { tone(220, 110, 0.22, 'square', 0.16); },
@@ -633,15 +645,55 @@
     var zombies = [];
     var attacking = false, attackT = 0, didHit = false;
     var ATK_DUR = 1.03, ATK_HIT_FROM = 0.25, ATK_HIT_TO = 0.6;
+
+    /* ---------- combo system ----------
+       Strike again while the chain window is open and the sword links into
+       x2 → x3 → FINISHER (a heavy strike that hits twice as hard and pays
+       bonus XP). Miss the rhythm and the chain resets. A finisher briefly
+       locks the chain out so spam-tapping can't live inside it forever. */
+    var COMBO = { CHAIN_WINDOW: 0.9, COOLDOWN: 0.7 };
+    var combo = { stage: 0, window: 0, cooldown: 0, finPending: false };
+    var finisherKill = false;   // set during a finisher's damage sweep
+
+    function renderComboChip() {
+      var el = document.getElementById('combo-chip');
+      if (combo.stage === 3) {
+        el.textContent = 'FINISHER!'; el.classList.add('fin'); el.classList.add('show');
+        clearTimeout(renderComboChip._t);
+        renderComboChip._t = setTimeout(function () { el.classList.remove('show'); }, 900);
+      } else if (combo.stage > 0) {
+        el.classList.remove('fin');
+        el.textContent = 'x' + (combo.stage + 1) + (combo.finPending ? ' ⚡' : '');
+        el.classList.add('show');
+        clearTimeout(renderComboChip._t);
+      } else {
+        el.classList.remove('show');
+      }
+    }
     var playerVel = new THREE.Vector3();
     var PLAYER_SPEED = 5.2;
 
     function tryAttack() {
-      if (!G.running || attacking || G.over) return;
+      if (!G.running || G.over) return;
+      if (attacking) {
+        // buffer a finisher if we're mid x2/x3 — fires when the swing ends
+        if (combo.stage >= 1 && combo.stage <= 2) combo.finPending = true;
+        return;
+      }
+      if (combo.cooldown > 0) return;   // finisher recovery locks the chain
+      var next = (combo.stage > 0 && combo.window > 0) ? combo.stage + 1 : 1;
+      if (next > 3) next = 3;
+      startComboAttack(next);
+    }
+
+    function startComboAttack(stage) {
       attacking = true; attackT = 0; didHit = false;
+      combo.stage = stage; combo.window = COMBO.CHAIN_WINDOW; combo.finPending = false;
+      G.bestCombo = Math.max(G.bestCombo || 0, stage);
       fade(lunaMix, curLuna, clipsL['attack'], 0.08);
       curLuna = 'attack';
-      sfx.swing();
+      if (stage === 3) { sfx.finisher(); renderComboChip(); }
+      else { sfx.swing(); renderComboChip(); }
     }
 
     function spawnWave(n) {
@@ -698,6 +750,7 @@
       st.dead = true; st.deadT = 0; st.mixer.stopAllAction();
       G.kills += 1;
       var gain = st.champ ? 20 : 10;
+      if (finisherKill) gain += 10;   // finisher cull bonus
       G.xp += gain;
       sfx.die();
       renderHud();
@@ -804,6 +857,8 @@
           attackT += dt;
           if (!didHit && attackT >= ATK_HIT_FROM && attackT <= ATK_HIT_TO) {
             didHit = true;
+            var dmg = (combo.stage === 3) ? 2 : 1;   // finisher hits twice as hard
+            finisherKill = (combo.stage === 3);
             var fw = new THREE.Vector3(Math.sin(luna.rotation.y), 0, Math.cos(luna.rotation.y));
             for (var i = 0; i < zombies.length; i++) {
               var st = zombies[i];
@@ -811,14 +866,27 @@
               var dv = st.root.position.clone().sub(luna.position); dv.y = 0;
               var dist = dv.length();
               if (dist < 2.9 && dv.normalize().dot(fw) > 0.25) {
-                st.hp -= 1;
+                st.hp -= dmg;
                 sfx.hit();
                 if (st.hp <= 0) killZombie(st);
               }
             }
+            finisherKill = false;
           }
-          if (attackT >= ATK_DUR) { attacking = false; curLuna = null; }
+          if (attackT >= ATK_DUR) {
+            attacking = false; curLuna = null;
+            if (combo.stage === 3) {
+              combo.stage = 0; combo.cooldown = COMBO.COOLDOWN; renderComboChip();
+            } else {
+              combo.window = COMBO.CHAIN_WINDOW;   // rhythm window opens on recovery
+            }
+            if (combo.finPending) { combo.finPending = false; startComboAttack(combo.stage === 0 ? 1 : combo.stage + 1); }
+          }
+        } else if (combo.stage > 0 && combo.window > 0) {
+          combo.window -= dt;
+          if (combo.window <= 0) { combo.stage = 0; renderComboChip(); }
         }
+        if (combo.cooldown > 0) combo.cooldown -= dt;
       }
 
       // zombies
@@ -932,7 +1000,7 @@
       var kept = G.won ? G.xp : Math.floor(G.xp * 0.5);
       document.getElementById('result-title').textContent = G.won ? 'THE FIRST TRIAL IS COMPLETE' : 'THE ARENA CLAIMS YOU… THIS TIME';
       document.getElementById('result-body').textContent = G.won
-        ? 'Five waves of the dead could not stop ' + alienName + '. The elders nod: the training was real.'
+        ? 'Five waves of the dead could not stop ' + alienName + '. ' + (G.bestCombo >= 3 ? 'A ' + G.bestCombo + '-hit sword chain — the elders nod: the training was real.' : 'The elders nod: the training was real.')
         : 'The dead were many. But every scar is a lesson — half the earned XP survives.';
       document.getElementById('result-xp').textContent = '+' + kept + ' XP';
       document.getElementById('result-note').textContent = alienId
@@ -949,6 +1017,8 @@
       for (var i = zombies.length - 1; i >= 0; i--) scene.remove(zombies[i].root);
       zombies.length = 0;
       G.hp = G.maxHp; G.kills = 0; G.xp = 0; G.wave = 0; G.over = false; G.running = false;
+      combo.stage = 0; combo.window = 0; combo.cooldown = 0; combo.finPending = false;
+      G.bestCombo = 0; renderComboChip();
       document.getElementById('result').classList.add('hidden');
       if (luna) { luna.position.set(arenaCenter.x, groundY(arenaCenter.x, arenaCenter.z + 6) - lunaFootY + 0.02, arenaCenter.z + 6); }
       startGame();
@@ -994,6 +1064,7 @@
       state: function () {
         return {
           hp: G.hp, wave: G.wave, kills: G.kills, xp: G.xp, zombies: zombies.length, atk: attacking,
+          combo: { stage: combo.stage, window: +combo.window.toFixed(2), cooldown: +combo.cooldown.toFixed(2) },
           input: { x: +input.x.toFixed(2), z: +input.z.toFixed(2) },
           zs: zombies.map(function (z) {
             return [+z.root.position.x.toFixed(1), +z.root.position.z.toFixed(1), z.champ ? 1 : 0];
@@ -1036,6 +1107,19 @@
         return { out: out, totalMeshes: meshes, totalNonFinite: skipped, arenaCenterY: +arenaCenter.y.toFixed(2) };
       },
       strike: function () { tryAttack(); },
+      fast: function () {   // cheap probe: no raycast-heavy dbg work
+        return { atk: attacking, running: G.running, hp: G.hp, kills: G.kills, xp: G.xp,
+                 combo: { stage: combo.stage, window: +combo.window.toFixed(2), cooldown: +combo.cooldown.toFixed(2) } };
+      },
+      tune: function (patch) {
+        for (var k in patch) {
+          if (k === 'ATK_DUR') ATK_DUR = patch[k];
+          else if (k === 'ATK_HIT_FROM') ATK_HIT_FROM = patch[k];
+          else if (k === 'ATK_HIT_TO') ATK_HIT_TO = patch[k];
+          else COMBO[k] = patch[k];
+        }
+      },
+      combo: function (n) { if (n >= 2) combo.finPending = true; tryAttack(); return combo.stage; },
       hurt: function () { damagePlayer(); },
       clearWave: function () { zombies.forEach(function (z) { if (!z.dead) killZombie(z); }); },
       loaded: function () { return !!(arena && luna && zombieProto); },
