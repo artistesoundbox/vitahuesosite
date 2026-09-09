@@ -228,7 +228,7 @@
         <div id="chyron"></div>
         <div id="essence-label">ESSENCE</div>
         <div id="essence-bar"><div id="essence-fill"></div></div>
-        <div id="hint">WASD steer · R/F climb · cruises toward the gods · SPACE dash · Q vision · E echo</div>
+        <div id="hint">WASD steer · R/F climb · SPACE dash · Q vision · E echo</div>
         <div id="dmg-flash"></div>
         <div id="riot-vignette"></div>
         <div id="stick"><div class="knob" id="knob"></div></div>
@@ -484,7 +484,7 @@
     var soul = new THREE.Group();
     var soulBody = null;
     var halo = new THREE.Mesh(
-      new THREE.SphereGeometry(1.05, 24, 18),
+      new THREE.SphereGeometry(1.7, 24, 18),
       new THREE.MeshBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0.20, blending: THREE.AdditiveBlending, depthWrite: false })
     );
     soul.add(halo);
@@ -495,7 +495,7 @@
     /* ---------- essence wisps (Soul Vision pickups) ---------- */
     var WISPS = [];
     (function makeWisps() {
-      var spots = [[-60, -80], [55, -95], [0, -20], [-45, -140], [70, -40], [-15, -60]];
+      var spots = [[-60, -30], [55, -35], [0, -18], [-45, -42], [70, -25], [-15, -8]];   // all inside the fly zone
       for (var i = 0; i < spots.length; i++) {
         var w = new THREE.Mesh(
           new THREE.IcosahedronGeometry(0.5, 1),
@@ -510,34 +510,43 @@
       }
     })();
 
-    /* ---------- the multitude: little roaming souls ---------- */
+    /* ---------- the multitude: lost souls — clones of the hero soul model,
+       each glowing its own color, drifting inside the player's fly zone ---------- */
     var NPC_SOULS = [];
     var NPC_COLORS = [0x8fd8ff, 0xa8ffe2, 0xffe2a8, 0xd8b0ff, 0xffb0c8, 0xbfffd0, 0xc8d8ff];
-    (function makeNpcSouls() {
+    function npcZoneZ(z) { return Math.max(-48, Math.min(12, z)); }   // the fly zone's depth band
+    function spawnNpcSouls() {
       for (var i = 0; i < 22; i++) {
         var g = new THREE.Group();
         var c = NPC_COLORS[i % NPC_COLORS.length];
+        var body = null;
+        if (soulBody) {
+          body = soulBody.clone();
+          body.traverse(function (o) {
+            if (o.isMesh && o.material) {
+              o.material = o.material.clone();
+              if (o.material.emissive) { o.material.emissive = new THREE.Color(c); o.material.emissiveIntensity = 1.2; }
+            }
+          });
+          body.scale.setScalar(0.8);   // lost souls: a shade smaller than the hero
+          g.add(body);
+        }
         var h = new THREE.Mesh(
           new THREE.SphereGeometry(1.3, 16, 12),
           new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false })
         );
         g.add(h);
-        var orb = new THREE.Mesh(
-          new THREE.SphereGeometry(0.5, 12, 10),
-          new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.75 })
-        );
-        g.add(orb);
         g.add(new THREE.PointLight(c, 7, 10, 2.0));
-        var a = Math.random() * Math.PI * 2, r = 20 + Math.random() * 90;
-        g.position.set(Math.cos(a) * r, 0, Math.sin(a) * r - 40);
+        var a = Math.random() * Math.PI * 2, r = 20 + Math.random() * 80;
+        g.position.set(Math.cos(a) * r, 0, npcZoneZ(Math.sin(a) * r - 40));
         scene.add(g);
-        NPC_SOULS.push({ grp: g, orb: orb, halo: h, yaw: Math.random() * Math.PI * 2,
+        NPC_SOULS.push({ grp: g, body: body, orb: body || h, halo: h, yaw: Math.random() * Math.PI * 2,
                          speed: 1.6 + Math.random() * 2.6, turn: (Math.random() - 0.5) * 0.9,
                          bobPh: Math.random() * Math.PI * 2,
-                         baseY: (i % 2 === 0) ? 7 + Math.random() * 52 : 0.9,   // half the multitude drifts high — all the way up to near-orbit
+                         baseY: (i % 2 === 0) ? 2 + Math.random() * 30 : 0.9,   // half drift high — all inside the fly zone
                          state: 'roam', t: 0, respawn: 0 });
       }
-    })();
+    }
     /* THE RESCUE RACE: roam → doomed (a god's reach) → consumed, unless the
        player swoops in first (rescue = essence + tally). Souls respawn to
        keep the field stocked. */
@@ -551,8 +560,8 @@
           n.respawn -= dt;
           if (n.respawn <= 0) {                       // a new lost soul wanders in
             n.state = 'roam'; n.t = 0;
-            var a0 = Math.random() * Math.PI * 2, r0 = 25 + Math.random() * 85;
-            P.set(Math.cos(a0) * r0, n.baseY, Math.sin(a0) * r0 - 40);
+            var a0 = Math.random() * Math.PI * 2, r0 = 25 + Math.random() * 80;
+            P.set(Math.cos(a0) * r0, n.baseY, npcZoneZ(Math.sin(a0) * r0 - 40));
             n.grp.scale.setScalar(1);
             n.halo.material.color.setHex(0xffffff);
             n.grp.visible = true;
@@ -603,7 +612,7 @@
         }
 
         // doom check: inside a god's ground reach
-        if (gdNear && dNear < reach && P.y < 46 && G.running) {   // high-flying souls escape the ground reach
+        if (gdNear && dNear < reach && P.y < 42 && G.running) {   // high-flying souls escape the ground reach
           if (n.state !== 'doomed') { n.state = 'doomed'; n.t = 0; n.halo.material.color.setHex(0xff6a55); }
           var gp2 = gdNear.root.position;
           // panic-flee: steer away, faster
@@ -622,12 +631,11 @@
           }
         } else {
           if (n.state === 'doomed') { n.state = 'roam'; n.halo.material.color.setHex(0xffffff); }
-          // ordinary wander
+          // ordinary wander — contained to the player's fly zone
           n.yaw += n.turn * dt;
           n.grp.position.x += Math.sin(n.yaw) * n.speed * dt;
           n.grp.position.z += Math.cos(n.yaw) * n.speed * dt;
-          var dx = P.x, dz = P.z + 40;
-          if (dx * dx + dz * dz > 130 * 130) n.yaw += Math.PI * (0.7 + Math.random() * 0.6);
+          if (P.x < -105 || P.x > 105 || P.z < -48 || P.z > 12) n.yaw += Math.PI * (0.7 + Math.random() * 0.6);
         }
 
         P.y = n.baseY + Math.sin(t * 1.7 + n.bobPh) * 0.6;
@@ -727,11 +735,10 @@
     // per-god behavior. cone = sight half-angle; personality drives the AI.
     var GOD_DEFS = [
       { file: 'god1.glb', key: 'g1', height: 44, x: -40, z: -72, tint: 0xff4055, name: 'THE GLADIATOR',
-        ai: 'patrol',  patrol: { cx: -30, cz: -80, rx: 55, rz: 34, speed: 1.0 } },
+        ai: 'patrol',  patrol: { cx: -30, cz: -80, rx: 14, rz: 9, speed: 1.0 } },   // leashed: gods prowl a small patch
       { file: 'god2.glb', key: 'g2', height: 44, x:   0, z: -58, tint: 0xffb040, name: 'THE EXECUTIONER',
-        ai: 'hunt',    stompRange: 15, stompCd: 5.5 },
-      { file: 'god3.glb', key: 'g3', height: 48, x:  42, z: -80, tint: 0x30d0ff, name: 'THE WATCHER',
-        ai: 'scan',    scan: { cx: 40, cz: -80, span: 60, speed: 0.45 }, stompRange: 20, stompCd: 7 }
+        ai: 'hunt',    stompRange: 26, stompCd: 5.5 },        { file: 'god3.glb', key: 'g3', height: 48, x:  42, z: -70, tint: 0x30d0ff, name: 'THE WATCHER',
+        ai: 'scan',    scan: { cx: 40, cz: -70, span: 18, speed: 0.45 }, stompRange: 26, stompCd: 7 }
     ];
 
     Promise.all([
@@ -749,7 +756,7 @@
       noCull(sm);
       var sb = new THREE.Box3().setFromObject(sm);
       var sh = Math.max(0.001, sb.max.y - sb.min.y);
-      sm.scale.setScalar(2.6 / sh);   // bigger hero soul — reads at broadcast distance
+      sm.scale.setScalar(3.2 / sh);   // big hero soul — broadcast-close
       sb.setFromObject(sm);
       var sc = sb.getCenter(new THREE.Vector3());
       sm.position.x -= sc.x; sm.position.z -= sc.z; sm.position.y -= sb.min.y;
@@ -812,6 +819,9 @@
           patrolPhase: Math.random() * Math.PI * 2
         });
       });
+
+      // the multitude spawns here: it needs the loaded soul model to clone
+      spawnNpcSouls();
 
       overlayText.textContent = 'The gods stand. The cameras are rolling.';
       var btn = document.getElementById('start-btn');
@@ -1122,9 +1132,9 @@
           // reach during patrol (crowd-powered, like his legs).
           var dp = soul.position.clone().sub(pos); dp.y = 0;
           var dpd = dp.length();
-          if (tier.walk > 0 && dpd < 16 && gd.stompCd <= 0 && gd.state !== 'attack') {
+          if (tier.walk > 0 && dpd < 22 && gd.stompCd <= 0 && gd.state !== 'attack') {
             gd.targetYaw = Math.atan2(dp.x, dp.z);
-            godStrike(gd, 22, 34);
+            godStrike(gd, 30, 34);   // sword wave reaches deep into the fly zone
           }
           if (gd.state === 'attack') {
             if (!gd.attackDone && gd.stateT >= gd.atkHitAt) {
@@ -1153,7 +1163,7 @@
               // melee swing with the real attack armature — facing locks so
               // the blade lands where the player was
               gd.targetYaw = Math.atan2(d2.x, d2.z);
-              godStrike(gd, 20, 30);
+              godStrike(gd, 26, 30);
             } else {
               gd.targetYaw = Math.atan2(soul.position.x - pos.x, soul.position.z - pos.z);
               setGodAnim(gd, 'idle');
@@ -1188,7 +1198,7 @@
           if (dist3 < def.stompRange && gd.stompCd <= 0 && gd.state !== 'attack') {
             // close-range slam with the real attack clip
             gd.targetYaw = Math.atan2(d3.x, d3.z);
-            godStrike(gd, 15, 24);
+            godStrike(gd, 24, 24);
           }
           if (gd.state === 'attack') {
             if (!gd.attackDone && gd.stateT >= gd.atkHitAt) {
@@ -1205,6 +1215,7 @@
         dy = Math.max(-Math.PI * 0.5, Math.min(Math.PI * 0.5, dy));
         gd.root.rotation.y += dy * Math.min(1, dt * 1.6);
         pos.y = -gd.feet;
+        pos.z = Math.min(pos.z, -52);   // hard leash: gods never step onto the soul's fly zone
 
         gd.aura.position.set(pos.x, 6, pos.z);
 
@@ -1347,7 +1358,7 @@
         // screen-up-depth — no axis swap needed, keyboard W/A/S/D, stick and
         // touch drag all read as direct screen-direction motion.
         var dashK = G.dashT > 0 ? DASH_MULT : 1;
-        var altK = 1 + (soul.position.y / 75) * 0.5;   // thin air: up to +50% speed
+        var altK = 1 + (soul.position.y / 40) * 0.5;   // thin air: up to +50% speed
         // saucer-style flight: the drag steers sideways + climb/dive while the
         // soul always cruises up the field toward the gods; throttle brakes or boosts
         var cruise = CRUISE + throttle * CRUISE_BOOST;
@@ -1368,9 +1379,9 @@
             soul.position.x += cvx * cf; soul.position.z += cvz * cf;
           }
         }
-        soul.position.x = THREE.MathUtils.clamp(soul.position.x, -110, 110);
-        soul.position.z = THREE.MathUtils.clamp(soul.position.z, -190, 16);
-        soul.position.y = THREE.MathUtils.clamp(soul.position.y, 0, 75);   // ceiling: orbit the gods' faces (~45) and climb above them
+        soul.position.x = THREE.MathUtils.clamp(soul.position.x, -105, 105);
+        soul.position.z = THREE.MathUtils.clamp(soul.position.z, -48, 12);   // fly zone: never deep into the gods' ground
+        soul.position.y = THREE.MathUtils.clamp(soul.position.y, 0, 40);   // ceiling below the gods' shoulders — they still tower over you
         if (!G.flewOnce && soul.position.y > 8) {
           G.flewOnce = true;
           chyron('AIRBORNE — THE CAMERAS LOVE AN AERIAL SHOT');
@@ -1457,11 +1468,13 @@
       var shakeX = G.shake > 0 ? (Math.random() - 0.5) * G.shake * 2 : 0;
       var shakeY = G.shake > 0 ? (Math.random() - 0.5) * G.shake * 2 : 0;
       var alt = Math.max(0, soul.position.y);   // camera pulls up+back when airborne: keep the field in frame
+      // wide broadcast framing: way back and high, looking deep up the field so
+      // all three gods stay in shot with the soul flying before them
       var camTarget = new THREE.Vector3(
-        soul.position.x * 0.9 + shakeX, soul.position.y + 7.5 + alt * 0.35 + shakeY, soul.position.z + 13 + alt * 0.55);
+        soul.position.x * 0.9 + shakeX, soul.position.y + 11 + alt * 0.45 + shakeY, soul.position.z + 26 + alt * 0.9);
       camPos.lerp(camTarget, 0.07);
       camera.position.copy(camPos);
-      camLook.lerp(new THREE.Vector3(soul.position.x, soul.position.y + 2.5, soul.position.z - 6), 0.1);
+      camLook.lerp(new THREE.Vector3(soul.position.x * 0.6, soul.position.y + 3.5, soul.position.z - 34), 0.1);
       camera.lookAt(camLook);
 
       renderer.render(scene, camera);
