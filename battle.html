@@ -274,8 +274,8 @@
 
     /* ================= game state ================= */
     var G = {
-      hp: 5, maxHp: 5, wave: 0, maxWaves: 5,
-      kills: 0, xp: 0, running: false, over: false, won: false
+      hp: 7, maxHp: 7, wave: 0, maxWaves: 5,
+      kills: 0, xp: 0, running: false, over: false, won: false, invuln: 0
     };
     // Character heights (world units). Luna 1.7 / zombie 1.5 — the arena
     // reads better with smaller fighters and the camera pulled back.
@@ -801,8 +801,9 @@
     }
 
     function damagePlayer() {
-      if (G.over) return;
+      if (G.over || G.invuln > 0) return;   // mercy i-frames: no instant shredding by a pack
       G.hp -= 1;
+      G.invuln = 1.2;
       sfx.hurt();
       var f = document.getElementById('dmg-flash');
       f.style.opacity = 1; setTimeout(function () { f.style.opacity = 0; }, 140);
@@ -954,6 +955,7 @@
           if (combo.window <= 0) { combo.stage = 0; renderComboChip(); }
         }
         if (combo.cooldown > 0) combo.cooldown -= dt;
+        if (G.invuln > 0) G.invuln -= dt;
       }
 
       // zombies
@@ -1203,7 +1205,7 @@
       hurt: function () { damagePlayer(); },
       clearWave: function () { zombies.forEach(function (z) { if (!z.dead) killZombie(z); }); },
       loaded: function () { return !!(arena && luna && zombieProto); },
-      god: function (on) { G.maxHp = on ? 9999 : 5; G.hp = on ? 9999 : Math.min(G.hp, 5); renderHud(); },
+      god: function (on) { G.maxHp = on ? 9999 : 7; G.hp = on ? 9999 : Math.min(G.hp, 7); renderHud(); },
       move: function (x, z) { input.x = x; input.z = z; }
     };
   </script>

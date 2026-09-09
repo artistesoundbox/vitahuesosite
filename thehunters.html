@@ -228,7 +228,7 @@
         <div id="chyron"></div>
         <div id="essence-label">ESSENCE</div>
         <div id="essence-bar"><div id="essence-fill"></div></div>
-        <div id="hint">WASD steer · R/F climb · the soul cruises toward the gods (hold S to brake) · SHIFT/SPACE dash · Q soul vision · E echo possess</div>
+        <div id="hint">WASD steer · R/F climb · cruises toward the gods · SPACE dash · Q vision · E echo</div>
         <div id="dmg-flash"></div>
         <div id="riot-vignette"></div>
         <div id="stick"><div class="knob" id="knob"></div></div>
@@ -518,12 +518,12 @@
         var g = new THREE.Group();
         var c = NPC_COLORS[i % NPC_COLORS.length];
         var h = new THREE.Mesh(
-          new THREE.SphereGeometry(0.75, 16, 12),
+          new THREE.SphereGeometry(1.3, 16, 12),
           new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false })
         );
         g.add(h);
         var orb = new THREE.Mesh(
-          new THREE.SphereGeometry(0.28, 12, 10),
+          new THREE.SphereGeometry(0.5, 12, 10),
           new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.75 })
         );
         g.add(orb);
@@ -541,7 +541,7 @@
     /* THE RESCUE RACE: roam → doomed (a god's reach) → consumed, unless the
        player swoops in first (rescue = essence + tally). Souls respawn to
        keep the field stocked. */
-    var RESCUE_R = 2.7, PULL_TIME = 1.25;
+    var RESCUE_R = 3.6, PULL_TIME = 1.25;   // generous: bigger souls are easier to scoop
     function updateNpcSouls(dt, t) {
       for (var i = 0; i < NPC_SOULS.length; i++) {
         var n = NPC_SOULS[i];
@@ -577,6 +577,13 @@
         var gdNear = null, dNear = 1e9;
         for (var gi = 0; gi < gods.length; gi++) {
           var gp = gods[gi].root.position;
+          // SOLID BODIES: lost souls can't sit inside a god — push them out
+          var push = gods[gi].radius - Math.hypot(P.x - gp.x, P.z - gp.z);
+          if (push > 0 && P.y < 42) {
+            var ux = P.x - gp.x, uz = P.z - gp.z;
+            var ul = Math.hypot(ux, uz) || 1;
+            P.x += (ux / ul) * push; P.z += (uz / ul) * push;
+          }
           var dd = Math.hypot(P.x - gp.x, P.z - gp.z);
           if (dd < dNear) { dNear = dd; gdNear = gods[gi]; }
         }
@@ -742,7 +749,7 @@
       noCull(sm);
       var sb = new THREE.Box3().setFromObject(sm);
       var sh = Math.max(0.001, sb.max.y - sb.min.y);
-      sm.scale.setScalar(1.5 / sh);
+      sm.scale.setScalar(2.6 / sh);   // bigger hero soul — reads at broadcast distance
       sb.setFromObject(sm);
       var sc = sb.getCenter(new THREE.Vector3());
       sm.position.x -= sc.x; sm.position.z -= sc.z; sm.position.y -= sb.min.y;
@@ -798,7 +805,8 @@
         gods.push({
           root: root, mixer: mixer, def: def, feet: feet, aura: aura,
           clips: { idle: idleC, walk: walkC, attack: atkC },
-          atkDur: atkDur, atkHitAt: 0.92, atkEndAt: 1.67, atkWaveR: 0, atkWaveSp: 0,
+          radius: def.height * 0.085,   // solid body — the soul collides with the god's legs
+          atkDur: atkDur, atkHitAt: atkDur * 0.55, atkEndAt: atkDur, atkWaveR: 0, atkWaveSp: 0,
           state: 'idle', stateT: 0, yaw: def.yaw || 0, targetYaw: def.yaw || 0,
           coneFoot: coneFoot, stompCd: 0, attackDone: false,
           patrolPhase: Math.random() * Math.PI * 2
@@ -837,14 +845,14 @@
     var _prevPad = [false, false, false, false];
     window.addEventListener('gamepadconnected', function () {
       document.getElementById('hint').textContent =
-        'LEFT STICK steer · RIGHT STICK altitude · always cruising to the gods · A dash · X vision · B echo';
+        'STICK steer · RIGHT STICK altitude · A dash · X vision · B echo';
     });
 
     var isTouch = ('ontouchstart' in window);
     if (isTouch) {
       document.body.classList.add('touch');
       document.getElementById('hint').textContent =
-        'drag to steer + climb · second finger: slide up to boost, down to brake · tap dash / vision / echo';
+        'drag: steer + climb · 2nd finger: boost / brake · tap dash / vision / echo';
     }
     var stick = document.getElementById('stick'), knob = document.getElementById('knob');
     var stickId = null, stickCx = 0, stickCy = 0;
@@ -1055,9 +1063,11 @@
     /* ---------- god AI ---------- */
     function setGodAnim(gd, name) {
       if (!gd.clips[name] || gd._anim === name) return;
+      var prev = gd._anim ? gd.mixer.clipAction(gd.clips[gd._anim]) : null;
       gd._anim = name;
-      gd.mixer.stopAllAction();
-      gd.mixer.clipAction(gd.clips[name]).reset().play();
+      var next = gd.mixer.clipAction(gd.clips[name]);
+      next.reset().play();
+      if (prev) prev.crossFadeTo(next, 0.25, false);   // no hard pose cuts = no glitch-pop
     }
 
     // Start a god's strike using the REAL attack clip. The shockwave lands
@@ -1190,8 +1200,9 @@
           }
         }
 
-        // smooth turn toward target yaw
+        // smooth turn toward target yaw (delta clamped so a wild target can't spin-pop)
         var dy = ((gd.targetYaw - gd.root.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+        dy = Math.max(-Math.PI * 0.5, Math.min(Math.PI * 0.5, dy));
         gd.root.rotation.y += dy * Math.min(1, dt * 1.6);
         pos.y = -gd.feet;
 
@@ -1347,6 +1358,16 @@
           vel.lerp(new THREE.Vector3(), 0.22);
         }
         soul.position.addScaledVector(vel, dt);
+        // solid gods: the soul slides around their bodies instead of ghosting through
+        for (var ci = 0; ci < gods.length; ci++) {
+          var cg = gods[ci].root.position;
+          var cvx = soul.position.x - cg.x, cvz = soul.position.z - cg.z;
+          var cd = Math.hypot(cvx, cvz), cr = gods[ci].radius + 1.2;
+          if (cd < cr && soul.position.y < 42) {
+            var cf = (cr - cd) / (cd || 1);
+            soul.position.x += cvx * cf; soul.position.z += cvz * cf;
+          }
+        }
         soul.position.x = THREE.MathUtils.clamp(soul.position.x, -110, 110);
         soul.position.z = THREE.MathUtils.clamp(soul.position.z, -190, 16);
         soul.position.y = THREE.MathUtils.clamp(soul.position.y, 0, 75);   // ceiling: orbit the gods' faces (~45) and climb above them
