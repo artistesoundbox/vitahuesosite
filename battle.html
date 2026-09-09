@@ -59,7 +59,7 @@
       border: 1px solid rgba(120, 180, 255, 0.25);
       box-shadow: 0 0 34px rgba(60, 120, 220, 0.25), inset 0 0 60px rgba(0,0,0,0.4);
       background: #060a12;
-      touch-action: none;
+      touch-action: pan-y;  /* pan-y keeps page scrolling alive on phones */
     }
     #stage canvas { display: block; width: 100%; height: 100%; }
 
@@ -265,6 +265,9 @@
       hp: 5, maxHp: 5, wave: 0, maxWaves: 5,
       kills: 0, xp: 0, running: false, over: false, won: false
     };
+    // Character heights (world units). Luna 1.7 / zombie 1.5 — the arena
+    // reads better with smaller fighters and the camera pulled back.
+    var LUNA_H = 1.7, ZOMBIE_H = 1.5;
     var WAVES = [
       { count: 3, speed: 1.7, hp: 1 },
       { count: 5, speed: 1.9, hp: 1 },
@@ -354,6 +357,52 @@
       root.traverse(function (o) { if (o.isBone) b.expandByPoint(o.getWorldPosition(v)); });
       return b;
     }
+    // True feet height from the SKINNED MESH's animated vertex positions
+    // (bind-pose boxes and bone boxes both lie — the rendered skin is truth).
+    // Full GPU skinning math on CPU for up to 1200 verts, one-time per model:
+    //   skinned = bindMatrixInverse · Σ(wᵏ · boneMatricesᵏ) · bindMatrix · v
+    // then into world with the root parked at y=0. Lowest vertex Y = feet.
+    function measureFeet(root) {
+      root.updateMatrixWorld(true);
+      var pos = root.position.clone();
+      root.position.set(0, 0, 0);
+      root.updateMatrixWorld(true);
+      var lowest = Infinity;
+      var v = new THREE.Vector3();
+      root.traverse(function (o) {
+        if (!o.isSkinnedMesh || !o.geometry || !o.geometry.getVertexPosition) return;
+        var sk = o.skeleton;
+        if (sk) sk.update();                        // refresh boneMatrices
+        var bm = o.bindMatrix || new THREE.Matrix4();
+        var bmi = o.bindMatrixInverse || new THREE.Matrix4();
+        var si = o.geometry.attributes.skinIndex;
+        var sw = o.geometry.attributes.skinWeight;
+        var n = Math.min(o.geometry.attributes.position.count, 1200);
+        for (var i = 0; i < n; i++) {
+          o.geometry.getVertexPosition(i, v);       // bind-space vertex
+          v.applyMatrix4(bm);
+          if (sk) {
+            var x = 0, y = 0, z = 0;
+            var idx = [si.getX(i), si.getY(i), si.getZ(i), si.getW(i)];
+            var wts = [sw.getX(i), sw.getY(i), sw.getZ(i), sw.getW(i)];
+            var m = sk.boneMatrices;
+            for (var k = 0; k < 4; k++) {
+              var w = wts[k]; if (!w) continue;
+              var off = idx[k] * 16;
+              x += w * (v.x * m[off]    + v.y * m[off+4]  + v.z * m[off+8]  + m[off+12]);
+              y += w * (v.x * m[off+1]  + v.y * m[off+5]  + v.z * m[off+9]  + m[off+13]);
+              z += w * (v.x * m[off+2]  + v.y * m[off+6]  + v.z * m[off+10] + m[off+14]);
+            }
+            v.set(x, y, z).applyMatrix4(bmi);       // skinned, mesh-local
+          }
+          v.applyMatrix4(o.matrixWorld);            // → world (root at y=0)
+          lowest = Math.min(lowest, v.y);
+        }
+      });
+      root.position.copy(pos);
+      root.updateMatrixWorld(true);
+      return isFinite(lowest) ? lowest : 0;
+    }
 
     var overlayText = document.getElementById('overlay-text');
 
@@ -374,29 +423,27 @@
       // ---- luna (player) ----
       luna = gs[1].scene;
       noCull(luna);
-      var nl = normalizeHeight(luna, 2.3);
+      var nl = normalizeHeight(luna, LUNA_H);
       scene.add(luna);
       lunaMix = new THREE.AnimationMixer(luna);
       gs[1].animations.forEach(function (a) { clipsL[a.name] = a; });
-      // play one idle frame so bones sit where they render, then measure feet
       if (clipsL['idle']) lunaMix.clipAction(clipsL['idle']).play();
       lunaMix.update(0.016);
       luna.position.set(0, 0, 0);
-      var lb = boneBox(luna);
-      lunaFootY = lb.min.y;                       // feet offset below origin
+      lunaFootY = measureFeet(luna);           // true skinned-feet offset
       luna.position.set(arenaCenter.x, floorY - lunaFootY + 0.02, arenaCenter.z + 6);
 
       // ---- zombie prototype ----
       zombieProto = gs[2].scene;
       noCull(zombieProto);
-      var nz = normalizeHeight(zombieProto, 2.05);
+      var nz = normalizeHeight(zombieProto, ZOMBIE_H);
       zombieProto.visible = false;
       scene.add(zombieProto);
       // bone-based foot offset for clones (bind-pose boxes lie)
       var zmTmp = new THREE.AnimationMixer(zombieProto);
       if (zombieClips['walk']) zmTmp.clipAction(zombieClips['walk']).play();
       zmTmp.update(0.016);
-      zombieFootY = boneBox(zombieProto).min.y;
+      zombieFootY = measureFeet(zombieProto);
       gs[2].animations.forEach(function (a) { zombieClips[a.name] = a; });
 
       overlayText.textContent = 'The arena stands silent. Ready when you are.';
@@ -428,6 +475,12 @@
       audio();
     });
     window.addEventListener('keyup', function (e) { keys[e.code] = false; });
+    // Gamepad: left stick moves, A / RT strikes (polled every frame below).
+    var _prevPadA = false, _prevPadRT = false;
+    window.addEventListener('gamepadconnected', function () {
+      document.getElementById('hint').textContent =
+        'WASD / arrows or LEFT STICK to move · SPACE / A / RT to strike';
+    });
 
     // virtual joystick (left half) + strike button
     var isTouch = ('ontouchstart' in window);
@@ -438,7 +491,7 @@
       audio();
       for (var i = 0; i < e.changedTouches.length; i++) {
         var t = e.changedTouches[i];
-        if (stickId === null && t.clientX - stage.getBoundingClientRect().left < stage.clientWidth * 0.5) {
+        if (stickId === null && t.clientX - stage.getBoundingClientRect().left < stage.clientWidth * 0.45) {
           stickId = t.identifier;
           var r = stage.getBoundingClientRect();
           stickCx = t.clientX; stickCy = t.clientY;
@@ -449,6 +502,7 @@
       }
     }, { passive: true });
     stage.addEventListener('touchmove', function (e) {
+      if (stickId === null) return;   // no stick drag → let the page pan
       for (var i = 0; i < e.changedTouches.length; i++) {
         var t = e.changedTouches[i];
         if (t.identifier === stickId) {
@@ -576,24 +630,34 @@
 
       if (lunaMix) lunaMix.update(dt);
 
-      // keyboard → input vector
+      // gather input: touch stick + keyboard + gamepad left stick
       var ix = input.x, iz = input.z;
       if (keys['KeyA'] || keys['ArrowLeft']) ix -= 1;
       if (keys['KeyD'] || keys['ArrowRight']) ix += 1;
       if (keys['KeyW'] || keys['ArrowUp']) iz -= 1;
       if (keys['KeyS'] || keys['ArrowDown']) iz += 1;
+      var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (var pi = 0; pi < pads.length; pi++) {
+        var gp = pads[pi]; if (!gp) continue;
+        if (gp.axes.length > 1) {
+          var gx = gp.axes[0], gy = gp.axes[1];
+          if (Math.abs(gx) > 0.18) ix += gx;
+          if (Math.abs(gy) > 0.18) iz += gy;
+        }
+        var aDown = !!(gp.buttons[0] && gp.buttons[0].pressed);
+        var rtDown = !!(gp.buttons[7] && gp.buttons[7].pressed);
+        if ((aDown && !_prevPadA) || (rtDown && !_prevPadRT)) tryAttack();
+        _prevPadA = aDown; _prevPadRT = rtDown;
+      }
       var mag = Math.hypot(ix, iz);
       if (mag > 1) { ix /= mag; iz /= mag; }
 
       if (luna && G.running && !G.over) {
-        // camera-relative move (camera yaw fixed at -45°)
-        var cy = -Math.PI / 4;
-        var fwd = new THREE.Vector3(Math.sin(cy), 0, Math.cos(cy));  // up-screen
+        // Camera sits at (+X,+Z) looking at the player, so screen-up (W) is
+        // the world diagonal away from it: (-1,0,-1). Fixed basis, no math
+        // games — W runs up-screen, S down-screen, A/D across.
+        var fwd = new THREE.Vector3(-1, 0, -1).normalize();
         var right = new THREE.Vector3(fwd.z, 0, -fwd.x);
-        // screen-up = -Z world when yaw -45: use forward = (sin cy, 0, cos cy) rotated:
-        // simpler: forward = (0,0,-1) rotated by cy around Y
-        fwd.set(Math.sin(cy) * -1, 0, Math.cos(cy) * -1);
-        right.set(-fwd.z, 0, fwd.x);
         var move = new THREE.Vector3()
           .addScaledVector(fwd, -iz)
           .addScaledVector(right, ix);
@@ -610,7 +674,7 @@
           arenaCenter.x - arenaHalf.x, arenaCenter.x + arenaHalf.x);
         luna.position.z = THREE.MathUtils.clamp(luna.position.z,
           arenaCenter.z - arenaHalf.z, arenaCenter.z + arenaHalf.z);
-        luna.position.y = floorY - lunaFootY + 0.02;
+        luna.position.y = floorY - lunaFootY + 0.02;   // true feet on the sand
 
         // face movement direction
         var sp2d = Math.hypot(playerVel.x, playerVel.z);
@@ -722,7 +786,7 @@
       // camera: fixed 3/4 view following luna
       if (luna) {
         var camTarget = new THREE.Vector3(
-          luna.position.x + 10.5, floorY + 8.2, luna.position.z + 10.5);
+          luna.position.x + 13.5, floorY + 10.6, luna.position.z + 13.5);
         camPos.lerp(camTarget, 0.06);
         camera.position.copy(camPos);
         camLook.lerp(new THREE.Vector3(luna.position.x, floorY + 1.4, luna.position.z), 0.09);
