@@ -228,7 +228,7 @@
         <div id="chyron"></div>
         <div id="essence-label">ESSENCE</div>
         <div id="essence-bar"><div id="essence-fill"></div></div>
-        <div id="hint">WASD steer · R/F climb · SPACE dash · Q vision · E echo</div>
+        <div id="hint">WASD steer · SPACE dash · Q vision · E echo</div>
         <div id="dmg-flash"></div>
         <div id="riot-vignette"></div>
         <div id="stick"><div class="knob" id="knob"></div></div>
@@ -646,7 +646,7 @@
           if (P.x < -105 || P.x > 105 || P.z < -38 || P.z > 12) n.yaw += Math.PI * (0.7 + Math.random() * 0.6);
         }
 
-        P.y = n.baseY + Math.sin(t * 1.7 + n.bobPh) * 0.6;
+        P.y = n.baseY;   // locked altitude — lost souls travel X/Z only, no depth
         n.orb.rotation.y += dt * 2;
         n.halo.material.opacity = (n.state === 'doomed' ? 0.3 : 0.12) + Math.sin(t * (n.state === 'doomed' ? 9 : 2.2) + n.bobPh) * 0.06;
       }
@@ -842,7 +842,7 @@
     });
 
     /* ---------- input ---------- */
-    var input = { x: 0, z: 0, y: 0 };   // y = climb/dive, baked into the drag
+    var input = { x: 0, z: 0 };   // Y locked: souls travel X/Z only (no altitude)
     var throttle = 0;                    // second finger: up = boost, down = brake
     var keys = {};
     window.addEventListener('keydown', function (e) {
@@ -855,7 +855,7 @@
     window.addEventListener('keyup', function (e) { keys[e.code] = false; });
     // stuck-key / stale-touch safety on focus loss — never coast on a phantom
     window.addEventListener('blur', function () {
-      keys = {}; input.x = input.z = input.y = 0; throttle = 0;
+      keys = {}; input.x = input.z = 0; throttle = 0;
       stickId = null;
       var st = document.getElementById('stick');
       if (st) { st.style.opacity = 0; var kn = document.getElementById('knob'); if (kn) kn.style.transform = 'translate(0,0)'; }
@@ -864,18 +864,18 @@
     var _prevPad = [false, false, false, false];
     window.addEventListener('gamepadconnected', function () {
       document.getElementById('hint').textContent =
-        'STICK steer · RIGHT STICK altitude · A dash · X vision · B echo';
+        'STICK steer · A dash · X vision · B echo';
     });
 
     var isTouch = ('ontouchstart' in window);
     if (isTouch) {
       document.body.classList.add('touch');
       document.getElementById('hint').textContent =
-        'drag: steer + climb · 2nd finger: boost / brake · tap dash / vision / echo';
+        'drag: steer · 2nd finger: boost / brake · tap dash / vision / echo';
     }
     var stick = document.getElementById('stick'), knob = document.getElementById('knob');
     var stickId = null, stickCx = 0, stickCy = 0;
-    var flyId = null, flyY = 0;   // second finger: altitude slider
+    var flyId = null, flyY = 0;   // second finger: throttle slider
     /* ---------- touch: finger 1 anywhere = move · finger 2 slide = fly ---------- */
     stage.addEventListener('touchstart', function (e) {
       audio();
@@ -902,8 +902,7 @@
           var len = Math.hypot(dx, dy), max = 46;
           var k = len > max ? max / len : 1;
           knob.style.transform = 'translate(' + dx * k + 'px,' + dy * k + 'px)';
-          input.x = (dx * k) / max; input.z = (dy * k) / max;
-          input.y = -((dy * k) / max);   // drag up = climb, drag down = dive — full 3D on one finger
+          input.x = (dx * k) / max; input.z = (dy * k) / max;   // X/Z only — no climb/dive
         } else if (t.identifier === flyId) {
           var dY = t.clientY - flyY;
           throttle = dY < -6 ? 1 : (dY > 6 ? -1 : 0);
@@ -914,7 +913,7 @@
       for (var i = 0; i < e.changedTouches.length; i++) {
         var id = e.changedTouches[i].identifier;
         if (id === stickId) {
-          stickId = null; input.x = input.z = input.y = 0;
+          stickId = null; input.x = input.z = 0;
           knob.style.transform = 'translate(0,0)'; stick.style.opacity = 0;
         } else if (id === flyId) {
           flyId = null; throttle = 0;
@@ -1244,6 +1243,7 @@
     var camLook = new THREE.Vector3(0, 3, 0);
     var vel = new THREE.Vector3();
     var SPEED = 10.5, DASH_MULT = 3.1;
+    var FLY_Y = 4.0;   // fixed altitude — the hunt plays on a flat X/Z plane now
     var CRUISE = 0.42, CRUISE_BOOST = 0.58;   // soul always drifts up the field; throttle stacks to full / slight brake
     var bank = 0, pitchA = 0;   // flight attitude (radians)
 
@@ -1334,20 +1334,17 @@
         }
 
         // input: touch + keyboard + gamepad (vertical = fly)
-        var ix = input.x, iz = input.z, iy = input.y;
+        var ix = input.x, iz = input.z;
         if (keys['KeyA'] || keys['ArrowLeft']) ix -= 1;
         if (keys['KeyD'] || keys['ArrowRight']) ix += 1;
         if (keys['KeyW'] || keys['ArrowUp']) iz -= 1;
         if (keys['KeyS'] || keys['ArrowDown']) iz += 1;
-        if (keys['KeyR']) iy += 1;   // hold R to rise
-        if (keys['KeyF']) iy -= 1;   // hold F to descend
         var pads = navigator.getGamepads ? navigator.getGamepads() : [];
         for (var pi = 0; pi < pads.length; pi++) {
           var gp = pads[pi]; if (!gp) continue;
           if (gp.axes.length > 1) {
             if (Math.abs(gp.axes[0]) > 0.18) ix += gp.axes[0];
             if (Math.abs(gp.axes[1]) > 0.18) iz += gp.axes[1];
-            if (gp.axes.length > 3 && Math.abs(gp.axes[3]) > 0.18) iy += gp.axes[3];   // right stick = altitude
           }
           var aD = !!(gp.buttons[0] && gp.buttons[0].pressed);
           var xD = !!(gp.buttons[2] && gp.buttons[2].pressed);
@@ -1371,7 +1368,7 @@
         // saucer-style flight: the drag steers sideways + climb/dive while the
         // soul always cruises up the field toward the gods; throttle brakes or boosts
         var cruise = CRUISE + throttle * CRUISE_BOOST;
-        var move = new THREE.Vector3(ix, iy, iz - cruise);
+        var move = new THREE.Vector3(ix, 0, iz - cruise);   // Y locked — plane-only flight
         if (move.lengthSq() > 0.01) {
           vel.lerp(move.multiplyScalar(SPEED * dashK * altK), 0.2);
         } else {
@@ -1390,10 +1387,10 @@
         }
         soul.position.x = THREE.MathUtils.clamp(soul.position.x, -105, 105);
         soul.position.z = THREE.MathUtils.clamp(soul.position.z, -38, 12);   // fly zone: an even 26-unit gap to the god line
-        soul.position.y = THREE.MathUtils.clamp(soul.position.y, 0, 40);   // ceiling below the gods' shoulders — they still tower over you
-        if (!G.flewOnce && soul.position.y > 8) {
+        soul.position.y = FLY_Y;   // locked altitude — no depth travel
+        if (!G.flewOnce && (Math.abs(vel.x) > 0.4 || Math.abs(vel.z) > 0.4)) {
           G.flewOnce = true;
-          chyron('AIRBORNE — THE CAMERAS LOVE AN AERIAL SHOT');
+          chyron('THE FEED SEES YOU FLY');
         }
 
         updateGods(dt);
@@ -1509,8 +1506,7 @@
     /* ---------- flow ---------- */
     function startGame() {
       audio();
-      document.getElementById('overlay').classList.add('hidden');
-      soul.position.set(0, 0, 8);
+      document.getElementById('overlay').classList.add('hidden');        soul.position.set(0, FLY_Y, 8);
       vel.set(0, 0, 0);
       while (WAVES.length) {                      // clear stale shockwaves from the last life
         var wv = WAVES.pop(); scene.remove(wv.mesh);
@@ -1610,7 +1606,7 @@
       },
       hasModel: function () { return !!soulBody; },
       clips: function () { return gods.map(function (g) { return { names: Object.keys(g.clips).filter(function (k) { return g.clips[k]; }), atkDur: +g.atkDur.toFixed(2), atkHitAt: +g.atkHitAt.toFixed(2), anim: g._anim, state: g.state }; }); },
-      moveTo: function (x, z) { soul.position.set(x, 0, z); },
+      moveTo: function (x, z) { soul.position.set(x, FLY_Y, z); },
       dash: tryDash, vision: tryVision, possess: tryPossess,
       drain: function (n) { G.essence = Math.max(0, G.essence - n); },
       time: function (n) { G.t = n; G.viewers = 12 + Math.floor(G.t * 37 + Math.pow(G.t, 1.8)); },
