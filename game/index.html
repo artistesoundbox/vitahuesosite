@@ -201,7 +201,7 @@ const engine = new Engine(GODOT_CONFIG);
 		setStatusMode('progress');
 				// Pack source chain: R2 (fast, no quota) -> GitHub LFS -> same-origin (offline dev)
 				const R2_BASE = '';
-				const RELEASE_PACK = 'https://media.githubusercontent.com/media/artistesoundbox/vitahuesosite/main/game/index.pck';
+				const RELEASE_PACK = 'https://media.githubusercontent.com/media/artistesoundbox/vitahuesosite/main/game/index.pck?v=20260910-1';
 		const LOCAL_PACK = 'index.pck';
 		const head = (u) => fetch(u, { method: 'HEAD', mode: 'cors' }).then((r) => r.ok).catch(() => false);
 		const probe = (async () => {
