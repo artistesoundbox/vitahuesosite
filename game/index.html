@@ -111,7 +111,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":327852100,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":327852724,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
@@ -229,6 +229,14 @@ const engine = new Engine(GODOT_CONFIG);
 		</script>
 	
 <script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw-pack.js').catch(function () {});
+  });
+}
+</script>
+
+<script>
 /*
  * Tilt steering — device orientation -> Godot game (Over The Ice).
  * Inlined into the web export shell by tools/patch-web-export.mjs.
@@ -342,14 +350,6 @@ const engine = new Engine(GODOT_CONFIG);
   window.addEventListener('keydown', ask, { once: false, capture: true });
 })();
 
-</script>
-
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function () {
-    navigator.serviceWorker.register('sw-pack.js').catch(function () {});
-  });
-}
 </script>
 </body>
 </html>
