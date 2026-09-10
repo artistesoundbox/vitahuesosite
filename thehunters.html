@@ -516,7 +516,7 @@
     var NPC_COLORS = [0x8fd8ff, 0xa8ffe2, 0xffe2a8, 0xd8b0ff, 0xffb0c8, 0xbfffd0, 0xc8d8ff];
     function npcZoneZ(z) { return Math.max(-38, Math.min(12, z)); }   // the fly zone's depth band
     function spawnNpcSouls() {
-      for (var i = 0; i < 22; i++) {
+      for (var i = 0; i < 11; i++) {
         var g = new THREE.Group();
         var c = NPC_COLORS[i % NPC_COLORS.length];
         var body = null;
@@ -542,9 +542,10 @@
         g.position.set(-95 + Math.random() * 190, 0, -36 + Math.random() * 44);
         scene.add(g);
         NPC_SOULS.push({ grp: g, body: body, orb: body || h, halo: h, yaw: Math.random() * Math.PI * 2,
-                         speed: 1.6 + Math.random() * 2.6, turn: (Math.random() - 0.5) * 0.9, retg: Math.random() * 3,
+                         speed: 0.8 + Math.random() * 4.7, turn: (Math.random() - 0.5) * 0.9, retg: Math.random() * 3,
                          bobPh: Math.random() * Math.PI * 2, sz: sz,
-                         baseY: (i % 2 === 0) ? 2 + Math.random() * 30 : 0.9,   // half drift high — all inside the fly zone
+                         drX: Math.random() * 0.4 + 0.1, drZ: Math.random() * 0.3 + 0.05, phX: Math.random() * 6.28, phZ: Math.random() * 6.28,
+                         baseY: 0.8 + Math.random() * 32,   // every soul finds its own altitude
                          state: 'roam', t: 0, respawn: 0 });
       }
     }
@@ -635,10 +636,13 @@
           // retargets its heading on its own clock, so the multitude stays
           // scattered across the zone instead of drifting into a cluster.
           n.retg -= dt;
-          if (n.retg <= 0) { n.retg = 2.2 + Math.random() * 3.5; n.turn = (Math.random() - 0.5) * 1.6; n.yaw = Math.random() * Math.PI * 2; }
+          if (n.retg <= 0) { n.retg = 3.0 + Math.random() * 5.0; n.turn = (Math.random() - 0.5) * 1.6; n.yaw = Math.random() * Math.PI * 2; }
           n.yaw += n.turn * dt;
-          n.grp.position.x += Math.sin(n.yaw) * n.speed * dt;
-          n.grp.position.z += Math.cos(n.yaw) * n.speed * dt;
+          // each soul drifts on its own sine wave — no two share a path
+          var driftX = Math.sin(t * n.drX + n.phX) * n.drX * 4;
+          var driftZ = Math.cos(t * n.drZ + n.phZ) * n.drZ * 3;
+          n.grp.position.x += Math.sin(n.yaw) * n.speed * dt + driftX * dt;
+          n.grp.position.z += Math.cos(n.yaw) * n.speed * dt + driftZ * dt;
           if (P.x < -105 || P.x > 105 || P.z < -38 || P.z > 12) n.yaw += Math.PI * (0.7 + Math.random() * 0.6);
         }
 
