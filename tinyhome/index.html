@@ -78,34 +78,6 @@
 </head>
 <body>
 <div id="app"></div>
-<script>
-/* Boot diagnostics: if the 3D app fails to start (module load error, WebGL
-   unavailable, stale cache…), surface it visibly instead of a silent blank canvas. */
-(function(){
-  window.__thErrors = [];
-  function show(msg){
-    var h = document.getElementById('hint');
-    if (h){ h.innerHTML = '<b style="color:#ff9d9d">⚠ ' + msg + '</b>'; }
-  }
-  window.addEventListener('error', function(e){
-    var m = (e.target && e.target.src) ? 'Failed to load: ' + e.target.src.split('/').pop()
-          : (e.message || 'Script error');
-    window.__thErrors.push(m);
-    if (!window.__thStarted) show(m);
-  }, true);
-  window.addEventListener('unhandledrejection', function(e){
-    var m = 'Promise error: ' + ((e.reason && e.reason.message) || e.reason);
-    window.__thErrors.push(m);
-    if (!window.__thStarted) show(m);
-  });
-  setTimeout(function(){
-    if (!window.__thStarted || !document.querySelector('#app canvas')){
-      var extra = window.__thErrors.length ? ' — ' + window.__thErrors[0] : ' — WebGL may be disabled';
-      show('3D failed to start' + extra + '. Try Chrome/Edge with hardware acceleration on, then hard-refresh (Ctrl+Shift+R).');
-    }
-  }, 7000);
-})();
-</script>
 
 <div id="topbar">
   <span class="title">🏠 UBAOG MULTI-LEVEL TINY HOME</span>
@@ -221,7 +193,6 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
 app.appendChild(renderer.domElement);
-window.__thStarted = true;   // boot diagnostic: module reached the render stage
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xa9c3da);
