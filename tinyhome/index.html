@@ -76,6 +76,17 @@ addEventListener('beforeinstallprompt', e => { e.preventDefault(); window.__inst
   #bFull { display:none; }
   @media (pointer:coarse){ #bFull { display:inline-block; } }
   #bInstall { display:none; }   /* shown by JS only when beforeinstallprompt fires */
+  /* ---- ⚙ settings chip + panel (look sensitivity / FOV, persisted) ---- */
+  #settings { position:fixed; right:14px; top:calc(56px + env(safe-area-inset-top)); width:240px; z-index:22;
+    background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px 14px; display:none;
+    backdrop-filter:blur(6px); box-shadow:0 8px 24px rgba(0,0,0,.45); }
+  #settings.open { display:block; }
+  #settings h4 { margin:0 0 6px; font-size:11px; text-transform:uppercase; letter-spacing:1.5px; color:#7f95ab; }
+  #settings .row { display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-top:9px; }
+  #settings label { font-size:12px; }
+  #settings .val { color:var(--accent); font-size:11px; font-variant-numeric:tabular-nums; }
+  #settings input[type=range] { width:100%; accent-color:var(--accent); margin:2px 0 0; }
+  #settings button { margin-top:12px; width:100%; }
   #joyBase { position:absolute; width:124px; height:124px; border:2px solid rgba(226,232,240,.35); border-radius:50%;
     background:rgba(13,17,23,.28); transform:translate(-50%,-50%); display:none; }
   #joyKnob { position:absolute; width:54px; height:54px; border-radius:50%; background:rgba(77,163,255,.5);
@@ -127,6 +138,7 @@ addEventListener('beforeinstallprompt', e => { e.preventDefault(); window.__inst
   <button class="btn" id="bWeather" title="Toggle rain ambience">🌧 Rain</button>
   <button class="btn" id="bFull" title="Fullscreen">⛶ Full</button>
   <button class="btn" id="bInstall" title="Install Tiny Home as an app (Android)">📲 Install</button>
+  <button class="btn" id="bSettings" title="Look & camera settings">⚙</button>
   <input type="file" id="fileImport" accept=".json,application/json" style="display:none">
   <span id="stats"></span>
 </div>
@@ -138,6 +150,17 @@ addEventListener('beforeinstallprompt', e => { e.preventDefault(); window.__inst
 </div>
 
 <div id="hint"></div>
+
+<div id="settings" role="dialog" aria-label="Camera and control settings">
+  <h4>⚙ Camera &amp; controls</h4>
+  <div class="row"><label for="setSens">Look sensitivity</label><span class="val" id="setSensV"></span></div>
+  <input type="range" id="setSens" min="0.0008" max="0.0055" step="0.0001">
+  <div class="row"><label for="setFovOrbit">Orbit field of view</label><span class="val" id="setFovOrbitV"></span></div>
+  <input type="range" id="setFovOrbit" min="40" max="80" step="1">
+  <div class="row"><label for="setFovWalk">Walk field of view</label><span class="val" id="setFovWalkV"></span></div>
+  <input type="range" id="setFovWalk" min="55" max="100" step="1">
+  <button class="btn" id="setReset">↺ Reset to defaults</button>
+</div>
 
 <div id="selinfo">
   <div id="selname" style="font-weight:600"></div>
@@ -1620,8 +1643,8 @@ document.addEventListener('pointerlockchange', () => {
 });
 document.addEventListener('mousemove', e => {
   if (!walkOn || document.pointerLockElement !== renderer.domElement) return;   // touch look has its own path
-  player.yaw   -= e.movementX * 0.0022;
-  player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch - e.movementY*0.0022));
+  player.yaw   -= e.movementX * SET.sens;
+  player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch - e.movementY*SET.sens));
 });
 const touchUI = {
   root: document.getElementById('touchui'),
@@ -1681,8 +1704,8 @@ addEventListener('pointermove', e => {
     touchUI.joyKnob.style.left = (joyCenter.x+dx)+'px';
     touchUI.joyKnob.style.top = (joyCenter.y+dy)+'px';
   } else if (e.pointerId === lookPtr && lookLast){
-    player.yaw   -= (e.clientX - lookLast.x) * 0.0031;      // gentler than desktop: touch drags sweep wider
-    player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch - (e.clientY - lookLast.y)*0.0031));
+    player.yaw   -= (e.clientX - lookLast.x) * SET.sens;      // slider-tunable (default gentler on touch)
+    player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch - (e.clientY - lookLast.y)*SET.sens));
     lookLast = {x:e.clientX, y:e.clientY};
   }
 });
@@ -1965,6 +1988,43 @@ if (IS_TOUCH){
 // register the pass-through service worker (required for installability; caches nothing)
 if ('serviceWorker' in navigator){
   addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
+
+// ⚙ settings chip — look sensitivity + FOV sliders, persisted in localStorage
+const SETKEY = 'tinyhome_settings_v1';
+const SET_DEF = { sens: IS_TOUCH ? 0.0031 : 0.0022, fovOrbit: FOV.orbit, fovWalk: FOV.walk };
+const SET = Object.assign({}, SET_DEF, (() => { try { return JSON.parse(localStorage.getItem(SETKEY)) || {}; } catch { return {}; } })());
+{
+  const setPanel = document.getElementById('settings');
+  const setUI = {
+    sens:     document.getElementById('setSens'),
+    fovOrbit: document.getElementById('setFovOrbit'),
+    fovWalk:  document.getElementById('setFovWalk'),
+  };
+  function saveSettings(){ try { localStorage.setItem(SETKEY, JSON.stringify(SET)); } catch {} }
+  function applySettings(){
+    FOV.orbit = SET.fovOrbit; FOV.walk = SET.fovWalk;
+    camera.fov = (mode === 'walk') ? FOV.walk : FOV.orbit;
+    camera.updateProjectionMatrix();
+    document.getElementById('setSensV').textContent     = SET.sens.toFixed(4);
+    document.getElementById('setFovOrbitV').textContent = Math.round(SET.fovOrbit) + '°';
+    document.getElementById('setFovWalkV').textContent  = Math.round(SET.fovWalk) + '°';
+  }
+  setUI.sens.value = SET.sens; setUI.fovOrbit.value = SET.fovOrbit; setUI.fovWalk.value = SET.fovWalk;
+  setUI.sens.addEventListener('input',     () => { SET.sens = +setUI.sens.value;             applySettings(); saveSettings(); });
+  setUI.fovOrbit.addEventListener('input', () => { SET.fovOrbit = +setUI.fovOrbit.value;       applySettings(); saveSettings(); });
+  setUI.fovWalk.addEventListener('input',  () => { SET.fovWalk = +setUI.fovWalk.value;         applySettings(); saveSettings(); });
+  document.getElementById('setReset').onclick = () => {
+    Object.assign(SET, SET_DEF);
+    setUI.sens.value = SET.sens; setUI.fovOrbit.value = SET.fovOrbit; setUI.fovWalk.value = SET.fovWalk;
+    applySettings(); saveSettings();
+  };
+  const bSettings = document.getElementById('bSettings');
+  bSettings.onclick = () => {
+    setPanel.classList.toggle('open');
+    bSettings.classList.toggle('active', setPanel.classList.contains('open'));
+  };
+  applySettings();   // restore persisted values on boot
 }
 // 📲 in-app install button — Android/Chrome fires beforeinstallprompt once the
 // SW + manifest criteria are met; iOS never fires it (Share → Add to Home Screen)
