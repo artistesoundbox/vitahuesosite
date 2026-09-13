@@ -810,8 +810,9 @@ wall(0, D, W, D, EXT, 0, EAVE, [
 wall(0, 0, 0, D, EXT, 0, EAVE, [
   { a:6.8, b:10.8, b0:2.42, b1:6.42 },
 ], M.extSiding);
-// East (x=28): D1 3' entry + D1.5 2' door (to porch)
+// East (x=28): front window (per tinyhome.png) + D1 3' entry + D1.5 2' door (to porch)
 wall(W, 0, W, D, EXT, 0, EAVE, [
+  { a:8.4, b:12.4, b0:2.42, b1:6.42 }, // front window, north of the doors
   { a:14.9, b:17.9, b0:0, b1:6.67 },   // D1
   { a:18.4, b:20.4, b0:0, b1:6.67 },   // D1.5
 ], M.extSiding);
@@ -822,6 +823,7 @@ windowUnit(4.6, 0, 8.6, 0, 4.6, 9.33, 8.6, 13.33);
 windowUnit(19.4, 0, 23.4, 0, 19.4, 9.33, 23.4, 13.33);
 windowUnit(8, D, 12, D, 8, 3.42, 12, 6.42);
 windowUnit(0, 6.8, 0, 10.8, 6.8, 2.42, 10.8, 6.42);
+windowUnit(W, 8.4, W, 12.4, 8.4, 2.42, 12.4, 6.42);   // front (east) window
 
 // exterior corner posts / trim
 for (const [px,pz] of [[0,0],[W,0],[0,D],[W,D]])
@@ -959,10 +961,12 @@ roofGroup.add(southCeil);      // hides with roof toggle
   // ridge cap
   const cap = new THREE.Mesh(new THREE.BoxGeometry(W+2.4, 0.28, 0.7), M.roof);
   cap.position.set(W/2, RIDGE_H+0.1, D/2); roofGroup.add(cap);
-  // gable end walls (triangles) — front (E) & back (W), spanning the 25' depth
+  // gable end infill (triangles) — front (E) & back (W): fill ONLY eave→ridge
+  // (the rectangular wall below EAVE comes from the wall() system with its openings;
+  //  a ground-to-ridge triangle here would paint over the doors and windows)
   {
     const sh = new THREE.Shape();
-    sh.moveTo(-1.4, 0); sh.lineTo(D+1.4, 0); sh.lineTo(D/2, RIDGE_H); sh.closePath();
+    sh.moveTo(-1.4, EAVE); sh.lineTo(D+1.4, EAVE); sh.lineTo(D/2, RIDGE_H); sh.closePath();
     const geo = new THREE.ExtrudeGeometry(sh, { depth: EXT, bevelEnabled:false });
     // rotation.y=-90° maps local (sx,sy,sz)→world(-sz,sy,sx): shape-x→world z, apex at z=D/2
     const east = new THREE.Mesh(geo, M.extSiding);   // front gable (entry side)
@@ -1019,10 +1023,50 @@ scene.add(roofGroup);
     br.position.set(px1-1.85, beamY-1.75, qz);
     br.rotation.z = Math.PI/4; br.castShadow = true; scene.add(br);
   }
-  // porch shed roof
-  const r = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.16, pz1-pz0+0.6), M.roof);
-  r.position.set(px0+2.3, beamY+0.5, (pz0+pz1)/2); r.rotation.z = -Math.atan2(4,12)*0.9;
-  r.castShadow = true; scene.add(r);
+  // porch roof: miniature GABLE — same design & orientation as the main roof
+  // (ridge E–W, triangle facing the ramp), per tinyhome.png front elevation
+  {
+    const a4 = Math.atan2(4, 12);
+    const gz0 = pz0-0.45, gz1 = pz1+0.45;          // gable span incl. eave overhang
+    const gspan = gz1-gz0, gz = (gz0+gz1)/2;       // apex over the porch center
+    const gEave = 10.45;                            // eave height (just above the beam)
+    const gRidge = gEave + gspan*4/12;              // apex ~13.1
+    for (const s of [-1, 1]){
+      const L = Math.hypot(gspan, gspan*4/12);
+      const pl = new THREE.Mesh(new THREE.BoxGeometry(4.75, 0.14, L), M.roof);
+      pl.position.set(px0+2.2, gRidge - (gspan/2)*Math.sin(a4), gz + s*(gspan/2)*Math.cos(a4));
+      pl.rotation.x = s>0 ? a4 : -a4;
+      pl.castShadow = true; pl.receiveShadow = true; scene.add(pl);
+      // standing seams to match the main roof
+      for (let x = px0+0.4; x <= px1+0.25; x += 0.85){
+        const sm = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, L*0.98), M.roof);
+        sm.position.set(x - (px0+2.2), 0.105, 0); pl.add(sm);
+      }
+      const und = new THREE.Mesh(new THREE.BoxGeometry(4.55, 0.05, L*0.99), M.roofUnd);
+      und.position.copy(pl.position); und.position.y -= 0.13; und.rotation.x = pl.rotation.x;
+      scene.add(und);
+    }
+    // gable infill triangle facing the ramp (siding eave→apex, like the main gables)
+    const sh = new THREE.Shape();
+    sh.moveTo(gz0, gEave-0.15); sh.lineTo(gz1, gEave-0.15); sh.lineTo(gz, gRidge-0.12); sh.closePath();
+    const ggeo = new THREE.ExtrudeGeometry(sh, { depth: 0.14, bevelEnabled:false });
+    const gface = new THREE.Mesh(ggeo, M.extSiding);
+    gface.position.set(px1, 0, 0); gface.rotation.y = -Math.PI/2;   // extrudes west, face at porch east edge
+    gface.castShadow = true; scene.add(gface);
+    // battens on the mini gable, following the triangle
+    for (const bz of [gz, gz-2.2, gz+2.2]){
+      const t = 1 - Math.abs(bz-gz)/(gspan/2);
+      const top = gEave + (gRidge-gEave-0.15)*t - 0.2;
+      const h = top - (gEave-0.15);
+      if (h <= 0.25) continue;
+      const b = new THREE.Mesh(new THREE.BoxGeometry(0.09, h, 0.07), M.extTrim);
+      b.position.set(px1+0.03, (gEave-0.15) + h/2, bz);
+      b.castShadow = true; scene.add(b);
+    }
+    // ridge cap
+    const gcap = new THREE.Mesh(new THREE.BoxGeometry(4.75, 0.2, 0.5), M.roof);
+    gcap.position.set(px0+2.2, gRidge+0.05, gz); gcap.castShadow = true; scene.add(gcap);
+  }
   // charcoal skirt around the deck base (per tinyhome.png)
   box(px1-px0+0.1, py-0.18, 0.08, M.skirt, (px0+px1)/2, (py-0.18)/2, pz0-0.06);
   box(px1-px0+0.1, py-0.18, 0.08, M.skirt, (px0+px1)/2, (py-0.18)/2, pz1+0.06);
