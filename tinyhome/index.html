@@ -1,0 +1,1862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UBAOG Multi-Level Tiny Home — 3D Interactive Model</title>
+<style>
+  :root { --panel:#151a20ee; --line:#2a3340; --accent:#4da3ff; --txt:#dbe4ee; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; overflow:hidden; font-family:'Segoe UI',system-ui,sans-serif; background:#0d1117; color:var(--txt); }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; }
+
+  #topbar { position:fixed; top:0; left:0; right:0; height:44px; display:flex; align-items:center; gap:8px;
+    padding:0 12px; background:var(--panel); border-bottom:1px solid var(--line); z-index:20; backdrop-filter:blur(6px); }
+  #topbar .title { font-weight:600; font-size:13px; letter-spacing:.4px; margin-right:6px; white-space:nowrap; }
+  #topbar .sub { font-size:11px; color:#8fa3b8; white-space:nowrap; }
+  .btn { background:#1d2733; color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:5px 11px;
+    font-size:12px; cursor:pointer; user-select:none; white-space:nowrap; }
+  .btn:hover { background:#273447; border-color:#3a4b60; }
+  .btn.active { background:var(--accent); color:#04121f; border-color:var(--accent); font-weight:600; }
+  .sep { width:1px; height:22px; background:var(--line); margin:0 2px; }
+  #stats { margin-left:auto; font-size:11px; color:#8fa3b8; }
+
+  #catalog { position:fixed; top:44px; left:0; bottom:0; width:236px; background:var(--panel);
+    border-right:1px solid var(--line); z-index:15; display:flex; flex-direction:column; }
+  #catalog.hidden { display:none; }
+  #catalog h3 { margin:10px 12px 4px; font-size:11px; text-transform:uppercase; letter-spacing:1.5px; color:#7f95ab; }
+  #catSearch { margin:4px 10px 8px; }
+  #catSearch input { width:100%; background:#0e141b; border:1px solid var(--line); color:var(--txt);
+    border-radius:6px; padding:6px 9px; font-size:12px; outline:none; }
+  #catList { flex:1; overflow-y:auto; padding:0 8px 12px; }
+  .cat-item { display:flex; align-items:center; gap:9px; padding:6px 8px; border-radius:6px; cursor:pointer; font-size:12px; }
+  .cat-item:hover { background:#222d3b; }
+  .cat-item.sel { background:#26415f; }
+  .cat-item .sw { width:26px; height:26px; border-radius:4px; background:#2b3644; display:flex; align-items:center;
+    justify-content:center; font-size:11px; color:#9fb4c9; flex:none; }
+  .cat-item .dims { color:#7890a6; font-size:10px; }
+
+  #hint { position:fixed; left:50%; transform:translateX(-50%); bottom:14px; background:var(--panel);
+    border:1px solid var(--line); border-radius:8px; padding:8px 14px; font-size:12px; z-index:20; max-width:640px; }
+  #hint b { color:var(--accent); }
+  #selinfo { position:fixed; top:52px; right:12px; background:var(--panel); border:1px solid var(--line);
+    border-radius:8px; padding:10px 12px; font-size:12px; z-index:20; display:none; min-width:180px; }
+  #selinfo .row { display:flex; gap:6px; margin-top:6px; }
+  #selinfo button { flex:1; }
+  #lockmsg { position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:30;
+    background:#0d1117cc; font-size:15px; }
+  #lockmsg .card { background:var(--panel); border:1px solid var(--line); padding:22px 30px; border-radius:12px; text-align:center; }
+  #compass { position:fixed; top:54px; left:248px; font-size:11px; color:#8fa3b8; z-index:14; }
+  #minimap { position:fixed; right:14px; bottom:14px; z-index:15; border:1px solid var(--line); border-radius:8px;
+    background:rgba(13,17,23,.82); display:none; }
+  ::-webkit-scrollbar { width:9px; } ::-webkit-scrollbar-thumb { background:#2b3644; border-radius:5px; }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js",
+    "three/addons/exporters/GLTFExporter.js": "./vendor/GLTFExporter.js"
+} }
+</script>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="topbar">
+  <span class="title">🏠 UBAOG MULTI-LEVEL TINY HOME</span>
+  <span class="sub">28' × 25' · per CAD plan A101/A102</span>
+  <div class="sep"></div>
+  <button class="btn active" id="bOrbit">🔍 Orbit view</button>
+  <button class="btn" id="bWalk">🚶 Walk inside</button>
+  <div class="sep"></div>
+  <button class="btn" id="bRoof">⛒ Hide roof</button>
+  <button class="btn" id="bCatalog">🛋 Furniture</button>
+  <div class="sep"></div>
+  <button class="btn" id="bSave">💾 Save</button>
+  <button class="btn" id="bLoad">📂 Load</button>
+  <button class="btn" id="bExport">⬇ JSON</button>
+  <button class="btn" id="bGLB" title="Download the 3D model as a .glb file (opens in Blender)">⬇ GLB</button>
+  <button class="btn" id="bCopy">📋 Copy</button>
+  <button class="btn" id="bImport">⬆ Import</button>
+  <button class="btn" id="bReset">↺ Reset plan</button>
+  <button class="btn" id="bMute" title="Toggle door sounds">🔊 Sound</button>
+  <button class="btn" id="bDay" title="Toggle day / night">🌙 Night</button>
+  <button class="btn" id="bWeather" title="Toggle rain ambience">🌧 Rain</button>
+  <input type="file" id="fileImport" accept=".json,application/json" style="display:none">
+  <span id="stats"></span>
+</div>
+
+<div id="catalog" class="hidden">
+  <h3>Furniture &amp; appliances</h3>
+  <div id="catSearch"><input id="catQ" placeholder="Search catalog…"></div>
+  <div id="catList"></div>
+</div>
+
+<div id="hint"></div>
+
+<div id="selinfo">
+  <div id="selname" style="font-weight:600"></div>
+  <div style="color:#8fa3b8" id="seldims"></div>
+  <div class="row">
+    <button class="btn" id="sRot">⟲ Rotate (R)</button>
+    <button class="btn" id="sDel">🗑 Delete</button>
+  </div>
+</div>
+
+<div id="lockmsg"><div class="card">
+  <div style="font-size:26px;margin-bottom:8px">🚶 Walk mode</div>
+  <div><b>W A S D</b> move · <b>Mouse</b> look · <b>Shift</b> run</div>
+  <div style="margin-top:6px;color:#9fb4c9">Stairs take you up to the loft · <b>Esc</b> to exit</div>
+  <div style="margin-top:12px"><button class="btn" id="bStart">Click to enter</button></div>
+</div></div>
+
+<div id="compass">N ↑ (north wall at top of plan) · walk mode starts in the living room · porch is outside the east entry doors</div>
+<canvas id="minimap" width="170" height="152"></canvas>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+/* ================================================================
+   UNITS: 1 world unit = 1 foot.  Plan origin = exterior NW corner.
+   x → east (0..28)      z → south (0..25)      y → up
+   Derived from "Tiny Home - Loft (1).pdf" (UBAOG multi-level, A101/A102):
+   28'-0" × 25'-0" exterior, 2×6 ext walls, 2×4 partitions,
+   main floor 10' ceilings (living/kitchen), loft floor +9'-0"
+   (108'-11 7/8" vs 100'-0"), ridge 20' (4:12), knee walls 3'-3",
+   porch east w/ 4x4 posts.  Doors D1 3', D1.5 2', D2 3' ×3,
+   D3 2'-6" ×2, D4 5' opening.  Windows W1 4'×4', W2 4'×3'.
+   ================================================================ */
+
+const FT = 1;                                  // scale
+const EXT = 0.46, PART = 0.33;                 // wall thicknesses (2x6, 2x4)
+const W = 28, D = 25;                          // exterior envelope
+const IX0 = EXT, IX1 = W-EXT, IZ0 = EXT, IZ1 = D-EXT;   // interior bounds
+const LOFT_Y = 9.0;                            // loft floor height
+const LOFT_T = 0.99;                           // 11-7/8" TJI floor structure
+const CEIL_S = 10.0;                           // living/kitchen ceiling
+const EAVE = 15.4, RIDGE_X = 14, RIDGE_H = 20; // gable: ridge runs E–W (front gable faces east entry)
+const KNEE = 3.25;                             // 3'-3" knee/rail
+
+// ---- stair: 16 treads rising WESTWARD in band y[12.21..15.5], x from 26.9 down to 14.4
+const ST = { x0:14.4, x1:26.9, z0:12.21, z1:15.5, n:16 };
+ST.run = ST.x1 - ST.x0;                        // 12.5 ft
+ST.tread = ST.run / ST.n;                      // 0.781
+ST.rise = LOFT_Y / ST.n;                       // 0.5625
+function stairH(x){                            // walking surface height at x (top of the tread you're on)
+  if (x < ST.x0 || x > ST.x1) return 0;
+  return Math.min(ST.n, Math.floor((ST.x1 - x)/ST.tread) + 1) * ST.rise;
+}
+
+// ---- ADA entry ramp off the porch (east): 1.55' drop at 1:12, per tinyhome.png ----
+const RAMP = { x0: W+4.2, x1: W+4.2+18.6, z0: 16.4, z1: 20.0, h: 1.55 };
+function rampY(x){                             // walking surface height on the ramp at x
+  if (x <= RAMP.x0) return RAMP.h;
+  if (x >= RAMP.x1) return 0;
+  return RAMP.h * (1 - (x - RAMP.x0)/(RAMP.x1 - RAMP.x0));
+}
+
+// ---------------- renderer / scene ----------------
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xa9c3da);
+scene.fog = new THREE.Fog(0xa9c3da, 90, 220);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.05, 400);
+camera.position.set(44, 22, 44);
+
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.target.set(14, 5, 12.5);
+orbit.enableDamping = true;
+orbit.maxPolarAngle = Math.PI*0.495;
+orbit.update();
+
+// lights
+const hemi = new THREE.HemisphereLight(0xcfe0f2, 0x7a8a6d, 0.55); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff0d8, 2.3);
+sun.position.set(55, 60, 30); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left:-60, right:70, top:60, bottom:-60, near:10, far:200 });
+sun.shadow.bias = -0.0004;
+scene.add(sun);
+
+// ground
+{
+  const g = new THREE.Mesh(new THREE.PlaneGeometry(400, 400),
+    new THREE.MeshStandardMaterial({ color:0x7d9b6a, roughness:1 }));
+  g.rotation.x = -Math.PI/2; g.position.y = 0; g.receiveShadow = true; g.userData.surface = 'grass'; scene.add(g);
+  // gravel apron around the home
+  const a = new THREE.Mesh(new THREE.PlaneGeometry(W+26, D+22),
+    new THREE.MeshStandardMaterial({ color:0xa39a8b, roughness:1 }));
+  a.rotation.x = -Math.PI/2; a.position.set(W/2, 0.02, D/2); a.receiveShadow = true; a.userData.surface = 'gravel'; scene.add(a);
+}
+
+// ---------------- procedural wood texture ----------------
+function woodTexture(base, gap, sheen=0){
+  const c = document.createElement('canvas'); c.width = 512; c.height = 512;
+  const g = c.getContext('2d');
+  const rows = 8;                                   // plank rows
+  for (let r = 0; r < rows; r++){
+    const y = r * 512/rows;
+    // per-plank tint
+    const v = (Math.sin(r*12.9898)*43758.5453) % 1;
+    const t = 0.86 + Math.abs(v)*0.24;
+    g.fillStyle = `rgb(${Math.min(255,base[0]*t)|0},${Math.min(255,base[1]*t)|0},${Math.min(255,base[2]*t)|0})`;
+    g.fillRect(0, y, 512, 512/rows - 1.5);
+    // grain streaks
+    for (let i = 0; i < 26; i++){
+      const gy = y + Math.random()*512/rows;
+      g.strokeStyle = `rgba(${base[0]*0.55|0},${base[1]*0.55|0},${base[2]*0.55|0},${0.05+Math.random()*0.09})`;
+      g.lineWidth = 0.6 + Math.random()*1.4;
+      g.beginPath(); g.moveTo(0, gy);
+      g.bezierCurveTo(170, gy+Math.random()*4-2, 340, gy+Math.random()*4-2, 512, gy+Math.random()*3-1.5);
+      g.stroke();
+    }
+    // plank seams + butt joints
+    g.fillStyle = gap;
+    g.fillRect(0, y + 512/rows - 1.5, 512, 1.5);
+    const jx = Math.random()*512;
+    g.fillRect(jx, y, 1.5, 512/rows);
+  }
+  if (sheen){ g.fillStyle = `rgba(255,255,255,${sheen})`; g.fillRect(0,0,512,512); }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  return tex;
+}
+
+// ---------------- materials ----------------
+const texFloorMain = woodTexture([184,140,90], 'rgba(70,46,24,0.9)');  texFloorMain.repeat.set(9, 8);
+const texFloorLoft = woodTexture([198,154,104], 'rgba(78,52,28,0.9)');  texFloorLoft.repeat.set(10, 8);
+const texWoodFn = woodTexture([118,88,54],   'rgba(45,30,16,0.9)');    texWoodFn.repeat.set(2, 2);
+const M = {
+  extSiding : new THREE.MeshStandardMaterial({ color:0xf2ede2, roughness:.85 }),  // cream board & batten (per tinyhome.png)
+  extTrim   : new THREE.MeshStandardMaterial({ color:0xf6f2e9, roughness:.9 }),
+  skirt     : new THREE.MeshStandardMaterial({ color:0x3a3f45, roughness:.9 }),   // charcoal base skirt
+  frameDark : new THREE.MeshStandardMaterial({ color:0x33383d, roughness:.55 }),  // dark window frames
+  leather   : new THREE.MeshStandardMaterial({ color:0x4b3a30, roughness:.5 }),   // dark leather sofa
+  quartz    : new THREE.MeshStandardMaterial({ color:0xf0ede6, roughness:.45 }),  // white quartz counters
+  concrete  : new THREE.MeshStandardMaterial({ color:0xb6b0a6, roughness:.95 }),  // ramp landing pad
+  tile      : new THREE.MeshStandardMaterial({ color:0x9aa0a3, roughness:.85 }),  // gray shower tile
+  wallIn    : new THREE.MeshStandardMaterial({ color:0xe9e4da, roughness:.95 }),
+  floorMain : new THREE.MeshStandardMaterial({ map:texFloorMain, color:0xffffff, roughness:.62 }),
+  floorLoft : new THREE.MeshStandardMaterial({ map:texFloorLoft, color:0xffffff, roughness:.6 }),
+  ceil      : new THREE.MeshStandardMaterial({ color:0xf2efe9, roughness:1 }),
+  roof      : new THREE.MeshStandardMaterial({ color:0x2b3035, roughness:.8 }),   // charcoal standing-seam (per tinyhome.png)
+  roofUnd   : new THREE.MeshStandardMaterial({ color:0xe9e5db, roughness:1 }),
+  wood      : new THREE.MeshStandardMaterial({ map:texWoodFn, color:0xffffff, roughness:.55 }),
+  woodDark  : new THREE.MeshStandardMaterial({ color:0x5f4630, roughness:.75 }),
+  metal     : new THREE.MeshStandardMaterial({ color:0xb9c2cc, roughness:.35, metalness:.75 }),
+  white     : new THREE.MeshStandardMaterial({ color:0xf4f4f2, roughness:.5 }),
+  glass     : new THREE.MeshPhysicalMaterial({ color:0xaebfc4, transparent:true, opacity:.3, roughness:.05, metalness:0 }),
+  doorLeaf  : new THREE.MeshStandardMaterial({ color:0xb08657, roughness:.6 }),
+  fab       : new THREE.MeshStandardMaterial({ color:0x9aa0a6, roughness:.95 }),
+  dark      : new THREE.MeshStandardMaterial({ color:0x3b3f45, roughness:.8 }),
+  post      : new THREE.MeshStandardMaterial({ color:0x9a8262, roughness:.8 }),
+  warmGlow  : new THREE.MeshStandardMaterial({ color:0xfff3dc, emissive:0xffd9a0, emissiveIntensity:2.4, roughness:.4 }),
+  shade     : new THREE.MeshStandardMaterial({ color:0xf3ede2, roughness:.9 }),
+};
+
+/* ---------------- interior lighting: warm fixtures per room ---------------- */
+const FIXTURE_Y_MAIN = 8.6;      // just below 9' wall plate on main floor (FLOOR0 = 0.15)
+const FIXTURE_Y_LOFT = 4.6;      // above loft floor surface (9.15)
+const roomLights = [];
+function roomLight(x, y, z, intensity=26, dist=24, color=0xffd2a0){
+  const p = new THREE.PointLight(color, intensity, dist, 2);
+  p.position.set(x, y, z); p.userData.base = intensity;
+  roomLights.push(p); scene.add(p);
+  // small visible ceiling fixture: flush mount disc + warm glow ring
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.62, 0.14, 20), M.shade);
+  disc.position.set(x, y + 0.16, z); scene.add(disc);
+  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.05, 20), M.warmGlow);
+  glow.position.set(x, y + 0.05, z); scene.add(glow);
+  return p;
+}
+// main floor (floor surface = 0.15)
+roomLight( 5.5, 0.15 + FIXTURE_Y_MAIN,  5.0, 20, 20);     // bedroom
+roomLight( 4.0, 0.15 + FIXTURE_Y_MAIN, 19.0, 22, 20);     // kitchen
+roomLight(16.5, 0.15 + FIXTURE_Y_MAIN, 20.5, 26, 24);     // living room
+roomLight(11.0, 0.15 + 8.0,           13.9, 16, 16);      // hall / laundry (under loft)
+roomLight(19.5, 0.15 + FIXTURE_Y_MAIN,  8.0, 18, 18);     // bathroom
+roomLight(26.0, 0.15 + FIXTURE_Y_MAIN, 23.0, 14, 14);     // SE storage nook
+// loft level (floor surface = 9.15)
+roomLight( 8.0, 9.15 + 4.6 + 0.45, 6.0, 24, 24);          // open loft (below ridge)
+roomLight(22.0, 9.15 + 4.6,  5.5, 18, 18);                // attic storage
+// porch: warm exterior lantern
+roomLight(30.0, 1.7 + 8.2, 17.5, 14, 14, 0xffd9b0);
+
+/* ---------------- day / night ---------------- */
+const dayNight = {
+  isNight: false,
+  cur:   { bg: new THREE.Color(0x9db8d2) },
+  day:   { bg: new THREE.Color(0xa9c3da), hemi: 0.55, sunI: 2.3, sunC: new THREE.Color(0xfff0d8), glow: 2.4, room: 1.0 },
+  night: { bg: new THREE.Color(0x060a14), hemi: 0.10, sunI: 0.10, sunC: new THREE.Color(0x8fa8d8), glow: 5.5, room: 2.6 }
+};
+document.getElementById('bDay').onclick = () => {
+  dayNight.isNight = !dayNight.isNight;
+  try { localStorage.setItem('tinyhome_daynight', dayNight.isNight ? '1' : '0'); } catch {}
+  document.getElementById('bDay').textContent = dayNight.isNight ? '☀️ Day' : '🌙 Night';
+  flash(dayNight.isNight ? '🌙 Night — lamps on' : '☀️ Day');
+};
+try { if (localStorage.getItem('tinyhome_daynight') === '1'){ dayNight.isNight = true; document.getElementById('bDay').textContent = '☀️ Day'; } } catch {}
+const _tmpBg = new THREE.Color();
+const _rainBg = new THREE.Color(0x5a636e);              // overcast gray the sky fades toward in rain
+function dayNightTick(dt){
+  const goal = dayNight.isNight ? dayNight.night : dayNight.day;
+  const k = Math.min(1, dt * 2.5);
+  const bg = _tmpBg.copy(goal.bg); if (weather.rain) bg.lerp(_rainBg, 0.55);
+  scene.background.lerp(bg, k);
+  scene.fog.color.lerp(bg, k);
+  hemi.intensity += (goal.hemi * (weather.rain ? 0.85 : 1) - hemi.intensity) * k;
+  sun.intensity += (goal.sunI * (weather.rain ? 0.3 : 1) - sun.intensity) * k;
+  sun.color.lerp(goal.sunC, k);
+  M.warmGlow.emissiveIntensity += (goal.glow - M.warmGlow.emissiveIntensity) * k;
+  for (const p of roomLights) p.intensity += (p.userData.base * goal.room - p.intensity) * k;
+}
+
+/* ---------------- LIGHTNING + THUNDER ----------------
+   while it rains, a strike every ~14–40 s: sky/fog whiten with a double-flicker,
+   hemisphere light spikes (interior flashes too), and a synthesized rumble
+   rolls in 0.7–3.5 s later — farther strikes arrive later and stay lower.       */
+const lightning = { v: 0, t: -1e9, next: 1e9 };
+const _flashC = new THREE.Color(0xdfe8ff);
+function strikeLightning(){
+  lightning.v = 1; lightning.t = performance.now();
+  thunderSound();
+}
+function lightningTick(dt){
+  const now = performance.now();
+  if (!weather.rain){ lightning.v = 0; lightning.next = 1e9; return; }
+  if (now >= lightning.next){
+    lightning.next = now + 14000 + Math.random()*26000;
+    strikeLightning();
+  }
+  const age = (now - lightning.t)/1000;
+  const env = age < 0 || age > 2 ? 0 : Math.min(1, Math.max(
+    Math.exp(-age*16),                                        // main strike
+    0.8 * Math.exp(-Math.pow((age-0.12)*18, 2))));            // second flicker peak ~0.12 s later
+  lightning.v = env;
+  if (env > 0.01){
+    const rise = Math.min(1, dt*20);
+    scene.background.lerp(_flashC, Math.min(0.8, env) * rise);
+    scene.fog.color.lerp(_flashC, Math.min(0.8, env) * rise);
+    hemi.intensity += 2.2 * env * rise;                       // lights the interior too
+  }
+}
+function thunderSound(){
+  const ac = ensureAudio(); if (!ac) return;
+  try {
+    const delay = 0.7 + Math.random()*2.8;                    // distance → the rumble arrives late
+    const dur = 2.6 + Math.random()*2.2;
+    const t0 = ac.currentTime + delay;
+    const len = Math.ceil(ac.sampleRate * dur);
+    const buf = ac.createBuffer(1, len, ac.sampleRate);
+    const ch = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++){ const w = Math.random()*2 - 1; last = (last + 0.045*w) / 1.045; ch[i] = last*3.2; }
+    const src = ac.createBufferSource(); src.buffer = buf;
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(300 + Math.random()*120, t0);
+    lp.frequency.exponentialRampToValueAtTime(55, t0 + dur);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(0.08 + Math.random()*0.05, t0 + 0.25 + Math.random()*0.3);  // slow build
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(lp); lp.connect(g); g.connect(outNode(ac));
+    src.start(t0);
+  } catch { /* stay silent */ }
+}
+
+function box(w, h, d, mat, x, y, z, rx=0, ry=0, rz=0){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z); m.rotation.set(rx, ry, rz);
+  m.castShadow = true; m.receiveShadow = true;
+  scene.add(m); return m;
+}
+
+/* ---------------- WALL SYSTEM ----------------
+   wall(x1,z1,x2,z2, th, base, top, openings[{a,b,b0,b1}])
+   axis-aligned; openings measured along the run from (x1,z1)      */
+const colliders = [];   // {x0,x1,z0,z1,y0,y1}  used by walk mode
+const wallMeshes = [];  // wall segments, tagged for the door-sound occlusion raycast
+function addCollider(x0,x1,z0,z1,y0,y1){ colliders.push({x0,x1,z0,z1,y0,y1}); }
+
+function wall(x1,z1,x2,z2, th, base, top, openings=[], mat=M.wallIn, collide=true){
+  const horiz = Math.abs(x2-x1) > Math.abs(z2-z1);
+  let len = horiz ? x2-x1 : z2-z1;
+  const sgn  = Math.sign(len) || 1; len = Math.abs(len);
+  const cx = (x1+x2)/2, cz = (z1+z2)/2;
+  const rel = horiz ? x1 : z1;
+  const ops = openings.map(o=>({a:o.a-rel, b:o.b-rel, b0:o.b0, b1:o.b1})).sort((p,q)=>p.a-q.a);
+  let cur = 0;
+  const segs = [];
+  for (const o of ops){
+    if (o.a > cur) segs.push([cur, o.a, base, top, false]);   // solid stretch before the opening (full height)
+    // header above door / sill below window
+    const b0 = o.b0 ?? base, b1 = o.b1 ?? top;
+    if (b1 < top) segs.push([o.a, o.b, b1, top, true]);      // above opening
+    if (b0 > base) segs.push([o.a, o.b, base, b0, true]);    // below opening
+    cur = o.b;
+  }
+  if (cur < len) segs.push([cur, len, base, top, false]);
+  for (const [a,b,y0,y1] of segs){
+    const L = b-a; if (L <= 0.001 || y1-y0 <= 0.001 || b <= 0 || a >= len) continue;  // drop phantom segments
+    const w = horiz ? L : th, d = horiz ? th : L;
+    const off = (a+b)/2 - len/2;
+    const wm = box(w, y1-y0, d, mat,
+      horiz ? cx + off : cx, (y0+y1)/2, horiz ? cz : cz + off);
+    wm.userData.occWall = true; wallMeshes.push(wm);      // occluder for muffled door sounds
+  }
+  if (collide){
+    for (const [a,b,y0,y1] of segs){
+      if (y0 > 5.7) continue;                       // headers above head height
+      const L = b-a;
+      if (horiz) addCollider(x1+a, x1+a+L, z1-th/2, z1+th/2, y0, y1);
+      else       addCollider(x1-th/2, x1+th/2, z1+a, z1+a+L, y0, y1);
+    }
+  }
+}
+
+const doors = [];   // animated door leaves: {g, base, swing, openFrac, hx, hz, cx, cz, col, t}
+const PUSH_RANGE = 1.45; // walking into a closed door (player radius 0.85) nudges it open
+function doorLeaf(x1,z1,x2,z2, width, openFrac=0.82, flip=false, baseY=0, h=6.67){
+  // hinge at (x1,z1) end; leaf swings into +z (or -z if flip)
+  const horiz = Math.abs(x2-x1) > Math.abs(z2-z1);
+  const hx = horiz ? x1 : x1, hz = z1;
+  const dir = horiz ? Math.sign(x2-x1) : Math.sign(z2-z1);
+  const g = new THREE.Group();
+  const leaf = new THREE.Mesh(new THREE.BoxGeometry(width, h, 0.146), M.doorLeaf);
+  leaf.castShadow = true; leaf.position.set(width/2, h/2, 0);
+  g.add(leaf);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 10), M.metal);
+  knob.position.set(width-0.35, Math.min(3.1, h-0.35), flip?-0.13:0.13); g.add(knob);
+  g.position.set(hx, baseY, hz);
+  const base = horiz ? (dir>0?0:Math.PI) : (dir>0?-Math.PI/2:Math.PI/2);   // vertical: +90° about Y points the leaf −z, so the signs are swapped vs. horizontal
+  const swing = (flip?-1:1)*openFrac*Math.PI/2*1.05;
+  g.rotation.y = base + swing;
+  scene.add(g);
+  // center of the doorway (closed leaf position) — used for push detection
+  const ccx = horiz ? hx + dir*width/2 : hx;
+  const ccz = horiz ? hz : hz + dir*width/2;
+  // solid collider for the CLOSED leaf (skipped once the door starts swinging open)
+  const col = horiz
+    ? { x0: Math.min(hx, hx+dir*width), x1: Math.max(hx, hx+dir*width), z0: hz-0.16, z1: hz+0.16, y0: baseY, y1: baseY+h }
+    : { x0: hx-0.16, x1: hx+0.16, z0: Math.min(hz, hz+dir*width), z1: Math.max(hz, hz+dir*width), y0: baseY, y1: baseY+h };
+  doors.push({ g, base, swing, openFrac, hx, hz, cx: ccx, cz: ccz, col, t: openFrac });  // t: 0=closed .. 1=open
+}
+
+/* distance-based volume: full up close, fading with range so far-away doors stay faint */
+const doorVol = dist => { dist = Math.max(dist ?? 0, 0); return dist <= 6 ? 1 : Math.max(0.05, 1 / (1 + (dist - 6) / 14)); };
+
+/* wall occlusion: raycast from the player's ear to the door centre — walls in between muffle the sound */
+const _earRay = new THREE.Raycaster();
+const _rp = new THREE.Vector3(), _rq = new THREE.Vector3(), _rv = new THREE.Vector3();
+function wallHitsBetween(px, pz, dx, dz){
+  if (!wallMeshes.length) return 0;
+  _rp.set(px, Math.min(player.pos.y, 5.5), pz);            // ear height on the main floor
+  _rq.set(dx, 3.5, dz);                                    // door centre height
+  _rv.subVectors(_rq, _rp);
+  const range = _rv.length();
+  if (range < 0.6) return 0;                               // door right next to you — nothing in between
+  _earRay.set(_rp, _rv.normalize());
+  _earRay.near = 0.25; _earRay.far = range - 0.25;         // trim the endpoints
+  return _earRay.intersectObjects(wallMeshes, false).length;
+}
+
+/* closed doors are solid; walking into one creaks it open with a soft push */
+let _walkSince = -1e9;                                        // suppress sounds when walk mode begins
+let _ppx = 0, _ppz = 0;                                       // player pos at previous tick (push-speed measure)
+function doorTick(dt){
+  if (mode === 'walk'){ if (_walkSince < 0) _walkSince = performance.now(); }
+  else _walkSince = -1;
+  const audible = mode === 'walk' && performance.now() - _walkSince > 1200;  // not during the settle-in chorus
+  for (const d of doors){
+    const dist = Math.hypot(player.pos.x - d.cx, player.pos.z - d.cz);
+    let target = d.openFrac;                                  // authored pose in orbit view
+    if (mode === 'walk'){
+      target = dist < PUSH_RANGE ? 1 : 0;                     // push open on contact, drift closed after
+    }
+    if (d.t !== target){
+      if (audible && target === 1 && d.t < 0.05){
+        // creak loudness scales with how hard the player is pushing (approach speed toward the door)
+        const mvx = player.pos.x - _ppx, mvz = player.pos.z - _ppz;
+        const mvLen = Math.hypot(mvx, mvz);
+        const ddx = d.cx - player.pos.x, ddz = d.cz - player.pos.z, dLen = Math.hypot(ddx, ddz) || 1;
+        const toward = mvLen > 1e-4 ? (mvx*ddx + mvz*ddz) / (mvLen * dLen) : 0;   // velocity aligned with door?
+        const speedFtS = mvLen / Math.max(dt, 1e-4) * Math.max(0, toward);
+        d.pushI = Math.max(0.2, Math.min(1, speedFtS / 7.2));                     // 7.2 ft/s = full run
+        const occl = wallHitsBetween(player.pos.x, player.pos.z, d.cx, d.cz) > 0;
+        creakSound(d.pushI, doorVol(dist), occl);
+      }
+      // slow reluctant start (creak), then a fuller swing; a harder push swings it faster too
+      const slow = (target === 1 && d.t < 0.25) || (target === 0 && d.t < 0.25);
+      const spd = (target > d.t ? 1 : -1) * dt * (slow ? (target === 1 ? 0.9 + 0.7*(d.pushI ?? 0.5) : 1.15) : 2.6);
+      d.t += spd;
+      if ((spd > 0 && d.t > target) || (spd < 0 && d.t < target)) d.t = target;
+      const ease = d.t*d.t*(3-2*d.t);                          // smoothstep
+      d.g.rotation.y = d.base + d.swing * ease;
+      if (d.t === target && audible){
+        const vol = doorVol(dist);
+        const occl = wallHitsBetween(player.pos.x, player.pos.z, d.cx, d.cz) > 0;
+        const sv = occl ? vol * 0.6 : vol;                     // walls soften the sound as well as muffle it
+        if (target === 0) latchSound(sv, occl);                // settles shut — latch click + thunk
+        else if (target === 1) bumpSound(sv, occl);            // reaches the fully-open stop
+      }
+    }
+  }
+  _ppx = player.pos.x; _ppz = player.pos.z;                    // remember for next tick's push measure
+}
+
+/* door sound effects (WebAudio, created lazily after a user gesture)
+   creak  — falling whine as the leaf is pushed off its latch
+   latch  — metallic click + low thunk when the door settles shut
+   bump   — soft knock as the leaf reaches the fully-open stop          */
+let _audio = null, _master = null;
+let _muted = false;                                     // 🔇 master mute for all door sounds
+function outNode(ac){
+  _master = _master || (() => { const g = ac.createGain(); g.gain.value = _muted ? 0 : 1; g.connect(ac.destination); return g; })();
+  _master.gain.value = _muted ? 0 : 1;                  // keep in sync with the toggle
+  return _master;
+}
+function ensureAudio(){
+  try {
+    _audio = _audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (_audio.state === 'suspended') _audio.resume();
+    return _audio;
+  } catch { return null; }
+}
+/* walls between you and the door route the sound through a lowpass — muffled, not just quieter */
+function muffleChain(ac, muffled){
+  if (!muffled) return outNode(ac);
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 600 + Math.random()*180; lp.Q.value = 0.8;
+  lp.connect(outNode(ac));
+  return lp;
+}
+function creakSound(intensity = 0.5, vol = 1, muffled = false){
+  const ac = ensureAudio(); if (!ac || vol <= 0.002) return;
+  try {
+    intensity = Math.max(0.15, Math.min(1, intensity));
+    vol = Math.max(0.002, Math.min(1, vol));
+    const t0 = ac.currentTime, dur = (0.55 + Math.random()*0.2) * (0.85 + 0.3*intensity);
+    const o = ac.createOscillator(); o.type = 'sawtooth';
+    const f0 = (110 + 70*intensity) + Math.random()*70;                       // harder push → higher, tighter whine
+    o.frequency.setValueAtTime(f0, t0);
+    o.frequency.linearRampToValueAtTime(f0*0.6 + Math.random()*30, t0+dur);
+    const bp = ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value = 700 + 300*intensity + Math.random()*400; bp.Q.value = 8;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0004, (0.012 + 0.05*intensity) * vol), t0+0.09);  // louder with a harder push, quieter with distance
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+    const dst = muffleChain(ac, muffled);
+    o.connect(bp); bp.connect(g); g.connect(dst);
+    o.start(t0); o.stop(t0+dur+0.05);
+  } catch { /* stay silent */ }
+}
+function clickBurst(vol, freq, dur, muffled = false){          // short filtered-noise transient
+  const ac = ensureAudio(); if (!ac) return;
+  try {
+    const t0 = ac.currentTime;
+    const len = Math.max(8, Math.ceil(ac.sampleRate * dur));
+    const buf = ac.createBuffer(1, len, ac.sampleRate);
+    const ch = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) ch[i] = (Math.random()*2 - 1) * Math.pow(1 - i/len, 2);
+    const src = ac.createBufferSource(); src.buffer = buf;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = 1.4;
+    const g = ac.createGain(); g.gain.value = vol;
+    src.connect(bp); bp.connect(g); g.connect(muffleChain(ac, muffled));
+    src.start(t0);
+    return t0;
+  } catch { /* stay silent */ }
+}
+function latchSound(vol = 1, muffled = false){
+  if (vol <= 0.002) return;
+  const t0 = clickBurst(0.07 * vol, 2100, 0.045, muffled);   // bright metallic click
+  const ac = ensureAudio(); if (!ac || t0 === undefined) return;
+  try {                                                     // ...followed by a low thunk
+    const o = ac.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(150, t0 + 0.05);
+    o.frequency.exponentialRampToValueAtTime(70, t0 + 0.13);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t0 + 0.05);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0004, 0.05 * vol), t0 + 0.06);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.15);
+    o.connect(g); g.connect(muffleChain(ac, muffled));
+    o.start(t0 + 0.05); o.stop(t0 + 0.18);
+  } catch { /* stay silent */ }
+}
+function bumpSound(vol = 1, muffled = false){ if (vol > 0.002) clickBurst(0.03 * vol, 800, 0.05, muffled); }  // soft knock at the open stop
+
+/* footsteps + floorboard creaks underfoot */
+function footstep(surface){               // surface: 'wood' | 'deck' | 'stair' | 'gravel' | 'grass'
+  const ac = ensureAudio(); if (!ac) return;
+  try {
+    const t0 = ac.currentTime;
+    if (surface === 'gravel'){                              // dry crunch: scattered noise bursts, no tonal thump
+      clickBurst(0.02 + Math.random()*0.012, 550 + Math.random()*700, 0.075);
+      clickBurst(0.010 + Math.random()*0.006, 1300 + Math.random()*900, 0.045);
+      return;
+    }
+    const stair = surface === 'stair';
+    const f0 = surface === 'grass' ? 90 : stair ? 95 + Math.random()*30 : 130 + Math.random()*50;
+    const o = ac.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(f0, t0);
+    o.frequency.exponentialRampToValueAtTime(55, t0+0.09);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(stair ? 0.04 : surface === 'grass' ? 0.016 : 0.03, t0+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+0.1);
+    o.connect(g); g.connect(outNode(ac));
+    o.start(t0); o.stop(t0+0.12);
+    if (surface !== 'grass') clickBurst(surface === 'deck' ? 0.014 : 0.009, stair ? 1050 : 1400, 0.02);  // heel tap
+    if (stair){                                             // faint riser echo — the tread knocks on its stringer
+      const o2 = ac.createOscillator(); o2.type = 'sine';
+      o2.frequency.setValueAtTime(120, t0+0.05);
+      o2.frequency.exponentialRampToValueAtTime(60, t0+0.13);
+      const g2 = ac.createGain();
+      g2.gain.setValueAtTime(0.0001, t0+0.05);
+      g2.gain.exponentialRampToValueAtTime(0.018, t0+0.06);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t0+0.16);
+      o2.connect(g2); g2.connect(outNode(ac));
+      o2.start(t0+0.05); o2.stop(t0+0.18);
+    }
+  } catch { /* stay silent */ }
+}
+function stepCreak(){                     // an occasional board creak underfoot
+  const ac = ensureAudio(); if (!ac) return;
+  try {
+    const t0 = ac.currentTime, dur = 0.18 + Math.random()*0.15;
+    const o = ac.createOscillator(); o.type = 'sawtooth';
+    const f0 = 200 + Math.random()*180;
+    o.frequency.setValueAtTime(f0, t0);
+    o.frequency.linearRampToValueAtTime(f0*0.75, t0+dur);
+    const bp = ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value = 900 + Math.random()*500; bp.Q.value = 9;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.018, t0+0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+    o.connect(bp); bp.connect(g); g.connect(outNode(ac));
+    o.start(t0); o.stop(t0+dur+0.02);
+  } catch { /* stay silent */ }
+}
+
+/* ---- rain ambience: muffled noise bed + droplet patters on the roof ---- */
+const weather = { rain:false, inside:false, zone:'out' };
+/* how the rain sounds from each place in/around the house */
+const RAIN_ZONES = {
+  out:       { lp: 2400, drip: 1.0,  dbl: 0.30, bed: 0.055 },  // open sky — crisp, close
+  porch:     { lp: 1500, drip: 0.70, dbl: 0.25, bed: 0.045 },  // under the porch roof
+  main:      { lp: 700,  drip: 0.35, dbl: 0.18, bed: 0.040 },  // ground rooms — one roof overhead
+  underloft: { lp: 380,  drip: 0.16, dbl: 0.10, bed: 0.028 },  // beneath the loft plate — doubly insulated
+  upper:     { lp: 1800, drip: 0.90, dbl: 0.40, bed: 0.050 },  // loft/attic — right under the roof deck
+  stair:     { lp: 1200, drip: 0.55, dbl: 0.22, bed: 0.038 },  // open stairwell
+};
+function rainZone(){
+  const x = player.pos.x, z = player.pos.z, gy = player.groundY ?? 0;
+  if (x >= W-0.2 && x <= W+4.4 && z >= 14 && z <= 21.4) return 'porch';
+  if (x > W+4.4 && x < RAMP.x1 && z >= RAMP.z0 && z <= RAMP.z1) return 'porch';   // under the ramp edge reads closest to porch
+  if (x < 0.3 || x > W || z < 0.3 || z > D) return 'out';
+  const onStairs = x >= ST.x0-0.3 && x <= ST.x1+0.3 && z >= ST.z0-0.2 && z <= ST.z1+0.2;
+  if (onStairs && gy > 0.5) return 'stair';
+  if (gy > 5) return 'upper';
+  return (z <= 15.8 && x >= IX0 && x <= 14.4) ? 'underloft' : 'main';   // bedroom/laundry/hall sit below the loft plate
+}
+let _rain = null;                                       // { src, lp, g, timer, t0 }
+function startRain(){
+  const ac = ensureAudio(); if (!ac || _rain) return;
+  try {
+    const len = ac.sampleRate * 3;
+    const buf = ac.createBuffer(1, len, ac.sampleRate);
+    const ch = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++){ const w = Math.random()*2 - 1; last = (last + 0.03*w) / 1.03; ch[i] = last*4; }
+    const src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;   // roof-muffled wash
+    const g = ac.createGain(); g.gain.value = 0;
+    src.connect(lp); lp.connect(g); g.connect(outNode(ac));
+    src.start();
+    g.gain.linearRampToValueAtTime(0.055, ac.currentTime + 2);                           // shower fades in
+    const timer = setInterval(() => {                                                    // droplet patters
+      if (!weather.rain) return;
+      const prof = RAIN_ZONES[weather.zone] || RAIN_ZONES.out;
+      if (_rain){
+        _rain.lp.frequency.value += (prof.lp - _rain.lp.frequency.value) * 0.06;       // muffle eases between zones
+        if (performance.now() - _rain.t0 > 2500)                                        // after the fade-in, bed level follows too
+          _rain.g.gain.value += (prof.bed - _rain.g.gain.value) * 0.05;
+      }
+      const n = Math.random() < prof.dbl ? 2 : 1;
+      for (let i = 0; i < n; i++)
+        clickBurst((0.008 + Math.random()*0.01) * prof.drip,
+                   1600 + Math.random()*2600, 0.02);
+    }, 95);
+    _rain = { src, lp, g, timer, t0: performance.now() };
+    lightning.next = performance.now() + 5000 + Math.random()*12000;   // first bolt soon after the shower starts
+  } catch { /* stay silent */ }
+}
+function stopRain(){
+  if (!_rain) return;
+  try {
+    const { src, g, timer } = _rain;
+    clearInterval(timer);
+    if (_audio) g.gain.linearRampToValueAtTime(0.0001, _audio.currentTime + 1.2);        // shower fades out
+    setTimeout(() => { try { src.stop(); } catch {} }, 1400);
+  } catch { /* stay silent */ }
+  _rain = null;
+}
+function setRain(on){
+  weather.rain = on;
+  if (on) startRain(); else stopRain();
+  try { localStorage.setItem('tinyhome_rain', on ? '1' : '0'); } catch {}
+}
+
+function windowUnit(x1,z1,x2,z2, w0, h0, w1, h1){
+  const horiz = Math.abs(x2-x1) > Math.abs(z2-z1);
+  const cx = (x1+x2)/2, cz = (z1+z2)/2, th = EXT;
+  const ww = w1-w0, hh = h1-h0, cy = (h0+h1)/2;
+  const f = 0.09, fd = th + 0.04, F = M.frameDark;
+  // glass pane
+  box(horiz?ww:0.06, hh, horiz?0.06:ww, M.glass, cx, cy, cz);
+  // frame bars (top / bottom / sides) — dark bronze frames per tinyhome.png
+  if (horiz){
+    box(ww, f, fd, F, cx, h0+f/2, cz);
+    box(ww, f, fd, F, cx, h1-f/2, cz);
+    box(f, hh, fd, F, w0+f/2, cy, cz);
+    box(f, hh, fd, F, w1-f/2, cy, cz);
+    box(0.08, hh-2*f, th+0.02, F, cx, cy, cz);   // mullion
+    addCollider(w0, w1, cz-th/2, cz+th/2, h0, h1);     // glass blocks walkthrough
+  } else {
+    box(fd, f, ww, F, cx, h0+f/2, cz);
+    box(fd, f, ww, F, cx, h1-f/2, cz);
+    box(fd, hh, f, F, cx, cy, w0+f/2);
+    box(fd, hh, f, F, cx, cy, w1-f/2);
+    box(th+0.02, hh-2*f, 0.08, F, cx, cy, cz);
+    addCollider(cx-th/2, cx+th/2, w0, w1, h0, h1);
+  }
+}
+
+/* ---------------- SHELL: exterior walls ---------------- */
+// North (y=0): two loft windows (4'x4', sill 9.33)
+wall(0, 0, W, 0, EXT, 0, EAVE, [
+  { a:4.6, b:8.6, b0:9.33, b1:13.33 },
+  { a:19.4, b:23.4, b0:9.33, b1:13.33 },
+], M.extSiding);
+// South (y=25): kitchen window W2 4'x3' sill 3.42
+wall(0, D, W, D, EXT, 0, EAVE, [
+  { a:8.0, b:12.0, b0:3.42, b1:6.42 },
+], M.extSiding);
+// West (x=0): W1 4'x4' centered ~8.8 → 6.8..10.8, sill 2.42
+wall(0, 0, 0, D, EXT, 0, EAVE, [
+  { a:6.8, b:10.8, b0:2.42, b1:6.42 },
+], M.extSiding);
+// East (x=28): D1 3' entry + D1.5 2' door (to porch)
+wall(W, 0, W, D, EXT, 0, EAVE, [
+  { a:14.9, b:17.9, b0:0, b1:6.67 },   // D1
+  { a:18.4, b:20.4, b0:0, b1:6.67 },   // D1.5
+], M.extSiding);
+doorLeaf(W, 17.9, W, 14.9, 3, 0.85, true);
+doorLeaf(W, 20.4, W, 18.4, 2, 0.85, true);
+// window frames + glass (per plan: W1, W2, two loft north windows) — dark frames per tinyhome.png
+windowUnit(4.6, 0, 8.6, 0, 4.6, 9.33, 8.6, 13.33);
+windowUnit(19.4, 0, 23.4, 0, 19.4, 9.33, 23.4, 13.33);
+windowUnit(8, D, 12, D, 8, 3.42, 12, 6.42);
+windowUnit(0, 6.8, 0, 10.8, 6.8, 2.42, 10.8, 6.42);
+
+// exterior corner posts / trim
+for (const [px,pz] of [[0,0],[W,0],[0,D],[W,D]])
+  box(EXT+0.08, EAVE, EXT+0.08, M.extTrim, px, EAVE/2, pz);
+
+/* ---------------- interior partitions ---------------- */
+// Spine wall x=17.4 (bedroom | closet+bath), y 0.46→12.21, doors D2 closet(y2.4-5.4) & bath(y8.4-11.4)
+wall(17.4, IZ0, 17.4, 12.21, PART, 0, LOFT_Y+0.01, [
+  { a:2.4, b:5.4, b0:0, b1:6.67 },
+  { a:8.4, b:11.4, b0:0, b1:6.67 },
+]);
+doorLeaf(17.4, 5.4, 17.4, 2.4, 3, 0.8, true);
+doorLeaf(17.4, 11.4, 17.4, 8.4, 3, 0.8, true);
+
+// Closet | Bathroom divider y=5.37 (x 17.73→27.54)
+wall(17.73, 5.37, 27.54, 5.37, PART, 0, LOFT_Y+0.01);
+
+// Cross wall y=12.21 full width, bedroom door D2 x7.6-10.6
+wall(IX0, 12.21, IX1, 12.21, PART, 0, LOFT_Y+0.01, [
+  { a:7.6, b:10.6, b0:0, b1:6.67 },
+]);
+doorLeaf(10.6, 12.21, 7.6, 12.21, 3, 0.8, true);   // D2 bedroom door (leaf hinged at opening, swings into bedroom)
+
+// Hall south wall (living north) y=15.5 from x10.8→27.54, D4 5' opening x13.5-18.5, D1 wide opening x24.0-27.27
+wall(10.8, 15.5, 27.54, 15.5, PART, 0, CEIL_S, [
+  { a:13.5, b:18.5, b0:0, b1:6.83 },   // D4 cased opening 5'-0"
+  { a:24.0, b:27.27, b0:0, b1:6.83 },  // D1 opening to stair bottom (per plan, leaf swings into living room)
+]);
+doorLeaf(27.27, 15.5, 24.0, 15.5, 3.27, 0.95, false);  // D1 leaf drawn open into living room
+// Laundry: east wall x=5.4 (y12.21→15.5) w/ 2.5' opening (abs 12.61–15.11)
+wall(5.4, 12.21, 5.4, 15.5, PART, 0, LOFT_Y+0.01, [ { a:12.61, b:15.11, b0:0, b1:6.83 } ]);
+// Under-stair storage box: west x10.86 (D3 2'-6" door abs 13.11–15.61), east x14.55 solid
+wall(10.86, 12.21, 10.86, 15.5, PART, 0, LOFT_Y+0.01, [ { a:13.11, b:15.61, b0:0, b1:6.67 } ]);
+wall(14.55, 12.21, 14.55, 15.5, PART, 0, LOFT_Y+0.01);
+doorLeaf(10.86, 15.61, 10.86, 13.11, 2.5, 0.85, true);  // D3 under-stair door aligned to opening
+// SE storage room: west x24.8 (D3 door abs 21.7–24.2), north y21.4
+wall(24.8, 21.4, 24.8, 24.54, PART, 0, CEIL_S, [ { a:21.7, b:24.2, b0:0, b1:6.67 } ]);
+wall(24.8, 21.4, 27.54, 21.4, PART, 0, CEIL_S);
+doorLeaf(24.8, 24.2, 24.8, 21.7, 2.5, 0.85, true);
+
+/* ---------------- FLOORS ---------------- */
+// main floor slab
+box(W, 0.3, D, M.floorMain, W/2, -0.15+0.3/2 + 0.0, D/2);
+// (slab top at 0.3 → raise walking plane: use floorY0 = 0.3? keep 0 for simplicity: set slab top at 0.15)
+// Actually: main walking level 0.15
+const FLOOR0 = 0.15;
+// loft plate: y<12.21 full width + west band 12.21..15.5 (x<14.4)
+function addLoftPlate(x0, x1, z0, z1){
+  box(x1-x0, LOFT_T, z1-z0, M.floorLoft, (x0+x1)/2, LOFT_Y - LOFT_T/2 + FLOOR0, (z0+z1)/2);
+}
+addLoftPlate(IX0, IX1, IZ0, 12.21);
+addLoftPlate(IX0, 14.4, 12.21, 15.5);
+// south ceiling (living/kitchen) at 10' — reparented into the roof group below so "hide roof" reveals the interior
+const southCeil = box(IX1-IX0, 0.12, IZ1-15.5, M.ceil, (IX0+IX1)/2, CEIL_S+0.06+FLOOR0, (15.5+IZ1)/2);
+
+/* ---------------- STAIRS ---------------- */
+{
+  const g = new THREE.Group();
+  for (let i=0;i<ST.n;i++){
+    const xC = ST.x1 - (i+0.5)*ST.tread;
+    const t = new THREE.Mesh(new THREE.BoxGeometry(ST.tread+0.02, 0.09, ST.z1-ST.z0), M.wood);
+    t.userData.surface = 'stair';
+    t.position.set(xC, FLOOR0 + (i+1)*ST.rise - 0.045, (ST.z0+ST.z1)/2);
+    t.castShadow = t.receiveShadow = true; g.add(t);
+    const r = new THREE.Mesh(new THREE.BoxGeometry(ST.tread, ST.rise, ST.z1-ST.z0-0.06), M.woodDark);
+    r.position.set(xC, FLOOR0 + i*ST.rise + ST.rise/2 - 0.04, (ST.z0+ST.z1)/2);
+    r.receiveShadow = true; g.add(r);
+  }
+  // soffit (enclosed under-stair)
+  const sx0 = 18.1;
+  for (let x=sx0; x<ST.x1; x+=ST.tread){
+    const h = stairH(x) + 0.3;
+    const s = new THREE.Mesh(new THREE.BoxGeometry(ST.tread, Math.max(h,0.01), ST.z1-ST.z0), M.wallIn);
+    s.position.set(x+ST.tread/2, FLOOR0 + h/2, (ST.z0+ST.z1)/2);
+    s.receiveShadow = true; g.add(s);
+    addCollider(x, x+ST.tread, ST.z0, ST.z1, 0, Math.max(stairH(x) - 0.55, 0)); // blocks floor-level entry, not climbers
+  }
+  // handrails both sides, from bottom up to top
+  for (const zEdge of [ST.z0+0.06, ST.z1-0.06]){
+    for (let i=0;i<ST.n;i+=4){
+      const xC = ST.x1 - (i+2)*ST.tread;
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,2.6,8), M.woodDark);
+      p.position.set(xC, FLOOR0 + stairH(xC)+1.3, zEdge); p.castShadow=true; g.add(p);
+    }
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(ST.run, 0.09, 0.09), M.woodDark);
+    rail.position.set((ST.x0+ST.x1)/2, FLOOR0 + LOFT_Y/2 + 2.55, zEdge);
+    rail.rotation.z = Math.atan2(ST.rise, -ST.tread)*0; // keep flat, fine visually
+    rail.castShadow = true; g.add(rail);
+  }
+  scene.add(g);
+  // guard rails at loft opening edges
+  const railH = KNEE; // 3'-3"
+  function guard(x0,x1,z0,z1, base){
+    box(x1-x0, railH, 0.09, M.woodDark, (x0+x1)/2, base+railH/2, (z0+z1)/2);
+    addCollider(x0,x1,z0-0.12,z1+0.12, base, base+railH);
+  }
+  guard(IX0, 14.4, 15.5, 15.5, LOFT_Y+FLOOR0);          // south edge of west band
+  guard(14.4, 26.2, 12.21, 12.21, LOFT_Y+FLOOR0);       // north edge over stair (east part)
+}
+
+/* Loft ↔ Attic/Storage divider (on the loft plate) with D2 door */
+wall(18.9, IZ0, 18.9, 12.21, PART, LOFT_Y+FLOOR0, LOFT_Y+FLOOR0+4.0, [
+  { a: 8.46, b: 11.46, b0: LOFT_Y+FLOOR0, b1: LOFT_Y+FLOOR0+6.67 },
+], M.wallIn);
+doorLeaf(18.9, 11.92, 18.9, 8.92, 3, 0.8, true, LOFT_Y+FLOOR0, 4.0);   // sits ON the loft plate — not a ground-floor door
+/* ---------------- ROOF (gable, ridge E–W at z=D/2) ----------------
+   The plan's front (entry/porch) is the EAST side, so the gable end faces
+   the front — the ridge runs E–W and the roof planes shed toward N & S.   */
+const roofGroup = new THREE.Group();
+roofGroup.add(southCeil);      // hides with roof toggle
+{
+  // two slope planes as thin boxes at exactly 4:12
+  const a4 = Math.atan2(4, 12);         // 18.43°
+  const half = D/2;                     // 12.5 ft half-span (E–W ridge sheds N–S)
+  const span = half + 1.6;              // eave overhang ~1 ft beyond wall
+  const L = Math.hypot(span, span*4/12);
+  for (const s of [-1, 1]){
+    const midZ = D/2 + s*(span/2)*Math.cos(a4);
+    const midY = RIDGE_H - (span/2)*Math.sin(a4);
+    const pl = new THREE.Mesh(new THREE.BoxGeometry(W+2.4, 0.22, L), M.roof);
+    pl.position.set(W/2, midY, midZ);
+    pl.rotation.x = s>0 ? a4 : -a4;
+    pl.castShadow = true; pl.receiveShadow = true;
+    roofGroup.add(pl);
+    // standing seams (charcoal metal roof, per tinyhome.png)
+    for (let x = -W/2-1.2; x <= W/2+1.2; x += 1.25){
+      const sm = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, L*1.0), M.roof);
+      sm.position.set(x, 0.145, 0);
+      pl.add(sm);
+    }
+    const und = new THREE.Mesh(new THREE.BoxGeometry(W+2.2, 0.06, L*0.99), M.roofUnd);
+    und.position.copy(pl.position); und.position.y -= 0.18; und.rotation.x = pl.rotation.x;
+    roofGroup.add(und);
+  }
+  // ridge cap
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(W+2.4, 0.28, 0.7), M.roof);
+  cap.position.set(W/2, RIDGE_H+0.1, D/2); roofGroup.add(cap);
+  // gable end walls (triangles) — front (E) & back (W), spanning the 25' depth
+  {
+    const sh = new THREE.Shape();
+    sh.moveTo(-1.4, 0); sh.lineTo(D+1.4, 0); sh.lineTo(D/2, RIDGE_H); sh.closePath();
+    const geo = new THREE.ExtrudeGeometry(sh, { depth: EXT, bevelEnabled:false });
+    // rotation.y=-90° maps local (sx,sy,sz)→world(-sz,sy,sx): shape-x→world z, apex at z=D/2
+    const east = new THREE.Mesh(geo, M.extSiding);   // front gable (entry side)
+    east.position.set(W, 0, 0);
+    east.rotation.y = -Math.PI/2;      // world z = shape-x ✓, x∈[W-EXT,W]
+    roofGroup.add(east);
+    const west = new THREE.Mesh(geo, M.extSiding);   // back gable
+    west.position.set(EXT, 0, 0);      // x∈[0,EXT] (fills the west wall line)
+    west.rotation.y = -Math.PI/2;
+    roofGroup.add(west);
+    // vertical battens on both gable ends, following the triangle (per tinyhome.png)
+    for (const gx of [W-EXT-0.02, EXT+0.02]){
+      for (let z = 0.9; z <= D-0.9; z += 1.4){
+        const lineY = EAVE + (RIDGE_H-EAVE) * (1 - Math.abs(z - D/2)/(D/2));
+        const top = lineY - 0.25;
+        const h = top - EAVE + 0.5;
+        if (h <= 0.3) continue;
+        const b = new THREE.Mesh(new THREE.BoxGeometry(0.1, h, 0.09), M.extTrim);
+        b.position.set(gx, EAVE + h/2 - 0.5, z);
+        roofGroup.add(b);
+      }
+    }
+  }
+}
+
+scene.add(roofGroup);
+
+/* ---------------- PORCH (east) — timber posts + exposed beam & braces, per tinyhome.png ---------------- */
+{
+  const px0 = W, px1 = W+4.2, pz0 = 14.2, pz1 = 21.2, py = 1.55; // deck top ~ main floor +1.4
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(px1-px0, 0.35, pz1-pz0), M.wood);
+  deck.userData.surface = 'deck';
+  deck.position.set((px0+px1)/2, py-0.175, (pz0+pz1)/2);
+  deck.castShadow = deck.receiveShadow = true; scene.add(deck);
+  for (let z=pz0; z<=pz1+0.01; z+=(pz1-pz0)/9){
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.02, pz1-pz0), M.woodDark);
+    b.position.set(px1-0.1, py+0.01, (pz0+pz1)/2); b.castShadow=true; scene.add(b);
+  }
+  // 6x6 timber posts on the deck corners
+  for (const [qx,qz] of [[px1-0.25,pz0+0.25],[px1-0.25,pz1-0.25]]){
+    box(0.42, 8.4, 0.42, M.post, qx, py+4.2, qz);
+    addCollider(qx-0.25,qx+0.25,qz-0.25,qz+0.25, 0, 9);
+  }
+  // exposed header beam across the post tops + rafter tails (per tinyhome.png)
+  const beamY = py + 8.35;
+  box(0.5, 0.75, pz1-pz0+1.0, M.post, px1-0.25, beamY, (pz0+pz1)/2);
+  for (let z=pz0-0.3; z<=pz1+0.31; z+=1.9){
+    const rt = new THREE.Mesh(new THREE.BoxGeometry(3.9, 0.28, 0.14), M.post);
+    rt.position.set(px0+1.85, beamY-0.48, z); rt.castShadow = true; scene.add(rt);
+  }
+  // angled knee braces post→wall (the reference's chunky braces)
+  for (const qz of [pz0+0.25, pz1-0.25]){
+    const br = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.34, 0.3), M.post);
+    br.position.set(px1-1.85, beamY-1.75, qz);
+    br.rotation.z = Math.PI/4; br.castShadow = true; scene.add(br);
+  }
+  // porch shed roof
+  const r = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.16, pz1-pz0+0.6), M.roof);
+  r.position.set(px0+2.3, beamY+0.5, (pz0+pz1)/2); r.rotation.z = -Math.atan2(4,12)*0.9;
+  r.castShadow = true; scene.add(r);
+  // charcoal skirt around the deck base (per tinyhome.png)
+  box(px1-px0+0.1, py-0.18, 0.08, M.skirt, (px0+px1)/2, (py-0.18)/2, pz0-0.06);
+  box(px1-px0+0.1, py-0.18, 0.08, M.skirt, (px0+px1)/2, (py-0.18)/2, pz1+0.06);
+  // steps down (south end)
+  for (let i=0;i<2;i++){
+    box(3.2, 0.32, 0.9, M.wood, px0+2.0, py-0.16-i*0.32, pz1+0.45+i*0.9);
+  }
+}
+
+/* ---------------- ADA RAMP (east of porch, per tinyhome.png) ---------------- */
+{
+  // concrete landing pad at grade
+  const pad = new THREE.Mesh(new THREE.BoxGeometry(8, 0.22, RAMP.z1-RAMP.z0+5), M.concrete);
+  pad.position.set(RAMP.x1+3.5, 0.11, (RAMP.z0+RAMP.z1)/2+1);
+  pad.receiveShadow = true; pad.userData.surface = 'gravel'; scene.add(pad);
+  // sloped deck (segmented, top follows rampY)
+  const NSEG = 12, segLen = (RAMP.x1-RAMP.x0)/NSEG, rampMidZ = (RAMP.z0+RAMP.z1)/2;
+  for (let i=0;i<NSEG;i++){
+    const xa = RAMP.x0 + i*segLen, xb = xa + segLen;
+    const ya = rampY(xa), yb = rampY(xb);
+    const len = Math.hypot(xb-xa, yb-ya);
+    const seg = new THREE.Mesh(new THREE.BoxGeometry(len+0.02, 0.28, RAMP.z1-RAMP.z0), M.wood);
+    seg.position.set((xa+xb)/2, (ya+yb)/2 - 0.14, rampMidZ);
+    seg.rotation.z = Math.atan2(yb-ya, xb-xa);
+    seg.castShadow = seg.receiveShadow = true; seg.userData.surface = 'deck';
+    scene.add(seg);
+  }
+  // wheel curbs both sides
+  for (const qz of [RAMP.z0+0.09, RAMP.z1-0.09]){
+    for (let i=0;i<NSEG;i++){
+      const xa = RAMP.x0 + i*segLen, xb = xa + segLen;
+      const ya = rampY(xa), yb = rampY(xb);
+      const crb = new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(xb-xa, yb-ya)+0.02, 0.26, 0.18), M.woodDark);
+      crb.position.set((xa+xb)/2, (ya+yb)/2 + 0.13, qz);
+      crb.rotation.z = Math.atan2(yb-ya, xb-xa);
+      crb.castShadow = true; scene.add(crb);
+    }
+  }
+  // metal handrails both sides: posts + double sloped tubes (per tinyhome.png)
+  const NRB = 12;
+  for (const qz of [RAMP.z0+0.14, RAMP.z1-0.14]){
+    for (let i=0;i<=NRB;i++){
+      const x = RAMP.x0 + (RAMP.x1-RAMP.x0)*i/NRB;
+      const y = rampY(x);
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3.1, 10), M.metal);
+      p.position.set(x, y+1.45, qz); p.castShadow = true; scene.add(p);
+    }
+    for (const railH of [2.85, 1.95]){                     // upper + lower rail tube
+      let prev = null;
+      for (let i=0;i<=NRB;i++){
+        const x = RAMP.x0 + (RAMP.x1-RAMP.x0)*i/NRB;
+        const pt = new THREE.Vector3(x, rampY(x)+railH, qz);
+        if (prev){
+          const mid = prev.clone().add(pt).multiplyScalar(0.5);
+          const len = prev.distanceTo(pt);
+          const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, len, 10), M.metal);
+          tube.position.copy(mid);
+          tube.rotation.z = Math.PI/2 - Math.atan2(pt.y-prev.y, pt.x-prev.x);
+          tube.castShadow = true; scene.add(tube);
+        }
+        prev = pt;
+      }
+    }
+  }
+  // keep walkers inside the ramp
+  addCollider(RAMP.x0, RAMP.x1, RAMP.z1-0.05, RAMP.z1+0.4, 0, 3.4);
+  addCollider(RAMP.x0, RAMP.x1, RAMP.z0-0.4, RAMP.z0+0.05, 0, 3.4);
+}
+
+/* ---------------- DESERT LANDSCAPING + HAZY RIDGES (per tinyhome.png) ---------------- */
+{
+  const shrubG = new THREE.MeshStandardMaterial({ color:0x5c7a48, roughness:1 });
+  const shrubY = new THREE.MeshStandardMaterial({ color:0x7d8f56, roughness:1 });
+  const lav = new THREE.MeshStandardMaterial({ color:0x8f7fa8, roughness:1 });
+  const rock = new THREE.MeshStandardMaterial({ color:0x8f8578, roughness:1 });
+  const dirt = new THREE.MeshStandardMaterial({ color:0x9c8a6e, roughness:1 });
+  const rnd = (a,b)=>a+Math.random()*(b-a);
+  function shrub(x,z,s){
+    const g = new THREE.Group();
+    for (let i=0;i<5;i++){
+      const m = new THREE.Mesh(new THREE.IcosahedronGeometry(rnd(.28,.5)*s,0), Math.random()<.5?shrubG:shrubY);
+      m.position.set(rnd(-.3,.3)*s, rnd(.3,.8)*s, rnd(-.3,.3)*s);
+      m.castShadow = true; g.add(m);
+    }
+    g.position.set(x,0,z); scene.add(g);
+  }
+  function lavender(x,z){
+    const g = new THREE.Group();
+    for (let i=0;i<4;i++){
+      const m = new THREE.Mesh(new THREE.ConeGeometry(.16,.9,6), lav);
+      m.position.set(rnd(-.25,.25), .45, rnd(-.25,.25));
+      m.rotation.z = rnd(-.25,.25); m.castShadow=true; g.add(m);
+    }
+    g.position.set(x,0,z); scene.add(g);
+  }
+  function boulder(x,z,s){
+    const m = new THREE.Mesh(new THREE.DodecahedronGeometry(s,0), rock);
+    m.position.set(x, s*.55, z); m.rotation.set(rnd(0,3),rnd(0,3),rnd(0,3));
+    m.castShadow = m.receiveShadow = true; scene.add(m);
+  }
+  function mulchPatch(x,z,w,d){
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w,d), dirt);
+    m.rotation.x = -Math.PI/2; m.position.set(x,0.035,z); m.receiveShadow = true; scene.add(m);
+  }
+  // entry bed along the front (east) wall, wrapping the porch/ramp
+  mulchPatch(W+2.6, 10.2, 6.5, 9);
+  mulchPatch(RAMP.x1+3.5, 24.2, 9, 4.5);
+  mulchPatch(RAMP.x1+3.5, 12.6, 9, 4.5);
+  for (let i=0;i<9;i++) shrub(W+rnd(1.2,4.4), 6.2+i*0.95, rnd(.7,1.1));
+  for (let i=0;i<5;i++) lavender(W+rnd(1.4,4.2), 7.0+i*1.8);
+  for (let i=0;i<4;i++) shrub(RAMP.x1+rnd(1,6), 22.6+rnd(-1.2,1.2), rnd(.7,1.0));
+  for (let i=0;i<4;i++) shrub(RAMP.x1+rnd(1,6), 11.4+rnd(-1.2,1.2), rnd(.7,1.0));
+  boulder(W+2.2, 5.4, .55); boulder(W+3.8, 5.0, .38); boulder(RAMP.x1+2.5, 25.4, .5);
+  boulder(RAMP.x1+5.5, 11.2, .42); boulder(W+3.4, 22.0, .34);
+  // a couple of scattered tufts elsewhere
+  shrub(-2.5, 4.0, .8); shrub(-2.2, 19.5, .7); shrub(14, -2.6, .8); shrub(24, -2.2, .7);
+  // hazy distant ridgeline (the reference's mountains on the horizon)
+  const ridgeMat = new THREE.MeshBasicMaterial({ color:0xb7c3cc, fog:true });
+  for (const [cx, cz, w, h, rot] of [[-90, -60, 220, 16, .3],[160, -80, 260, 20, -.2],[-60, 150, 240, 14, .2],[180, 130, 280, 18, -.15]]){
+    const sh = new THREE.Shape();
+    sh.moveTo(-w/2, 0); sh.lineTo(w/2, 0); sh.lineTo(w*0.12, h); sh.lineTo(-w*0.1, h*0.72); sh.closePath();
+    const m = new THREE.Mesh(new THREE.ShapeGeometry(sh), ridgeMat);
+    m.position.set(cx, 0, cz); m.rotation.y = rot; scene.add(m);
+  }
+}
+
+/* ---------------- fixtures baked from the plan ---------------- */
+// closet rod + shelf
+{
+  box(9.6, 0.08, 0.08, M.metal, 22.6, 5.4, 1.1);
+  box(9.6, 0.06, 1.1, M.white, 22.6, 6.4, 0.65);
+}
+// bathroom: gray tile surround + glass (per tinyhome.png walk-in shower)
+{
+  box(2.6, 0.12, 2.6, M.tile, 26.1, 0.16, 10.6);
+  box(2.6, 6.4, 0.06, M.tile, 26.1, 3.4, 11.86);        // tile back wall
+  box(0.06, 6.4, 2.6, M.tile, 27.37, 3.4, 10.6);        // tile side wall
+  const gl = new THREE.Mesh(new THREE.BoxGeometry(2.6, 6.4, 0.04), M.glass);
+  gl.position.set(26.1, 3.4, 9.32); gl.castShadow=false; scene.add(gl);
+  addCollider(24.8, 27.4, 9.3, 11.9, 0, 6.4);
+}
+// kitchen lower cabinets: west run + south run
+{
+  // west run: fridge + range are freestanding units per plan; cabinets only south of the range
+  // white shaker fronts + quartz counters (per tinyhome.png kitchen)
+  box(2.0, 2.95, 3.1, M.white, 1.46, 1.62, 22.95);               // west run (south of range)
+  box(9.4, 2.95, 2.0, M.white, 7.2, 1.62, 23.54);                // south run
+  for (let x=0.6; x<11.9; x+=1.55) box(0.06, 2.6, 0.02, M.quartz, x, 1.62, 22.53);   // shaker reveals, west run
+  for (let x=2.6; x<11.8; x+=1.55) box(0.06, 2.6, 0.02, M.quartz, x, 1.62, 22.53+0.005);
+  box(2.1, 0.08, 3.1, M.quartz, 1.46, 3.12, 22.95);
+  box(9.5, 0.08, 2.1, M.quartz, 7.2, 3.12, 23.54);
+  addCollider(IX0, 2.5, 21.4, 24.4, 0, 3.2);
+  addCollider(IX0, 11.9, 22.5, IZ1, 0, 3.2);
+}
+// room labels (orbit only)
+const labels = [
+  ['BEDROOM', 7, 5, 0], ['CLOSET', 22.6, 2.5, 0], ['BATHROOM', 21.5, 8.5, 0],
+  ['LAUNDRY', 2.9, 13.8, 0], ['HALL', 7.5, 13.8, 0], ['STORAGE', 12.7, 13.8, 0],
+  ['KITCHEN', 5.5, 19.5, 0], ['LIVING ROOM', 19.5, 20, 0], ['ENTRY', 26.2, 18, 0],
+  ['LOFT', 8, 6, LOFT_Y+2.2], ['ATTIC / STORAGE', 23, 5, LOFT_Y+2.2],
+];
+const labelGroup = new THREE.Group();
+{
+  const c = document.createElement('canvas'); c.width=256; c.height=64;
+  function makeLabel(text){
+    const cv = document.createElement('canvas'); cv.width=512; cv.height=128;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = 'rgba(10,16,22,0.55)';
+    ctx.roundRect ? (ctx.beginPath(), ctx.roundRect(0,0,512,128,20), ctx.fill())
+                  : ctx.fillRect(0,0,512,128);
+    ctx.fillStyle = '#e8f1fb'; ctx.font = '600 44px Segoe UI, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, 256, 66);
+    const tex = new THREE.CanvasTexture(cv);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, depthTest:false }));
+    sp.scale.set(4.6, 1.15, 1); return sp;
+  }
+  for (const [t,x,z,y] of labels){
+    const sp = makeLabel(t); sp.position.set(x, y+FLOOR0+0.2, z); labelGroup.add(sp);
+  }
+}
+scene.add(labelGroup);
+
+/* ================================================================
+   FURNITURE SYSTEM
+   ================================================================ */
+const items = [];          // placed items: {type, x, z, rot, y, group}
+const FURN = {};           // builders
+
+function grp(){ return new THREE.Group(); }
+function bx(parent, w,h,d, mat, x,y,z, ry=0){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  m.position.set(x,y,z); m.rotation.y = ry; m.castShadow = m.receiveShadow = true;
+  parent.add(m); return m;
+}
+function cyl(parent, r0,r1,h, mat, x,y,z, seg=14){
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r0,r1,h,seg), mat);
+  m.position.set(x,y,z); m.castShadow = m.receiveShadow = true; parent.add(m); return m;
+}
+
+FURN.sofa      = { name:'Sofa', cat:'Living', w:6.8, d:3.1, h:2.6, build(g){
+  bx(g, 6.8,.55,3.1, M.leather, 0,.5,0); bx(g, 6.8,1.6,.75, M.leather, 0,1.3,-1.2);   // dark leather per tinyhome.png
+  bx(g, .75,1.15,2.4, M.leather, -3.0,1.1,0); bx(g, .75,1.15,2.4, M.leather, 3.0,1.1,0);
+  bx(g, 2.2,.45,1.3, M.leather, -1.9,.95,.35); bx(g, 2.2,.45,1.3, M.leather, 1.9,.95,.35); }};
+FURN.armchair  = { name:'Armchair', cat:'Living', w:2.8, d:2.9, h:2.6, build(g){
+  bx(g, 2.8,.5,2.9, M.fab, 0,.45,0); bx(g, 2.8,1.5,.7, M.fab, 0,1.2,-1.1);
+  bx(g, .6,1.1,2.2, M.fab, -1.1,1.05,0); bx(g, .6,1.1,2.2, M.fab, 1.1,1.05,0); }};
+FURN.coffee    = { name:'Coffee table', cat:'Living', w:3.8, d:2.0, h:1.5, build(g){
+  bx(g, 3.8,.14,2.0, M.wood, 0,1.4,0);
+  for (const [x,z] of [[-1.6,-.8],[1.6,-.8],[-1.6,.8],[1.6,.8]]) cyl(g, .07,.07,1.4, M.woodDark, x,.7,z); }};
+FURN.tv        = { name:'TV + console', cat:'Living', w:4.8, d:1.4, h:4.2, build(g){
+  bx(g, 4.8,1.5,1.4, M.woodDark, 0,.85,0);
+  bx(g, 4.2,2.3,.16, M.dark, 0,2.9,0); }};
+FURN.shelf     = { name:'Bookshelf', cat:'Living', w:3.0, d:1.0, h:5.5, build(g){
+  bx(g, 3.0,.1,1.0, M.wood, 0,5.4,0);
+  for (let y=0.4; y<5.4; y+=1.25) bx(g, 2.96,.08,0.96, M.wood, 0,y,0);
+  for (const x of [-1.45,1.45]) bx(g, .1,5.5,1.0, M.woodDark, x,2.75,0);
+  bx(g, 2.96,.08,.96, M.wood, 0,1.65,0); bx(g, 2.96,.08,.96, M.wood, 0,2.9,0); }};
+FURN.rug       = { name:'Rug 8×8½', cat:'Living', w:8, d:8.5, h:0.06, flat:true, build(g){
+  bx(g, 8,.05,8.5, new THREE.MeshStandardMaterial({color:0x9a8f7d,roughness:1}), 0,.03,0); }};
+FURN.plant     = { name:'Plant', cat:'Living', w:1.6, d:1.6, h:4.2, build(g){
+  cyl(g, .55,.4,.9, new THREE.MeshStandardMaterial({color:0x8a5a3a,roughness:.8}), 0,.45,0);
+  const leaf = new THREE.MeshStandardMaterial({color:0x3f7d44,roughness:.9});
+  for (let i=0;i<7;i++){ const s=new THREE.Mesh(new THREE.SphereGeometry(.45+Math.random()*.2,8,8), leaf);
+    s.position.set((Math.random()-.5)*.7, 1.4+Math.random()*2.2, (Math.random()-.5)*.7); s.castShadow=true; g.add(s);} }};
+FURN.lamp      = { name:'Floor lamp', cat:'Living', w:1.2, d:1.2, h:5.4, build(g){
+  cyl(g, .35,.35,.06, M.dark, 0,.03,0); cyl(g, .03,.03,4.6, M.metal, 0,2.3,0);
+  cyl(g, .5,.7,.7, new THREE.MeshStandardMaterial({color:0xf6e6c8,emissive:0x554422,roughness:.6}), 0,4.9,0); }};
+
+FURN.bed       = { name:'Bed (queen)', cat:'Bedroom', w:4.9, d:6.7, h:3.0, build(g){
+  bx(g, 4.9,.9,6.7, M.woodDark, 0,.55,0);           // frame
+  bx(g, 4.9,2.0,.35, M.woodDark, 0,1.7,-3.2);       // headboard
+  bx(g, 4.7,.75,6.4, M.white, 0,1.35,.1);           // mattress
+  bx(g, 4.7,.5,2.0, M.fab, 0,1.9,-2.2);             // pillows zone
+  bx(g, 4.72,.16,4.2, new THREE.MeshStandardMaterial({color:0x8a9b7d,roughness:1}), 0,1.85,1.4); }};   // sage duvet per tinyhome.png
+FURN.bunk      = { name:'Bunk bed', cat:'Bedroom', w:3.4, d:6.6, h:5.4, build(g){
+  bx(g, 3.4,.6,6.6, M.woodDark, 0,.5,0); bx(g, 3.4,.6,6.6, M.woodDark, 0,3.7,0);
+  bx(g, 3.2,.6,6.3, M.white, 0,1.15,0); bx(g, 3.2,.6,6.3, M.white, 0,4.35,0);
+  bx(g, 3.4,5.4,.3, M.woodDark, 0,2.7,-3.2); }};
+FURN.night     = { name:'Nightstand', cat:'Bedroom', w:1.6, d:1.5, h:2.1, build(g){
+  bx(g, 1.6,2.1,1.5, M.wood, 0,1.05,0); bx(g, 1.4,.08,1.3, M.woodDark, 0,1.4,0.05); }};
+FURN.dresser   = { name:'Dresser', cat:'Bedroom', w:4.0, d:1.8, h:3.4, build(g){
+  bx(g, 4.0,3.4,1.8, M.wood, 0,1.7,0);
+  for (let i=0;i<3;i++) bx(g, 3.7,.06,1.6, M.woodDark, 0,.8+i*1.0,0.05); }};
+FURN.wardrobe  = { name:'Wardrobe', cat:'Bedroom', w:4.0, d:2.0, h:6.7, build(g){
+  bx(g, 4.0,6.7,2.0, M.wood, 0,3.35,0); bx(g, 3.8,6.4,.06, M.woodDark, 0,3.3,1.02); }};
+FURN.desk      = { name:'Desk', cat:'Bedroom', w:4.4, d:2.2, h:2.5, build(g){
+  bx(g, 4.4,.12,2.2, M.wood, 0,2.4,0);
+  for (const [x,z] of [[-2.0,-.95],[2.0,-.95],[-2.0,.95],[2.0,.95]]) bx(g, .12,2.4,.12, M.woodDark, x,1.2,z); }};
+
+FURN.fridge    = { name:'Refrigerator', cat:'Kitchen', w:2.6, d:2.4, h:5.8, build(g){
+  bx(g, 2.6,5.8,2.4, M.metal, 0,2.9,0); bx(g, 2.5,2.7,.05, M.dark, 0,4.2,1.21); bx(g, 2.5,2.6,.05, M.dark, 0,1.4,1.21); }};
+FURN.range     = { name:'Range / oven', cat:'Kitchen', w:2.4, d:2.2, h:3.0, build(g){
+  bx(g, 2.4,3.0,2.2, M.metal, 0,1.5,0); bx(g, 2.1,.1,1.9, M.dark, 0,3.05,0);
+  for (const [x,z] of [[-.6,-.5],[.6,-.5],[-.6,.5],[.6,.5]]) cyl(g, .28,.28,.05, M.dark, x,3.1,z,12); }};
+FURN.island    = { name:'Kitchen island', cat:'Kitchen', w:5.0, d:2.6, h:3.1, build(g){
+  bx(g, 5.0,2.9,2.6, M.woodDark, 0,1.45,0); bx(g, 5.3,.12,2.9, new THREE.MeshStandardMaterial({color:0x30343a,roughness:.4}), 0,2.98,0); }};
+FURN.dish      = { name:'Dishwasher', cat:'Kitchen', w:2.0, d:2.2, h:2.9, build(g){
+  bx(g, 2.0,2.9,2.2, M.metal, 0,1.45,0); }};
+FURN.stool     = { name:'Bar stool', cat:'Kitchen', w:1.4, d:1.4, h:2.4, build(g){
+  cyl(g, .6,.6,.12, M.wood, 0,2.35,0); cyl(g, .05,.05,2.3, M.metal, 0,1.15,0);
+  cyl(g, .28,.28,.05, M.metal, 0,.03,0,12); }};
+
+FURN.washer    = { name:'Washer', cat:'Laundry', w:2.0, d:2.0, h:3.2, build(g){
+  bx(g, 2.0,3.2,2.0, M.white, 0,1.6,0); cyl(g, .68,.68,.06, M.dark, 0,1.9,1.01,20);
+  bx(g, 1.6,.5,.2, M.dark, 0,3.05,.9); }};
+FURN.dryer     = { name:'Dryer', cat:'Laundry', w:2.0, d:2.0, h:3.2, build(g){
+  bx(g, 2.0,3.2,2.0, M.white, 0,1.6,0); cyl(g, .68,.68,.06, M.dark, 0,1.9,1.01,20); }};
+FURN.laundryR  = { name:'Shelf unit', cat:'Laundry', w:3.0, d:1.4, h:4.6, build(g){
+  bx(g, 3.0,4.6,1.4, M.wood, 0,2.3,0); }};
+
+FURN.toilet    = { name:'Toilet', cat:'Bathroom', w:1.5, d:2.1, h:2.6, build(g){
+  bx(g, 1.4,1.3,.7, M.white, 0,2.0,-.7); cyl(g, .75,.62,.9, M.white, 0,.55,.35,18); }};
+FURN.vanity    = { name:'Vanity + sink', cat:'Bathroom', w:3.4, d:1.9, h:3.1, build(g){
+  bx(g, 3.4,2.9,1.9, M.wood, 0,1.45,0); bx(g, 3.5,.12,2.0, M.white, 0,3.0,0);
+  cyl(g, .5,.42,.25, M.white, 0,3.05,0,18); cyl(g, .03,.03,1.0, M.metal, 0,2.6,0); }};
+FURN.shower    = { name:'Shower stall', cat:'Bathroom', w:2.8, d:2.8, h:6.9, build(g){
+  bx(g, 2.8,.12,2.8, M.white, 0,.06,0);
+  const gl = new THREE.Mesh(new THREE.BoxGeometry(2.8,6.6,.04), M.glass); gl.position.set(0,3.4,1.38); g.add(gl);
+  cyl(g, .04,.04,6.4, M.metal, -1.1,3.3,1.3); }};
+FURN.tub       = { name:'Bathtub', cat:'Bathroom', w:5.0, d:2.6, h:1.9, build(g){
+  bx(g, 5.0,1.7,2.6, M.white, 0,.85,0); bx(g, 4.6,1.2,2.2, M.glass, 0,1.15,0); }};
+
+FURN.shelves   = { name:'Storage shelves', cat:'Storage', w:4.0, d:1.6, h:6.0, build(g){
+  bx(g, 4.0,.1,1.6, M.wood, 0,5.9,0);
+  for (let y=.3; y<6; y+=1.4) bx(g, 3.96,.08,1.56, M.wood, 0,y,0);
+  bx(g, .1,6.0,1.6, M.woodDark, -1.95,3,0); bx(g, .1,6.0,1.6, M.woodDark, 1.95,3,0); }};
+FURN.crate     = { name:'Storage crate', cat:'Storage', w:2.0, d:2.0, h:1.6, build(g){
+  bx(g, 2.0,1.6,2.0, M.woodDark, 0,.8,0); }};
+
+/* ---- catalog UI ---- */
+const catList = document.getElementById('catList');
+const catQ = document.getElementById('catQ');
+let catSel = null;
+function renderCatalog(filter=''){
+  catList.innerHTML = '';
+  const groups = {};
+  for (const k in FURN){
+    const f = FURN[k];
+    if (filter && !(f.name+' '+f.cat).toLowerCase().includes(filter)) continue;
+    (groups[f.cat] ??= []).push([k,f]);
+  }
+  for (const cat of Object.keys(groups)){
+    const h = document.createElement('h3'); h.textContent = cat; h.style.cssText='margin:8px 4px 2px';
+    catList.appendChild(h);
+    for (const [k,f] of groups[cat]){
+      const el = document.createElement('div');
+      el.className = 'cat-item' + (catSel===k?' sel':'');
+      el.innerHTML = `<div class="sw">🛋</div><div><div>${f.name}</div>
+        <div class="dims">${f.w}′ × ${f.d}′</div></div>`;
+      el.onclick = () => { catSel = (catSel===k? null : k); renderCatalog(catQ.value.toLowerCase()); updateHint(); };
+      catList.appendChild(el);
+    }
+  }
+}
+catQ.oninput = () => renderCatalog(catQ.value.toLowerCase());
+renderCatalog();
+
+/* ---- placement state ---- */
+const ray = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let ghost = null, ghostType = null, ghostRot = 0, selected = null, dragging = null;
+let mode = 'orbit';   // 'orbit' | 'walk'
+const floorsMeshes = [];
+
+function surfaceY(x, z){
+  // stair zone
+  if (x >= ST.x0-0.3 && x <= ST.x1+0.3 && z >= ST.z0-0.2 && z <= ST.z1+0.2){
+    const h = stairH(x); if (h > 0.05) return FLOOR0 + h;
+  }
+  // loft plate
+  if (z <= 12.21+0.3 && x >= IX0 && x <= IX1) return FLOOR0 + LOFT_Y + 0.02;
+  if (z <= 15.5+0.3 && x <= 14.4 && x >= IX0) return FLOOR0 + LOFT_Y + 0.02;
+  // porch
+  if (x >= W-0.2 && x <= W+4.4 && z >= 14.0 && z <= 21.4) return 1.55;
+  // ADA ramp (east of porch) — smooth slope down to grade
+  if (x > W+4.4 && x < RAMP.x1+0.3 && z >= RAMP.z0-0.2 && z <= RAMP.z1+0.2) return Math.max(0.15, rampY(Math.min(x, RAMP.x1)));
+  return FLOOR0;
+}
+
+/* height-aware ground pick: the highest surface at (x,z) that is at/below the player's feet.
+   surfaceY alone returns the loft plate even when you're underneath it — this keeps you grounded. */
+function groundBelow(x, z, feetY){
+  const cands = [FLOOR0];                                                            // main floor is always beneath you
+  if (x >= W-0.2 && x <= W+4.4 && z >= 14.0 && z <= 21.4) cands.push(1.55);          // porch deck
+  if (x > W+4.4 && x < RAMP.x1+0.3 && z >= RAMP.z0-0.2 && z <= RAMP.z1+0.2)
+    cands.push(Math.max(0.15, rampY(Math.min(x, RAMP.x1))));                         // ADA ramp slope
+  if (x >= ST.x0-0.3 && x <= ST.x1+0.3 && z >= ST.z0-0.2 && z <= ST.z1+0.2){
+    const h = stairH(x); if (h > 0.05) cands.push(FLOOR0 + h);                       // stair tread
+  }
+  if (z <= 12.21+0.3 && x >= IX0 && x <= IX1) cands.push(FLOOR0 + LOFT_Y + 0.02);    // loft plate
+  if (z <= 15.5+0.3 && x <= 14.4 && x >= IX0) cands.push(FLOOR0 + LOFT_Y + 0.02);
+  let best = cands[0];
+  for (const c of cands) if (c <= feetY + (c <= 2 ? 1.6 : 0.7) && c > best) best = c; // small step-up only — no teleporting to the loft
+  return best;
+}
+
+function buildItem(type, x, z, rot, y){
+  const f = FURN[type]; if (!f) return null;
+  const g = grp();
+  f.build(g);
+  g.position.set(x, y, z); g.rotation.y = rot;
+  g.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+  g.userData = { type, x, z, rot, y, w:f.w, d:f.d };
+  scene.add(g);
+  items.push(g);
+  return g;
+}
+function itemAABB(g){
+  const w = g.userData.w, d = g.userData.d, r = g.rotation.y;
+  const ca = Math.abs(Math.cos(r)), sa = Math.abs(Math.sin(r));
+  const ew = w*ca + d*sa, ed = w*sa + d*ca;
+  return { x0:g.position.x-ew/2, x1:g.position.x+ew/2, z0:g.position.z-ed/2, z1:g.position.z+ed/2,
+           y0:g.position.y, y1:g.position.y + (FURN[g.userData.type].h||2) };
+}
+function selectItem(g){
+  if (selected) selected.traverse(o=>{ if(o.isMesh && o.material.emissive) o.material.emissive.setHex(o.userData._e||0); });
+  selected = g;
+  if (g){
+    g.traverse(o=>{ if(o.isMesh){ o.userData._e ??= o.material.emissive?.getHex?.() ?? 0; o.material.emissive?.setHex(0x2a4d80); } });
+    document.getElementById('selinfo').style.display = 'block';
+    const f = FURN[g.userData.type];
+    document.getElementById('selname').textContent = f.name;
+    document.getElementById('seldims').textContent = `${f.w}′ × ${f.d}′ × ${f.h}′ h`;
+  } else document.getElementById('selinfo').style.display = 'none';
+}
+function removeItem(g){
+  const i = items.indexOf(g); if (i>=0) items.splice(i,1);
+  scene.remove(g); if (selected===g) selectItem(null);
+}
+function removeCollidersFor(g){
+  // furniture colliders rebuilt each frame from items — nothing stored
+}
+
+/* ---- pointer handling ---- */
+let downPos = null, moved = false, pendingLabel = null;
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (mode==='walk') return;
+  downPos = { x:e.clientX, y:e.clientY }; moved = false; pendingLabel = null;
+  if (e.button===0 && !catSel){
+    pointer.set(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1);
+    ray.setFromCamera(pointer, camera);
+    // room label hit? fly there on release (a drag still just orbits)
+    try {
+      const lh = ray.intersectObjects(labelGroup.children, false)[0];
+      if (lh) pendingLabel = { x: lh.object.position.x, z: lh.object.position.z };
+    } catch {}
+    if (!pendingLabel){
+      // click on furniture selects it; only an ALREADY-selected item starts a drag,
+      // so rotating the view never shoves furniture around by accident
+      const hits = ray.intersectObjects(items, true);
+      if (hits.length){
+        let g = hits[0].object; while (g.parent && !items.includes(g)) g = g.parent;
+        if (items.includes(g)){
+          const wasSelected = (g === selected);
+          selectItem(g);
+          if (wasSelected){ dragging = g; orbit.enabled = false; }
+        }
+      } else selectItem(null);
+    }
+  }
+});
+renderer.domElement.addEventListener('pointermove', e => {
+  pointer.set(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1);
+  if (mode!=='orbit') return;
+  // ghost follows cursor
+  if (catSel && !ghost){
+    const g = grp(); FURN[catSel].build(g);
+    g.traverse(o=>{ if(o.isMesh){ o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = .45; } });
+    ghost = g; ghostType = catSel; scene.add(g);
+  }
+  if (ghost){
+    ray.setFromCamera(pointer, camera);
+    const hit = ray.intersectObjects(floorsMeshes, false)[0];
+    const p = hit ? hit.point : null;
+    if (p){ ghost.position.set(p.x, surfaceY(p.x, p.z), p.z); ghost.rotation.y = ghostRot; }
+  }
+  // drag existing
+  if (downPos && dragging){
+    ray.setFromCamera(pointer, camera);
+    const hit = ray.intersectObjects(floorsMeshes, false)[0];
+    if (hit){
+      dragging.position.set(hit.point.x, surfaceY(hit.point.x, hit.point.z), hit.point.z);
+      moved = true;
+    }
+  }
+});
+renderer.domElement.addEventListener('pointerup', e => {
+  if (mode==='walk'){ pendingLabel = null; return; }
+  if (downPos && !moved && pendingLabel){                       // label click → smooth fly to the room
+    const c = new THREE.Vector3(pendingLabel.x, 1.5, pendingLabel.z);
+    const dirV = new THREE.Vector3(camera.position.x - c.x, 0, camera.position.z - c.z);
+    if (dirV.lengthSq() < 0.1) dirV.set(1, 0, 1);
+    dirV.normalize();
+    flyTo(new THREE.Vector3(c.x + dirV.x*9, 9.5, c.z + dirV.z*9), c);   // dollhouse vantage from your side
+    selectItem(null);
+  }
+  pendingLabel = null;
+  if (downPos && !moved){
+    if (catSel && ghost && ghost.position.x){
+      const g = buildItem(ghostType, ghost.position.x, ghost.position.z, ghostRot, ghost.position.y);
+      selectItem(g); // keep catalog selection for repeat placement
+    } else {
+      ray.setFromCamera(pointer, camera);
+      const hits = ray.intersectObjects(items, true);
+      let g = null;
+      if (hits.length){ g = hits[0].object; while (g.parent && !items.includes(g)) g = g.parent; }
+      selectItem(items.includes(g) ? g : null);
+    }
+  }
+  if (dragging) orbit.enabled = (mode==='orbit');
+  dragging = null; downPos = null;
+});
+addEventListener('keydown', e => {
+  if (mode==='walk'){ walkKey(e, true); return; }
+  if (e.key==='r' || e.key==='R'){
+    if (selected) selected.rotation.y += (e.shiftKey? Math.PI/4 : Math.PI/12);
+    else ghostRot += (e.shiftKey? Math.PI/4 : Math.PI/12);
+    if (ghost) ghost.rotation.y = ghostRot;
+  }
+  if (e.key==='Delete' || e.key==='Backspace'){ if (selected) removeItem(selected); }
+  if (e.key==='Escape'){ catSel=null; renderCatalog(); ghost?.removeFromParent(); ghost=null; updateHint(); }
+});
+addEventListener('keyup', e => { if (mode==='walk') walkKey(e, false); });   // release keys — without this WASD sticks
+
+/* ================================================================
+   WALK MODE
+   ================================================================ */
+const player = { pos:new THREE.Vector3(19.5, 5.15, 18.5), yaw:-Math.PI/2, pitch:-0.02, vel:new THREE.Vector3() };  // spawn in the living room facing the interior (west, toward kitchen/sofa); the porch outside the east doors stays the exit route
+let walkOn = false;
+const keys = {};
+function walkKey(e, down){ keys[e.code] = down; if (down && e.code.startsWith('Key')) e.preventDefault?.(); }
+
+document.getElementById('bWalk').onclick = () => enterWalk();
+document.getElementById('bStart').onclick = () => renderer.domElement.requestPointerLock();
+document.getElementById('lockmsg').onclick = (e) => { if (e.target.id==='lockmsg') exitWalkUI(); };
+renderer.domElement.addEventListener('click', () => { if (mode==='walk' && !walkOn) renderer.domElement.requestPointerLock(); });
+document.addEventListener('pointerlockchange', () => {
+  walkOn = document.pointerLockElement === renderer.domElement;
+  if (!walkOn) for (const k in keys) keys[k] = false;   // Esc: drop held keys so you don't keep sliding
+  document.getElementById('lockmsg').style.display = (mode==='walk' && !walkOn) ? 'flex' : 'none';
+});
+document.addEventListener('mousemove', e => {
+  if (!walkOn) return;
+  player.yaw   -= e.movementX * 0.0022;
+  player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch - e.movementY*0.0022));
+});
+function enterWalk(){
+  mode = 'walk'; orbit.enabled = false;
+  document.getElementById('minimap').style.display = 'block';
+  document.getElementById('lockmsg').style.display = 'flex';
+  document.getElementById('bWalk').classList.add('active');
+  document.getElementById('bOrbit').classList.remove('active');
+  labelGroup.visible = false;
+  updateHint();
+  camera.position.copy(player.pos);
+  look();
+}
+function exitWalk(){
+  mode = 'orbit'; orbit.enabled = true; walkOn = false;
+  document.getElementById('minimap').style.display = 'none';
+  for (const k in keys) keys[k] = false;
+  if (document.pointerLockElement) document.exitPointerLock();
+  document.getElementById('lockmsg').style.display = 'none';
+  document.getElementById('bWalk').classList.remove('active');
+  document.getElementById('bOrbit').classList.add('active');
+  labelGroup.visible = true;
+  camera.position.set(44,22,44); orbit.target.set(14,5,12.5); orbit.update();
+  updateHint();
+}
+document.getElementById('bOrbit').onclick = exitWalk;
+
+function collide(px, pz, py){
+  const r = 0.4, eps = 0.25;                 // slim enough to use the real walkways (laundry door, TV↔coffee lane)
+  // furniture + walls
+  const boxes = [];
+  for (const c of colliders){
+    if (c.y0 >= py + 5.4) continue;            // above the head
+    if (c.y1 <= py + 0.7) continue;            // low enough to step up onto (stairs, curbs)
+    boxes.push(c);
+  }
+  for (const g of items){ const b = itemAABB(g); if (b.y1 - b.y0 > 0.4) boxes.push({x0:b.x0,x1:b.x1,z0:b.z0,z1:b.z1,y0:b.y0,y1:b.y1}); }
+  // closed doors block the swing path; the collider drops out as the leaf starts opening
+  for (const d of doors){ if (d.col && d.t < 0.3) boxes.push(d.col); }
+  let x = px, z = pz;
+  for (const c of boxes){
+    if (c.y0 >= py + 5.4) continue;            // above the head
+    if (c.y1 <= py + 0.7) continue;            // low enough to step onto
+    const nx0 = c.x0 - r, nx1 = c.x1 + r, nz0 = c.z0 - r, nz1 = c.z1 + r;
+    if (x > nx0 && x < nx1 && z > nz0 && z < nz1){
+      const dxl = x-nx0, dxr = nx1-x, dzl = z-nz0, dzr = nz1-z;
+      const m = Math.min(dxl, dxr, dzl, dzr);
+      if (m===dxl) x = nx0; else if (m===dxr) x = nx1; else if (m===dzl) z = nz0; else z = nz1;
+    }
+  }
+  // building bounds — extend east to cover the ramp
+  const lo = W+4.2+18.6+2.0, hi = -1.0;
+  x = Math.min(Math.max(x, hi), lo); z = Math.min(Math.max(z, -1.0), D+4);
+  return [x, z];
+}
+function look(){
+  const dir = new THREE.Vector3(
+    Math.sin(player.yaw)*Math.cos(player.pitch),
+    Math.sin(player.pitch),
+    Math.cos(player.yaw)*Math.cos(player.pitch));
+  camera.lookAt(camera.position.clone().add(dir));
+}
+let _stepAcc = 0;                                             // distance travelled since the last footstep
+/* raycast straight down from the feet: what surface are we standing on? */
+const _footRay = new THREE.Raycaster();
+const _footDir = new THREE.Vector3(0, -1, 0);
+function surfaceUnderFoot(){
+  const from = new THREE.Vector3(player.pos.x, player.groundY + 0.4, player.pos.z);
+  _footRay.set(from, _footDir); _footRay.far = 6;
+  const ms = []; scene.traverse(o => { if (o.isMesh && o.visible) ms.push(o); });
+  for (const h of _footRay.intersectObjects(ms, false)){
+    const o = h.object;
+    if (o.userData.surface) return o.userData.surface;         // tagged: grass/gravel/deck/stair
+    const m = o.material;                                      // untagged wood build surfaces
+    if (m === M.floorMain || m === M.floorLoft || m === M.wood) return 'wood';
+    return 'wood';                                             // anything solid indoors reads as wood
+  }
+  return 'grass';
+}
+function walkTick(dt){
+  if (!walkOn) return;
+  const running = keys['ShiftLeft'] || keys['ShiftRight'];
+  const sp = (running ? 7.2 : 4.2) * dt;
+  const f = new THREE.Vector3(Math.sin(player.yaw), 0, Math.cos(player.yaw));   // same convention as look(): W moves where you look
+  const r = new THREE.Vector3(-f.z, 0, f.x);
+  let mv = new THREE.Vector3();
+  if (keys['KeyW']) mv.add(f); if (keys['KeyS']) mv.sub(f);
+  if (keys['KeyD']) mv.add(r); if (keys['KeyA']) mv.sub(r);
+  if (mv.lengthSq()) mv.normalize().multiplyScalar(sp);
+  let nx = player.pos.x + mv.x, nz = player.pos.z + mv.z;
+  [nx, nz] = collide(nx, nz, player.groundY ?? 0);
+  player.pos.x = nx; player.pos.z = nz;
+  // ground follow
+  const gy = groundBelow(player.pos.x, player.pos.z, player.groundY ?? 0);   // height-aware: stays grounded under the loft
+  player.groundY = gy;
+  player.pos.y += (gy + 5.0 - player.pos.y) * Math.min(1, dt*10);   // eye height 5 ft — lower, roomier feel
+  // footsteps: stride-locked to distance travelled; surface changes the sound
+  if (mv.lengthSq() > 0){
+    _stepAcc += sp;
+    const stride = running ? 2.3 : 1.8;
+    if (_stepAcc >= stride){
+      _stepAcc = 0;
+      const px = player.pos.x, pz = player.pos.z;
+      const surface = surfaceUnderFoot();
+      footstep(surface);
+      if ((surface === 'wood' || surface === 'deck' || surface === 'stair') && Math.random() < (surface === 'stair' ? 0.18 : 0.24)) stepCreak();   // some boards creak
+    }
+  } else _stepAcc = Math.min(_stepAcc, 0.9);                  // mid-stride pause keeps the rhythm
+  camera.position.copy(player.pos);
+  look();
+}
+
+/* ---- corner minimap: floor plan + furniture + player dot with facing (walk mode) ---- */
+const mini = document.getElementById('minimap'), mctx = mini.getContext('2d');
+function drawMinimap(){
+  const w = mini.width, h = mini.height, pad = 8;
+  const s = Math.min((w - 2*pad)/W, (h - 2*pad)/D);
+  const ox = (w - W*s)/2, oz = (h - D*s)/2;
+  const X = x => ox + x*s, Z = z => oz + z*s;
+  mctx.clearRect(0, 0, w, h);
+  mctx.fillStyle = 'rgba(255,255,255,0.13)';                       // furniture ghosts
+  for (const g of items){
+    const b = itemAABB(g);
+    mctx.fillRect(X(b.x0), Z(b.z0), (b.x1-b.x0)*s, (b.z1-b.z0)*s);
+  }
+  mctx.fillStyle = '#8fa3b8';                                      // walls (bounds cached on first draw)
+  for (const m of wallMeshes){
+    const p = m.geometry.parameters, b = m.userData.mb || (m.userData.mb = { x: m.position.x, z: m.position.z });
+    mctx.fillRect(X(b.x - p.width/2), Z(b.z - p.depth/2), p.width*s, p.depth*s);
+  }
+  mctx.fillStyle = '#e0a23c';                                      // closed ground-floor doors amber (loft-level doors stay off the plan)
+  for (const d of doors){
+    if (d.t < 0.3 && d.col && d.col.y0 < 1) mctx.fillRect(X(d.col.x0), Z(d.col.z0), (d.col.x1-d.col.x0)*s, (d.col.z1-d.col.z0)*s);
+  }
+  const px = X(player.pos.x), pz = Z(player.pos.z), a = player.yaw;   // player dot + facing wedge
+  const fx = Math.sin(a), fz = Math.cos(a);
+  mctx.beginPath();
+  mctx.moveTo(px + fx*10, pz + fz*10);
+  mctx.lineTo(px - fx*3 + fz*4.5, pz - fz*3 - fx*4.5);
+  mctx.lineTo(px - fx*3 - fz*4.5, pz - fz*3 + fx*4.5);
+  mctx.closePath();
+  mctx.fillStyle = '#4fc3f7'; mctx.fill();
+  mctx.fillStyle = '#8fa3b8'; mctx.font = '9px sans-serif';
+  mctx.fillText('N \u2191', 5, 11);
+}
+
+/* ---- smooth camera fly-to (label navigation: click a room name → dollhouse view) ---- */
+let camTween = null;
+function flyTo(pos, target){
+  camTween = { p0: camera.position.clone(), t0: orbit.target.clone(), p1: pos, t1: target, start: performance.now(), dur: 900 };
+  orbit.enabled = false;
+}
+
+/* ================================================================
+   SAVE / LOAD
+   ================================================================ */
+const LSKEY = 'tinyhome_layout_v1';
+function serialize(){ return { v:1, items: items.map(g=>({ t:g.userData.type, x:+g.position.x.toFixed(3), z:+g.position.z.toFixed(3), r:+g.rotation.y.toFixed(3), y:+g.position.y.toFixed(3) })) }; }
+function clearItems(){ [...items].forEach(removeItem); }
+function deserialize(data){
+  clearItems();
+  for (const it of data.items||[]) buildItem(it.t, it.x, it.z, it.r, it.y);
+}
+function defaultLayout(){
+  // furniture pre-placed per the CAD plan
+  const L = [
+    ['bed',     6.6, 3.6, 0, 0.15],                       // bedroom (headboard at north wall)
+    ['night',   3.3, 5.9, 0, 0.15],                       // west of bed
+    ['wardrobe',12.4, 1.6, Math.PI, 0.15],                // bedroom east wall
+    ['fridge',  1.8, 17.3, 0, 0.15],                      // kitchen west run north end
+    ['range',   1.6, 20.2, Math.PI/2, 0.15],              // kitchen west run (per plan)
+    ['stool',   8.3, 21.4, 0, 0.15],
+    ['sofa',    16.5, 23.2, Math.PI, 0.15],                // living room, back to south wall, facing D4 entry
+    ['tv',      21.2, 16.6, Math.PI, 0.15],                // on north partition, east of the 5' D4 opening
+    ['coffee',  16.5, 19.6, 0, 0.15],
+    ['rug',     16.5, 20.2, 0, 0.15],
+    ['shelf',   11.2, 16.6, 0, 0.15],
+    ['washer',  1.55, 13.3, 0, 0.15],                     // laundry (per plan symbols, against north wall)
+    ['dryer',   3.75, 13.3, 0, 0.15],
+    ['vanity',  19.5, 6.5, Math.PI, 0.15],                // bathroom north (per plan)
+    ['toilet',  21.5, 11.05, Math.PI, 0.15],              // against south wall, clear of the D2 door swing
+    ['crate',   26.2, 23.7, 0, 0.15],                     // SE storage nook
+    ['crate',   26.3, 6.7, 0, LOFT_Y+0.02],               // attic storage
+    ['bunk',    6.5, 5.2, 0, LOFT_Y+0.02],                // loft
+    ['shelf',   12.2, 1.9, Math.PI, LOFT_Y+0.02],
+    ['rug',     8, 6.5, 0, LOFT_Y+0.02],
+    ['lamp',    3.2, 8.2, 0, LOFT_Y+0.02],
+    ['shelves', 23.5, 3.2, 0, LOFT_Y+0.02],               // attic storage
+    ['crate',   24.0, 8.0, 0, LOFT_Y+0.02],
+    ['crate',   21.5, 9.5, 0.3, LOFT_Y+0.02],
+    ['plant',   31.0, 15.6, 0, 1.55],                     // porch corner
+  ];
+  return { v:1, items: L.map(([t,x,z,r,y])=>({ t, x, z, r, y: y + (t==='rug'? 0 : 0) })) };
+}
+document.getElementById('bSave').onclick = () => { localStorage.setItem(LSKEY, JSON.stringify(serialize())); flash('💾 Layout saved'); };
+document.getElementById('bLoad').onclick = () => {
+  const s = localStorage.getItem(LSKEY);
+  if (!s) return flash('Nothing saved yet');
+  deserialize(JSON.parse(s)); flash('📂 Saved layout loaded');
+};
+document.getElementById('bReset').onclick = () => { deserialize(defaultLayout()); flash('↺ Reset to plan furniture'); };
+document.getElementById('bExport').onclick = () => {
+  const blob = new Blob([JSON.stringify(serialize(), null, 2)], { type:'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'tinyhome-layout.json'; a.click();
+  flash('⬇ Layout exported as tinyhome-layout.json');
+};
+document.getElementById('bGLB').onclick = exportGLB;
+// 📋 Copy — put the current layout JSON on the clipboard so it can be pasted into chat
+const layoutText = () => JSON.stringify(serialize(), null, 2);
+document.getElementById('bCopy').onclick = () => {
+  const txt = layoutText();
+  const done = () => flash(`📋 Layout copied (${serialize().items.length} items) — paste it in chat and I'll finalize it`);
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, () => fallbackCopy(txt, done));
+  else fallbackCopy(txt, done);
+};
+function fallbackCopy(txt, done){
+  const ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); } catch { flash('⚠ Copy failed — use ⬇ JSON instead'); }
+  ta.remove();
+}
+// Import: load a shared tinyhome-layout.json file back into the scene
+function applyImportedLayout(text, label='imported file'){
+  let data;
+  try { data = JSON.parse(text); }
+  catch { flash('⚠ Import failed: file is not valid JSON'); return false; }
+  if (!data || data.v !== 1 || !Array.isArray(data.items) || data.items.some(i => !i.t || typeof i.x !== 'number' || typeof i.z !== 'number')){
+    flash('⚠ Import failed: not a tinyhome layout file'); return false;
+  }
+  deserialize(data);
+  flash(`⬆ Imported ${data.items.length} items from ${label} — press 💾 Save to keep it`);
+  return true;
+}
+document.getElementById('bImport').onclick = () => document.getElementById('fileImport').click();
+document.getElementById('fileImport').onchange = (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => applyImportedLayout(rd.result, f.name);
+  rd.readAsText(f);
+  e.target.value = '';   // allow re-selecting the same file later
+};
+// 🔊/🔇 mute toggle — master gain for all door sounds, preference persisted
+const MUTEKEY = 'tinyhome_muted';
+function applyMuteUI(){
+  const b = document.getElementById('bMute');
+  b.textContent = _muted ? '🔇 Muted' : '🔊 Sound';
+  b.classList.toggle('active', _muted);
+  if (_master) _master.gain.value = _muted ? 0 : 1;
+}
+document.getElementById('bMute').onclick = () => {
+  _muted = !_muted;
+  try { localStorage.setItem(MUTEKEY, _muted ? '1' : '0'); } catch {}
+  applyMuteUI();
+  flash(_muted ? '🔇 Door sounds muted' : '🔊 Door sounds on');
+};
+try { if (localStorage.getItem(MUTEKEY) === '1') _muted = true; } catch {}
+applyMuteUI();
+// 🌧 rain toggle — rain-on-the-roof ambience + overcast sky, preference persisted
+const RAINKEY = 'tinyhome_rain';
+document.getElementById('bWeather').onclick = () => {
+  setRain(!weather.rain);
+  const b = document.getElementById('bWeather');
+  b.textContent = weather.rain ? '☀️ Clear' : '🌧 Rain';
+  b.classList.toggle('active', weather.rain);
+  flash(weather.rain ? '🌧 Rain — patter on the roof' : '☀️ Clear skies');
+};
+window.addEventListener('pointerdown', () => { try { if (_audio && _audio.state === 'suspended') _audio.resume(); } catch {} });
+try {
+  if (localStorage.getItem(RAINKEY) === '1'){
+    setRain(true);
+    const b = document.getElementById('bWeather');
+    b.textContent = '☀️ Clear'; b.classList.add('active');
+  }
+} catch {}
+// initial load: saved ? saved : plan defaults
+try {
+  const s = localStorage.getItem(LSKEY);
+  if (s) deserialize(JSON.parse(s)); else deserialize(defaultLayout());
+} catch { deserialize(defaultLayout()); }
+
+/* daylight through windows: glass must not block the sun's shadow */
+scene.traverse(o => { if (o.isMesh && o.material === M.glass) o.castShadow = false; });
+
+/* collect walkable surfaces for ghost raycast (floors + porch deck + stair treads) */
+scene.traverse(o => {
+  if (o.isMesh && (o.material===M.floorMain || o.material===M.floorLoft || o.material===M.wood)) floorsMeshes.push(o);
+});
+
+/* ---------------- UI wiring ---------------- */
+const bRoof = document.getElementById('bRoof');
+bRoof.onclick = () => {
+  roofGroup.visible = !roofGroup.visible;
+  bRoof.classList.toggle('active', !roofGroup.visible);
+};
+const bCatalog = document.getElementById('bCatalog');
+bCatalog.onclick = () => {
+  const c = document.getElementById('catalog');
+  c.classList.toggle('hidden');
+  bCatalog.classList.toggle('active', !c.classList.contains('hidden'));
+};
+const bOrbitB = document.getElementById('bOrbit');
+bOrbitB.onclick = exitWalk;
+
+function updateHint(){
+  const h = document.getElementById('hint');
+  if (mode==='walk'){
+    h.innerHTML = `<b>W A S D</b> move · mouse look · <b>Shift</b> run · stairs to the loft are east of the hall · <b>Esc</b> back to orbit`;
+  } else if (catSel){
+    h.innerHTML = `Placing <b>${FURN[catSel].name}</b> — click to drop · <b>R</b> rotate · <b>Esc</b> cancel`;
+  } else {
+    h.innerHTML = `Orbit: drag to look, wheel to zoom · <b>🛋 Furniture</b> to place items · click an item to select, drag to move · <b>R</b> rotate · <b>Delete</b> removes`;
+  }
+}
+updateHint();
+document.getElementById('sRot').onclick = () => { if (selected) selected.rotation.y += Math.PI/12; };
+document.getElementById('sDel').onclick = () => { if (selected) removeItem(selected); };
+
+let flashT;
+function flash(msg){
+  const h = document.getElementById('hint'); const old = h.innerHTML;
+  h.innerHTML = `<b>${msg}</b>`;
+  clearTimeout(flashT); flashT = setTimeout(()=>updateHint(), 1800);
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* ---------------- loop ---------------- */
+const clock = new THREE.Clock();
+window.__dbg = { scene, camera, orbit, roofGroup, hemi, sun, THREE, items, FURN, surfaceY, stairH, groundBelow, colliders, wallMeshes, wallHitsBetween, player, collide, enterWalk, walkTick, keys, get walkOn(){ return walkOn; }, set walkOn(v){ walkOn = v; }, doors, doorTick, serialize, deserialize, defaultLayout, applyImportedLayout, creakSound, latchSound, bumpSound, doorVol, footstep, stepCreak, surfaceUnderFoot, weather, setRain, rainZone, lightning, strikeLightning, thunderSound, RAIN_ZONES, get rainLp(){ return _rain ? Math.round(_rain.lp.frequency.value) : null; }, get rainBed(){ return _rain ? +_rain.g.gain.value.toFixed(4) : null; } };
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (mode==='orbit' && !camTween) orbit.update();
+  walkTick(dt);
+  if (mode==='walk') drawMinimap();
+  if (camTween){                                                   // eased camera fly
+    const k = Math.min(1, (performance.now() - camTween.start)/camTween.dur);
+    const e = k < 0.5 ? 4*k*k*k : 1 - Math.pow(-2*k+2, 3)/2;
+    camera.position.lerpVectors(camTween.p0, camTween.p1, e);
+    orbit.target.lerpVectors(camTween.t0, camTween.t1, e);
+    orbit.update();
+    if (k >= 1){ camTween = null; orbit.enabled = (mode === 'orbit'); }
+  }
+  doorTick(dt);
+  weather.inside = player.pos.x > 0.3 && player.pos.x < W && player.pos.z > 0.3 && player.pos.z < D;
+  weather.zone = rainZone();
+  dayNightTick(dt);
+  lightningTick(dt);
+  renderer.render(scene, camera);
+}
+animate();
+
+/* ---------------- GLB export ---------------- */
+function exportGLB(){
+  // Export the building only (skip helpers, minimap-ish nodes, invisible weather/rain fx)
+  const out = new THREE.Scene();
+  out.name = 'TinyHome';
+  scene.children.forEach(c => {
+    if (!c.visible) return;
+    if (c.isLight || c.isCamera) return;
+    if (c.type === 'GridHelper' || c.type === 'AxesHelper') return;
+    out.add(c);
+  });
+  const exporter = new GLTFExporter();
+  exporter.parse(out, (result) => {
+    const blob = new Blob([result], { type: 'model/gltf-binary' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'tinyhome.glb';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    console.log('[export] tinyhome.glb saved, bytes:', result.byteLength || result.length);
+  }, (err) => console.error('[export] failed', err), { binary: true });
+}
+window.__exportGLB = exportGLB;
+</script>
+</body>
+</html>

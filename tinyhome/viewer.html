@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html,body{margin:0;height:100%;background:#1a2028;color:#e2e8f0;font:13px system-ui}
+  #row{display:flex;height:100%}
+  .pane{flex:1;position:relative;min-width:0}
+  .pane h3{position:absolute;top:8px;left:8px;margin:0;z-index:2;background:rgba(13,17,23,.85);padding:4px 10px;border-radius:6px}
+  canvas{display:block}
+  #bar{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);z-index:9;background:rgba(13,17,23,.9);padding:6px 14px;border-radius:8px;display:flex;gap:14px;align-items:center}
+  button{background:#2b3644;color:#e2e8f0;border:0;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:13px}
+  button:hover{background:#3b4656}
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js",
+    "three/addons/loaders/GLTFLoader.js": "./vendor/GLTFLoader.js"
+} }
+</script>
+</head>
+<body>
+<div id="row">
+  <div class="pane"><h3>ORIGINAL (tinyhome.glb)</h3><div id="p1"></div></div>
+  <div class="pane"><h3>YOUR EDIT (tinihome2.glb)</h3><div id="p2"></div></div>
+</div>
+<div id="bar">
+  <label>View:</label>
+  <button data-v="se">SE exterior ↘</button>
+  <button data-v="sw">SW exterior ↙</button>
+  <button data-v="ne">NE exterior ↗</button>
+  <button data-v="front">Front entry (east)</button>
+  <button data-v="top">Top / plan</button>
+  <button data-v="roof">Roof closeup</button>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+function makePane(container, url){
+  const w = container.clientWidth, h = container.clientHeight;
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(w, h);
+  renderer.setPixelRatio(devicePixelRatio);
+  container.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1a2028);
+  const camera = new THREE.PerspectiveCamera(45, w/h, 0.1, 500);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  const hemi = new THREE.HemisphereLight(0xdfeaff, 0x40403a, 1.0); scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xfff2dd, 2.2); sun.position.set(40, 60, 30); scene.add(sun);
+  const loader = new GLTFLoader();
+  const done = new Promise((res, rej) => loader.load(url, g => { scene.add(g.scene); res(g.scene); }, undefined, rej));
+  const tick = () => { requestAnimationFrame(tick); controls.update(); renderer.render(scene, camera); };
+  tick();
+  return { scene, camera, controls, renderer, done, setSize(){ renderer.setSize(container.clientWidth, container.clientHeight); } };
+}
+
+const p1 = makePane(document.getElementById('p1'), 'tinyhome.glb');
+const p2 = makePane(document.getElementById('p2'), 'tinihome2.glb');
+let panes = [p1, p2];
+
+const VIEWS = {
+  se:   { pos: [55, 35, 55],  tgt: [14, 5, 12] },
+  sw:   { pos: [-30, 28, 55], tgt: [14, 5, 12] },
+  ne:   { pos: [55, 25, -30], tgt: [14, 5, 12] },
+  front:{ pos: [48, 6, 14],   tgt: [26, 6, 16] },
+  top:  { pos: [14, 75, 12.6],tgt: [14, 0, 12.4] },
+  roof: { pos: [30, 30, 30],  tgt: [14, 9, 12] },
+};
+function setView(k){
+  const v = VIEWS[k]; if (!v) return;
+  panes.forEach(p => {
+    p.camera.position.set(...v.pos);
+    p.controls.target.set(...v.tgt);
+    p.controls.update();
+  });
+}
+document.querySelectorAll('#bar button').forEach(b => b.onclick = () => setView(b.dataset.v));
+setView('se');
+onresize = () => panes.forEach(p => p.setSize());
+window.__views = { panes, setView, VIEWS };
+</script>
+</body>
+</html>
