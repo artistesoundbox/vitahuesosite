@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <style>
   html,body{margin:0;height:100%;background:#1a2028;color:#e2e8f0;font:13px system-ui}
-  #row{display:flex;height:100%}
+  #row{display:flex;height:100vh}
   .pane{flex:1;position:relative;min-width:0}
   .pane h3{position:absolute;top:8px;left:8px;margin:0;z-index:2;background:rgba(13,17,23,.85);padding:4px 10px;border-radius:6px}
   canvas{display:block}
@@ -40,7 +40,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 function makePane(container, url){
-  const w = container.clientWidth, h = container.clientHeight;
+  const w = container.clientWidth  || innerWidth/2;    // fallback for embedded browsers where %-height chains collapse
+  const h = container.clientHeight || innerHeight;
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(w, h);
   renderer.setPixelRatio(devicePixelRatio);
@@ -55,7 +56,10 @@ function makePane(container, url){
   const done = new Promise((res, rej) => loader.load(url, g => { scene.add(g.scene); res(g.scene); }, undefined, rej));
   const tick = () => { requestAnimationFrame(tick); controls.update(); renderer.render(scene, camera); };
   tick();
-  return { scene, camera, controls, renderer, done, setSize(){ renderer.setSize(container.clientWidth, container.clientHeight); } };
+  return { scene, camera, controls, renderer, done, setSize(){
+    const w2 = container.clientWidth || innerWidth/2, h2 = container.clientHeight || innerHeight;
+    renderer.setSize(w2, h2); camera.aspect = w2/h2; camera.updateProjectionMatrix();
+  } };
 }
 
 const p1 = makePane(document.getElementById('p1'), 'tinyhome.glb');
