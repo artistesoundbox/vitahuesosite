@@ -12,6 +12,13 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>UBAOG Multi-Level Tiny Home — 3D Interactive Model</title>
+<script>
+/* Capture the PWA install prompt as early as possible — it can fire before the
+   main module loads. preventDefault() suppresses Chrome's mini-infobar so the
+   in-app 📲 button owns the install flow. */
+window.__installEvt = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); window.__installEvt = e; });
+</script>
 <style>
   :root { --panel:#151a20ee; --line:#2a3340; --accent:#4da3ff; --txt:#dbe4ee; }
   * { box-sizing:border-box; }
@@ -68,6 +75,7 @@
   #touchui { position:fixed; inset:0; z-index:18; display:none; pointer-events:none; }
   #bFull { display:none; }
   @media (pointer:coarse){ #bFull { display:inline-block; } }
+  #bInstall { display:none; }   /* shown by JS only when beforeinstallprompt fires */
   #joyBase { position:absolute; width:124px; height:124px; border:2px solid rgba(226,232,240,.35); border-radius:50%;
     background:rgba(13,17,23,.28); transform:translate(-50%,-50%); display:none; }
   #joyKnob { position:absolute; width:54px; height:54px; border-radius:50%; background:rgba(77,163,255,.5);
@@ -118,6 +126,7 @@
   <button class="btn" id="bDay" title="Toggle day / night">🌙 Night</button>
   <button class="btn" id="bWeather" title="Toggle rain ambience">🌧 Rain</button>
   <button class="btn" id="bFull" title="Fullscreen">⛶ Full</button>
+  <button class="btn" id="bInstall" title="Install Tiny Home as an app (Android)">📲 Install</button>
   <input type="file" id="fileImport" accept=".json,application/json" style="display:none">
   <span id="stats"></span>
 </div>
@@ -1956,6 +1965,24 @@ if (IS_TOUCH){
 // register the pass-through service worker (required for installability; caches nothing)
 if ('serviceWorker' in navigator){
   addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
+// 📲 in-app install button — Android/Chrome fires beforeinstallprompt once the
+// SW + manifest criteria are met; iOS never fires it (Share → Add to Home Screen)
+{
+  const bInstall = document.getElementById('bInstall');
+  const installed = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const maybeShow = () => { if (window.__installEvt && !installed()) bInstall.style.display = 'inline-block'; };
+  maybeShow();                                                   // prompt captured before the module ran
+  addEventListener('beforeinstallprompt', e => {                 // prompt arrives after (belt & braces)
+    e.preventDefault(); window.__installEvt = e; maybeShow();
+  });
+  bInstall.onclick = async () => {
+    const p = window.__installEvt; if (!p) return;
+    bInstall.style.display = 'none';
+    try { await p.prompt(); } catch {}
+    window.__installEvt = null;
+  };
+  addEventListener('appinstalled', () => { bInstall.style.display = 'none'; window.__installEvt = null; });
 }
 
 // 🔊/🔇 mute toggle — master gain for all door sounds, preference persisted
