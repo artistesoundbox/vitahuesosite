@@ -1049,19 +1049,19 @@ scene.add(roofGroup);
     b.position.set(px1-0.1, py+0.01, (pz0+pz1)/2); b.castShadow=true; scene.add(b);
   }
   // 6x6 timber posts on the deck corners
-  for (const [qx,qz] of [[px1-0.25,pz0+0.25],[px1-0.25,pz1-0.25]]){
+  for (const [qx,qz] of [[px1-0.25,pz0+0.8],[px1-0.25,pz1-0.8]]){
     box(0.42, 8.4, 0.42, M.post, qx, py+4.2, qz);
     addCollider(qx-0.25,qx+0.25,qz-0.25,qz+0.25, 0, 9);
   }
   // exposed header beam across the post tops + rafter tails (per tinyhome.png)
   const beamY = py + 8.35;
-  box(0.5, 0.75, pz1-pz0+1.0, M.post, px1-0.25, beamY, (pz0+pz1)/2);
-  for (let z=pz0-0.3; z<=pz1+0.31; z+=1.9){
+  box(0.5, 0.75, 6.0, M.post, px1-0.25, beamY, (pz0+pz1)/2);
+  for (let z=pz0+0.6; z<=pz1-0.55; z+=1.45){
     const rt = new THREE.Mesh(new THREE.BoxGeometry(3.9, 0.28, 0.14), M.post);
     rt.position.set(px0+1.85, beamY-0.48, z); rt.castShadow = true; scene.add(rt);
   }
   // angled knee braces post→wall (the reference's chunky braces)
-  for (const qz of [pz0+0.25, pz1-0.25]){
+  for (const qz of [pz0+0.8, pz1-0.8]){
     const br = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.34, 0.3), M.post);
     br.position.set(px1-1.85, beamY-1.75, qz);
     br.rotation.z = Math.PI/4; br.castShadow = true; scene.add(br);
@@ -1070,22 +1070,22 @@ scene.add(roofGroup);
   // (ridge E–W, triangle facing the ramp), per tinyhome.png front elevation
   {
     const a4 = Math.atan2(4, 12);
-    const gz0 = pz0-0.1, gz1 = pz1+0.1;            // minimal eave overhang — compact roof, clear of the loft window
+    const gz0 = pz0+0.5, gz1 = pz1-0.5;            // compact canopy — well inside the deck, clear of the loft window
     const gspan = gz1-gz0, gz = (gz0+gz1)/2;       // apex over the porch center
     const gEave = 10.45;                            // eave height (just above the beam)
-    const gRidge = gEave + gspan*4/12;              // apex ~12.85
+    const gRidge = gEave + gspan*4/12;              // apex ~12.45
     for (const s of [-1, 1]){
       const L = Math.hypot(gspan, gspan*4/12);
-      const pl = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.14, L), M.roof);
-      pl.position.set(px0+2.15, gRidge - (gspan/2)*Math.sin(a4), gz + s*(gspan/2)*Math.cos(a4));   // west edge buried in the wall — no gap
+      const pl = new THREE.Mesh(new THREE.BoxGeometry(3.9, 0.14, L), M.roof);
+      pl.position.set(px0+1.8, gRidge - (gspan/2)*Math.sin(a4), gz + s*(gspan/2)*Math.cos(a4));   // west edge buried in the wall — no gap
       pl.rotation.x = s>0 ? a4 : -a4;
       pl.castShadow = true; pl.receiveShadow = true; scene.add(pl);
       // standing seams to match the main roof
-      for (let x = px0+0.3; x <= px1+0.05; x += 0.85){
+      for (let x = px0+0.35; x <= px1-0.3; x += 0.85){
         const sm = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, L*0.98), M.roof);
-        sm.position.set(x - (px0+2.15), 0.105, 0); pl.add(sm);
+        sm.position.set(x - (px0+1.8), 0.105, 0); pl.add(sm);
       }
-      const und = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.05, L*0.99), M.roofUnd);
+      const und = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.05, L*0.99), M.roofUnd);
       und.position.copy(pl.position); und.position.y -= 0.13; und.rotation.x = pl.rotation.x;
       scene.add(und);
     }
@@ -1097,7 +1097,7 @@ scene.add(roofGroup);
     gface.position.set(px1, 0, 0); gface.rotation.y = -Math.PI/2;   // extrudes west, face at porch east edge
     gface.castShadow = true; scene.add(gface);
     // battens on the mini gable, following the triangle
-    for (const bz of [gz, gz-2.2, gz+2.2]){
+    for (const bz of [gz, gz-1.9, gz+1.9]){
       const t = 1 - Math.abs(bz-gz)/(gspan/2);
       const top = gEave + (gRidge-gEave-0.15)*t - 0.2;
       const h = top - (gEave-0.15);
@@ -1107,8 +1107,8 @@ scene.add(roofGroup);
       b.castShadow = true; scene.add(b);
     }
     // ridge cap
-    const gcap = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.2, 0.5), M.roof);
-    gcap.position.set(px0+2.15, gRidge+0.05, gz); gcap.castShadow = true; scene.add(gcap);
+    const gcap = new THREE.Mesh(new THREE.BoxGeometry(3.9, 0.2, 0.5), M.roof);
+    gcap.position.set(px0+1.8, gRidge+0.05, gz); gcap.castShadow = true; scene.add(gcap);
   }
   // charcoal skirt around the deck base (per tinyhome.png)
   box(px1-px0+0.1, py-0.18, 0.08, M.skirt, (px0+px1)/2, (py-0.18)/2, pz0-0.06);
