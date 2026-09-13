@@ -198,7 +198,9 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xa9c3da);
 scene.fog = new THREE.Fog(0xa9c3da, 90, 220);
 
-const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.05, 400);
+const IS_TOUCH = matchMedia('(pointer: coarse)').matches;   // phones/tablets: touch UI + wider FOV
+const FOV = { orbit: IS_TOUCH ? 60 : 55, walk: IS_TOUCH ? 72 : 55 };   // wider on touch so rooms read bigger
+const camera = new THREE.PerspectiveCamera(FOV.orbit, innerWidth/innerHeight, 0.05, 400);
 camera.position.set(44, 22, 44);
 
 const orbit = new OrbitControls(camera, renderer.domElement);
@@ -1549,7 +1551,6 @@ document.addEventListener('mousemove', e => {
   player.yaw   -= e.movementX * 0.0022;
   player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch - e.movementY*0.0022));
 });
-const IS_TOUCH = matchMedia('(pointer: coarse)').matches;
 const touchUI = {
   root: document.getElementById('touchui'),
   joyBase: document.getElementById('joyBase'),
@@ -1608,8 +1609,8 @@ addEventListener('pointermove', e => {
     touchUI.joyKnob.style.left = (joyCenter.x+dx)+'px';
     touchUI.joyKnob.style.top = (joyCenter.y+dy)+'px';
   } else if (e.pointerId === lookPtr && lookLast){
-    player.yaw   -= (e.clientX - lookLast.x) * 0.005;
-    player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch - (e.clientY - lookLast.y)*0.005));
+    player.yaw   -= (e.clientX - lookLast.x) * 0.0031;      // gentler than desktop: touch drags sweep wider
+    player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch - (e.clientY - lookLast.y)*0.0031));
     lookLast = {x:e.clientX, y:e.clientY};
   }
 });
@@ -1625,6 +1626,7 @@ addEventListener('pointercancel', endPointer);
 
 function enterWalk(){
   mode = 'walk'; orbit.enabled = false;
+  camera.fov = FOV.walk; camera.updateProjectionMatrix();   // pull back the focal length while walking
   document.getElementById('minimap').style.display = 'block';
   document.getElementById('lockmsg').style.display = 'flex';
   document.getElementById('bWalk').classList.add('active');
@@ -1636,6 +1638,7 @@ function enterWalk(){
 }
 function exitWalk(){
   mode = 'orbit'; orbit.enabled = true; walkOn = false;
+  camera.fov = FOV.orbit; camera.updateProjectionMatrix();
   document.getElementById('minimap').style.display = 'none';
   for (const k in keys) keys[k] = false;
   if (document.pointerLockElement) document.exitPointerLock();
