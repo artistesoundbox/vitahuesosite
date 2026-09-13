@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8">
 <link rel="icon" href="../favicon.ico">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tiny Home">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.webmanifest">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>UBAOG Multi-Level Tiny Home — 3D Interactive Model</title>
 <style>
@@ -12,16 +19,23 @@
   #app { position:fixed; inset:0; }
   canvas { display:block; }
 
-  #topbar { position:fixed; top:0; left:0; right:0; height:44px; display:flex; align-items:center; gap:8px;
-    padding:0 12px; background:var(--panel); border-bottom:1px solid var(--line); z-index:20; backdrop-filter:blur(6px); }
+  #topbar { position:fixed; top:0; left:0; right:0; min-height:44px; display:flex; align-items:center; gap:8px;
+    padding:4px 12px; background:var(--panel); border-bottom:1px solid var(--line); z-index:20; backdrop-filter:blur(6px);
+    overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  #topbar::-webkit-scrollbar{display:none}
   #topbar .title { font-weight:600; font-size:13px; letter-spacing:.4px; margin-right:6px; white-space:nowrap; }
   #topbar .sub { font-size:11px; color:#8fa3b8; white-space:nowrap; }
   .btn { background:#1d2733; color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:5px 11px;
-    font-size:12px; cursor:pointer; user-select:none; white-space:nowrap; }
+    font-size:12px; cursor:pointer; user-select:none; white-space:nowrap; -webkit-tap-highlight-color:transparent; }
   .btn:hover { background:#273447; border-color:#3a4b60; }
   .btn.active { background:var(--accent); color:#04121f; border-color:var(--accent); font-weight:600; }
-  .sep { width:1px; height:22px; background:var(--line); margin:0 2px; }
+  .sep { width:1px; height:22px; background:var(--line); margin:0 2px; flex:none; }
   #stats { margin-left:auto; font-size:11px; color:#8fa3b8; }
+  @media (max-width:700px){
+    #topbar .sub, #topbar .sep { display:none; }
+    #topbar .title { font-size:11px; }
+    .btn { padding:7px 12px; font-size:12px; }
+  }
 
   #catalog { position:fixed; top:44px; left:0; bottom:0; width:236px; background:var(--panel);
     border-right:1px solid var(--line); z-index:15; display:flex; flex-direction:column; }
@@ -39,7 +53,9 @@
   .cat-item .dims { color:#7890a6; font-size:10px; }
 
   #hint { position:fixed; left:50%; transform:translateX(-50%); bottom:14px; background:var(--panel);
-    border:1px solid var(--line); border-radius:8px; padding:8px 14px; font-size:12px; z-index:20; max-width:640px; }
+    border:1px solid var(--line); border-radius:8px; padding:8px 14px; font-size:12px; z-index:20; max-width:min(640px, 92vw);
+    transition:opacity .4s; }
+  #hint.hidden { opacity:0; pointer-events:none; }
   #hint b { color:var(--accent); }
   #selinfo { position:fixed; top:52px; right:12px; background:var(--panel); border:1px solid var(--line);
     border-radius:8px; padding:10px 12px; font-size:12px; z-index:20; display:none; min-width:180px; }
@@ -50,6 +66,8 @@
   #lockmsg .card { background:var(--panel); border:1px solid var(--line); padding:22px 30px; border-radius:12px; text-align:center; }
   /* ---- touch controls (walk mode on phones/tablets) ---- */
   #touchui { position:fixed; inset:0; z-index:18; display:none; pointer-events:none; }
+  #bFull { display:none; }
+  @media (pointer:coarse){ #bFull { display:inline-block; } }
   #joyBase { position:absolute; width:124px; height:124px; border:2px solid rgba(226,232,240,.35); border-radius:50%;
     background:rgba(13,17,23,.28); transform:translate(-50%,-50%); display:none; }
   #joyKnob { position:absolute; width:54px; height:54px; border-radius:50%; background:rgba(77,163,255,.5);
@@ -99,6 +117,7 @@
   <button class="btn" id="bMute" title="Toggle door sounds">🔊 Sound</button>
   <button class="btn" id="bDay" title="Toggle day / night">🌙 Night</button>
   <button class="btn" id="bWeather" title="Toggle rain ambience">🌧 Rain</button>
+  <button class="btn" id="bFull" title="Fullscreen">⛶ Full</button>
   <input type="file" id="fileImport" accept=".json,application/json" style="display:none">
   <span id="stats"></span>
 </div>
@@ -1870,6 +1889,31 @@ document.getElementById('fileImport').onchange = (e) => {
   rd.readAsText(f);
   e.target.value = '';   // allow re-selecting the same file later
 };
+// ⛶ fullscreen toggle (touch devices): immersive landscape walkthroughs
+const bFull = document.getElementById('bFull');
+bFull.onclick = () => {
+  try {
+    if (!document.fullscreenElement && !document.webkitFullscreenElement){
+      (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen).call(document.documentElement);
+    } else {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    }
+  } catch {}
+};
+// auto-hide the hint bar after a while on touch so it doesn't cover the ramp view
+if (IS_TOUCH){
+  let hintTimer = setTimeout(() => document.getElementById('hint').classList.add('hidden'), 6000);
+  addEventListener('pointerdown', () => {
+    document.getElementById('hint').classList.remove('hidden');
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => document.getElementById('hint').classList.add('hidden'), 6000);
+  }, { passive:true });
+}
+// register the pass-through service worker (required for installability; caches nothing)
+if ('serviceWorker' in navigator){
+  addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
+
 // 🔊/🔇 mute toggle — master gain for all door sounds, preference persisted
 const MUTEKEY = 'tinyhome_muted';
 function applyMuteUI(){

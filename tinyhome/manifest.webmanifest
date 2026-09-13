@@ -1,0 +1,16 @@
+{
+  "name": "UBAOG Tiny Home — 3D Model",
+  "short_name": "Tiny Home",
+  "description": "Interactive 3D tiny home: orbit the dollhouse, walk the rooms, out onto the porch and ADA ramp.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
