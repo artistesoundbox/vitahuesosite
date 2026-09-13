@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <link rel="icon" href="../favicon.ico">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>UBAOG Multi-Level Tiny Home — 3D Interactive Model</title>
 <style>
   :root { --panel:#151a20ee; --line:#2a3340; --accent:#4da3ff; --txt:#dbe4ee; }
@@ -48,6 +48,21 @@
   #lockmsg { position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:30;
     background:#0d1117cc; font-size:15px; }
   #lockmsg .card { background:var(--panel); border:1px solid var(--line); padding:22px 30px; border-radius:12px; text-align:center; }
+  /* ---- touch controls (walk mode on phones/tablets) ---- */
+  #touchui { position:fixed; inset:0; z-index:18; display:none; pointer-events:none; }
+  #joyBase { position:absolute; width:124px; height:124px; border:2px solid rgba(226,232,240,.35); border-radius:50%;
+    background:rgba(13,17,23,.28); transform:translate(-50%,-50%); display:none; }
+  #joyKnob { position:absolute; width:54px; height:54px; border-radius:50%; background:rgba(77,163,255,.5);
+    border:2px solid rgba(226,232,240,.6); transform:translate(-50%,-50%); display:none; }
+  #joyHint { position:absolute; left:34px; bottom:calc(34px + env(safe-area-inset-bottom)); width:110px; height:110px;
+    border:2px dashed rgba(226,232,240,.22); border-radius:50%; display:flex; align-items:center; justify-content:center;
+    color:#8fa3b8; font-size:10px; text-align:center; }
+  #lookHint { position:absolute; right:34px; bottom:calc(34px + env(safe-area-inset-bottom)); width:110px; height:110px;
+    border:2px dashed rgba(226,232,240,.22); border-radius:50%; display:flex; align-items:center; justify-content:center;
+    color:#8fa3b8; font-size:10px; text-align:center; }
+  #bExitWalk { position:absolute; top:calc(52px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
+    display:none; pointer-events:auto; }
+  canvas { touch-action:none; }
   #compass { position:fixed; top:54px; left:248px; font-size:11px; color:#8fa3b8; z-index:14; }
   #minimap { position:fixed; right:14px; bottom:14px; z-index:15; border:1px solid var(--line); border-radius:8px;
     background:rgba(13,17,23,.82); display:none; }
@@ -139,6 +154,14 @@
   <div style="margin-top:6px;color:#9fb4c9">Stairs take you up to the loft · <b>Esc</b> to exit</div>
   <div style="margin-top:12px"><button class="btn" id="bStart">Click to enter</button></div>
 </div></div>
+
+<div id="touchui">
+  <div id="joyHint">drag here<br>to move</div>
+  <div id="lookHint">drag here<br>to look</div>
+  <div id="joyBase"></div>
+  <div id="joyKnob"></div>
+  <button class="btn" id="bExitWalk">✕ Exit walk</button>
+</div>
 
 <div id="compass">N ↑ (north wall at top of plan) · walk mode starts in the living room · porch is outside the east entry doors</div>
 <canvas id="minimap" width="170" height="152"></canvas>
@@ -461,7 +484,7 @@ function wall(x1,z1,x2,z2, th, base, top, openings=[], mat=M.wallIn, collide=tru
 }
 
 const doors = [];   // animated door leaves: {g, base, swing, openFrac, hx, hz, cx, cz, col, t}
-const PUSH_RANGE = 1.45; // walking into a closed door (player radius 0.85) nudges it open
+const PUSH_RANGE = 1.7; // walking into a closed door (player radius 0.85) nudges it open
 function doorLeaf(x1,z1,x2,z2, width, openFrac=0.82, flip=false, baseY=0, h=6.67){
   // hinge at (x1,z1) end; leaf swings into +z (or -z if flip)
   const horiz = Math.abs(x2-x1) > Math.abs(z2-z1);
@@ -514,7 +537,11 @@ function doorTick(dt){
   else _walkSince = -1;
   const audible = mode === 'walk' && performance.now() - _walkSince > 1200;  // not during the settle-in chorus
   for (const d of doors){
-    const dist = Math.hypot(player.pos.x - d.cx, player.pos.z - d.cz);
+    // distance from the player to the door's closed-leaf rectangle (not just its center),
+    // so pushing anywhere along the doorway opens it
+    const ndx = player.pos.x - Math.max(d.col.x0, Math.min(player.pos.x, d.col.x1));
+    const ndz = player.pos.z - Math.max(d.col.z0, Math.min(player.pos.z, d.col.z1));
+    const dist = Math.hypot(ndx, ndz);
     let target = d.openFrac;                                  // authored pose in orbit view
     if (mode === 'walk'){
       target = dist < PUSH_RANGE ? 1 : 0;                     // push open on contact, drift closed after
@@ -796,8 +823,8 @@ wall(W, 0, W, D, EXT, 0, EAVE, [
   { a:14.9, b:17.9, b0:0, b1:6.67 },   // D1
   { a:18.4, b:20.4, b0:0, b1:6.67 },   // D1.5
 ], M.extSiding);
-doorLeaf(W, 17.9, W, 14.9, 3, 0.85, true);
-doorLeaf(W, 20.4, W, 18.4, 2, 0.85, true);
+doorLeaf(W, 17.9, W, 14.9, 3, 0.85, false);   // swings INWARD so the leaf is visible from inside
+doorLeaf(W, 20.4, W, 18.4, 2, 0.85, false);
 // window frames + glass (per plan: W1, W2, two loft north windows) — dark frames per tinyhome.png
 windowUnit(4.6, 0, 8.6, 0, 4.6, 9.33, 8.6, 13.33);
 windowUnit(19.4, 0, 23.4, 0, 19.4, 9.33, 23.4, 13.33);
@@ -1007,6 +1034,35 @@ scene.add(roofGroup);
   // charcoal skirt around the deck base (per tinyhome.png)
   box(px1-px0+0.1, py-0.18, 0.08, M.skirt, (px0+px1)/2, (py-0.18)/2, pz0-0.06);
   box(px1-px0+0.1, py-0.18, 0.08, M.skirt, (px0+px1)/2, (py-0.18)/2, pz1+0.06);
+  // guard rails along the east edge, flush corner-to-ramp (z 16.4..20 stays open)
+  const railY = py + 2.85;
+  for (const [za, zb] of [[pz0, 16.4], [20.0, pz1]]){
+    const segLen = zb - za;
+    if (segLen < 0.4) continue;
+    box(0.14, 0.14, segLen, M.woodDark, px1-0.25, railY, (za+zb)/2);
+    box(0.1, 0.1, segLen, M.woodDark, px1-0.25, railY-0.95, (za+zb)/2);   // mid rail
+    for (let z = za+0.22; z < zb; z += 0.55){
+      box(0.07, railY-py, 0.07, M.woodDark, px1-0.25, py+(railY-py)/2, z);
+    }
+    addCollider(px1-0.4, px1-0.1, za, zb, py, py+3.1);
+  }
+  // potted plants tucked into the rail corners, wall lantern by the doors
+  function porchPlanter(x, z){
+    cyl(scene, .5,.38,.62, new THREE.MeshStandardMaterial({color:0x8a5a3a,roughness:.85}), x, py+0.31, z, 14);
+    const leaf = new THREE.MeshStandardMaterial({color:0x3f7d44,roughness:.9});
+    for (let i=0;i<5;i++){
+      const s = new THREE.Mesh(new THREE.SphereGeometry(.3+Math.random()*.15,8,8), leaf);
+      s.position.set(x+(Math.random()-.5)*.4, py+0.85+Math.random()*.55, z+(Math.random()-.5)*.4);
+      s.castShadow = true; scene.add(s);
+    }
+    addCollider(x-.5, x+.5, z-.5, z+.5, py, py+2);
+  }
+  porchPlanter(px1-0.55, pz0+0.5);
+  porchPlanter(px1-0.55, pz1-0.5);
+  // warm lantern on the wall south of the D1.5 door
+  const lan = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.42, 0.22), M.warmGlow);
+  lan.position.set(W+0.14, py+2.6, 21.0); scene.add(lan);
+  box(0.3, 0.08, 0.3, M.frameDark, W+0.14, py+2.85, 21.0);
   // steps down (south end)
   for (let i=0;i<2;i++){
     box(3.2, 0.32, 0.9, M.wood, px0+2.0, py-0.16-i*0.32, pz1+0.45+i*0.9);
@@ -1071,6 +1127,12 @@ scene.add(roofGroup);
   // keep walkers inside the ramp
   addCollider(RAMP.x0, RAMP.x1, RAMP.z1-0.05, RAMP.z1+0.4, 0, 3.4);
   addCollider(RAMP.x0, RAMP.x1, RAMP.z0-0.4, RAMP.z0+0.05, 0, 3.4);
+  // bench at the ramp bottom — a spot to sit without crowding the porch
+  const benchX = RAMP.x1+2.5, benchZ = 21.5;
+  box(3.2, 0.14, 1.15, M.wood, benchX, 0.85, benchZ);
+  box(3.2, 0.5, 0.12, M.wood, benchX, 1.35, benchZ+0.5);
+  for (const bx2 of [benchX-1.4, benchX+1.4]) box(0.12, 0.85, 1.05, M.woodDark, bx2, 0.42, benchZ);
+  addCollider(benchX-1.7, benchX+1.7, benchZ-0.65, benchZ+0.65, 0, 2.2);
 }
 
 /* ---------------- DESERT LANDSCAPING + HAZY RIDGES (per tinyhome.png) ---------------- */
@@ -1498,19 +1560,98 @@ const keys = {};
 function walkKey(e, down){ keys[e.code] = down; if (down && e.code.startsWith('Key')) e.preventDefault?.(); }
 
 document.getElementById('bWalk').onclick = () => enterWalk();
-document.getElementById('bStart').onclick = () => renderer.domElement.requestPointerLock();
+document.getElementById('bStart').onclick = () => {
+  if (IS_TOUCH) beginTouchWalk();
+  else renderer.domElement.requestPointerLock();
+};
 document.getElementById('lockmsg').onclick = (e) => { if (e.target.id==='lockmsg') exitWalkUI(); };
-renderer.domElement.addEventListener('click', () => { if (mode==='walk' && !walkOn) renderer.domElement.requestPointerLock(); });
+renderer.domElement.addEventListener('click', () => {
+  if (mode==='walk' && !walkOn && !IS_TOUCH) renderer.domElement.requestPointerLock();
+});
 document.addEventListener('pointerlockchange', () => {
   walkOn = document.pointerLockElement === renderer.domElement;
   if (!walkOn) for (const k in keys) keys[k] = false;   // Esc: drop held keys so you don't keep sliding
   document.getElementById('lockmsg').style.display = (mode==='walk' && !walkOn) ? 'flex' : 'none';
 });
 document.addEventListener('mousemove', e => {
-  if (!walkOn) return;
+  if (!walkOn || document.pointerLockElement !== renderer.domElement) return;   // touch look has its own path
   player.yaw   -= e.movementX * 0.0022;
   player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch - e.movementY*0.0022));
 });
+const IS_TOUCH = matchMedia('(pointer: coarse)').matches;
+const touchUI = {
+  root: document.getElementById('touchui'),
+  joyBase: document.getElementById('joyBase'),
+  joyKnob: document.getElementById('joyKnob'),
+  joyHint: document.getElementById('joyHint'),
+  lookHint: document.getElementById('lookHint'),
+  exit: document.getElementById('bExitWalk'),
+  move: {x:0, y:0},          // -1..1 joystick vector (y>0 = forward)
+  run: false,
+};
+touchUI.exit.onclick = () => exitWalk();
+function beginTouchWalk(){
+  walkOn = true;
+  document.getElementById('lockmsg').style.display = 'none';   // no pointerlock event on touch — hide it ourselves
+  touchUI.root.style.display = 'block';
+  touchUI.exit.style.display = 'block';
+  touchUI.joyHint.style.display = 'flex';
+  touchUI.lookHint.style.display = 'flex';
+}
+function endTouchWalk(){
+  walkOn = false;
+  touchUI.root.style.display = 'none';
+  touchUI.exit.style.display = 'none';
+  touchUI.move.x = touchUI.move.y = 0;
+}
+/* left half = joystick, right half = look. Pointer events cover touch + pen + mouse-drag. */
+let joyPtr = null, lookPtr = null, lookLast = null;
+const joyCenter = {x:0, y:0};
+const JOY_R = 52;
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (mode !== 'walk' || !walkOn || !IS_TOUCH) return;
+  if (e.clientX < innerWidth/2){
+    if (joyPtr !== null) return;
+    joyPtr = e.pointerId;
+    joyCenter.x = e.clientX; joyCenter.y = e.clientY;
+    touchUI.joyBase.style.display = touchUI.joyKnob.style.display = 'block';
+    touchUI.joyBase.style.left = e.clientX+'px'; touchUI.joyBase.style.top = e.clientY+'px';
+    touchUI.joyKnob.style.left = e.clientX+'px'; touchUI.joyKnob.style.left = e.clientX+'px';
+    touchUI.joyKnob.style.top = e.clientY+'px';
+    touchUI.joyHint.style.display = 'none';
+  } else {
+    if (lookPtr !== null) return;
+    lookPtr = e.pointerId; lookLast = {x:e.clientX, y:e.clientY};
+    touchUI.lookHint.style.display = 'none';
+  }
+});
+addEventListener('pointermove', e => {
+  if (mode !== 'walk' || !walkOn || !IS_TOUCH) return;
+  if (e.pointerId === joyPtr){
+    let dx = e.clientX - joyCenter.x, dy = e.clientY - joyCenter.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const cl = Math.min(len, JOY_R);
+    dx = dx/len*cl; dy = dy/len*cl;
+    touchUI.move.x = dx/JOY_R; touchUI.move.y = -dy/JOY_R;      // up = forward
+    touchUI.run = cl > JOY_R*0.92;                              // full extension = run
+    touchUI.joyKnob.style.left = (joyCenter.x+dx)+'px';
+    touchUI.joyKnob.style.top = (joyCenter.y+dy)+'px';
+  } else if (e.pointerId === lookPtr && lookLast){
+    player.yaw   -= (e.clientX - lookLast.x) * 0.005;
+    player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch - (e.clientY - lookLast.y)*0.005));
+    lookLast = {x:e.clientX, y:e.clientY};
+  }
+});
+function endPointer(e){
+  if (e.pointerId === joyPtr){
+    joyPtr = null; touchUI.move.x = touchUI.move.y = 0; touchUI.run = false;
+    touchUI.joyBase.style.display = touchUI.joyKnob.style.display = 'none';
+  }
+  if (e.pointerId === lookPtr){ lookPtr = null; lookLast = null; }
+}
+addEventListener('pointerup', endPointer);
+addEventListener('pointercancel', endPointer);
+
 function enterWalk(){
   mode = 'walk'; orbit.enabled = false;
   document.getElementById('minimap').style.display = 'block';
@@ -1527,6 +1668,7 @@ function exitWalk(){
   document.getElementById('minimap').style.display = 'none';
   for (const k in keys) keys[k] = false;
   if (document.pointerLockElement) document.exitPointerLock();
+  endTouchWalk();
   document.getElementById('lockmsg').style.display = 'none';
   document.getElementById('bWalk').classList.remove('active');
   document.getElementById('bOrbit').classList.add('active');
@@ -1559,8 +1701,8 @@ function collide(px, pz, py){
       if (m===dxl) x = nx0; else if (m===dxr) x = nx1; else if (m===dzl) z = nz0; else z = nz1;
     }
   }
-  // building bounds — extend east to cover the ramp
-  const lo = W+4.2+18.6+2.0, hi = -1.0;
+  // building bounds — extend east past the ramp onto the landing pad & yard
+  const lo = RAMP.x1 + 10.0, hi = -1.0;
   x = Math.min(Math.max(x, hi), lo); z = Math.min(Math.max(z, -1.0), D+4);
   return [x, z];
 }
@@ -1590,13 +1732,17 @@ function surfaceUnderFoot(){
 }
 function walkTick(dt){
   if (!walkOn) return;
-  const running = keys['ShiftLeft'] || keys['ShiftRight'];
+  const running = keys['ShiftLeft'] || keys['ShiftRight'] || touchUI.run;
   const sp = (running ? 7.2 : 4.2) * dt;
   const f = new THREE.Vector3(Math.sin(player.yaw), 0, Math.cos(player.yaw));   // same convention as look(): W moves where you look
   const r = new THREE.Vector3(-f.z, 0, f.x);
   let mv = new THREE.Vector3();
   if (keys['KeyW']) mv.add(f); if (keys['KeyS']) mv.sub(f);
   if (keys['KeyD']) mv.add(r); if (keys['KeyA']) mv.sub(r);
+  if (touchUI.move.x || touchUI.move.y){                                        // virtual joystick
+    mv.addScaledVector(f, touchUI.move.y);
+    mv.addScaledVector(r, touchUI.move.x);
+  }
   if (mv.lengthSq()) mv.normalize().multiplyScalar(sp);
   let nx = player.pos.x + mv.x, nz = player.pos.z + mv.z;
   [nx, nz] = collide(nx, nz, player.groundY ?? 0);
@@ -1815,7 +1961,9 @@ bOrbitB.onclick = exitWalk;
 function updateHint(){
   const h = document.getElementById('hint');
   if (mode==='walk'){
-    h.innerHTML = `<b>W A S D</b> move · mouse look · <b>Shift</b> run · stairs to the loft are east of the hall · <b>Esc</b> back to orbit`;
+    h.innerHTML = IS_TOUCH
+      ? `<b>Left thumb</b> move · <b>right thumb</b> look · push the stick fully to run · ✕ exits`
+      : `<b>W A S D</b> move · mouse look · <b>Shift</b> run · stairs to the loft east of the hall · exit the east doors to the porch + ramp · <b>Esc</b> back to orbit`;
   } else if (catSel){
     h.innerHTML = `Placing <b>${FURN[catSel].name}</b> — click to drop · <b>R</b> rotate · <b>Esc</b> cancel`;
   } else {
@@ -1840,7 +1988,7 @@ addEventListener('resize', () => {
 
 /* ---------------- loop ---------------- */
 const clock = new THREE.Clock();
-window.__dbg = { scene, camera, orbit, roofGroup, hemi, sun, THREE, items, FURN, surfaceY, stairH, groundBelow, colliders, wallMeshes, wallHitsBetween, player, collide, enterWalk, walkTick, keys, get walkOn(){ return walkOn; }, set walkOn(v){ walkOn = v; }, doors, doorTick, serialize, deserialize, defaultLayout, applyImportedLayout, creakSound, latchSound, bumpSound, doorVol, footstep, stepCreak, surfaceUnderFoot, weather, setRain, rainZone, lightning, strikeLightning, thunderSound, RAIN_ZONES, get rainLp(){ return _rain ? Math.round(_rain.lp.frequency.value) : null; }, get rainBed(){ return _rain ? +_rain.g.gain.value.toFixed(4) : null; } };
+window.__dbg = { scene, camera, orbit, roofGroup, hemi, sun, THREE, items, FURN, surfaceY, stairH, groundBelow, colliders, wallMeshes, wallHitsBetween, player, collide, enterWalk, walkTick, keys, get walkOn(){ return walkOn; }, set walkOn(v){ walkOn = v; }, doors, doorTick, serialize, deserialize, defaultLayout, applyImportedLayout, creakSound, latchSound, bumpSound, doorVol, footstep, stepCreak, surfaceUnderFoot, weather, setRain, rainZone, lightning, strikeLightning, thunderSound, RAIN_ZONES, IS_TOUCH, touchUI, get rainLp(){ return _rain ? Math.round(_rain.lp.frequency.value) : null; }, get rainBed(){ return _rain ? +_rain.g.gain.value.toFixed(4) : null; } };
 function animate(){
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
