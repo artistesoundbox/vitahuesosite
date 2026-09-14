@@ -156,9 +156,9 @@ addEventListener('beforeinstallprompt', e => { e.preventDefault(); window.__inst
   <div class="row"><label for="setSens">Look sensitivity</label><span class="val" id="setSensV"></span></div>
   <input type="range" id="setSens" min="0.0008" max="0.0055" step="0.0001">
   <div class="row"><label for="setFovOrbit">Orbit field of view</label><span class="val" id="setFovOrbitV"></span></div>
-  <input type="range" id="setFovOrbit" min="40" max="80" step="1">
+  <input type="range" id="setFovOrbit" min="40" max="95" step="1">
   <div class="row"><label for="setFovWalk">Walk field of view</label><span class="val" id="setFovWalkV"></span></div>
-  <input type="range" id="setFovWalk" min="55" max="100" step="1">
+  <input type="range" id="setFovWalk" min="55" max="110" step="1">
   <button class="btn" id="setReset">↺ Reset to defaults</button>
 </div>
 
@@ -250,7 +250,7 @@ scene.background = new THREE.Color(0xa9c3da);
 scene.fog = new THREE.Fog(0xa9c3da, 90, 220);
 
 const IS_TOUCH = matchMedia('(pointer: coarse)').matches;   // phones/tablets: touch UI + wider FOV
-const FOV = { orbit: IS_TOUCH ? 60 : 55, walk: IS_TOUCH ? 72 : 55 };   // wider on touch so rooms read bigger
+const FOV = { orbit: IS_TOUCH ? 70 : 62, walk: IS_TOUCH ? 85 : 68 };   // shorter focal length: less tunnel vision at startup and inside
 const camera = new THREE.PerspectiveCamera(FOV.orbit, innerWidth/innerHeight, 0.05, 400);
 camera.position.set(44, 22, 44);
 
@@ -1051,7 +1051,8 @@ scene.add(roofGroup);
   // 6x6 timber posts on the deck corners
   for (const [qx,qz] of [[px1-0.25,pz0+0.8],[px1-0.25,pz1-0.8]]){
     box(0.42, 8.4, 0.42, M.post, qx, py+4.2, qz);
-    addCollider(qx-0.25,qx+0.25,qz-0.25,qz+0.25, 0, 9);
+    // no colliders on the posts: the guard rail already blocks the deck edge here,
+    // and the NE post's box walled off the door→ramp walking lane
   }
   // exposed header beam across the post tops + rafter tails (per tinyhome.png)
   const beamY = py + 8.35;
@@ -1136,8 +1137,7 @@ scene.add(roofGroup);
     }
     addCollider(x-.5, x+.5, z-.5, z+.5, py, py+2);
   }
-  porchPlanter(px1-0.55, pz0+0.5);
-  porchPlanter(px1-0.55, pz1-0.5);
+  porchPlanter(px1-0.55, pz1-0.5);                     // south corner only — the north corner sits in the door→ramp walking lane
   // warm lantern on the wall south of the D1.5 door
   const lan = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.42, 0.22), M.warmGlow);
   lan.position.set(W+0.14, py+2.6, 21.0); scene.add(lan);
@@ -1709,8 +1709,10 @@ addEventListener('pointermove', e => {
     let dx = e.clientX - joyCenter.x, dy = e.clientY - joyCenter.y;
     const len = Math.hypot(dx, dy) || 1;
     const cl = Math.min(len, JOY_R);
+    const DZ = 0.18;                                            // ignore finger jitter near the center
     dx = dx/len*cl; dy = dy/len*cl;
-    touchUI.move.x = dx/JOY_R; touchUI.move.y = -dy/JOY_R;      // up = forward
+    const mag = Math.max(0, (cl/JOY_R - DZ) / (1 - DZ));        // rescaled so full extension still = full speed
+    touchUI.move.x = mag ? (dx/cl)*mag : 0; touchUI.move.y = mag ? (-dy/cl)*mag : 0;
     touchUI.run = cl > JOY_R*0.92;                              // full extension = run
     touchUI.joyKnob.style.left = (joyCenter.x+dx)+'px';
     touchUI.joyKnob.style.top = (joyCenter.y+dy)+'px';
@@ -1819,11 +1821,13 @@ function walkTick(dt){
   let mv = new THREE.Vector3();
   if (keys['KeyW']) mv.add(f); if (keys['KeyS']) mv.sub(f);
   if (keys['KeyD']) mv.add(r); if (keys['KeyA']) mv.sub(r);
-  if (touchUI.move.x || touchUI.move.y){                                        // virtual joystick
+  let mag = 1;                                                                  // virtual joystick — analog: deflection sets speed
+  if (touchUI.move.x || touchUI.move.y){
+    mag = Math.min(1, Math.hypot(touchUI.move.x, touchUI.move.y));
     mv.addScaledVector(f, touchUI.move.y);
     mv.addScaledVector(r, touchUI.move.x);
   }
-  if (mv.lengthSq()) mv.normalize().multiplyScalar(sp);
+  if (mv.lengthSq()) mv.normalize().multiplyScalar(sp * mag);
   let nx = player.pos.x + mv.x, nz = player.pos.z + mv.z;
   [nx, nz] = collide(nx, nz, player.groundY ?? 0);
   player.pos.x = nx; player.pos.z = nz;
@@ -1925,7 +1929,7 @@ function defaultLayout(){
     ['shelves', 23.5, 3.2, 0, LOFT_Y+0.02],               // attic storage
     ['crate',   24.0, 8.0, 0, LOFT_Y+0.02],
     ['crate',   21.5, 9.5, 0.3, LOFT_Y+0.02],
-    ['plant',   31.0, 15.6, 0, 1.55],                     // porch corner
+                                                                      // (porch corners have fixed planters — a movable one here blocked the door→ramp lane)
   ];
   return { v:1, items: L.map(([t,x,z,r,y])=>({ t, x, z, r, y: y + (t==='rug'? 0 : 0) })) };
 }
@@ -2004,6 +2008,16 @@ if ('serviceWorker' in navigator){
 // ⚙ settings chip — look sensitivity + FOV sliders, persisted in localStorage
 const SETKEY = 'tinyhome_settings_v1';
 const SET_DEF = { sens: IS_TOUCH ? 0.0031 : 0.0022, fovOrbit: FOV.orbit, fovWalk: FOV.walk };
+{
+  /* migration: v1 persisted the old auto-assigned defaults; bump once so the new wider FOV reaches existing devices */
+  try {
+    const prev = JSON.parse(localStorage.getItem(SETKEY));
+    if (prev && !prev.v && (prev.fovOrbit === 55 || prev.fovOrbit === 60 || prev.fovWalk === 55 || prev.fovWalk === 72)) {
+      delete prev.fovOrbit; delete prev.fovWalk;                 // let new defaults through; keep any manual sens
+      prev.v = 2; localStorage.setItem(SETKEY, JSON.stringify(prev));
+    }
+  } catch {}
+}
 const SET = Object.assign({}, SET_DEF, (() => { try { return JSON.parse(localStorage.getItem(SETKEY)) || {}; } catch { return {}; } })());
 {
   const setPanel = document.getElementById('settings');
