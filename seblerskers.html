@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SEBLERSKERS – Vitamina Hueso @ Manteca Studios</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="icon-192.png" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    html, body {
+      width: 100%; min-height: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #e8ddc8; background: #060808;
+      overflow-x: hidden;
+    }
+    body {
+      background:
+        radial-gradient(1100px 560px at 85% -8%, rgba(255, 150, 40, 0.10), transparent 60%),
+        radial-gradient(900px 500px at 8% 108%, rgba(80, 170, 255, 0.08), transparent 60%),
+        #060808;
+    }
+    a { color: #ffd9a0; }
+    .btn {
+      display: inline-block; padding: 11px 34px; font-size: 14px; letter-spacing: 0.22em;
+      text-transform: uppercase; color: #f2e2c2; background: rgba(22, 16, 8, 0.6);
+      border: 1px solid rgba(255, 180, 90, 0.35); border-radius: 999px;
+      text-decoration: none; transition: all .25s; cursor: pointer;
+    }
+    .btn:hover { border-color: rgba(255, 200, 130, 0.85); box-shadow: 0 0 18px rgba(255, 160, 60, 0.35); color: #fff; }
+    .btn.small { padding: 8px 22px; font-size: 12px; }
+
+    /* ---------- title menu screen ---------- */
+    #title-screen {
+      position: relative;
+      min-height: 100vh; min-height: 100dvh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: 24px 6vw;
+      background:
+        radial-gradient(900px 480px at 50% 38%, rgba(255, 140, 30, 0.10), transparent 65%),
+        #060808;
+      overflow: hidden;
+    }
+    .menu-back { position: absolute; top: 18px; left: 18px; }
+    .menu-art {
+      width: min(300px, 58vw); height: auto; border-radius: 50%;
+      box-shadow: 0 0 34px rgba(255, 170, 60, 0.4), 0 0 90px rgba(255, 120, 30, 0.18);
+      animation: rise .9s ease-out both;
+    }
+    .menu-title {
+      margin-top: 26px;
+      font-size: clamp(42px, 9vw, 84px); letter-spacing: 0.18em; color: #ffe9c4;
+      text-shadow: 0 0 34px rgba(255, 150, 50, 0.55), 0 2px 12px #000;
+      animation: rise .9s ease-out .15s both;
+    }
+    .menu-tag {
+      margin-top: 8px;
+      font-size: clamp(12px, 2vw, 15px); letter-spacing: 0.34em; text-transform: uppercase;
+      color: #d8b58a;
+      animation: rise .9s ease-out .3s both;
+    }
+    .start-btn {
+      margin-top: 38px; padding: 16px 64px; font-size: 18px;
+      border-color: rgba(255, 190, 100, 0.55); background: rgba(30, 20, 8, 0.7);
+      animation: rise .9s ease-out .45s both, pulse 2.6s ease-in-out 1.4s infinite;
+    }
+    .start-btn:hover { box-shadow: 0 0 26px rgba(255, 170, 60, 0.55); }
+    .menu-hint {
+      position: absolute; bottom: 22px; left: 0; right: 0;
+      font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: #6d6250;
+      animation: rise .9s ease-out .6s both;
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 14px rgba(255, 170, 60, 0.25); }
+      50%      { box-shadow: 0 0 30px rgba(255, 170, 60, 0.55); }
+    }
+
+    /* ---------- the saga (below the fold) ---------- */
+    header { max-width: 1200px; margin: 0 auto; padding: 40px 6vw 0; text-align: center; }
+    .kicker { font-size: 13px; letter-spacing: 0.42em; text-transform: uppercase; color: #a08c6a; margin-bottom: 6px; }
+    header h2 {
+      font-size: clamp(24px, 4vw, 36px); letter-spacing: 0.16em; color: #ffe9c4;
+      text-shadow: 0 0 30px rgba(255, 150, 50, 0.5);
+    }
+    header p.tag { font-size: clamp(13px, 2vw, 16px); line-height: 1.6; color: #b8a488; max-width: 760px; margin: 10px auto 0; }
+    .top-row { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .features { max-width: 860px; margin: 26px auto 10px; padding: 0 6vw; }
+    .features ul { list-style: none; text-align: left; }
+    .features li {
+      padding: 9px 0 9px 28px; position: relative; color: #cbb894;
+      font-size: 15px; line-height: 1.6; border-bottom: 1px solid rgba(255, 180, 90, 0.12);
+    }
+    .features li:last-child { border-bottom: none; }
+    .features li::before { content: "⚔"; position: absolute; left: 2px; color: #ffb040; }
+    footer { max-width: 900px; margin: 30px auto 50px; padding: 0 6vw; text-align: center; color: #7f7462; font-size: 13px; line-height: 1.7; }
+  </style>
+</head>
+<body>
+  <!-- ============ TITLE MENU SCREEN ============ -->
+  <section id="title-screen">
+    <a class="btn small menu-back" href="index.html">&#9664; Back to the portal</a>
+    <img src="seblerskers.png" alt="SEBLERSKERS" class="menu-art" />
+    <h1 class="menu-title">SEBLERSKERS</h1>
+    <div class="menu-tag">The Viking Island Saga</div>
+    <a class="btn start-btn" href="#saga">Start</a>
+    <div class="menu-hint">fly &middot; sail &middot; raid</div>
+  </section>
+
+  <!-- ============ THE SAGA ============ -->
+  <header id="saga">
+    <div class="top-row">
+      <a class="btn small nav-back" href="index.html">&#9664; BACK</a>
+      <a class="btn small" href="index.html">&#8962; HOME</a>
+    </div>
+    <p class="kicker">Vitamina Hueso @ Manteca Studios</p>
+    <h2>THE SAGA</h2>
+    <p class="tag">
+      Wash ashore on a living norse island. Walk its village, take wing over
+      its mountains, command a longship across its seas — and hold the walls
+      when the night raid comes.
+    </p>
+  </header>
+
+  <div class="features">
+    <ul>
+      <li>Fly like a bird — dive, glide and trade height for speed</li>
+      <li>Sail the flagship with a rowing crew and a coastal regatta to race</li>
+      <li>Defend the village through night raids and earn your medals</li>
+      <li>Treasure hoards on castle rooftops, lighthouse galleries — and out at sea</li>
+      <li>A living island: day-night cycle, fireflies, birdsong and the tide</li>
+    </ul>
+  </div>
+
+  <div style="text-align:center; margin: 30px auto 60px;">
+    <a class="btn" href="seblerskers.html" onclick="alert('The build download is coming soon — this page will link it.');return false;">Download the build</a>
+  </div>
+
+  <footer>
+    SEBLERSKERS · a viking island saga. The wind knows your name; the sea keeps its secrets.
+  </footer>
+</body>
+</html>
