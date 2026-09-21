@@ -1,15 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-EY4SD4FCN4"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'G-EY4SD4FCN4');
-    </script>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
 		<title>Over The Ice</title>
@@ -120,7 +111,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":327852724,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":327853876,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
@@ -210,7 +201,7 @@ const engine = new Engine(GODOT_CONFIG);
 		setStatusMode('progress');
 				// Pack source chain: R2 (fast, no quota) -> GitHub LFS -> same-origin (offline dev)
 				const R2_BASE = '';
-				const RELEASE_PACK = 'https://media.githubusercontent.com/media/artistesoundbox/vitahuesosite/main/game/index.pck?v=20260910-1';
+				const RELEASE_PACK = 'https://media.githubusercontent.com/media/artistesoundbox/vitahuesosite/main/game/index.pck?v=20260920-1';
 		const LOCAL_PACK = 'index.pck';
 		const head = (u) => fetch(u, { method: 'HEAD', mode: 'cors' }).then((r) => r.ok).catch(() => false);
 		const probe = (async () => {
@@ -243,6 +234,11 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw-pack.js').catch(function () {});
   });
 }
+</script>
+
+<script>
+window.vhGamePausedState = window.vhGamePausedState || function () {};
+window.vhGameMusicState = window.vhGameMusicState || function () {};
 </script>
 
 <script>
@@ -359,11 +355,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('keydown', ask, { once: false, capture: true });
 })();
 
-</script>
-
-<script>
-window.vhGamePausedState = window.vhGamePausedState || function () {};
-window.vhGameMusicState = window.vhGameMusicState || function () {};
 </script>
 </body>
 </html>

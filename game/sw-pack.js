@@ -14,8 +14,12 @@
  * Failures degrade gracefully: any cache error falls back to plain network.
  */
 
-const CACHE = 'vh-game-v1';
+const CACHE = 'vh-game-v2';   // bumped 2026-09-20: force every client to drop the v1 cache (stale Sep 6 pack served Sep 19)
 const PACK_MARKER = /index\.pck(\?|$)/;
+// A versioned pack URL (?v=...) is a NEW pack by definition (the shell is
+// re-shipped with a bumped version on every build) — never cache-first it.
+// The bare URL keeps caching so repeat loads stay instant.
+const PACK_UNCACHEABLE = /index\.pck\?/;
 const BIG_FILE = /index\.pck|index\.wasm(\.gz)?$|index\.side\.wasm/;
 const SMALL_FILE = /\.(js|png|ico|worklet\.js)$|index\.audio\./;
 
@@ -53,6 +57,7 @@ self.addEventListener('fetch', function (event) {
     (BIG_FILE.test(url.pathname) || SMALL_FILE.test(url.pathname));
 
   if (!isPack && !engineAsset) return;   // everything else: browser native
+  if (isPack && PACK_UNCACHEABLE.test(url.pathname + url.search)) return;
 
   event.respondWith(cacheFirst(req, isPack));
 });
