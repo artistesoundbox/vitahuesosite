@@ -467,9 +467,33 @@ const GODOT_THREADS_ENABLED = false;
     });
   }
 
+  /* One ranged fetch of the first 40 bytes: the PCK header declares the
+     directory-table offset (Godot writes the table AFTER all data). A
+     partial/truncated publish still has the header but reports a shorter
+     Content-Length than its own declared table offset — detectable BEFORE
+     downloading 500 MB of a pack Godot would reject at setup. */
+  function probeTable(size) {
+    return fetch(CDN_BASE + "?cb=" + Date.now(), {
+      headers: { Range: "bytes=0-39" }, cache: "no-store"
+    }).then(function (r) { return r.arrayBuffer(); }).then(function (buf) {
+      if (buf.byteLength < 40) throw new Error("pack header read short");
+      var tableOff = Number(new DataView(buf).getBigUint64(32, true));
+      if (!(tableOff > 100 && tableOff + 16 <= size)) {
+        throw new Error("the CDN is still publishing an incomplete build " +
+          "(header expects the catalog at byte " + tableOff +
+          ", origin serves only " + size + ") \u2014 wait a minute and press " +
+          "Set sail again");
+      }
+      slog("table", "catalog offset " + tableOff + " within size " + size + " OK");
+    });
+  }
+
   function downloadPack(onProgress, attempts) {
     attempts = attempts || 0;
     return stableHead(0)
+      .then(function (head) {
+        return probeTable(head.size).then(function () { return head; });
+      })
       .then(function (head) {
         var size = head.size;
         window.__sebLastPackSize = size;
