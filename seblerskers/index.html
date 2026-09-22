@@ -262,6 +262,20 @@ const GODOT_THREADS_ENABLED = false;
     try {
       var joined = Array.prototype.join.call(arguments, " ");
       if (joined.indexOf("Couldn't load project data") >= 0 && !_brokenRetried) {
+        if (sessionStorage.getItem("seb-broken-retry")) {
+          /* one auto-retry per tab is enough \u2014 beyond that, be honest and
+             let the human decide (avoids a purge/re-download loop while the
+             CDN converges) */
+          console.info("[shell] setup rejected the build AGAIN \u2014 CDN still " +
+            "publishing; not auto-retrying further");
+          wrap.style.display = "block";
+          bar.style.width = "0%";
+          status.textContent = "the CDN is still publishing an incomplete " +
+            "build. Wait about two minutes, then refresh the page \u2014 this is " +
+            "on our side, not your browser.";
+          _brokenRetried = true;
+          return _origError.apply(console, arguments);
+        }
         _brokenRetried = true;
         console.info("[shell] setup rejected the delivered build \u2014 CDN likely " +
           "mid-publish; purging its chunks and auto-retrying once");
@@ -459,7 +473,7 @@ const GODOT_THREADS_ENABLED = false;
       .then(function (head) {
         var size = head.size;
         window.__sebLastPackSize = size;
-        if (!head.ok || !size || head.headers.get("Accept-Ranges") !== "bytes") {
+        if (!head.ok || !size || head.ranges !== "bytes") {
           return -1; // no chunked path: engine loads the CDN URL directly
         }
         var chunks = Math.ceil(size / CHUNK);
