@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0908">
+<title>SEBLERSKERS — a viking island saga</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: #0a0908; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center;
+         font-family: Georgia, 'Times New Roman', serif; color: #f1eee6; }
+  #frame { position: relative; width: 100vw; height: 100vh; }
+  #bg { position: absolute; inset: 0; z-index: 1; background: #0a0908 center / cover no-repeat; }
+  #bg::after { content: ""; position: absolute; inset: 0;
+               background: linear-gradient(180deg, rgba(10,9,8,.30) 0%, rgba(10,9,8,.55) 55%, rgba(10,9,8,.82) 100%); }
+  #canvas { position: absolute; inset: 0; width: 100%; height: 100%;
+            display: block; background: #000; outline: none; touch-action: none; }
+  #veil { position: absolute; inset: 0; z-index: 5;
+          display: flex; flex-direction: column; align-items: center;
+          justify-content: center; gap: 16px; text-align: center; padding: 16px; }
+  #veil h1 { font-size: clamp(30px, 7vw, 58px); letter-spacing: 6px;
+             color: #d8c07a; text-shadow: 0 2px 14px #000, 0 0 30px rgba(0,0,0,.8);
+             font-weight: normal; }
+  #veil .tag { font-style: italic; opacity: .85; font-size: clamp(13px, 2.5vw, 18px);
+               text-shadow: 0 1px 8px #000; }
+  #start-btn { margin-top: 10px; font: inherit; font-size: clamp(16px, 3.4vw, 24px);
+               color: #f1eee6; background: rgba(42,36,28,.85); border: 2px solid #b8964f;
+               border-radius: 40px; padding: 14px 44px; cursor: pointer;
+               text-shadow: 0 1px 6px #000; }
+  #start-btn:hover { background: rgba(58,49,38,.9); }
+  #progress-wrap { width: min(70vw, 420px); height: 10px; border: 1px solid #6a5a38;
+                   border-radius: 6px; overflow: hidden; display: none;
+                   background: rgba(0,0,0,.45); }
+  #progress { height: 100%; width: 0%; background: linear-gradient(90deg, #8a6d2f, #d8c07a); }
+  #status { font-size: 14px; opacity: .9; min-height: 18px; text-shadow: 0 1px 6px #000; }
+  #note { margin-top: 10px; font-size: clamp(11px, 2.2vw, 14px); opacity: .85;
+          max-width: min(92vw, 660px); line-height: 1.5; text-shadow: 0 1px 6px #000; }
+  #rotate-hint { display: none; position: fixed; inset: 0; z-index: 999;
+                 background: #0a0908; color: #f1eee6; align-items: center;
+                 justify-content: center; text-align: center; padding: 24px;
+                 font-size: 18px; line-height: 1.6; }
+  @media (orientation: portrait) and (pointer: coarse) { #rotate-hint { display: flex; } }
+  .hidden { display: none !important; }
+  /* --- gamepad diagnostics overlay --- */
+  #gp-chip { position: fixed; right: 10px; bottom: 10px; z-index: 1200;
+             font: 11px/1.2 Consolas, monospace; letter-spacing: .08em;
+             color: #d8c07a; background: rgba(10,9,8,.75); border: 1px solid #6a5a38;
+             border-radius: 14px; padding: 6px 12px; cursor: pointer; opacity: .7; }
+  #gp-chip:hover { opacity: 1; }
+  #gp-panel { position: fixed; left: 10px; right: 10px; bottom: 44px; z-index: 1200;
+              display: none; width: auto; max-width: 430px; max-height: 62vh;
+              overflow-y: auto; overflow-wrap: anywhere;
+              margin-left: max(0px, env(safe-area-inset-left) - 10px);
+              font: 11px/1.55 Consolas, monospace; color: #e8ddc8; text-align: left;
+              background: rgba(8,7,6,.93); border: 1px solid #6a5a38;
+              border-radius: 10px; padding: 10px 12px; }
+  #gp-panel.open { display: block; }
+  #gp-panel h3 { font: inherit; letter-spacing: .12em; color: #d8c07a; margin: 0 0 6px; }
+  #gp-panel .pad { margin-bottom: 8px; padding-bottom: 6px;
+                   border-bottom: 1px solid rgba(106,90,56,.4); }
+  #gp-panel .none { opacity: .75; }
+  #gp-panel .btn-lit { color: #ffb040; font-weight: bold; }
+  #gp-panel .axis-bar { display: inline-block; vertical-align: middle; width: 58px;
+                        height: 6px; background: rgba(255,255,255,.12);
+                        border-radius: 3px; position: relative; margin: 0 6px; }
+  #gp-panel .axis-fill { position: absolute; top: 0; bottom: 0; left: 50%;
+                         background: #8fb4e8; border-radius: 3px; }
+  #gp-log { margin-top: 6px; opacity: .85; white-space: pre-line; }
+  #gp-hint { margin-top: 8px; opacity: .6; font-family: Georgia, serif;
+             font-style: italic; line-height: 1.45; }
+  /* --- back-to-portal button: always reachable, even mid-game --- */
+  #portal-btn { position: fixed; top: 10px; left: 10px; z-index: 1300;
+                font: 13px Georgia, serif; letter-spacing: .08em;
+                color: #f1eee6; background: rgba(42,36,28,.8); border: 1px solid #b8964f;
+                border-radius: 999px; padding: 7px 18px; cursor: pointer;
+                text-decoration: none; opacity: .85; }
+  #portal-btn:hover { background: rgba(58,49,38,.95); opacity: 1; }
+</style>
+</head>
+<body>
+<div id="rotate-hint">&#10227; Rotate your phone &mdash;<br>SEBLERSKERS plays in landscape</div>
+<a id="portal-btn" href="https://artistesoundbox.github.io/vitahuesosite/index.html">&#9664; Portal</a>
+<div id="frame">
+  <div id="bg"></div>
+  <canvas id="canvas"></canvas>
+  <div id="veil">
+    <h1>SEBLERSKERS</h1>
+    <div class="tag">a viking island saga</div>
+    <button id="start-btn">&#9876; Set sail</button>
+    <div id="progress-wrap"><div id="progress"></div></div>
+    <div id="status">arming the longship&hellip;</div>
+    <div id="note">
+      Keyboard: WASD move &middot; mouse look &middot; Space jump &middot; click attack &middot;
+      Tab/Q scroll &middot; Esc pause<br>
+      Touch: left-thumb joystick &middot; right-thumb look &middot; on-screen buttons &middot;
+      plug in an Xbox controller and it just works<br>
+      Big download: on phones this resumable loader keeps going even if your
+      connection dips &mdash; if the tab reloads, press Set sail again and it
+      picks up where it left off. After one full load the whole saga is
+      cached and boots offline.
+    </div>
+  </div>
+</div>
+<button id="gp-chip" type="button">GAMEPAD: 0</button>
+<div id="gp-panel">
+  <h3>GAMEPAD DIAGNOSTICS</h3>
+  <div id="gp-body"></div>
+  <div id="gp-log"></div>
+  <div id="gp-hint">Pad listed here but the game ignores it? Send Buffy exactly what this panel shows.</div>
+</div>
+<script src="./index.js"></script>
+<script>
+/*
+ * SEBLERSKERS shell for the vitahuesosite portal (served from /seblerskers/).
+ *
+ * - Engine (index.js / index.wasm / index.side.wasm / worklets / terrain
+ *   GDExtension) lives in this folder.
+ * - The game pack (index.pck, ~535 MB) streams cross-origin from the game
+ *   repo's GitHub Pages CDN (artistesoundbox.github.io/seblerskers/), which
+ *   sends Access-Control-Allow-Origin: * — no quota, refreshed by that repo's
+ *   deploy workflow whenever a new build ships.
+ *
+ * MOBILE-SAFE, RESUMABLE, CACHE-BACKED LOADER
+ * Plain godot fetches download the whole ~535 MB pack in one request; on a
+ * phone (or any flaky link) one dropped connection throws everything away
+ * and the "download" never completes. This shell instead streams the pack
+ * in 8 MB chunks itself, stitches them in memory, and hands the finished
+ * ArrayBuffer to the engine. Benefits:
+ *   - every chunk is a small, independent request — one failure retries
+ *     only that 8 MB slice (3 attempts, growing pause), not the whole file
+ *   - a service worker (site-sw.js) stores every completed chunk in the
+ *     Cache API under a size-keyed URL, so returning players replay the
+ *     finished chunks from disk instantly and only fetch what's missing —
+ *     after one full load the game boots offline
+ *   - progress reads honestly (bytes actually received / known total)
+ *   - memory stays at ONE copy of the pack: chunks land directly in a
+ *     single preallocated buffer as they arrive (an earlier version held
+ *     chunk copies + a stitched copy — two full packs — which silently
+ *     OOM-killed the wasm engine right after the bar hit 100%)
+ */
+const CDN_BASE = "https://artistesoundbox.github.io/seblerskers/index.pck";
+const CHUNK = 8 * 1024 * 1024; // 8 MB slices
+
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,
+  "ensureCrossOriginIsolationHeaders":false,"executable":"index",
+  "experimentalVK":false,"fileSizes":{"index.wasm":1508095},
+  "focusCanvas":true,"gdextensionLibs":["libterrain.web.release.wasm32.wasm"],
+  "godotPoolSize":4,
+  "persistentDrops":true};
+const GODOT_THREADS_ENABLED = false;
+
+(function () {
+  "use strict";
+  var veil = document.getElementById("veil");
+  var status = document.getElementById("status");
+  var wrap = document.getElementById("progress-wrap");
+  var bar = document.getElementById("progress");
+  var btn = document.getElementById("start-btn");
+  /*
+   * Gamepad-to-keyboard bridge for the WEB build only.
+   *
+   * The pad itself is fine — browsers expose it with mapping "standard"
+   * (verified live with an Xbox controller, vendor 045e). The problem is
+   * Godot web UI focus: on the web export, JoypadButton events often fail
+   * to move/press focused UI the way they do on desktop, so the title and
+   * pause menus ignore the pad. This bridge re-injects every pad button
+   * as its conventional keyboard event, which the game's menus, the
+   * intro Skip and the pause screen all handle natively:
+   *   d-pad / left stick  -> arrows      A -> Enter
+   *   B / Back            -> Escape      Start -> Enter
+   * It never synthesizes repeats (menus only need edges) and stops as
+   * soon as gameplay owns input (canvas focus + gameplay flags).
+   */
+  var PAD_MAP = { 0: "Enter", 1: "Escape", 4: "ArrowLeft", 5: "ArrowRight",
+    12: "ArrowUp", 13: "ArrowDown", 14: "ArrowLeft", 15: "ArrowRight",
+    8: "Escape", 9: "Enter" };
+  var padState = {};
+  function padKeyDown(code) {
+    var canvas = GODOT_CONFIG["canvas"];
+    canvas.dispatchEvent(new KeyboardEvent("keydown", { key: code, code: code,
+      bubbles: true, cancelable: true }));
+  }
+  function padKeyUp(code) {
+    var canvas = GODOT_CONFIG["canvas"];
+    canvas.dispatchEvent(new KeyboardEvent("keyup", { key: code, code: code,
+      bubbles: true, cancelable: true }));
+  }
+  function padToKey(idx, pressed) {
+    var code = PAD_MAP[idx];
+    if (!code) return;
+    if (pressed && !padState[code]) { padState[code] = true; padKeyDown(code); }
+    else if (!pressed && padState[code]) { padState[code] = false; padKeyUp(code); }
+  }
+  function pollPads() {
+    var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (var p = 0; p < pads.length; p++) {
+      var pad = pads[p];
+      if (!pad) continue;
+      for (var b = 0; b < pad.buttons.length; b++) {
+        padToKey(b, pad.buttons[b].pressed);
+      }
+      if (pad.axes.length >= 2) {
+        padToKey(14, pad.axes[0] < -0.6);  // stick left -> ArrowLeft
+        padToKey(15, pad.axes[0] > 0.6);   // stick right -> ArrowRight
+        padToKey(12, pad.axes[1] < -0.6);  // stick up -> ArrowUp
+        padToKey(13, pad.axes[1] > 0.6);   // stick down -> ArrowDown
+      }
+    }
+    requestAnimationFrame(pollPads);
+  }
+  requestAnimationFrame(pollPads);
+
+  /* pack-cache service worker: registers quietly; not required to play */
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./site-sw.js").catch(function () { });
+    navigator.serviceWorker.addEventListener("message", function (e) {
+      if (e.data && e.data.type === "seb-engine-updated") {
+        console.info("seblerskers: updated engine asset served next reload:", e.data.file);
+      }
+    });
+  }
+  GODOT_CONFIG["canvas"] = document.getElementById("canvas");
+  GODOT_CONFIG["onProgress"] = function (cur, total) {
+    if (total > 0) {
+      wrap.style.display = "block";
+      bar.style.width = Math.round(100 * cur / total) + "%";
+      status.textContent = "loading\u2026 " + Math.round(100 * cur / total) + "%";
+    } else {
+      status.textContent = "fetching the hold\u2026 " + (cur / 1048576).toFixed(1) + " MB";
+    }
+  };
+
+  var engine = new Engine(GODOT_CONFIG);
+  /* cover art: big screen gets the 1920px version, small a 61 KB one */
+  document.getElementById("bg").style.backgroundImage =
+    'url("./' + ((window.innerWidth < 900) ? "site-shell-cover-small.jpg" : "site-shell-cover.jpg") + '")';
+  function fail(err) {
+    status.textContent = "This browser can't run the saga (" + err + "). " +
+      "Try Chrome/Edge/Firefox on desktop, or Safari 15+ / Chrome on Android.";
+  }
+
+  function setBar(cur, total) {
+    wrap.style.display = "block";
+    var pct = Math.round(100 * cur / total);
+    bar.style.width = pct + "%";
+    status.textContent = "loading\u2026 " + pct + "%  (" +
+      (cur / 1048576).toFixed(0) + " of " + (total / 1048576).toFixed(0) + " MB)";
+  }
+
+  function fetchChunk(url, begin, end, tries) {
+    return fetch(url, {
+      headers: { "Range": "bytes=" + begin + "-" + (end - 1) },
+      cache: "no-store",
+      redirect: "follow",
+    }).then(function (resp) {
+      if (!resp.ok) throw new Error("HTTP " + resp.status + " for chunk " + begin);
+      return resp.arrayBuffer().then(function (buf) {
+        if (buf.byteLength !== end - begin) {
+          throw new Error("short chunk: got " + buf.byteLength +
+            " of " + (end - begin));
+        }
+        return buf;
+      });
+    }).catch(function (err) {
+      if (tries <= 0) throw err;
+      return new Promise(function (resolve) {
+        setTimeout(resolve, 300 * (4 - tries) * (4 - tries));
+      }).then(function () {
+        return fetchChunk(url, begin, end, tries - 1);
+      });
+    });
+  }
+
+  /* cache-key helpers: chunk URLs embed the pack's total size, so a new
+     build (new size) can never be stitched from stale chunks */
+  function chunkKey(size, idx) {
+    return CDN_BASE + "?s=" + size + "&c=" + idx;
+  }
+  var packCache = null;
+  function openCache() {
+    if (!packCache) packCache = (self.caches ? caches.open("seb-pack-v1") : null);
+    return packCache || Promise.resolve(null);
+  }
+  function sweepCache(size) {
+    return openCache().then(function (c) {
+      if (!c) return [];
+      return c.keys().then(function (keys) {
+        var have = [];
+        var junk = [];
+        var prefix = CDN_BASE + "?s=";
+        keys.forEach(function (k) {
+          var m = k.url.match(/^[^?]*\?s=(\d+)&c=(\d+)$/);
+          if (k.url.indexOf(prefix) === 0 && m && Number(m[1]) === size) {
+            have.push(Number(m[2]));   // the CHUNK INDEX, not the size
+          } else {
+            junk.push(k);
+          }
+        });
+        // prune chunks from other pack sizes / malformed keys
+        junk.forEach(function (k) { try { c.delete(k); } catch (e) { } });
+        return have;
+      });
+    }).catch(function () { return []; });
+  }
+
+  /* Stage 1: get every chunk of the pack into the browser's Cache (the
+     service worker stores them). This stage holds NO big buffer \u2014 peak
+     memory stays at a few MB. Stage 2 is the ENGINE's stock loader: it
+     fetches same-origin "index.pck", the service worker assembles the
+     response from the cached chunks (site-sw.js), and the engine runs
+     exactly the code path it was built for. */
+  function downloadPack(onProgress) {
+    /* ?cb busts Fastly: GitHub Pages' CDN serves cached HEADs for ~10 min
+       after a push, and a stale size would replay an outdated pack against
+       a freshly revalidated engine — the "loads then no project data" trap. */
+    return fetch(CDN_BASE + "?cb=" + Date.now(), { method: "HEAD", cache: "no-store" })
+      .then(function (head) {
+        var size = Number(head.headers.get("Content-Length"));
+        if (!head.ok || !size || head.headers.get("Accept-Ranges") !== "bytes") {
+          return -1; // no chunked path: engine loads the CDN URL directly
+        }
+        var chunks = Math.ceil(size / CHUNK);
+        return sweepCache(size).then(function (haveList) {
+          var have = {};
+          var doneCount = 0;
+          haveList.forEach(function (i) {
+            if (i >= 0 && i < chunks) { have[i] = true; doneCount++; }
+          });
+          var missing = chunks - doneCount;
+          if (doneCount === chunks) {
+            status.textContent = "cached copy found \u2014 unloading the cargo\u2026";
+          } else if (doneCount) {
+            status.textContent = "resuming \u2014 " + doneCount + " of " +
+              chunks + " parts cached\u2026";
+          }
+          onProgress(Math.min(doneCount * CHUNK, size), size);
+          if (!navigator.onLine && missing > 0) {
+            throw new Error("offline and the full pack isn't cached yet (" +
+              doneCount + " of " + chunks + " parts) \u2014 reconnect once to finish caching it");
+          }
+          var next = 0;
+          var claimedAll = false;
+          function claim() {            // -1 once every chunk is taken
+            if (claimedAll || next >= chunks) { claimedAll = true; return -1; }
+            return next++;
+          }
+          var workers = new Array(Math.min(4, chunks));
+          function cacheChunk(idx) {
+            var begin = idx * CHUNK;
+            var end = Math.min(size, (idx + 1) * CHUNK);
+            return fetchChunk(chunkKey(size, idx), begin, end, 3).then(function (buf) {
+              return openCache().then(function (c) {
+                if (c) try { c.put(chunkKey(size, idx), new Response(buf)); } catch (e) { }
+                doneCount++;
+                onProgress(Math.min(doneCount * CHUNK, size), size);
+              });
+            });
+          }
+          function run() {
+            var idx = claim();
+            if (idx < 0) return Promise.resolve();
+            if (have[idx]) return run(); // already in the cache
+            return cacheChunk(idx).then(run);
+          }
+          for (var w = 0; w < workers.length; w++) workers[w] = run();
+          return Promise.all(workers).then(function () {
+            onProgress(size, size);
+            return size;
+          });
+        });
+      })
+      .catch(function (err) {
+        if (err && err.message && err.message.indexOf("offline") === 0) throw err;
+        // Chunked caching failed mid-flight (network died, CDN 5xx...).
+        // Surface it \u2014 never fall back to a silent 500 MB re-download.
+        throw err || new Error("chunked pack load failed");
+      });
+  }
+
+  btn.addEventListener("click", function () {
+    btn.disabled = true;
+    btn.classList.add("hidden");
+    status.textContent = "hoisting the sails\u2026";
+    downloadPack(setBar).then(function (size) {
+      status.textContent = "raising the sails \u2014 starting the engine\u2026";
+      var begun = function () { veil.classList.add("hidden");
+        document.getElementById("bg").classList.add("hidden"); };
+      // Stock engine path: startGame fetches "index.pck" itself \u2014 the
+      // service worker serves it assembled from the cached chunks, so the
+      // engine runs exactly the loader code path it shipped with.
+      if (size > 0) {
+        return engine.startGame({ mainPack: "index.pck" }).then(begun, fail);
+      }
+      // CDN refused ranges (rare): stream the whole pack straight from it
+      return engine.startGame({ mainPack: CDN_BASE }).then(begun, fail);
+    }).catch(fail);
+  });
+})();
+
+/*
+ * Gamepad diagnostics overlay — diagnoses "Xbox controller not responding"
+ * on the live site. Polls navigator.getGamepads() every animation frame:
+ * connected pads with id + mapping, every button (lit when pressed, Xbox
+ * face-button labels under the standard mapping), stick/trigger axes as
+ * center-anchored bars, and a connect/disconnect event log. The panel
+ * auto-opens when a pad connects. Nothing here touches the game.
+ */
+(function () {
+  "use strict";
+  var chip = document.getElementById("gp-chip");
+  var panel = document.getElementById("gp-panel");
+  var body = document.getElementById("gp-body");
+  var logEl = document.getElementById("gp-log");
+  var labels = ["A","B","X","Y","LB","RB","LT","RT","Back","Start",
+                "LS","RS","Up","Down","Left","Right","Guide"];
+  var axisNames = ["L-X", "L-Y", "R-X", "R-Y", "LT", "RT"];
+  var logs = [];
+  function log(msg) {
+    logs.push(new Date().toTimeString().slice(0, 8) + "  " + msg);
+    if (logs.length > 6) logs.shift();
+    logEl.textContent = logs.join("\n");
+  }
+  function fmtAxis(v) {
+    var pct = Math.max(0, Math.min(1, Math.abs(v))) * 50;
+    var left = v < 0 ? 50 - pct : 50;
+    return '<span class="axis-bar"><span class="axis-fill" style="left:' +
+      left.toFixed(1) + '%;width:' + pct.toFixed(1) + '%"></span></span>' +
+      (v >= 0 ? "+" : "") + v.toFixed(2);
+  }
+  function render() {
+    var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    var n = 0, html = "";
+    for (var i = 0; i < pads.length; i++) {
+      var p = pads[i];
+      if (!p) continue;
+      n++;
+      html += '<div class="pad"><b>[' + p.index + "] " + (p.id || "?") +
+        "</b><br>mapping: " + (p.mapping || "none") + "<br>";
+      if (p.buttons && p.buttons.length) {
+        var bs = [];
+        for (var b = 0; b < p.buttons.length && b < labels.length; b++) {
+          var on = p.buttons[b].pressed || p.buttons[b].value > 0.12;
+          bs.push(on ? '<span class="btn-lit">' + labels[b] + "</span>" : labels[b]);
+        }
+        html += "buttons: " + bs.join(" ") + "<br>";
+      }
+      if (p.axes && p.axes.length) {
+        for (var a = 0; a < p.axes.length && a < axisNames.length; a++) {
+          html += (axisNames[a] || ("axis" + a)) + " " + fmtAxis(p.axes[a]) + "<br>";
+        }
+      }
+      html += "</div>";
+    }
+    if (!n) {
+      html = '<div class="none">No gamepads detected. Press any button on the ' +
+        'controller \u2014 browsers only reveal a pad after a press.</div>';
+    }
+    body.innerHTML = html;
+    chip.textContent = "GAMEPAD: " + n;
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+  window.addEventListener("gamepadconnected", function (e) {
+    log("CONNECTED [" + e.gamepad.index + "] " + e.gamepad.id +
+      " (mapping " + (e.gamepad.mapping || "none") + ")");
+    panel.classList.add("open");
+  });
+  window.addEventListener("gamepaddisconnected", function (e) {
+    log("DISCONNECTED [" + e.gamepad.index + "] " + e.gamepad.id);
+  });
+  chip.addEventListener("click", function () { panel.classList.toggle("open"); });
+})();
+</script>
+</body>
+</html>
