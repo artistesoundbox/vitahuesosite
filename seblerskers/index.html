@@ -251,10 +251,53 @@ const GODOT_THREADS_ENABLED = false;
   /* cover art: big screen gets the 1920px version, small a 61 KB one */
   document.getElementById("bg").style.backgroundImage =
     'url("./' + ((window.innerWidth < 900) ? "site-shell-cover-small.jpg" : "site-shell-cover.jpg") + '")';
+  /* Godot prints this exact error (via console.error) when the pack it was
+     handed is incomplete/corrupt \u2014 the signature of a partial CDN publish.
+     Its main() then exits "successfully", so no promise ever rejects and the
+     old failure mode was a silent black screen. Intercept, purge the suspect
+     chunks, say so honestly, and auto-retry once after the CDN settles. */
+  var _origError = console.error;
+  var _brokenRetried = false;
+  console.error = function () {
+    try {
+      var joined = Array.prototype.join.call(arguments, " ");
+      if (joined.indexOf("Couldn't load project data") >= 0 && !_brokenRetried) {
+        _brokenRetried = true;
+        console.info("[shell] setup rejected the delivered build \u2014 CDN likely " +
+          "mid-publish; purging its chunks and auto-retrying once");
+        setTimeout(function () {
+          var m = window.__sebLastPackSize;
+          var done = function () {
+            sessionStorage.setItem("seb-broken-retry", "1");
+            wrap.style.display = "block";
+            bar.style.width = "0%";
+            status.textContent = "the CDN was still publishing an incomplete " +
+              "build \u2014 cleared it, retrying in 30 seconds\u2026";
+            setTimeout(function () { location.reload(); }, 30000);
+          };
+          if (!m) { done(); return; }
+          openCache().then(function (c) {
+            if (!c) return;
+            return c.keys().then(function (keys) {
+              var doomed = keys.filter(function (k) {
+                return k.url.indexOf(CDN_BASE + "?s=" + m + "&c=") === 0;
+              });
+              return Promise.all(doomed.map(function (k) { return c.delete(k); }));
+            });
+          }).then(done, done);
+        }, 1500);
+      }
+    } catch (e) { /* never break the page's own logging */ }
+    return _origError.apply(console, arguments);
+  };
+
   function fail(err) {
     slog("FAIL", err && (err.stack || err.message) || String(err));
-    status.textContent = "This browser can't run the saga (" + err + "). " +
-      "Try Chrome/Edge/Firefox on desktop, or Safari 15+ / Chrome on Android.";
+    /* honest wording: loader/CDN problems are ours, not the browser's —
+       the old "this browser can't run the saga" text blamed the wrong party */
+    status.textContent = "Something went wrong loading the saga \u2014 not your " +
+      "browser's fault. Press Set sail to try again, or refresh the page. " +
+      "Details: " + err;
   }
 
   function setBar(cur, total) {
@@ -366,15 +409,56 @@ const GODOT_THREADS_ENABLED = false;
      length checks pass and a mixed-generation set slips through \u2014 Godot
      then rejects the corrupted file table). On a head mismatch we purge and
      re-download once against the then-current origin. */
+  /* Stage 1 begins with a TRI-PART HEAD: GitHub Pages publishes deploys to
+     its origin replicas over a few minutes, and a read during that window
+     can report an incomplete pack (size short by ~36 MB) whose download
+     would always die at Godot's setup. Require the last two samples to
+     agree before trusting the size. Each probe is cache-busted (?cb) so a
+     stale edge/origin HEAD can't masquerade as current. */
+  function stableHead(round) {
+    var bust = function () {
+      return fetch(CDN_BASE + "?cb=" + Date.now(), {
+        method: "HEAD", cache: "no-store"
+      }).then(function (h) {
+        return {
+          size: Number(h.headers.get("Content-Length")),
+          ok: h.ok,
+          ranges: h.headers.get("Accept-Ranges")
+        };
+      });
+    };
+    return bust().then(function (first) {
+      return new Promise(function (res) { setTimeout(res, 4000); })
+        .then(bust).then(function (second) {
+          return new Promise(function (res) { setTimeout(res, 4000); })
+            .then(bust).then(function (third) {
+              if (second.size === third.size && second.size > 0) {
+                slog("HEAD", "size=" + second.size + " ranges=" + second.ranges +
+                  " status=" + second.ok + " (samples: " + first.size + "/" +
+                  second.size + "/" + third.size + ")");
+                return second;
+              }
+              if (round >= 2) {
+                throw new Error("the CDN is still publishing the latest build " +
+                  "(sizes seen: " + first.size + "/" + second.size + "/" +
+                  third.size + ") \u2014 give it a minute and press Set sail again");
+              }
+              slog("HEAD", "unstable (" + first.size + "/" + second.size + "/" +
+                third.size + ") \u2014 rechecking");
+              status.textContent = "the CDN is still publishing \u2014 rechecking\u2026";
+              return new Promise(function (res) { setTimeout(res, 20000); })
+                .then(function () { return stableHead(round + 1); });
+            });
+        });
+    });
+  }
+
   function downloadPack(onProgress, attempts) {
     attempts = attempts || 0;
-    /* ?cb busts Fastly: GitHub Pages' CDN serves cached HEADs for ~10 min
-       after a push, and a stale size would replay an outdated pack against
-       a freshly revalidated engine — the "loads then no project data" trap. */
-    return fetch(CDN_BASE + "?cb=" + Date.now(), { method: "HEAD", cache: "no-store" })
+    return stableHead(0)
       .then(function (head) {
-        var size = Number(head.headers.get("Content-Length"));
-        slog("HEAD", "size=" + size + " ranges=" + head.headers.get("Accept-Ranges") + " status=" + head.status);
+        var size = head.size;
+        window.__sebLastPackSize = size;
         if (!head.ok || !size || head.headers.get("Accept-Ranges") !== "bytes") {
           return -1; // no chunked path: engine loads the CDN URL directly
         }
