@@ -21,7 +21,7 @@
  */
 
 const CACHE = "seb-pack-v1";
-const VERSION = "2026-09-22.1";
+const VERSION = "2026-09-22.2"; // engine-set purge on activate + pinned revalidate
 
 /* this folder's engine files */
 const ENGINE = /\/seblerskers\/(index\.js|index\.wasm|index\.side\.wasm|index\.audio\.worklet\.js|index\.audio\.position\.worklet\.js|libterrain\.web\.release\.wasm32\.wasm|site-shell-cover(-small)?\.jpg)$/;
@@ -37,6 +37,20 @@ self.addEventListener("activate", function (event) {
     const names = await caches.keys();
     await Promise.all(names.filter(function (n) { return n !== CACHE; })
       .map(function (n) { return caches.delete(n); }));
+    // Purge engine files + covers but KEEP pack chunks: the engine set must
+    // always move as one generation (a new index.js next to an old cached
+    // index.wasm/side.wasm is a frankenbuild that boots nothing and then
+    // blocks its own repair — every doomed boot killed the background
+    // revalidation mid-download). Chunks are size-keyed and re-verified by
+    // the loader every visit, so they are always safe to keep.
+    try {
+      const cache = await caches.open(CACHE);
+      const keys = await cache.keys();
+      await Promise.all(keys.filter(function (k) {
+        return ENGINE.test(new URL(k.url).pathname) ||
+          /\/site-shell-cover(-small)?\.jpg$/.test(new URL(k.url).pathname);
+      }).map(function (k) { return cache.delete(k); }));
+    } catch (e) { /* best effort */ }
     await self.clients.claim();
   })());
 });
@@ -63,9 +77,11 @@ self.addEventListener("fetch", function (event) {
     return;
   }
 
-  // engine files: cache-first + background size revalidate
+  // engine files: cache-first + background size revalidate. The revalidate
+  // is pinned with waitUntil so a page that dies mid-boot cannot kill it —
+  // an unpinned revalidation is how stale engine binaries survived here.
   if (url.origin === self.location.origin && ENGINE.test(url.pathname)) {
-    event.respondWith(cacheFirst(req, false));
+    event.respondWith(cacheFirstEngine(req, event));
     return;
   }
   // everything else (CDN HEAD requests, gtag, the portal itself): native
@@ -85,12 +101,19 @@ async function networkFirst(req) {
 }
 
 async function cacheFirst(req, isPack) {
+  return cacheFirstEngine(req, null, isPack);
+}
+
+async function cacheFirstEngine(req, event, isPack) {
   const cache = await caches.open(CACHE);
   let cached = null;
   try { cached = await cache.match(req, { ignoreSearch: false }); } catch (e) { }
 
   if (cached) {
-    if (!isPack) revalidateEngine(req, cache); // background, non-blocking
+    if (isPack === false || isPack === undefined) {
+      const p = revalidateEngine(req, cache);
+      if (event) event.waitUntil(p); // outlive the page that triggered us
+    }
     return cached;
   }
 
@@ -145,25 +168,39 @@ function packUrl(size, idx) {
 async function servePack(req) {
   const cache = await caches.open(CACHE);
   const keys = await cache.keys();
-  let size = 0;
-  let count = 0;
-  const have = {};
+  // group chunk keys by pack size — a CI rebuild can briefly leave two
+  // sizes cached, and we must serve whichever set is COMPLETE
+  const bySize = {};
   keys.forEach(function (k) {
     const m = k.url.match(/\?s=(\d+)&c=(\d+)$/);
     if (!m) return;
-    if (!size) size = Number(m[1]);
-    if (Number(m[1]) === size) { have[Number(m[2])] = true; count++; }
+    const s = Number(m[1]);
+    (bySize[s] = bySize[s] || {})[Number(m[2])] = true;
   });
 
   const cdn = PACK_ORIGIN + "/seblerskers/index.pck";
-  if (!size || !count) {
+  let size = 0;
+  for (const s in bySize) {
+    const sz = Number(s);
+    const chunks = Math.ceil(sz / CHUNK_SIZE);
+    let complete = true;
+    for (let i = 0; i < chunks; i++) {
+      if (!bySize[sz][i]) { complete = false; break; }
+    }
+    if (complete) { size = sz; break; }
+    if (!size || Object.keys(bySize[sz]).length > Object.keys(bySize[size]).length) {
+      size = sz; // remember the best partial in case none is complete
+    }
+  }
+
+  if (!size) {
     return fetch(cdn, { mode: "cors", cache: "no-store" });
   }
 
   const chunks = Math.ceil(size / CHUNK_SIZE);
   let complete = true;
   for (let i = 0; i < chunks; i++) {
-    if (!have[i]) { complete = false; break; }
+    if (!bySize[size][i]) { complete = false; break; }
   }
   if (!complete) {
     return fetch(cdn, { mode: "cors", cache: "no-store" });
