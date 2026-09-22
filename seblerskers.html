@@ -89,7 +89,17 @@
       50%      { box-shadow: 0 0 30px rgba(255, 170, 60, 0.55); }
     }
 
-    /* ---------- the saga (below the fold) ---------- */
+    /* ---------- game overlay ---------- */
+#game-overlay { position: fixed; inset: 0; z-index: 1000; background: #060808; }
+#game-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+#game-exit { position: absolute; top: 14px; right: 14px; z-index: 2; }
+#game-loading {
+position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+color: #d8b58a; letter-spacing: 0.3em; text-transform: uppercase;
+font-size: 13px; z-index: 1;
+}
+
+/* ---------- the saga (below the fold) ---------- */
     header { max-width: 1200px; margin: 0 auto; padding: 40px 6vw 0; text-align: center; }
     .kicker { font-size: 13px; letter-spacing: 0.42em; text-transform: uppercase; color: #a08c6a; margin-bottom: 6px; }
     header h2 {
@@ -116,7 +126,7 @@
     <img src="seblerskers.png" alt="SEBLERSKERS" class="menu-art" />
     <h1 class="menu-title">SEBLERSKERS</h1>
     <div class="menu-tag">The Viking Island Saga</div>
-    <a class="btn start-btn" href="#saga">Start</a>
+    <a class="btn start-btn" id="start-btn" href="#saga">Start</a>
     <div class="menu-hint">fly &middot; sail &middot; raid</div>
   </section>
 
@@ -152,5 +162,33 @@
   <footer>
     SEBLERSKERS · a viking island saga. The wind knows your name; the sea keeps its secrets.
   </footer>
+<!-- ============ GAME OVERLAY ============ -->
+<div id="game-overlay" hidden>
+<button id="game-exit" class="btn small" type="button">&#10005; Exit</button>
+<div id="game-loading">hoisting the sails&hellip;</div>
+<iframe id="game-frame" title="SEBLERSKERS" allow="autoplay; fullscreen" allowfullscreen></iframe>
+</div>
+<script>
+(function () {
+var overlay = document.getElementById('game-overlay');
+var frame = document.getElementById('game-frame');
+var loading = document.getElementById('game-loading');
+var startBtn = document.getElementById('start-btn');
+var GAME_URL = 'https://artistesoundbox.github.io/seblerskers/';
+function openGame() {
+overlay.hidden = false;
+document.body.style.overflow = 'hidden';
+frame.src = GAME_URL; /* fresh voyage every time */
+}
+function closeGame() {
+overlay.hidden = true;
+frame.src = 'about:blank';
+document.body.style.overflow = '';
+}
+startBtn.addEventListener('click', function (e) { e.preventDefault(); openGame(); });
+document.getElementById('game-exit').addEventListener('click', closeGame);
+frame.addEventListener('load', function () { loading.style.display = 'none'; });
+})();
+</script>
 </body>
 </html>
