@@ -423,55 +423,57 @@ const GODOT_THREADS_ENABLED = false;
      length checks pass and a mixed-generation set slips through \u2014 Godot
      then rejects the corrupted file table). On a head mismatch we purge and
      re-download once against the then-current origin. */
-  /* Stage 1 begins with a TRI-PART HEAD: GitHub Pages publishes deploys to
-     its origin replicas over a few minutes, and a read during that window
-     can report an incomplete pack (size short by ~36 MB) whose download
-     would always die at Godot's setup. Require the last two samples to
-     agree before trusting the size. Each probe is cache-busted (?cb) so a
-     stale edge/origin HEAD can't masquerade as current. */
-  function stableHead(round) {
-    var bust = function () {
-      return fetch(CDN_BASE + "?cb=" + Date.now(), {
-        method: "HEAD", cache: "no-store"
-      }).then(function (h) {
-        return {
-          size: Number(h.headers.get("Content-Length")),
-          ok: h.ok,
-          ranges: h.headers.get("Accept-Ranges")
-        };
+  /* Stage 1 begins with a SIZE PROBE. GitHub Pages' HEAD answers can be
+     STALE — an old deploy's header (short by ~36 MB) keeps being served
+     after a new publish, while ranged GETs return the object that is
+     actually stored (Content-Range "total" is authoritative). So the probe
+     is a 64-byte ranged GET, GDPC-magic-checked, repeated until two
+     samples agree. Cache-busted (?cb) so no layer can replay an old read. */
+  function trueSizeOnce() {
+    return fetch(CDN_BASE + "?cb=" + Date.now(), {
+      headers: { Range: "bytes=0-63" }, cache: "no-store"
+    }).then(function (r) {
+      var total = Number((r.headers.get("Content-Range") || "").split("/")[1]);
+      if (!r.ok || !total) {
+        throw new Error("the CDN refused a range request — cannot size the pack");
+      }
+      return r.arrayBuffer().then(function (buf) {
+        if (new TextDecoder().decode(buf.slice(0, 4)) !== "GDPC") {
+          throw new Error("the CDN object is not a Godot pack — refusing to load it");
+        }
+        return { size: total, ok: true, ranges: "bytes" };
       });
-    };
-    return bust().then(function (first) {
-      return new Promise(function (res) { setTimeout(res, 4000); })
-        .then(bust).then(function (second) {
-          return new Promise(function (res) { setTimeout(res, 4000); })
-            .then(bust).then(function (third) {
-              if (second.size === third.size && second.size > 0) {
-                slog("HEAD", "size=" + second.size + " ranges=" + second.ranges +
-                  " status=" + second.ok + " (samples: " + first.size + "/" +
-                  second.size + "/" + third.size + ")");
-                return second;
-              }
-              if (round >= 2) {
-                throw new Error("the CDN is still publishing the latest build " +
-                  "(sizes seen: " + first.size + "/" + second.size + "/" +
-                  third.size + ") \u2014 give it a minute and press Set sail again");
-              }
-              slog("HEAD", "unstable (" + first.size + "/" + second.size + "/" +
-                third.size + ") \u2014 rechecking");
-              status.textContent = "the CDN is still publishing \u2014 rechecking\u2026";
-              return new Promise(function (res) { setTimeout(res, 20000); })
-                .then(function () { return stableHead(round + 1); });
-            });
+    });
+  }
+  function stableHead(round) {
+    return trueSizeOnce().then(function (first) {
+      return new Promise(function (res) { setTimeout(res, 1500); })
+        .then(trueSizeOnce).then(function (second) {
+          if (second.size === first.size && second.size > 0) {
+            slog("HEAD", "size=" + second.size + " ranges=" + second.ranges +
+              " (ranged-GET probe, samples: " + first.size + "/" +
+              second.size + ")");
+            return second;
+          }
+          if (round >= 3) {
+            throw new Error("the CDN is still publishing the latest build " +
+              "(sizes seen: " + first.size + "/" + second.size +
+              ") \u2014 give it a minute and press Set sail again");
+          }
+          slog("HEAD", "unstable (" + first.size + "/" + second.size +
+            ") \u2014 rechecking");
+          status.textContent = "the CDN is still publishing \u2014 rechecking\u2026";
+          return new Promise(function (res) { setTimeout(res, 8000); })
+            .then(function () { return stableHead(round + 1); });
         });
     });
   }
 
-  /* One ranged fetch of the first 40 bytes: the PCK header declares the
-     directory-table offset (Godot writes the table AFTER all data). A
-     partial/truncated publish still has the header but reports a shorter
-     Content-Length than its own declared table offset — detectable BEFORE
-     downloading 500 MB of a pack Godot would reject at setup. */
+  /* Second gate: the PCK header declares the directory-table offset
+     (Godot writes the table AFTER all data). Beyond the arithmetic check,
+     we RANGE-FETCH the catalog itself — if that 64-byte read answers 206
+     with the full total, the complete object (not a stale partial
+     replica) is what the CDN will serve for every chunk. */
   function probeTable(size) {
     return fetch(CDN_BASE + "?cb=" + Date.now(), {
       headers: { Range: "bytes=0-39" }, cache: "no-store"
@@ -479,12 +481,21 @@ const GODOT_THREADS_ENABLED = false;
       if (buf.byteLength < 40) throw new Error("pack header read short");
       var tableOff = Number(new DataView(buf).getBigUint64(32, true));
       if (!(tableOff > 100 && tableOff + 16 <= size)) {
-        throw new Error("the CDN is still publishing an incomplete build " +
-          "(header expects the catalog at byte " + tableOff +
-          ", origin serves only " + size + ") \u2014 wait a minute and press " +
-          "Set sail again");
+        throw new Error("the pack header is inconsistent (catalog at byte " +
+          tableOff + " vs size " + size + ") \u2014 try again in a minute");
       }
-      slog("table", "catalog offset " + tableOff + " within size " + size + " OK");
+      return fetch(CDN_BASE + "?cb=" + Date.now(), {
+        headers: { Range: "bytes=" + tableOff + "-" + (tableOff + 63) },
+        cache: "no-store"
+      }).then(function (r) {
+        var total = Number((r.headers.get("Content-Range") || "").split("/")[1]);
+        if (r.status !== 206 || total !== size) {
+          throw new Error("the CDN is serving a partial pack (catalog " +
+            "unreadable at byte " + tableOff + ") \u2014 try again in a minute");
+        }
+        slog("table", "catalog reachable at byte " + tableOff +
+          " \u2014 full object confirmed (size " + size + ")");
+      });
     });
   }
 
