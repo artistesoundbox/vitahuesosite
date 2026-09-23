@@ -506,6 +506,9 @@ const GODOT_THREADS_ENABLED = false;
         return probeTable(head.size).then(function () { return head; });
       })
       .then(function (head) {
+        return storageGate(head.size * 1.1).then(function () { return head; });
+      })
+      .then(function (head) {
         var size = head.size;
         window.__sebLastPackSize = size;
         if (!head.ok || !size || head.ranges !== "bytes") {
@@ -533,6 +536,7 @@ const GODOT_THREADS_ENABLED = false;
           }
           var next = 0;
           var claimedAll = false;
+          var saved = 0, saveFail = 0;   // honest cache-write accounting
           function claim() {            // -1 once every chunk is taken
             if (claimedAll || next >= chunks) { claimedAll = true; return -1; }
             return next++;
@@ -548,7 +552,17 @@ const GODOT_THREADS_ENABLED = false;
             var fetchUrl = CDN_BASE + "?s=" + size + "&c=" + idx + "&cb=" + Date.now();
             return fetchChunk(fetchUrl, begin, end, 3).then(function (buf) {
               return openCache().then(function (c) {
-                if (c) try { c.put(key, new Response(buf)); } catch (e) { }
+                if (c) {
+                  /* AWAIT the put: a failed write (quota, private mode)
+                     must fail this chunk — silently swallowed rejections
+                     used to make a full-looking cache that was empty. */
+                  return c.put(key, new Response(buf)).catch(function (e) {
+                    saveFail++; slog("cache put failed", "chunk " + idx +
+                    ": " + (e && e.message || e));
+                  });
+                }
+              }).then(function () {
+                saved++;
                 doneCount++;
                 onProgress(Math.min(doneCount * CHUNK, size), size);
               });
@@ -562,6 +576,15 @@ const GODOT_THREADS_ENABLED = false;
           }
           for (var w = 0; w < workers.length; w++) workers[w] = run();
           return Promise.all(workers).then(function () {
+            if (saveFail > 0 && saveFail >= saved) {
+              throw new Error("this device refused to store the pack (" +
+                saveFail + " of " + chunks + " parts failed to save) \u2014 " +
+                "free up space (or leave Private browsing) and try again");
+            }
+            if (saveFail > 0) {
+              slog("warning", saveFail + " parts failed to save \u2014 they will " +
+                "re-download next visit");
+            }
             slog("chunks done", "all " + chunks + " cached (size " + size + ")");
             onProgress(size, size);
             return verifyHead(size).then(function () {
@@ -594,10 +617,45 @@ const GODOT_THREADS_ENABLED = false;
       });
   }
 
+  /* Persistent storage: without it the browser may evict the ~565 MB pack
+     cache under disk pressure (and iOS Safari wipes site data after 7 days
+     of non-use) — "retains nothing". Requesting inside the click gesture is
+     when browsers actually grant it. Must not block the boot on failure. */
+  function askPersistence() {
+    try {
+      if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persist().then(function (granted) {
+          slog("storage", granted ? "persistent \u2014 cache will survive" :
+            "best-effort \u2014 the browser MAY evict the cache under disk pressure");
+        }).catch(function () { });
+      }
+    } catch (e) { /* old browsers: best-effort anyway */ }
+  }
+  /* Storage gate: a phone with less free space than the pack needs would
+     crawl through a doomed download and die at the end. Fail fast, honestly. */
+  function storageGate(needBytes) {
+    if (!navigator.storage || !navigator.storage.estimate) return Promise.resolve();
+    return navigator.storage.estimate().then(function (est) {
+      var free = (est.quota || 0) - (est.usage || 0);
+      if (free < needBytes) {
+        throw new Error("this device is low on storage \u2014 the saga needs about " +
+          Math.ceil(needBytes / 1048576) + " MB free (found ~" +
+          Math.max(0, Math.round(free / 1048576)) + " MB available). " +
+          "Clear some space and press Set sail again.");
+      }
+      slog("storage", "quota OK (" + Math.round(free / 1048576) + " MB free of need " +
+        Math.ceil(needBytes / 1048576) + " MB)");
+    }).catch(function (err) {
+      /* estimate() unsupported/failed is fine; a real gate failure is not */
+      if (err instanceof Error && err.message.indexOf("storage") !== -1) throw err;
+    });
+  }
+
   btn.addEventListener("click", function () {
     btn.disabled = true;
     btn.classList.add("hidden");
     status.textContent = "hoisting the sails\u2026";
+    askPersistence();
     downloadPack(setBar).then(function (size) {
       slog("downloadPack resolved", size);
       status.textContent = "raising the sails \u2014 starting the engine\u2026";
