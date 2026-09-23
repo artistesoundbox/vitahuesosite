@@ -191,10 +191,14 @@ const GODOT_THREADS_ENABLED = false;
      (in several browsers they never reach the engine), so while the game
      is running the pad is ALSO translated into the exact keyboard/mouse
      events the input actions are bound to:
-       stick + d-pad -> WASD/arrows   A -> Space (jump)   RT -> Shift (sprint)
-       X / LT -> attack click         right stick -> mouse-look
-     Menus keep the button map above in every state. */
-  var padState = {};
+       menus:   d-pad / stick -> arrows, A/Start -> Enter, B/Back -> Esc
+       playing: stick -> WASD, A -> jump, X/RB or LT -> attack, RT -> sprint,
+                B -> crouch, LB -> quest scroll, Y -> camera, Start -> pause
+                right stick -> mouse-look
+     Desired-state semantics: every frame collects the set of keys the pad
+     wants held, then diffs against what is actually held. Two buttons
+     sharing a key (Start and Back both -> Esc) merge instead of fighting
+     over one state bit — the key releases only when BOTH release. */
   function padKeyEvent(type, key, code) {
     var canvas = GODOT_CONFIG["canvas"];
     canvas.dispatchEvent(new KeyboardEvent(type, { key: key, code: code,
@@ -206,20 +210,14 @@ const GODOT_THREADS_ENABLED = false;
   function padKeyUp(code, key) {
     padKeyEvent("keyup", key || code, code);
   }
-  var keyOf = {}; /* code -> key string used on keydown (for matching keyup) */
-  function padToKey(code, pressed, key) {
-    if (!code) return;
-    if (pressed && !padState[code]) {
-      padState[code] = true; keyOf[code] = key || code; padKeyDown(code, key);
-    } else if (!pressed && padState[code]) {
-      padState[code] = false; padKeyUp(code, key);
-    }
-  }
+  var held = {};  /* code -> true while our synthetic key is down */
+  var keyOf = {}; /* code -> key string used on keydown */
+  var atkHeld = false;
   function releaseAllPadKeys() {
-    for (var k in padState) {
-      if (padState[k]) { padState[k] = false; padKeyUp(k, keyOf[k]); }
+    for (var code in held) {
+      if (held[code]) { held[code] = false; padKeyUp(code, keyOf[code]); }
     }
-    if (padState.__atk) { padState.__atk = false; padMouse(false); }
+    if (atkHeld) { atkHeld = false; padMouse(false); }
     lookX = 0; lookY = 0;
   }
   function padMouse(down) {
@@ -248,6 +246,9 @@ const GODOT_THREADS_ENABLED = false;
   function pollPads() {
     var pads = navigator.getGamepads ? navigator.getGamepads() : [];
     var running = veil.classList.contains("hidden");
+    var want = {};    /* code -> key the pad(s) want down this frame */
+    var wantAtk = false;
+    var look = null;
     var anyPad = false;
     for (var p = 0; p < pads.length; p++) {
       var pad = pads[p];
@@ -259,35 +260,43 @@ const GODOT_THREADS_ENABLED = false;
         }
         var codeB = PAD_MAP[b];
         if (running && b === 9) codeB = "Escape"; /* Start opens pause */
-        padToKey(codeB, pad.buttons[b].pressed);
+        if (codeB && pad.buttons[b].pressed) want[codeB] = codeB;
       }
       if (pad.axes.length >= 2) {
-        padToKey("ArrowLeft", pad.axes[0] < -0.6);
-        padToKey("ArrowRight", pad.axes[0] > 0.6);
-        padToKey("ArrowUp", pad.axes[1] < -0.6);
-        padToKey("ArrowDown", pad.axes[1] > 0.6);
+        if (pad.axes[0] < -0.6) want.ArrowLeft = "ArrowLeft";
+        if (pad.axes[0] > 0.6) want.ArrowRight = "ArrowRight";
+        if (pad.axes[1] < -0.6) want.ArrowUp = "ArrowUp";
+        if (pad.axes[1] > 0.6) want.ArrowDown = "ArrowDown";
       }
       if (!running || pad.axes.length < 4) continue;
       /* gameplay-only translation (engine sees real joypad events too;
          both paths drive the same actions) */
-      padToKey("KeyW", pad.axes[1] < -0.4, "w");
-      padToKey("KeyS", pad.axes[1] > 0.4, "s");
-      padToKey("KeyA", pad.axes[0] < -0.4, "a");
-      padToKey("KeyD", pad.axes[0] > 0.4, "d");
-      padToKey("Space", pad.buttons[0] && pad.buttons[0].pressed, " ");
-      padToKey("KeyC", pad.buttons[1] && pad.buttons[1].pressed, "c");
-      padToKey("KeyV", pad.buttons[3] && pad.buttons[3].pressed, "v");
-      padToKey("KeyQ", pad.buttons[4] && pad.buttons[4].pressed, "q"); /* LB = quest scroll */
-      padToKey("ShiftLeft",
-        (pad.buttons[7] && pad.buttons[7].pressed) || pad.axes[5] > 0.5, "Shift");
-      var atk = (pad.buttons[2] && pad.buttons[2].pressed) ||
-        (pad.buttons[5] && pad.buttons[5].pressed) || pad.axes[4] > 0.5;
-      if (atk && !padState.__atk) { padState.__atk = true; padMouse(true); }
-      else if (!atk && padState.__atk) { padState.__atk = false; padMouse(false); }
-      if (Math.abs(pad.axes[2]) > 0.12 || Math.abs(pad.axes[3]) > 0.12) {
-        padLook(pad.axes[2] * 14, pad.axes[3] * 14);
-      }
+      if (pad.axes[1] < -0.4) want.KeyW = "w";
+      if (pad.axes[1] > 0.4) want.KeyS = "s";
+      if (pad.axes[0] < -0.4) want.KeyA = "a";
+      if (pad.axes[0] > 0.4) want.KeyD = "d";
+      if (pad.buttons[0] && pad.buttons[0].pressed) want.Space = " ";
+      if (pad.buttons[1] && pad.buttons[1].pressed) want.KeyC = "c";
+      if (pad.buttons[3] && pad.buttons[3].pressed) want.KeyV = "v";
+      if (pad.buttons[4] && pad.buttons[4].pressed) want.KeyQ = "q"; /* LB scroll */
+      if ((pad.buttons[7] && pad.buttons[7].pressed) || pad.axes[5] > 0.5)
+        want.ShiftLeft = "Shift";
+      if ((pad.buttons[2] && pad.buttons[2].pressed) ||
+          (pad.buttons[5] && pad.buttons[5].pressed) || pad.axes[4] > 0.5)
+        wantAtk = true;
+      if (Math.abs(pad.axes[2]) > 0.12 || Math.abs(pad.axes[3]) > 0.12)
+        look = [pad.axes[2] * 14, pad.axes[3] * 14];
     }
+    /* diff: release what the pad no longer wants, then press what's new */
+    for (var c1 in held) {
+      if (held[c1] && !want[c1]) { held[c1] = false; padKeyUp(c1, keyOf[c1]); }
+    }
+    for (var c2 in want) {
+      if (!held[c2]) { held[c2] = true; keyOf[c2] = want[c2]; padKeyDown(c2, want[c2]); }
+    }
+    if (wantAtk && !atkHeld) { atkHeld = true; padMouse(true); }
+    else if (!wantAtk && atkHeld) { atkHeld = false; padMouse(false); }
+    if (look) padLook(look[0], look[1]);
     /* pad vanished mid-play: release everything synthetic so keys don't
        stick down (engine keeps a released key's action "held" otherwise) */
     if (hadPad && !anyPad) releaseAllPadKeys();
