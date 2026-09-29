@@ -1,0 +1,68 @@
+# Deploy the whole vitahuesosite to GitHub Pages as a Actions artifact —
+# INCLUDING game/index.pck as real bytes (313 MB).
+#
+# WHY THIS EXISTS
+# The old delivery chain for the Over The Ice pack was GitHub LFS
+# (media.githubusercontent.com). LFS free tier = 1 GB bandwidth/month and the
+# pack alone is 328 MB — so ~3 player downloads a month exhaust it, every HEAD
+# then 403s, the shell falls back to the same-origin copy, and that copy is a
+# 134-byte LFS *pointer* that Godot chokes on. This workflow ships the pack
+# the way the SEBLERSKERS CDN already does it: a Pages artifact built on the
+# runner, which bypasses both the 100 MB git limit and LFS bandwidth entirely.
+#
+# ONE-TIME MANUAL STEP (repo owner):
+#   Settings -> Pages -> Build and deployment -> Source: "GitHub Actions"
+# Until that switch happens, this workflow may run but Pages keeps serving
+# the old branch build (no regression, just no improvement yet).
+
+name: Deploy vitahuesosite to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout (with LFS smudge for the game pack)
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Verify the pack arrived as real bytes
+        run: |
+          size=$(stat -c%s game/index.pck)
+          echo "game/index.pck: $size bytes"
+          if [ "$size" -lt 100000000 ]; then
+            echo "::error::game/index.pck is an LFS pointer ($size bytes), not the real pack - check LFS storage/quota"
+            exit 1
+          fi
+
+      - name: Trim working copy before packaging
+        run: rm -rf .git
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

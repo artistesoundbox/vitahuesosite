@@ -199,17 +199,30 @@ const engine = new Engine(GODOT_CONFIG);
 		}
 	} else {
 		setStatusMode('progress');
-				// Pack source chain: R2 (fast, no quota) -> GitHub LFS -> same-origin (offline dev)
+				// Pack source chain: same-origin (Pages artifact, real pack bytes) ->
+				// R2 (fast, no quota; set R2_BASE when a bucket exists) -> GitHub LFS
+				// media gateway (1 GB/month bandwidth quota - last resort only).
+				// EVERY tier is size-validated: a 134-byte LFS pointer or a quota 403
+				// must never be handed to the engine as if it were the game.
+				const MIN_PACK_BYTES = 100 * 1024 * 1024;
 				const R2_BASE = '';
-				const RELEASE_PACK = 'https://media.githubusercontent.com/media/artistesoundbox/vitahuesosite/main/game/index.pck?v=20260920-1';
+				const LFS_PACK = 'https://media.githubusercontent.com/media/artistesoundbox/vitahuesosite/main/game/index.pck?v=20260920-1';
 		const LOCAL_PACK = 'index.pck';
-		const head = (u) => fetch(u, { method: 'HEAD', mode: 'cors' }).then((r) => r.ok).catch(() => false);
+		const head = (u) => fetch(u, { method: 'HEAD', mode: 'cors' }).then((r) => {
+			const len = Number(r.headers.get('content-length') || 0);
+			return r.ok && len >= MIN_PACK_BYTES;
+		}).catch(() => false);
 		const probe = (async () => {
+			if (await head(LOCAL_PACK)) return LOCAL_PACK;
 			if (R2_BASE && (await head(R2_BASE + '/index.pck'))) return R2_BASE + '/index.pck';
-			if (await head(RELEASE_PACK)) return RELEASE_PACK;
-			return LOCAL_PACK;
+			if (await head(LFS_PACK)) return LFS_PACK;
+			return null;
 		})();
 		probe.then((packUrl) => {
+			if (!packUrl) {
+				displayFailureNotice('The game pack is unreachable right now - the free pack host has most likely used up its monthly download quota. It recovers when the quota resets or the site redeploys. This is not your browser failing.');
+				return;
+			}
 		engine.startGame({ mainPack: packUrl,
 			'onProgress': function (current, total) {
 				if (current > 0 && total > 0) {

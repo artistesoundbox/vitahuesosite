@@ -14,7 +14,7 @@
  * Failures degrade gracefully: any cache error falls back to plain network.
  */
 
-const CACHE = 'vh-game-v2';   // bumped 2026-09-20: force every client to drop the v1 cache (stale Sep 6 pack served Sep 19)
+const CACHE = 'vh-game-v3';   // bumped 2026-09-28: drop any pointer-poisoned pack caches before the Pages-artifact pack ships
 const PACK_MARKER = /index\.pck(\?|$)/;
 // A versioned pack URL (?v=...) is a NEW pack by definition (the shell is
 // re-shipped with a bumped version on every build) — never cache-first it.
