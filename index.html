@@ -27,20 +27,15 @@
     }
     </script>
     <style>
-        /* This patch centers the third button perfectly underneath the first two */
+        /* Icon grid: 4 per row, left to right (banner above, labels under each) */
         .button-container {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 15px; /* Keeps the spacing consistent */
-            max-width: 500px; /* Prevents layout stretching */
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 16px 12px;
+            max-width: 880px;
             margin: 0 auto;
-        }
-        .full-width-btn-wrapper {
-            flex-basis: 100%;
-            display: flex;
-            justify-content: center;
-            margin-top: 5px;
+            align-items: start;
+            justify-items: center;
         }
         .full-width-btn-wrapper .side-btn {
             min-width: 220px; /* Matches the visual weight of the top buttons */
@@ -179,18 +174,31 @@
             padding: 10px 6px;
         }
         #landing-page::-webkit-scrollbar { display: none; }
-        .button-container { gap: 10px; }
-        .full-width-btn-wrapper { margin-top: 0; }
+        .button-container { gap: 12px 8px; }
+        .music-link { width: auto; margin: 0; }
         #site-banner-img { width: min(330px, 60vw); }
         #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #music-img {
             display: block;
             margin: 0 auto;   /* keep the chip centered under the column */
             width: auto;
             height: auto;
-            max-width: min(200px, 46vw);
+            max-width: min(100%, 175px);
             max-height: clamp(88px, 15vh, 160px);
         }
         .music-link { width: auto; }
+
+        /* Icon titles — small navy Courier labels under each art button */
+        .art-label {
+            display: block;
+            margin-top: 5px;
+            font-family: "Courier New", Courier, monospace;
+            font-weight: 700;
+            font-size: 13px;
+            letter-spacing: 0.08em;
+            color: #16305f;
+            text-align: center;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.55);
+        }
     </style>
 </head>
 <body>
@@ -203,60 +211,62 @@
         <div class="button-container">
 
             <!-- Sobre El Gelo / Over The Ice — the saucer game -->
-            <div class="full-width-btn-wrapper">
+
                 <a href="splash.html" class="play-art-link" id="play-over-the-ice" aria-label="Play Over The Ice">
                     <img src="playovertheicebutton.png" alt="Play Over The Ice" id="play-art-img" />
+                    <span class="art-label">Sobre El Gelo</span>
                 </a>
-            </div>
 
             <!-- Movies — the free film library -->
-            <div class="full-width-btn-wrapper">
+
                 <a href="movies.html" class="movies-art-link" id="movies-button" aria-label="Movies – free film library">
                     <img src="moviesbutton.png" alt="Movies – free film library" id="movies-art-img" />
+                    <span class="art-label">Movies</span>
                 </a>
-            </div>
 
             <!-- Hemisync — chakra tone sanctuary -->
-            <div class="full-width-btn-wrapper">
+
                 <a href="hemisync.html" class="hs-art-link" id="hemisync-button" aria-label="Hemisync – chakra tone sanctuary">
                     <img src="hemisync.png" alt="Hemisync – chakra tone sanctuary" id="hs-art-img" />
+                    <span class="art-label">Hemi-sync</span>
                 </a>
-            </div>
 
             <!-- Crazy Algorithm — a different way to browse YouTube -->
-            <div class="full-width-btn-wrapper">
+
                 <a href="crazy.html" class="ca-art-link" id="crazy-button" aria-label="Crazy Algorithm Tube – a different way to browse YouTube">
                     <img src="crazyalgo.png" alt="Crazy Algorithm Tube – a different way to browse YouTube" id="ca-art-img" />
+                    <span class="art-label">Crazy Algorithm Tube</span>
                 </a>
-            </div>
 
             <!-- Train Your Alien — raise a little cosmic friend -->
-            <div class="full-width-btn-wrapper">
+
                 <a href="trainyouralien.html" class="ca-art-link" id="tya-button" aria-label="Train Your Alien – raise a little cosmic friend">
                     <img src="trainyouralien/trainyouralien.png" alt="Train Your Alien – raise a little cosmic friend" id="tya-art-img" />
+                    <span class="art-label">Train Your Alien</span>
                 </a>
-            </div>
 
             <!-- SEBLERSKERS — the viking island saga -->
-            <div class="full-width-btn-wrapper">
+
                 <a href="seblerskers/index.html" class="ca-art-link" id="seb-button" aria-label="SEBLERSKERS – the viking island saga: fly, sail, raid">
                     <img src="seblerskers.png" alt="SEBLERSKERS – the viking island saga" id="seb-art-img" />
+                    <span class="art-label">Seblerskers</span>
                 </a>
-            </div>
 
             <!-- Silent Sound Theater — the Dream Series screening room -->
-            <div class="full-width-btn-wrapper">
+
                 <a href="silentsoundtheater.html" class="ca-art-link" id="sst-button" aria-label="Silent Sound Theater – films made of music">
                     <img src="silent.sound.theater.icon.png?v=3" alt="Silent Sound Theater" id="sst-art-img" />
+                    <span class="art-label">Silent Sound Theater</span>
                 </a>
             </div>
-        </div>
 
         <!-- MY MUSIC — the fivetilogy on BandLab -->
         <a class="music-link" id="music-artist-link" href="mymusic.html" aria-label="My Music – the five albums on BandLab"
            title="My Music — the five-chapter saga on BandLab">
             <img src="mymusic.png" alt="My Music" id="music-img" />
+            <span class="art-label">My Music</span>
         </a>
+        </div>
     </div>
 	<div style="max-width: 900px; margin: 42px auto 26px; padding: 0 6vw; text-align: center; color: #7f6f7d; font-size: 13px; letter-spacing: .14em; text-transform: uppercase;">Under Development</div>
 	<script type="module" src="main.js"></script>
