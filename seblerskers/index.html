@@ -48,6 +48,11 @@
              color: #d8c07a; background: rgba(10,9,8,.75); border: 1px solid #6a5a38;
              border-radius: 14px; padding: 6px 12px; cursor: pointer; opacity: .7; }
   #gp-chip:hover { opacity: 1; }
+  #perf-chip { position: fixed; right: 10px; bottom: 44px; z-index: 1200;
+               font: 11px/1.2 Consolas, monospace; letter-spacing: .08em;
+               color: #a8c8a0; background: rgba(10,9,8,.75); border: 1px solid #4a6a48;
+               border-radius: 14px; padding: 6px 12px; cursor: pointer; opacity: .7; }
+  #perf-chip:hover { opacity: 1; }
   #gp-panel { position: fixed; left: 10px; right: 10px; bottom: 44px; z-index: 1200;
               display: none; width: auto; max-width: 430px; max-height: 62vh;
               overflow-y: auto; overflow-wrap: anywhere;
@@ -102,6 +107,7 @@
     </div>
   </div>
 </div>
+<button id="perf-chip" type="button" title="Toggle resolution: FAST renders at 1x pixel density, PRETTY at up to 1.5x">FAST &middot; &hellip;</button>
 <button id="gp-chip" type="button">GAMEPAD: 0</button>
 <div id="gp-panel">
   <h3>GAMEPAD DIAGNOSTICS</h3>
@@ -168,53 +174,160 @@ const GODOT_THREADS_ENABLED = false;
    * The pad itself is fine — browsers expose it with mapping "standard"
    * (verified live with an Xbox controller, vendor 045e). The problem is
    * Godot web UI focus: on the web export, JoypadButton events often fail
-   * to move/press focused UI the way they do on desktop, so the title and
-   * pause menus ignore the pad. This bridge re-injects every pad button
-   * as its conventional keyboard event, which the game's menus, the
-   * intro Skip and the pause screen all handle natively:
-   *   d-pad / left stick  -> arrows      A -> Enter
-   *   B / Back            -> Escape      Start -> Enter
-   * It never synthesizes repeats (menus only need edges) and stops as
-   * soon as gameplay owns input (canvas focus + gameplay flags).
+   * to reach the engine at all, so menus AND gameplay ignore the pad.
+   * This bridge re-injects pad input as the keyboard/mouse events the
+   * game already handles:
+   *   menus:   d-pad / stick -> arrows, A/Start -> Enter, B/Back -> Esc
+   *   playing: stick -> WASD, A -> jump, X or LT -> attack, RT -> sprint,
+   *            B -> crouch, LB -> quest scroll, Y -> camera, Start -> pause
+   *            right stick -> mouse-look
+   * Edge-triggered (no synthetic key repeats); the gameplay half only
+   * runs while the game is actually running (veil hidden).
    */
   var PAD_MAP = { 0: "Enter", 1: "Escape", 4: "ArrowLeft", 5: "ArrowRight",
     12: "ArrowUp", 13: "ArrowDown", 14: "ArrowLeft", 15: "ArrowRight",
     8: "Escape", 9: "Enter" };
-  var padState = {};
-  function padKeyDown(code) {
+  /* Gameplay bridge: the web build's native joypad events are unreliable
+     (in several browsers they never reach the engine), so while the game
+     is running the pad is ALSO translated into the exact keyboard/mouse
+     events the input actions are bound to:
+       menus:   d-pad / stick -> arrows, A/Start -> Enter, B/Back -> Esc
+       playing: stick -> WASD, A -> jump, X/RB or LT -> attack, RT -> sprint,
+                B -> crouch, Back -> quest scroll (Select, per the game's
+                hint text), Y -> camera, Start -> pause
+                right stick -> mouse-look
+     Desired-state semantics: every frame collects the set of keys the pad
+     wants held, then diffs against what is actually held. Two buttons
+     sharing a key (Start and Back both -> Esc) merge instead of fighting
+     over one state bit — the key releases only when BOTH release. */
+  /* Godot's web glue reads the LEGACY event.keyCode (0 on synthetic
+     KeyboardEvents — the constructor refuses to set it), so without these
+     the engine sees "unknown key" and drops every bridge key. Verified
+     live: Escape with keyCode 27 works, without it silently ignored. */
+  var KEY_CODES = { Enter: 13, Escape: 27, ArrowLeft: 37, ArrowUp: 38,
+    ArrowRight: 39, ArrowDown: 40, KeyW: 87, KeyA: 65, KeyS: 83,
+    KeyD: 68, Space: 32, KeyC: 67, KeyV: 86, KeyQ: 81, ShiftLeft: 16 };
+  function padKeyEvent(type, key, code) {
     var canvas = GODOT_CONFIG["canvas"];
-    canvas.dispatchEvent(new KeyboardEvent("keydown", { key: code, code: code,
-      bubbles: true, cancelable: true }));
+    var ev = new KeyboardEvent(type, { key: key, code: code,
+      bubbles: true, cancelable: true });
+    var kc = KEY_CODES[code];
+    if (kc) {
+      Object.defineProperty(ev, "keyCode", { value: kc });
+      Object.defineProperty(ev, "which", { value: kc });
+    }
+    canvas.dispatchEvent(ev);
   }
-  function padKeyUp(code) {
+  function padKeyDown(code, key) {
+    padKeyEvent("keydown", key || code, code);
+  }
+  function padKeyUp(code, key) {
+    padKeyEvent("keyup", key || code, code);
+  }
+  var held = {};  /* code -> true while our synthetic key is down */
+  var keyOf = {}; /* code -> key string used on keydown */
+  var atkHeld = false;
+  function releaseAllPadKeys() {
+    for (var code in held) {
+      if (held[code]) { held[code] = false; padKeyUp(code, keyOf[code]); }
+    }
+    if (atkHeld) { atkHeld = false; padMouse(false); }
+    lookX = 0; lookY = 0;
+  }
+  function padMouse(down) {
     var canvas = GODOT_CONFIG["canvas"];
-    canvas.dispatchEvent(new KeyboardEvent("keyup", { key: code, code: code,
-      bubbles: true, cancelable: true }));
+    var r = canvas.getBoundingClientRect();
+    var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    canvas.dispatchEvent(new MouseEvent(down ? "mousedown" : "mouseup",
+      { button: 0, buttons: down ? 1 : 0, clientX: cx, clientY: cy,
+        bubbles: true, cancelable: true }));
   }
-  function padToKey(idx, pressed) {
-    var code = PAD_MAP[idx];
-    if (!code) return;
-    if (pressed && !padState[code]) { padState[code] = true; padKeyDown(code); }
-    else if (!pressed && padState[code]) { padState[code] = false; padKeyUp(code); }
+  var lookX = 0, lookY = 0;
+  function padLook(dx, dy) {
+    var canvas = GODOT_CONFIG["canvas"];
+    var r = canvas.getBoundingClientRect();
+    if (!lookX && !lookY) { lookX = r.left + r.width / 2; lookY = r.top + r.height / 2; }
+    /* clamp to the canvas (no center-teleport: an absolute-position jump
+       would swing the camera); parked at an edge the camera simply waits
+       until the stick pulls it back */
+    lookX = Math.max(r.left + 8, Math.min(r.right - 8, lookX + dx));
+    lookY = Math.max(r.top + 8, Math.min(r.bottom - 8, lookY + dy));
+    var ev = new MouseEvent("mousemove", { clientX: lookX, clientY: lookY,
+      bubbles: true, cancelable: true });
+    /* movementX/Y are not MouseEventInit members (always 0 on synthetic
+       events) — the engine's mouse-look reads them, so define them */
+    Object.defineProperty(ev, "movementX", { value: dx });
+    Object.defineProperty(ev, "movementY", { value: dy });
+    canvas.dispatchEvent(ev);
   }
+  var hadPad = false;
   function pollPads() {
     var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    var running = veil.classList.contains("hidden");
+    var want = {};    /* code -> key the pad(s) want down this frame */
+    var wantAtk = false;
+    var look = null;
+    var anyPad = false;
     for (var p = 0; p < pads.length; p++) {
       var pad = pads[p];
       if (!pad) continue;
+      anyPad = true;
       for (var b = 0; b < pad.buttons.length; b++) {
-        padToKey(b, pad.buttons[b].pressed);
+        if (running && (b === 0 || b === 1 || b === 4 || b === 5)) {
+          continue; /* A/B/LB/RB re-bound for gameplay below */
+        }
+        var codeB = PAD_MAP[b];
+        if (running && b === 9) codeB = "Escape";  /* Start opens pause */
+        if (running && b === 8) codeB = "KeyQ";    /* Back reads the scroll
+          (the game's own hint: "Tab / Q / Select / D-pad") — LB sat right
+          under the index finger and every flap-tap toggled the scroll */
+        if (codeB && pad.buttons[b].pressed) want[codeB] = codeB;
       }
       if (pad.axes.length >= 2) {
-        padToKey(14, pad.axes[0] < -0.6);  // stick left -> ArrowLeft
-        padToKey(15, pad.axes[0] > 0.6);   // stick right -> ArrowRight
-        padToKey(12, pad.axes[1] < -0.6);  // stick up -> ArrowUp
-        padToKey(13, pad.axes[1] > 0.6);   // stick down -> ArrowDown
+        if (pad.axes[0] < -0.6) want.ArrowLeft = "ArrowLeft";
+        if (pad.axes[0] > 0.6) want.ArrowRight = "ArrowRight";
+        if (pad.axes[1] < -0.6) want.ArrowUp = "ArrowUp";
+        if (pad.axes[1] > 0.6) want.ArrowDown = "ArrowDown";
       }
+      if (!running || pad.axes.length < 4) continue;
+      /* gameplay-only translation (engine sees real joypad events too;
+         both paths drive the same actions) */
+      if (pad.axes[1] < -0.4) want.KeyW = "w";
+      if (pad.axes[1] > 0.4) want.KeyS = "s";
+      if (pad.axes[0] < -0.4) want.KeyA = "a";
+      if (pad.axes[0] > 0.4) want.KeyD = "d";
+      if (pad.buttons[0] && pad.buttons[0].pressed) want.Space = " ";
+      if (pad.buttons[1] && pad.buttons[1].pressed) want.KeyC = "c";
+      if (pad.buttons[3] && pad.buttons[3].pressed) want.KeyV = "v";
+      if ((pad.buttons[7] && pad.buttons[7].pressed) || pad.axes[5] > 0.5)
+        want.ShiftLeft = "Shift";
+      if ((pad.buttons[2] && pad.buttons[2].pressed) ||
+          (pad.buttons[5] && pad.buttons[5].pressed) || pad.axes[4] > 0.5)
+        wantAtk = true;
+      if (Math.abs(pad.axes[2]) > 0.12 || Math.abs(pad.axes[3]) > 0.12)
+        look = [pad.axes[2] * 14, pad.axes[3] * 14];
     }
-    requestAnimationFrame(pollPads);
+    /* diff: release what the pad no longer wants, then press what's new */
+    for (var c1 in held) {
+      if (held[c1] && !want[c1]) { held[c1] = false; padKeyUp(c1, keyOf[c1]); }
+    }
+    for (var c2 in want) {
+      if (!held[c2]) { held[c2] = true; keyOf[c2] = want[c2]; padKeyDown(c2, want[c2]); }
+    }
+    if (wantAtk && !atkHeld) { atkHeld = true; padMouse(true); }
+    else if (!wantAtk && atkHeld) { atkHeld = false; padMouse(false); }
+    if (look) padLook(look[0], look[1]);
+    /* pad vanished mid-play: release everything synthetic so keys don't
+       stick down (engine keeps a released key's action "held" otherwise) */
+    if (hadPad && !anyPad) releaseAllPadKeys();
+    hadPad = anyPad;
   }
-  requestAnimationFrame(pollPads);
+  /* Sampled on a timer, not rAF: when the game crawls at 5-15 fps the
+     rAF stream barely ticks and pad presses were dropped or lagged
+     seconds behind — the pad felt dead exactly when the game was
+     slowest. A steady 125 Hz timer keeps input sampling independent of
+     frame rate (cheap: reads state, diffs a few keys). */
+  setInterval(pollPads, 8);
 
   /* pack-cache service worker: registers quietly; not required to play */
   if ("serviceWorker" in navigator) {
@@ -247,6 +360,76 @@ const GODOT_THREADS_ENABLED = false;
     }
   };
 
+  /* --- resolution / performance -------------------------------------
+     WebGL fill rate is the top frame cost on hi-dpi screens (a DPR-3
+     phone renders 9x the pixels it needs). Cap the DPR the engine sees
+     BEFORE init: FAST (default) = 1x pixels, PRETTY = up to 1.5x. The
+     chip toggles live and doubles as an fps readout. */
+  var canvasEl = document.getElementById("canvas");
+  var perfChip = document.getElementById("perf-chip");
+  var nativeDpr = window.devicePixelRatio || 1;
+  var dprCap = 1.0, pretty = false;
+  var dynScale = 1.0; /* dynamic resolution: engine sees dprCap * dynScale */
+  try {
+    Object.defineProperty(window, "devicePixelRatio", {
+      get: function () { return Math.min(nativeDpr, dprCap * dynScale); },
+      configurable: true,
+    });
+  } catch (e) { /* very old browser: just runs at native density */ }
+  function applyDpr() {
+    var w = Math.round(canvasEl.clientWidth * dprCap * dynScale);
+    var h = Math.round(canvasEl.clientHeight * dprCap * dynScale);
+    if (w > 0 && h > 0) {
+      canvasEl.width = w;
+      canvasEl.height = h;
+      try { window.dispatchEvent(new Event("resize")); } catch (e) { }
+    }
+  }
+  perfChip.addEventListener("click", function () {
+    pretty = !pretty;
+    dprCap = pretty ? Math.min(1.5, nativeDpr) : 1.0;
+    dynScale = 1.0; /* manual tier choice starts DRA from full res */
+    applyDpr();
+  });
+  /* Dynamic resolution scaling: once the game is running, if the last
+     second was slow (< 25 fps) shrink the render target 10%, and if there
+     is headroom (> 55 fps) grow it back 10%. Adjusts at most every 2 s,
+     never below 75%: Godot sizes UI in canvas pixel space, so deep
+     shrink made the HUD gigantic and blurry — measured on real hardware,
+     deep scaling bought ~nothing on a CPU-bound machine anyway. Resets
+     when the player picks FAST/PRETTY by hand. */
+  (function fpsLoop() {
+    var frames = 0, t0 = performance.now();
+    var sinceAdjust = 0;
+    function tick(t) {
+      frames++;
+      if (t - t0 >= 1000) {
+        var rate = Math.round(frames * 1000 / (t - t0));
+        frames = 0; t0 = t;
+        if (veil.classList.contains("hidden")) {
+          sinceAdjust += 1;
+          if (sinceAdjust >= 2) {
+            sinceAdjust = 0;
+            var ns = dynScale;
+            if (rate < 25 && ns > 0.75) ns = Math.max(0.75, ns - 0.1);
+            else if (rate > 55 && ns < 1.0) ns = Math.min(1.0, ns + 0.1);
+            if (ns !== dynScale) {
+              dynScale = ns;
+              applyDpr();
+              slog("dynres", Math.round(ns * 100) + "%");
+            }
+          }
+        } else {
+          sinceAdjust = 0;
+        }
+        var label = (pretty ? "PRETTY" : "FAST");
+        if (dynScale < 1) label += " \u00b7 " + Math.round(dynScale * 100) + "%";
+        perfChip.textContent = label + " \u00b7 " + rate + " fps";
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  })();
   var engine = new Engine(GODOT_CONFIG);
   /* cover art: big screen gets the 1920px version, small a 61 KB one */
   document.getElementById("bg").style.backgroundImage =
@@ -423,55 +606,57 @@ const GODOT_THREADS_ENABLED = false;
      length checks pass and a mixed-generation set slips through \u2014 Godot
      then rejects the corrupted file table). On a head mismatch we purge and
      re-download once against the then-current origin. */
-  /* Stage 1 begins with a TRI-PART HEAD: GitHub Pages publishes deploys to
-     its origin replicas over a few minutes, and a read during that window
-     can report an incomplete pack (size short by ~36 MB) whose download
-     would always die at Godot's setup. Require the last two samples to
-     agree before trusting the size. Each probe is cache-busted (?cb) so a
-     stale edge/origin HEAD can't masquerade as current. */
-  function stableHead(round) {
-    var bust = function () {
-      return fetch(CDN_BASE + "?cb=" + Date.now(), {
-        method: "HEAD", cache: "no-store"
-      }).then(function (h) {
-        return {
-          size: Number(h.headers.get("Content-Length")),
-          ok: h.ok,
-          ranges: h.headers.get("Accept-Ranges")
-        };
+  /* Stage 1 begins with a SIZE PROBE. GitHub Pages' HEAD answers can be
+     STALE — an old deploy's header (short by ~36 MB) keeps being served
+     after a new publish, while ranged GETs return the object that is
+     actually stored (Content-Range "total" is authoritative). So the probe
+     is a 64-byte ranged GET, GDPC-magic-checked, repeated until two
+     samples agree. Cache-busted (?cb) so no layer can replay an old read. */
+  function trueSizeOnce() {
+    return fetch(CDN_BASE + "?cb=" + Date.now(), {
+      headers: { Range: "bytes=0-63" }, cache: "no-store"
+    }).then(function (r) {
+      var total = Number((r.headers.get("Content-Range") || "").split("/")[1]);
+      if (!r.ok || !total) {
+        throw new Error("the CDN refused a range request — cannot size the pack");
+      }
+      return r.arrayBuffer().then(function (buf) {
+        if (new TextDecoder().decode(buf.slice(0, 4)) !== "GDPC") {
+          throw new Error("the CDN object is not a Godot pack — refusing to load it");
+        }
+        return { size: total, ok: true, ranges: "bytes" };
       });
-    };
-    return bust().then(function (first) {
-      return new Promise(function (res) { setTimeout(res, 4000); })
-        .then(bust).then(function (second) {
-          return new Promise(function (res) { setTimeout(res, 4000); })
-            .then(bust).then(function (third) {
-              if (second.size === third.size && second.size > 0) {
-                slog("HEAD", "size=" + second.size + " ranges=" + second.ranges +
-                  " status=" + second.ok + " (samples: " + first.size + "/" +
-                  second.size + "/" + third.size + ")");
-                return second;
-              }
-              if (round >= 2) {
-                throw new Error("the CDN is still publishing the latest build " +
-                  "(sizes seen: " + first.size + "/" + second.size + "/" +
-                  third.size + ") \u2014 give it a minute and press Set sail again");
-              }
-              slog("HEAD", "unstable (" + first.size + "/" + second.size + "/" +
-                third.size + ") \u2014 rechecking");
-              status.textContent = "the CDN is still publishing \u2014 rechecking\u2026";
-              return new Promise(function (res) { setTimeout(res, 20000); })
-                .then(function () { return stableHead(round + 1); });
-            });
+    });
+  }
+  function stableHead(round) {
+    return trueSizeOnce().then(function (first) {
+      return new Promise(function (res) { setTimeout(res, 1500); })
+        .then(trueSizeOnce).then(function (second) {
+          if (second.size === first.size && second.size > 0) {
+            slog("HEAD", "size=" + second.size + " ranges=" + second.ranges +
+              " (ranged-GET probe, samples: " + first.size + "/" +
+              second.size + ")");
+            return second;
+          }
+          if (round >= 3) {
+            throw new Error("the CDN is still publishing the latest build " +
+              "(sizes seen: " + first.size + "/" + second.size +
+              ") \u2014 give it a minute and press Set sail again");
+          }
+          slog("HEAD", "unstable (" + first.size + "/" + second.size +
+            ") \u2014 rechecking");
+          status.textContent = "the CDN is still publishing \u2014 rechecking\u2026";
+          return new Promise(function (res) { setTimeout(res, 8000); })
+            .then(function () { return stableHead(round + 1); });
         });
     });
   }
 
-  /* One ranged fetch of the first 40 bytes: the PCK header declares the
-     directory-table offset (Godot writes the table AFTER all data). A
-     partial/truncated publish still has the header but reports a shorter
-     Content-Length than its own declared table offset — detectable BEFORE
-     downloading 500 MB of a pack Godot would reject at setup. */
+  /* Second gate: the PCK header declares the directory-table offset
+     (Godot writes the table AFTER all data). Beyond the arithmetic check,
+     we RANGE-FETCH the catalog itself — if that 64-byte read answers 206
+     with the full total, the complete object (not a stale partial
+     replica) is what the CDN will serve for every chunk. */
   function probeTable(size) {
     return fetch(CDN_BASE + "?cb=" + Date.now(), {
       headers: { Range: "bytes=0-39" }, cache: "no-store"
@@ -479,12 +664,21 @@ const GODOT_THREADS_ENABLED = false;
       if (buf.byteLength < 40) throw new Error("pack header read short");
       var tableOff = Number(new DataView(buf).getBigUint64(32, true));
       if (!(tableOff > 100 && tableOff + 16 <= size)) {
-        throw new Error("the CDN is still publishing an incomplete build " +
-          "(header expects the catalog at byte " + tableOff +
-          ", origin serves only " + size + ") \u2014 wait a minute and press " +
-          "Set sail again");
+        throw new Error("the pack header is inconsistent (catalog at byte " +
+          tableOff + " vs size " + size + ") \u2014 try again in a minute");
       }
-      slog("table", "catalog offset " + tableOff + " within size " + size + " OK");
+      return fetch(CDN_BASE + "?cb=" + Date.now(), {
+        headers: { Range: "bytes=" + tableOff + "-" + (tableOff + 63) },
+        cache: "no-store"
+      }).then(function (r) {
+        var total = Number((r.headers.get("Content-Range") || "").split("/")[1]);
+        if (r.status !== 206 || total !== size) {
+          throw new Error("the CDN is serving a partial pack (catalog " +
+            "unreadable at byte " + tableOff + ") \u2014 try again in a minute");
+        }
+        slog("table", "catalog reachable at byte " + tableOff +
+          " \u2014 full object confirmed (size " + size + ")");
+      });
     });
   }
 
@@ -493,6 +687,9 @@ const GODOT_THREADS_ENABLED = false;
     return stableHead(0)
       .then(function (head) {
         return probeTable(head.size).then(function () { return head; });
+      })
+      .then(function (head) {
+        return storageGate(head.size * 1.1).then(function () { return head; });
       })
       .then(function (head) {
         var size = head.size;
@@ -522,6 +719,7 @@ const GODOT_THREADS_ENABLED = false;
           }
           var next = 0;
           var claimedAll = false;
+          var saved = 0, saveFail = 0;   // honest cache-write accounting
           function claim() {            // -1 once every chunk is taken
             if (claimedAll || next >= chunks) { claimedAll = true; return -1; }
             return next++;
@@ -537,7 +735,17 @@ const GODOT_THREADS_ENABLED = false;
             var fetchUrl = CDN_BASE + "?s=" + size + "&c=" + idx + "&cb=" + Date.now();
             return fetchChunk(fetchUrl, begin, end, 3).then(function (buf) {
               return openCache().then(function (c) {
-                if (c) try { c.put(key, new Response(buf)); } catch (e) { }
+                if (c) {
+                  /* AWAIT the put: a failed write (quota, private mode)
+                     must fail this chunk — silently swallowed rejections
+                     used to make a full-looking cache that was empty. */
+                  return c.put(key, new Response(buf)).catch(function (e) {
+                    saveFail++; slog("cache put failed", "chunk " + idx +
+                    ": " + (e && e.message || e));
+                  });
+                }
+              }).then(function () {
+                saved++;
                 doneCount++;
                 onProgress(Math.min(doneCount * CHUNK, size), size);
               });
@@ -551,6 +759,15 @@ const GODOT_THREADS_ENABLED = false;
           }
           for (var w = 0; w < workers.length; w++) workers[w] = run();
           return Promise.all(workers).then(function () {
+            if (saveFail > 0 && saveFail >= saved) {
+              throw new Error("this device refused to store the pack (" +
+                saveFail + " of " + chunks + " parts failed to save) \u2014 " +
+                "free up space (or leave Private browsing) and try again");
+            }
+            if (saveFail > 0) {
+              slog("warning", saveFail + " parts failed to save \u2014 they will " +
+                "re-download next visit");
+            }
             slog("chunks done", "all " + chunks + " cached (size " + size + ")");
             onProgress(size, size);
             return verifyHead(size).then(function () {
@@ -583,15 +800,73 @@ const GODOT_THREADS_ENABLED = false;
       });
   }
 
+  /* Persistent storage: without it the browser may evict the ~565 MB pack
+     cache under disk pressure (and iOS Safari wipes site data after 7 days
+     of non-use) — "retains nothing". Requesting inside the click gesture is
+     when browsers actually grant it. Must not block the boot on failure. */
+  function askPersistence() {
+    try {
+      if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persist().then(function (granted) {
+          slog("storage", granted ? "persistent \u2014 cache will survive" :
+            "best-effort \u2014 the browser MAY evict the cache under disk pressure");
+        }).catch(function () { });
+      }
+    } catch (e) { /* old browsers: best-effort anyway */ }
+  }
+  /* Storage gate: a phone with less free space than the pack needs would
+     crawl through a doomed download and die at the end. Fail fast, honestly. */
+  function storageGate(needBytes) {
+    if (!navigator.storage || !navigator.storage.estimate) return Promise.resolve();
+    return navigator.storage.estimate().then(function (est) {
+      var free = (est.quota || 0) - (est.usage || 0);
+      if (free < needBytes) {
+        throw new Error("this device is low on storage \u2014 the saga needs about " +
+          Math.ceil(needBytes / 1048576) + " MB free (found ~" +
+          Math.max(0, Math.round(free / 1048576)) + " MB available). " +
+          "Clear some space and press Set sail again.");
+      }
+      slog("storage", "quota OK (" + Math.round(free / 1048576) + " MB free of need " +
+        Math.ceil(needBytes / 1048576) + " MB)");
+    }).catch(function (err) {
+      /* estimate() unsupported/failed is fine; a real gate failure is not */
+      if (err instanceof Error && err.message.indexOf("storage") !== -1) throw err;
+    });
+  }
+
+  /* Boot-crash-loop detector: phones can OOM-kill the tab while the engine
+     buffers the 565 MB pack into RAM (Godot web loads the whole pck into
+     heap). The tab reloads to this start screen — chunks all cached, so it
+     looks like it "loaded fine" — and the player can loop forever. Detect
+     reloads shortly after a sail click and say so honestly instead. */
+  var sailAt = Number(sessionStorage.getItem("seb-sail-at") || 0);
+  if (sailAt && Date.now() - sailAt < 45000) {
+    var crashes = Number(sessionStorage.getItem("seb-boot-crashes") || 0) + 1;
+    sessionStorage.setItem("seb-boot-crashes", String(crashes));
+    if (crashes >= 2) {
+      status.innerHTML = "the game keeps running out of memory while starting " +
+        "on this device — a browser tab can't hold the full 565 MB world. " +
+        "A smaller phone edition is planned; on a computer it runs today. " +
+        "You can still press Set sail to try again.";
+      slog("boot-loop", crashes + " consecutive boot crashes detected");
+    }
+  } else {
+    sessionStorage.removeItem("seb-boot-crashes");
+  }
+
   btn.addEventListener("click", function () {
     btn.disabled = true;
     btn.classList.add("hidden");
     status.textContent = "hoisting the sails\u2026";
+    sessionStorage.setItem("seb-sail-at", String(Date.now()));
+    askPersistence();
     downloadPack(setBar).then(function (size) {
       slog("downloadPack resolved", size);
       status.textContent = "raising the sails \u2014 starting the engine\u2026";
       var begun = function () {
         slog("engine started");
+        sessionStorage.removeItem("seb-sail-at");       /* boot survived */
+        sessionStorage.removeItem("seb-boot-crashes");
         veil.classList.add("hidden");
         document.getElementById("bg").classList.add("hidden");
       };
@@ -648,6 +923,7 @@ const GODOT_THREADS_ENABLED = false;
       left.toFixed(1) + '%;width:' + pct.toFixed(1) + '%"></span></span>' +
       (v >= 0 ? "+" : "") + v.toFixed(2);
   }
+  var lastCount = -1, lastPaint = 0;
   function render() {
     var pads = navigator.getGamepads ? navigator.getGamepads() : [];
     var n = 0, html = "";
@@ -676,8 +952,16 @@ const GODOT_THREADS_ENABLED = false;
       html = '<div class="none">No gamepads detected. Press any button on the ' +
         'controller \u2014 browsers only reveal a pad after a press.</div>';
     }
-    body.innerHTML = html;
-    chip.textContent = "GAMEPAD: " + n;
+    /* repaint only when the panel is open (max ~2 fps) or the pad count
+       changed — an every-frame innerHTML rebuild was measurable overhead
+       during play */
+    var countChanged = n !== lastCount;
+    lastCount = n;
+    if (countChanged) chip.textContent = "GAMEPAD: " + n;
+    if (panel.classList.contains("open") && performance.now() - lastPaint > 500) {
+      body.innerHTML = html;
+      lastPaint = performance.now();
+    }
     requestAnimationFrame(render);
   }
   requestAnimationFrame(render);
