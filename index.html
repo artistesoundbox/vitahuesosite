@@ -37,11 +37,6 @@
             align-items: start;
             justify-items: center;
         }
-        .full-width-btn-wrapper .side-btn {
-            min-width: 220px; /* Matches the visual weight of the top buttons */
-            text-decoration: none;
-            text-align: center;
-        }
 
         /* Site banner (anthonitus.png) — first element INSIDE the centered
            column, so banner + buttons flow as one stack and can never
@@ -174,7 +169,7 @@
             padding: 10px 6px;
         }
         #landing-page::-webkit-scrollbar { display: none; }
-        .button-container { gap: 12px 8px; }
+        .button-container { gap: 22px 18px; }
         .music-link { width: auto; margin: 0; }
         #site-banner-img { width: min(330px, 60vw); }
         #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #music-img {
@@ -198,6 +193,20 @@
             color: #16305f;
             text-align: center;
             text-shadow: 0 1px 2px rgba(255, 255, 255, 0.55);
+        }
+
+        /* Phones: 2 icons per row, bigger art, roomier breathing space */
+        @media (max-width: 640px) {
+            .button-container {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 30px 18px;
+                max-width: 560px;
+            }
+            #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #music-img {
+                max-width: min(100%, 210px);
+                max-height: clamp(110px, 19vh, 190px);
+            }
+            .art-label { font-size: 12px; letter-spacing: 0.06em; }
         }
     </style>
 </head>
@@ -258,7 +267,6 @@
                     <img src="silent.sound.theater.icon.png?v=3" alt="Silent Sound Theater" id="sst-art-img" />
                     <span class="art-label">Silent Sound Theater</span>
                 </a>
-            </div>
 
         <!-- MY MUSIC — the fivetilogy on BandLab -->
         <a class="music-link" id="music-artist-link" href="mymusic.html" aria-label="My Music – the five albums on BandLab"
