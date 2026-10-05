@@ -99,6 +99,21 @@
             box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
         }
 
+        /* GOD'S EYE VIEW art button — same spec as the other art buttons */
+        #gev-art-img {
+            display: block;
+            max-width: 215px;
+            width: 100%;
+            height: auto;
+            margin: 0 auto;
+            border-radius: 18px;
+            box-shadow: 0 0 22px rgba(80, 150, 255, 0.35);
+            transition: box-shadow 0.25s ease;
+        }
+        .ca-art-link:hover #gev-art-img {
+            box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
+        }
+
         /* MY MUSIC link — chip under the buttons (BandLab albums page) */
         .music-link {
             pointer-events: auto;
@@ -172,7 +187,7 @@
         .button-container { gap: 30px 26px; }
         .music-link { width: auto; margin: 0; }
         #site-banner-img { width: min(330px, 60vw); }
-        #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #music-img {
+        #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #music-img {
             display: block;
             margin: 0 auto;   /* keep the chip centered under the column */
             width: auto;
@@ -202,7 +217,7 @@
                 gap: 30px 18px;
                 max-width: 560px;
             }
-            #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #music-img {
+            #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #music-img {
                 max-width: min(100%, 210px);
                 max-height: clamp(110px, 19vh, 190px);
             }
@@ -266,6 +281,13 @@
                 <a href="silentsoundtheater.html" class="ca-art-link" id="sst-button" aria-label="Silent Sound Theater – films made of music">
                     <img src="silent.sound.theater.icon.png?v=3" alt="Silent Sound Theater" id="sst-art-img" />
                     <span class="art-label">Silent Sound Theater</span>
+                </a>
+
+            <!-- God's Eye View — the live intelligence console -->
+
+                <a href="gods-eye-view/" class="ca-art-link" id="gods-eye-button" aria-label="God's Eye View – live intelligence console">
+                    <img src="godseyeicon.png" alt="God's Eye View" id="gev-art-img" />
+                    <span class="art-label">God's Eye View</span>
                 </a>
 
         <!-- MY MUSIC — the fivetilogy on BandLab -->
