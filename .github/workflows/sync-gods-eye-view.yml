@@ -1,0 +1,178 @@
+# Refresh the /gods-eye-view/ demo on this site from its source repo.
+#
+# WHY THIS EXISTS
+# The demo is a build artifact (a Vite bundle plus the Godot level export), not
+# source, and it used to be refreshed by hand: build in a source checkout, copy
+# dist/ into gods-eye-view/, commit, push. This workflow does exactly that, with
+# the same steps, on a runner.
+#
+# WHEN IT RUNS
+# On a schedule — the source repo is public, so polling its tip is the only
+# trigger available without a second credential in the source repo — plus
+# workflow_dispatch for a manual run, plus repository_dispatch for a source repo
+# that holds a token able to reach this one (see docs/DEMO-DEPLOYMENT.md in the
+# source repo for that optional notifier). A run whose source commit already
+# matches .gev-source-sha stops after the checkout.
+#
+# ONE MANUAL STEP (repo owner)
+# Add CESIUM_ION_TOKEN under Settings -> Secrets and variables -> Actions, with
+# the value the source build inlines. Without it the job fails before publishing
+# rather than quietly shipping a demo with its ion map stacks missing.
+name: Sync gods-eye-view demo from source
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild and republish even when the source commit is unchanged
+        type: boolean
+        default: false
+  repository_dispatch:
+    types: [gev-update]
+  schedule:
+    # Three probes an hour. The no-op path is one checkout and one `ls-remote`.
+    - cron: '7,27,47 * * * *'
+
+# contents: write to land the sync commit, actions: write to ask this repo's own
+# Pages workflow to publish it — a push made with GITHUB_TOKEN does not trigger
+# other workflows, and workflow_dispatch is the documented exception.
+permissions:
+  contents: write
+  actions: write
+
+# Never cancel a sync mid-publish; queue the next one behind it.
+concurrency:
+  group: gev-sync
+  cancel-in-progress: false
+
+env:
+  # Mirrored in the "Check out the source repo" step: `with:` takes no variables.
+  SOURCE_REPO: bilawalsidhu/gods-eye-view
+  SOURCE_BRANCH: main
+  SOURCE_DIR: .gev-source
+  TARGET_DIR: gods-eye-view
+  STAMP_PATH: .gev-source-sha
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: '1'
+    steps:
+      - name: Check out this site
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Probe the source commit
+        id: probe
+        run: |
+          set -euo pipefail
+          upstream=$(git ls-remote "https://github.com/${SOURCE_REPO}.git" "refs/heads/${SOURCE_BRANCH}" | cut -f1 || true)
+          deployed=$(tr -d '[:space:]' < "${STAMP_PATH}" 2>/dev/null || true)
+          if [ -z "$upstream" ]; then
+            echo "::error::could not read ${SOURCE_REPO} ${SOURCE_BRANCH}"
+            exit 1
+          fi
+          echo "source tip:      ${upstream}"
+          echo "published build: ${deployed:-unknown}"
+          echo "upstream=${upstream}" >> "$GITHUB_OUTPUT"
+          if [ "$upstream" = "$deployed" ] && [ "${{ inputs.force }}" != "true" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "the source commit has not moved — nothing to rebuild"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out the source repo
+        if: steps.probe.outputs.changed == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: bilawalsidhu/gods-eye-view
+          ref: main
+          path: .gev-source
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Use Node.js
+        if: steps.probe.outputs.changed == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.14.0
+          cache: npm
+          cache-dependency-path: .gev-source/package-lock.json
+
+      - name: Install locked dependencies
+        if: steps.probe.outputs.changed == 'true'
+        working-directory: .gev-source
+        run: npm ci
+
+      # GOOGLE_MAPS_API_KEY and CESIUM_ION_TOKEN are inlined into the bundle by
+      # design (they are client-exposed — see the source repo's SECURITY.md).
+      - name: Write the client-exposed keys into the build environment
+        if: steps.probe.outputs.changed == 'true'
+        working-directory: .gev-source
+        env:
+          CESIUM_ION_TOKEN: ${{ secrets.CESIUM_ION_TOKEN }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$CESIUM_ION_TOKEN" ]; then
+            echo "::error::CESIUM_ION_TOKEN is not set in this repository (Settings -> Secrets and variables -> Actions). Refusing to publish: the live demo currently carries that token, so a rebuild without it would silently drop the ion map stacks."
+            exit 1
+          fi
+          {
+            echo "CESIUM_ION_TOKEN=${CESIUM_ION_TOKEN}"
+            echo "GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}"
+          } > .env
+          [ -n "$GOOGLE_MAPS_API_KEY" ] || echo "::warning::GOOGLE_MAPS_API_KEY is not set in this repository — this build will land on keyless imagery"
+
+      - name: Build production bundle
+        if: steps.probe.outputs.changed == 'true'
+        working-directory: .gev-source
+        run: npm run build
+
+      - name: Mirror the build into the demo path
+        if: steps.probe.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          test -f .gev-source/dist/index.html
+          # A mirror, not a merge: the demo path holds build output only.
+          rsync --archive --delete .gev-source/dist/ "${TARGET_DIR}/"
+          echo "${{ steps.probe.outputs.upstream }}" > "${STAMP_PATH}"
+
+      - name: Land the sync commit
+        if: steps.probe.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- "${TARGET_DIR}" "${STAMP_PATH}"
+          if git diff --cached --quiet; then
+            echo "the published demo already matches this build — nothing to commit"
+            exit 0
+          fi
+          git commit -m "Sync gods-eye-view demo from ${SOURCE_REPO}@$(echo '${{ steps.probe.outputs.upstream }}' | cut -c1-12)"
+          # No credential is left in the config: the token rides in the URL for
+          # this one push and is masked in the log.
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:${GITHUB_REF_NAME}"
+
+      # A push made with GITHUB_TOKEN does not start other workflows, so ask the
+      # Pages workflow for the deployment explicitly.
+      - name: Ask this repo's Pages workflow to publish
+        if: steps.probe.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "Accept: application/vnd.github+json" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/deploy-pages.yml/dispatches" \
+            --data "{\"ref\":\"${GITHUB_REF_NAME}\"}"
