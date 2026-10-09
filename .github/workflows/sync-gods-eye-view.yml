@@ -7,12 +7,17 @@
 # the same steps, on a runner.
 #
 # WHEN IT RUNS
-# On a schedule — the source repo is public, so polling its tip is the only
-# trigger available without a second credential in the source repo — plus
-# workflow_dispatch for a manual run, plus repository_dispatch for a source repo
-# that holds a token able to reach this one (see docs/DEMO-DEPLOYMENT.md in the
-# source repo for that optional notifier). A run whose source commit already
-# matches .gev-source-sha stops after the checkout.
+# Once a day, and on workflow_dispatch, and on a repository_dispatch of type
+# `gev-update` (the source repo's optional notifier sends that after a push, see
+# docs/DEMO-DEPLOYMENT.md there). A run whose source commit already matches
+# .gev-source-sha stops after its own checkout.
+#
+# WHAT IT REFUSES TO DO
+# Publish a demo that is not the demo. The source ref is checked for the level
+# before anything is installed, and the build is checked for it again before
+# anything is committed: a ref that does not carry `public/mission-level` (or a
+# build that did not produce it) fails the run rather than mirroring a demo
+# without its level over the live one. That guard exists because it happened.
 #
 # ONE MANUAL STEP (repo owner)
 # Add CESIUM_ION_TOKEN under Settings -> Secrets and variables -> Actions, with
@@ -30,8 +35,9 @@ on:
   repository_dispatch:
     types: [gev-update]
   schedule:
-    # Three probes an hour. The no-op path is one checkout and one `ls-remote`.
-    - cron: '7,27,47 * * * *'
+    # Daily, not minutes: the demo is a heavy artifact, and the no-op path is a
+    # checkout either way. `workflow_dispatch` is the on-demand door.
+    - cron: '17 14 * * *'
 
 # contents: write to land the sync commit, actions: write to ask this repo's own
 # Pages workflow to publish it — a push made with GITHUB_TOKEN does not trigger
@@ -96,6 +102,24 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      # The demo is the app *plus* the level, and the level has to be in the ref
+      # being built. Fail here — before an install and a build — if it is not.
+      - name: Verify the source ref carries the level
+        if: steps.probe.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          for required in \
+            "${SOURCE_DIR}/public/mission-level/index.pck" \
+            "${SOURCE_DIR}/public/mission-level/index.wasm" \
+            "${SOURCE_DIR}/firstperson/godot-shooter/project.godot"
+          do
+            if [ ! -f "$required" ]; then
+              echo "::error::${SOURCE_REPO}@${SOURCE_BRANCH} does not carry ${required}. The live demo is built from a tree that has the level, so publishing this ref would replace the playable level with a demo that has none. Push the level work to ${SOURCE_BRANCH}, or point SOURCE_BRANCH at the branch that carries it."
+              exit 1
+            fi
+          done
+          echo "${SOURCE_REPO}@${SOURCE_BRANCH} carries the level"
+
       - name: Use Node.js
         if: steps.probe.outputs.changed == 'true'
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -139,6 +163,9 @@ jobs:
         run: |
           set -euo pipefail
           test -f .gev-source/dist/index.html
+          # The second half of the guard: a build that lost the level does not
+          # get to be mirrored, whatever the source said it contained.
+          test -f .gev-source/dist/mission-level/index.pck
           # A mirror, not a merge: the demo path holds build output only.
           rsync --archive --delete .gev-source/dist/ "${TARGET_DIR}/"
           echo "${{ steps.probe.outputs.upstream }}" > "${STAMP_PATH}"

@@ -18,8 +18,7 @@ For commercial use, obtain separate permission or exclude both this pack and the
 derived coordinate dataset in `src/data/bhoteKoshiFloodPath.js` from the source
 and build. Deleting this directory alone does not remove the compiled river
 data. Excluding the Nepal scene also requires removing its registrations and
-imports before building, including the `get_bhote_koshi_flood` tool in
-`src/tools/queries/events.js`.
+imports before building.
 
 Sources:
 
