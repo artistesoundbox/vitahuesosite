@@ -1863,8 +1863,17 @@
     bindPad(document.getElementById('pad-right'), function () { touch.steer = -1; }, function () { if (touch.steer < 0) touch.steer = 0; });
     bindPad(document.getElementById('pad-gas'), function () { touch.throttle = 1; }, function () { touch.throttle = 0; });
     bindPad(document.getElementById('pad-brake'), function () { touch.brake = 1; }, function () { touch.brake = 0; });
-    if (window.matchMedia && (window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 760)) {
-      padsEl.classList.add('on');
+    /* Whether a device gets pads is a media query, and media queries change
+       under you: a phone turned to landscape, a desktop window dragged narrow,
+       a tablet docked or undocked. Deciding this once at boot left the style
+       sheet asking for viewport-pinned pads that the script had never created —
+       the game simply had no controls. So it is re-decided whenever the stage
+       is resized, which is also when the renderer is. */
+    function syncPads() {
+      const want = !!(window.matchMedia &&
+        (window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 760));
+      padsEl.classList.toggle('on', want);
+      return want;
     }
 
     /* Pinned to the viewport, so they need stowing when the game has been
@@ -1959,6 +1968,7 @@
        resize: the render target is one texel per character
        ============================================================ */
     function resize() {
+      syncPads();
       const w = stageEl.clientWidth, h = stageEl.clientHeight;
       if (!w || !h || !renderer) return;
       dpr = Math.min(window.devicePixelRatio || 1, 2);
