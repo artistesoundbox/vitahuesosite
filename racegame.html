@@ -1035,7 +1035,11 @@
       }
       return worst;
     }
-    function isStraight(s, back, ahead) { return Math.abs(worstCurvature(s, back, ahead)) < 0.006; }
+    /* The lap's curvature is bimodal — the straights come out at 0, the long
+       gentle bends next to them at 0.0075 (a 133-unit radius: over a 13-unit
+       ramp that is a 0.16-unit rise, nothing), and the corners at 0.02 up to
+       0.082. The line sits between the bends and the corners. */
+    function isStraight(s, back, ahead) { return Math.abs(worstCurvature(s, back, ahead)) < 0.012; }
 
     /* ============================================================
        road furniture — every pad, ramp and pickup on the lap is
@@ -2267,6 +2271,13 @@
         air: function () {
           const r = racers[playerIdx];
           return { hgt: +r.hgt.toFixed(3), vy: +r.vy.toFixed(2), air: r.air, ground: +rampHeightAt(r.s, r.lat).toFixed(3) };
+        },
+        /* the curvature profile of the lap, sampled the way the generator sees
+           it: this is what decides whether a stretch counts as a straight */
+        curve: function () {
+          const out = [];
+          for (let s = 0; s < trackLen; s += 24) out.push(+worstCurvature(s, 4, 40).toFixed(4));
+          return out;
         },
         look: function (y, p) {
           if (y !== undefined) lookYaw = clamp(y, -LOOK_MAX, LOOK_MAX);
