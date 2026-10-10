@@ -879,8 +879,20 @@
           /* the texture streams in behind the binary: the race starts on the
              tinted hull and the livery lands a moment later */
           loader.load('racegame/' + texName, function (t) {
+            /* These are glTF UVs and glTF puts v=0 at the TOP of the image,
+               while a TextureLoader texture uploads flipped. Leaving flipY at
+               its default mirrors every hull's paint vertically — the panels
+               land in the wrong places and the livery reads as distorted.
+               GLTFLoader sets flipY = false for exactly this reason, and we
+               are loading the same kind of asset by hand. */
+            t.flipY = false;
+            /* the export's sampler says REPEAT, and UVs sit right on the 0/1
+               edge, so the default clamp would smear the edge row outwards */
+            t.wrapS = t.wrapT = THREE.RepeatWrapping;
             t.colorSpace = THREE.SRGBColorSpace;
             t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+            t.needsUpdate = true;          // re-upload with the V flip applied
+            material.userData.tex = t;
             material.map = t;
             material.needsUpdate = true;
           });
@@ -1417,6 +1429,9 @@
     const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
     const tmpFwd = new THREE.Vector3(), tmpPos = new THREE.Vector3(), tmpLook = new THREE.Vector3();
     let fpsAcc = 0, fpsN = 0, fps = 0;
+    /* pulls the chase camera in or pushes it out. 1 is the game's own framing;
+       the debug handle moves it to inspect a hull's paint or a road feature. */
+    let camDistMul = 1;
     const gearSpan = MAX_SPEED / 5;
 
     function playerForward(out) {
@@ -1497,8 +1512,8 @@
       /* The rest height is deliberately lower than the racing one: parked on the
          grid, the hull sits close to the lens, and from 3.9 up a tilted-down
          camera puts it half out of the bottom of the frame. */
-      const dist = 8.4 + me.v * 0.045;
-      const height = 2.8 + me.v * 0.022;
+      const dist = (8.4 + me.v * 0.045) * camDistMul;
+      const height = (2.8 + me.v * 0.022) * camDistMul;
       tmpPos.set(me.group.position.x - tmpFwd.x * dist, height, me.group.position.z - tmpFwd.z * dist);
       tmpLook.set(me.group.position.x + tmpFwd.x * (12 + me.v * 0.1), 0.75, me.group.position.z + tmpFwd.z * (12 + me.v * 0.1));
       const k = 1 - Math.exp(-(raceState === 'countdown' ? 2.4 : 7.5) * dt);
@@ -1669,6 +1684,32 @@
         },
         release: function () { const r = racers[playerIdx]; r.lap = RACE_LAPS - 1; r.lastLapAt = raceTime - 12; },
         snapCamera: snapCamera,
+        /* geometry and paint, so a hull can be inspected without guessing:
+           triangle count per racer, and whether its texture actually landed */
+        parts: function () {
+          return racers.map(function (r) {
+            const g = r.mesh.geometry, m = r.mesh.material, t = m.map;
+            return {
+              name: RACER_NAMES[r.idx % RACER_NAMES.length],
+              tris: g.index ? g.index.count / 3 : g.attributes.position.count / 3,
+              verts: g.attributes.position.count,
+              hasUv: !!g.attributes.uv, hasNormal: !!g.attributes.normal,
+              map: !!t, flipY: t ? t.flipY : null,
+              texSize: t && t.image ? [t.image.width, t.image.height] : null,
+              colour: '#' + m.color.getHexString(), emissive: +m.emissiveIntensity.toFixed(2)
+            };
+          });
+        },
+        /* strips the paint off every hull, so "is that the mesh or the map?"
+           can be answered by looking instead of by reasoning */
+        paint: function (on) {
+          racers.forEach(function (r) {
+            r.mesh.material.map = (on === false) ? null : r.mesh.material.userData.tex || null;
+            r.mesh.material.needsUpdate = true;
+          });
+          return racers[0].mesh.material.map ? 'on' : 'off';
+        },
+        zoom: function (m) { if (m !== undefined) camDistMul = clamp(m, 0.25, 8); return camDistMul; },
         raw: function (v) { if (v !== undefined) { rawView = !!v; applyLightRig(); } return rawView; },
         pad: function () { return { live: pad.live, steer: pad.steer, throttle: pad.throttle, brake: pad.brake }; },
         shake: function (v) { if (v !== undefined) shake = v; return shake; },

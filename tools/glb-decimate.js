@@ -30,6 +30,14 @@
  *      the positions, and the cell key includes the UV, so vertices either side
  *      of a texture seam never merge and the mapping stays sharp.
  *
+ * The UV part of the cell key is calibrated, not guessed: the base-colour
+ * texture spans roughly the model's canonical width, so a UV bucket of 1/res
+ * is about the same size on the surface as the position cell, and a merge
+ * moves a vertex by at most half a cell in both. Buckets finer than the
+ * position cell would stop any merging at all (a 1-texel key is as good as no
+ * decimation); coarser ones are what lets two unrelated islands weld and their
+ * paint average into a smear, so the key is clamped to never be coarser.
+ *
  * Output format (little endian):
  *   u32 magic 'VRS2', u32 vehicleCount
  *   per vehicle: u32 nameLen + name bytes
@@ -50,7 +58,9 @@ const COMPONENT = { 5120: Int8Array, 5121: Uint8Array, 5122: Int16Array, 5123: U
 const COMP_BYTES = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
 const ITEMS = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT2: 4, MAT3: 9, MAT4: 16 };
 
-const UV_RES = 48;      // UV cells used to keep texture seams from merging
+/* Finest UV bucket used in the cluster key. The effective bucket is
+   max(UV_RES, res) — see the note in the header for why it tracks the grid. */
+const UV_RES = 64;
 
 /* ---------- glTF reading ---------- */
 
@@ -243,6 +253,9 @@ function cluster(positions, uvs, indices, res) {
   const size = [b.hi[0] - b.lo[0], b.hi[1] - b.lo[1], b.hi[2] - b.lo[2]];
   const longest = Math.max(size[0], size[1], size[2], 1e-6);
   const cell = longest / res;
+  /* the UV bucket has to be at least as fine as the position cell, or two
+     patches of the atlas that are 20 texels apart weld together */
+  const uvRes = Math.max(UV_RES, res);
   const nx = Math.max(1, Math.ceil(size[0] / cell) + 1);
   const ny = Math.max(1, Math.ceil(size[1] / cell) + 1);
 
@@ -259,8 +272,8 @@ function cluster(positions, uvs, indices, res) {
     /* rounded, not floored: a UV of exactly 0 or 1 must not land in a thin
        extra cell of its own, and negative UVs must stay distinct from small
        positive ones (wrapping happens at sample time, not here) */
-    const iu = Math.round(u * UV_RES);
-    const iv = Math.round(v * UV_RES);
+    const iu = Math.round(u * uvRes);
+    const iv = Math.round(v * uvRes);
     const key = ix + ',' + iy + ',' + iz + ',' + iu + ',' + iv;
     let id = map.get(key);
     if (id === undefined) {
@@ -394,7 +407,12 @@ if (args.length < 3) {
 }
 const outFile = args[0];
 const outDir = path.dirname(outFile) || '.';
-const target = 8000;
+/* 8,000 triangles was a budget for a hull that was only ever a glowing ASCII
+   silhouette. The plain 3D view is the game now, and at a 4-unit hull the
+   paint is the whole point — the decimation error still lands sub-pixel but
+   the *mapping* is what suffers, because clustering also moves the UVs. 16,000
+   halves that without becoming a download. */
+const target = 16000;
 const vehicles = [];
 let beforeTris = 0, beforeBytes = 0, texBytes = 0;
 args.slice(1).forEach(function (f) {
