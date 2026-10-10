@@ -387,6 +387,7 @@
     const BILLBOARD_SKINS = 6;    // neon sign faces the towers can wear
     let billboardMats = [];       // kept, so the signs can flicker too
     let beaconMats = [];          // the rooftop-beacon groups, each on its own cycle
+    let cityBoxes = [];           // every tower, kept so the clearance can be checked
 
     const RNG_SEED = 20260410;    // the city is identical on every visit
     const WINDOW_SKINS = 4;       // facade textures, worn at random
@@ -402,6 +403,7 @@
     const CITY_HALF = 209;        // the ground slab, a little past the last street
     const STREET_W = 15;          // painted street width (the circuit's asphalt is its own)
     const BLOCK_HALF = 15;        // a block reaches street edge to street edge
+    const STREET_CLEAR = 3.5;     // how much air a building keeps off every street
 
     /* ---------- road furniture ----------
        Boost arrows and ramps are placed along the spline from the seed, on the
@@ -413,7 +415,12 @@
     const BOOST_TOP = 1.22;       // how much more top speed that buys
     const BOOST_ACCEL = 1.9;
     const RAMP_LEN = 13;
-    const RAMP_HALF = 3.4;
+    /* A ramp spans the WHOLE tarmac, edge to kerb. It used to take a lane at
+       lat ±3.5 with a half-width of 3.4 and leave the other lane clear, which
+       made the jump optional — you could always steer round it. There is no
+       way round this one: the whole road is the ramp, so a ramp on the lap is
+       a jump on the lap, every time. */
+    const RAMP_HALF = TRACK_HALF;
     const RAMP_H = 1.9;
     const RAMP_LIFT = 0.155;      // of your speed, turned into upward speed at the lip
     const GRAVITY = 24;
@@ -824,7 +831,12 @@
 
       const ground = new THREE.Mesh(
         new THREE.PlaneGeometry(half * 2, half * 2),
-        new THREE.MeshBasicMaterial({ color: 0x070a10 })
+        /* Not quite black, and deliberately: at 0x070a10 the ground beside a
+           kerb read as a HOLE rather than a surface — a hard black wedge next
+           to the brightest thing on screen, which looks like missing geometry
+           even though it is only dark. It stays darker than it ever was, but
+           dark enough to see the tone in it. */
+        new THREE.MeshBasicMaterial({ color: 0x0a0e16 })
       );
       ground.rotation.x = -Math.PI / 2;
       scene.add(ground);
@@ -851,9 +863,16 @@
           /* the outer band between the last street and the edge of the slab is
              33 units, not 44, so its pavement keeps a smaller footprint — at
              a full 15-half it would shove out over the circuit */
-          const gap = Math.min(RING_X[i + 1] - RING_X[i], RING_X[j + 1] - RING_X[j]);
+          const gapX = RING_X[i + 1] - RING_X[i], gapZ = RING_X[j + 1] - RING_X[j];
           centres.push([(RING_X[i] + RING_X[i + 1]) / 2, (RING_X[j] + RING_X[j + 1]) / 2,
-            Math.min(BLOCK_HALF, gap / 2 - 3.5)]);
+            Math.min(BLOCK_HALF, Math.min(gapX, gapZ) / 2 - 3.5),
+            /* how far a tower's CENTRE may sit from the middle of this block,
+               per axis: enough that the closest face keeps STREET_CLEAR of the
+               street. It is 11 for a 44-unit block — the number this code used
+               to hard-code — and 5.5 for the 33-unit outer band, where 11 would
+               have put towers 1.5 units ONTO the circuit's tarmac. */
+            gapX / 2 - STREET_CLEAR - STREET_W / 2,
+            gapZ / 2 - STREET_CLEAR - STREET_W / 2]);
         }
       }
       const slabs = { pos: [], nrm: [], idx: [] };
@@ -861,18 +880,23 @@
         const h = c[2];
         pushRect(slabs, c[0] - h, c[0] + h, c[1] - h, c[1] + h, 0.018);
       });
-      scene.add(new THREE.Mesh(geometryFrom(slabs), new THREE.MeshBasicMaterial({ color: 0x121820 })));
+      scene.add(new THREE.Mesh(geometryFrom(slabs), new THREE.MeshBasicMaterial({ color: 0x171e27 })));
 
-      const boxes = [];
+      const boxes = cityBoxes = [];
       centres.forEach(function (c) {
         const n = 4 + Math.floor(rnd() * 3);
+        const reachX = c[3], reachZ = c[4];
         for (let i = 0; i < n; i++) {
-          /* held inside +/-11 of the block centre, which is still 3.5 clear of
-             every street, so the canyon stays tight and nothing sits on tarmac */
-          const w = 7 + rnd() * 9, d = 7 + rnd() * 9;
+          /* A tower is held so that its closest face keeps STREET_CLEAR of every
+             street: the offset is bounded by the block's reach, and the footprint
+             is capped so a big block can still hold a big tower. Both numbers
+             are 11 and unlimited for a 44-unit block — which is exactly what
+             this used to be — and tighten only in the 33-unit outer band. */
+          const w = Math.min(7 + rnd() * 9, reachX * 2 - 1.5);
+          const d = Math.min(7 + rnd() * 9, reachZ * 2 - 1.5);
           boxes.push({
-            x: c[0] + (rnd() - 0.5) * 2 * (11 - w * 0.5),
-            z: c[1] + (rnd() - 0.5) * 2 * (11 - d * 0.5),
+            x: c[0] + (rnd() - 0.5) * 2 * Math.max(0, reachX - w * 0.5),
+            z: c[1] + (rnd() - 0.5) * 2 * Math.max(0, reachZ - d * 0.5),
             w: w, d: d,
             /* taller on average than the old circuit's, because a skyline has
                to hold up at 350 units across rather than 170 */
@@ -1542,12 +1566,14 @@
           });
           s += 46 + rnd() * 32;
         } else {
-          /* a ramp takes a lane and leaves the other one clear, so there is
-             always a way past it — and hitting it flat out is a choice */
-          const side = rnd() < 0.5 ? -1 : 1;
+          /* A ramp covers the full width, so there is no lane to hide in and
+             every one of them is a jump. The side is still drawn (and thrown
+             away) so the rest of the seeded layout lands where it always
+             did — this change widens the ramps and moves nothing. */
+          rnd();
           features.push({
             kind: 'ramp', s0: s, s1: s + RAMP_LEN, s: s + RAMP_LEN * 0.5,
-            lat: side * 3.5, half: RAMP_HALF, h: RAMP_H
+            lat: 0, half: RAMP_HALF, h: RAMP_H
           });
           s += 62 + rnd() * 48;
         }
@@ -1596,7 +1622,13 @@
         const base = 0.03;
         const lift = h * 0.38;         // where the tread turns bright
         const midS = f.s1 - RAMP_LEN * 0.3;
-        const DARK = [0.17, 0.19, 0.23], HOT = [1.35, 0.78, 0.12];
+        /* The ramp's structure was darkened along with everything else and it
+           turned the thing into a hole in the road: a Lambert facet at 0.17
+           albedo barely receives anything from a night rig, so the wedge read
+           as a black slab and the only part you could see was the lip. A ramp
+           is a hazard, not scenery — it stays mid-grey, and the painted arrows
+           and the kerbs stay bright for the same reason. */
+        const DARK = [0.46, 0.48, 0.54], HOT = [1.35, 0.78, 0.12];
         /* tread: dark up to the lift, then a bright band into the lip */
         quad(ramp, trackPoint(f.s0, l, base), trackPoint(f.s0, r, base), trackPoint(midS, r, lift), trackPoint(midS, l, lift), DARK);
         quad(ramp, trackPoint(midS, l, lift), trackPoint(midS, r, lift), trackPoint(f.s1, r, lipY), trackPoint(f.s1, l, lipY), HOT);
@@ -2845,6 +2877,92 @@
             speeds: racers.map(function (r) { return +r.v.toFixed(1); }),
             lats: racers.map(function (r) { return +r.lat.toFixed(2); })
           };
+        },
+        /* Turn one of the scene's own children on or off. A black rectangle
+           floating in the road is the kind of thing that is obvious in a
+           screenshot and invisible in a geometry list, so being able to switch
+           candidate objects off one at a time is the fastest way to name it. */
+        visible: function (i, on) {
+          const o = scene.children[i];
+          if (!o) return null;
+          if (on !== undefined) o.visible = !!on;
+          return {
+            i: i, type: o.type, visible: o.visible,
+            geo: o.geometry ? o.geometry.type : null,
+            tris: o.geometry && o.geometry.index ? o.geometry.index.count / 3 : null,
+            colour: o.material && o.material.color ? '#' + o.material.color.getHexString() : null,
+            map: !!(o.material && o.material.map), vcol: !!(o.material && o.material.vertexColors)
+          };
+        },
+        /* which towers are near a point, with the numbers that decide whether
+           they are allowed to be there */
+        boxesNear: function (x, z, r) {
+          r = r || 10;
+          return cityBoxes.filter(function (b) {
+            return Math.abs(b.x - x) < r + b.w / 2 && Math.abs(b.z - z) < r + b.d / 2;
+          }).map(function (b) {
+            return {
+              x: +b.x.toFixed(1), z: +b.z.toFixed(1),
+              w: +b.w.toFixed(1), d: +b.d.toFixed(1), h: +b.h.toFixed(1),
+              block: [+b.c[0].toFixed(1), +b.c[1].toFixed(1)],
+              reach: [+b.c[3].toFixed(2), +b.c[4].toFixed(2)],
+              /* the two violations that matter: a face on the tarmac, and a
+                 tower that overran the reach its own block allowed it */
+              clearanceX: +(Math.abs(b.x - (b.x < 0 ? -176 : 176)) - b.w / 2 - TRACK_HALF).toFixed(2),
+              clearanceZ: +(Math.abs(b.z - (b.z < 0 ? -176 : 176)) - b.d / 2 - TRACK_HALF).toFixed(2),
+              overReach: +((Math.abs(b.x - b.c[0]) + b.w / 2) - b.c[3]).toFixed(2)
+            };
+          });
+        },
+        /* What is actually under a screen pixel. A black rectangle floating in
+           the road is the kind of thing that is obvious in a screenshot and
+           invisible in a geometry list, so this casts a ray through the point
+           and names the object, its material and the instance id. */
+        pick: function (sx, sy) {
+          if (!renderer || !camera) return null;
+          const rct = renderer.domElement.getBoundingClientRect();
+          const ndc = new THREE.Vector2(
+            ((sx - rct.left) / rct.width) * 2 - 1,
+            -((sy - rct.top) / rct.height) * 2 + 1);
+          const ray = new THREE.Raycaster();
+          ray.setFromCamera(ndc, camera);
+          const hits = ray.intersectObjects(scene.children, true);
+          return hits.slice(0, 4).map(function (h) {
+            const o = h.object, m = o.material;
+            return {
+              dist: +h.distance.toFixed(1), type: o.type,
+              geo: o.geometry ? o.geometry.type : null,
+              instance: h.instanceId != null ? h.instanceId : null,
+              colour: m && m.color ? '#' + m.color.getHexString() : null,
+              map: !!(m && m.map), vcol: !!(m && m.vertexColors),
+              objPos: o.position ? [+o.position.x.toFixed(1), +o.position.y.toFixed(1), +o.position.z.toFixed(1)] : null,
+              hit: [+h.point.x.toFixed(1), +h.point.y.toFixed(1), +h.point.z.toFixed(1)]
+            };
+          });
+        },
+        /* The invariant that keeps towers off the circuit. The lap runs the
+           outermost street ring, so the four ±176 lines are the ones a building
+           can encroach on, and the number that matters is the closest any face
+           comes to the EDGE OF THE TARMAC: it has to stay positive, and it has
+           to stay outside the barrier at WALL_AT. */
+        clearance: function () {
+          let worst = 1e9, at = null;
+          const test = function (b, ring, axis) {
+            const half = axis === 'x' ? b.w / 2 : b.d / 2;
+            const otherHalf = axis === 'x' ? b.d / 2 : b.w / 2;
+            const across = Math.abs(axis === 'x' ? b.z : b.x) - 176;
+            if (across > otherHalf + 2) return;         // past the corner: not on this street
+            const gap = Math.abs((axis === 'x' ? b.x : b.z) - ring) - half - TRACK_HALF;
+            if (gap < worst) {
+              worst = gap;
+              at = { x: +b.x.toFixed(1), z: +b.z.toFixed(1), w: +b.w.toFixed(1), d: +b.d.toFixed(1), axis: axis, ring: ring };
+            }
+          };
+          cityBoxes.forEach(function (b) {
+            test(b, 176, 'x'); test(b, -176, 'x'); test(b, 176, 'z'); test(b, -176, 'z');
+          });
+          return { towers: cityBoxes.length, tarmacHalf: TRACK_HALF, barrierAt: WALL_AT,
+            minClearanceOfTarmac: +worst.toFixed(2), worstCase: at };
         },
         /* what is actually moving in the city, so "alive" is a number and not
            an impression: how many vehicles exist, how far they have travelled,
