@@ -418,17 +418,19 @@
       { id: 'combo',    name: 'Combo Master',    icon: '⚡', test: function (s) { return s.maxCombo >= 10; } },
       { id: 'collector',name: 'Full Set',        icon: '🎭', test: function (s) { return s.tried.length >= CHARACTERS.length; } },
       { id: 'super',    name: 'Super Squisher',  icon: '💥', test: function (s) { return s.supers >= 1; } },
+      { id: 'spinner',  name: 'Turntable',       icon: '🌀', test: function (s) { return s.spun >= SPIN_TROPHY; } },
       { id: 'deep',     name: 'Blob Wrangler',   icon: '🏅', test: function (s) { return s.squishes >= 150; } }
     ];
 
     /* ---------- saved progress (this device only) ---------- */
     const STORE_KEY = 'vh-squishy-v2';
-    const state = { squishes: 0, supers: 0, maxCombo: 0, tried: [], trophies: [], muted: false, charId: 'cat' };
+    const state = { squishes: 0, supers: 0, maxCombo: 0, spun: 0, tried: [], trophies: [], muted: false, charId: 'cat' };
     try {
       const saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
       if (Number.isFinite(saved.squishes)   && saved.squishes >= 0) state.squishes = Math.floor(saved.squishes);
       if (Number.isFinite(saved.supers)     && saved.supers >= 0)   state.supers = Math.floor(saved.supers);
       if (Number.isFinite(saved.maxCombo)   && saved.maxCombo >= 0) state.maxCombo = Math.floor(saved.maxCombo);
+      if (Number.isFinite(saved.spun)       && saved.spun >= 0)     state.spun = saved.spun;
       if (Array.isArray(saved.tried))     state.tried = saved.tried.filter(function (x) { return typeof x === 'string'; });
       if (Array.isArray(saved.trophies))  state.trophies = saved.trophies.filter(function (x) { return typeof x === 'string'; });
       if (saved.muted === true) state.muted = true;
@@ -515,6 +517,28 @@
       } catch (e) {}
     }
 
+    /* the throw: a short airy whoosh whose body follows how hard you flicked */
+    function playWhoosh(strength) {
+      if (state.muted) return;
+      try {
+        const ctx = audioReady(); if (!ctx || !noiseBuf) return;
+        if (ctx.state === 'suspended') ctx.resume();
+        const t = ctx.currentTime;
+        const s = Math.max(0.25, Math.min(1, strength));
+        const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 0.9;
+        bp.frequency.setValueAtTime(260, t);
+        bp.frequency.exponentialRampToValueAtTime(1500, t + 0.16);
+        bp.frequency.exponentialRampToValueAtTime(480, t + 0.44);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.15 * s, t + 0.13);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.48);
+        src.connect(bp).connect(g).connect(master || ctx.destination);
+        src.start(t); src.stop(t + 0.52);
+      } catch (e) { /* audio is a bonus, never a failure */ }
+    }
+
     function playChime() {
       if (state.muted) return;
       try {
@@ -579,6 +603,14 @@
     const SPRING_K     = 52;     // stiffness — the "slow rise"
     const SPRING_D     = 6.4;    // damping — leaves a small, happy overshoot
 
+    /* turning the toy around */
+    const SPIN_PER_PX  = 0.0095; // yaw gained per pixel dragged (~330px = half a turn)
+    const TILT_PER_PX  = 0.0052; // tip gained per pixel dragged
+    const TILT_LIMIT   = 0.50;   // never tip a friend further than this (radians)
+    const SPIN_DAMPING = 1.9;    // how quickly a flicked spin coasts to a stop
+    const TILT_RETURN  = 5.5;    // a tipped-over friend stands back up
+    const SPIN_TROPHY  = 6.283;  // one whole turn of yaw
+
     let renderer = null, scene = null, camera = null, shadow = null, shadowBase = 1;
     let modelRoot = null;        // wrapper: idle sway + squash/stretch live here
     let records = [];            // one per unique geometry in the active model
@@ -594,6 +626,11 @@
     let lastPointerType = 'mouse';
     let pressAmt = 0, pulse = 0, dentPower = 0, dentActive = false, dentDepth = 0;
     let lastSquelchAt = 0;
+
+    /* yaw stays where you leave it, so you can look a friend in the back of
+       the head; the tip always springs back upright like a weeble. */
+    let spin = 0, spinVel = 0, tilt = 0, prevSpin = 0;
+    let dragActive = false, dragX = 0, dragY = 0, spunAwarded = false;
 
     /* combo + energy */
     const COMBO_WINDOW = 900;    // ms between squishes to keep a combo alive
@@ -836,7 +873,9 @@
       activeIdx = idx;
       modelRoot = entry.wrapper;
       records = entry.records;
-      modelRoot.rotation.y = CHARACTERS[idx].rotY;
+      /* a freshly picked friend always arrives facing you, upright */
+      spin = 0; spinVel = 0; tilt = 0; prevSpin = 0; dragActive = false;
+      modelRoot.rotation.set(0, CHARACTERS[idx].rotY, 0);
       scene.add(modelRoot);
       modelRoot.updateMatrixWorld(true);
       resetRecords(records);
@@ -1004,13 +1043,39 @@
       const t = clock.elapsedTime;
 
       if (modelRoot) {
+        if (!dragActive) {
+          /* the throw: a flicked friend coasts, slowing all the while */
+          if (reducedMotion) {
+            spinVel = 0;
+          } else if (spinVel) {
+            spin += spinVel * dt;
+            spinVel *= Math.exp(-SPIN_DAMPING * dt);
+            if (Math.abs(spinVel) < 0.04) spinVel = 0;
+          }
+          /* let go and it stands back up — but stays turned where you left it */
+          tilt += (0 - tilt) * Math.min(1, TILT_RETURN * dt);
+          if (Math.abs(tilt) < 0.0008) tilt = 0;
+        }
+
         const rotY = activeChar().rotY;
-        modelRoot.rotation.y = rotY + (reducedMotion ? 0 : Math.sin(t * 0.5) * 0.10);
-        modelRoot.rotation.x = reducedMotion ? 0 : Math.cos(t * 0.8) * 0.03;
+        /* tilt about the world's X, so turning the friend never changes which
+           way "up" means — that is what makes the yaw feel like a turntable */
+        modelRoot.rotation.set(
+          tilt + (reducedMotion ? 0 : Math.cos(t * 0.8) * 0.03),
+          rotY + spin + (reducedMotion ? 0 : Math.sin(t * 0.5) * 0.10),
+          0
+        );
         modelRoot.position.y = reducedMotion ? 0 : Math.sin(t * 1.3) * 0.04;
         /* squash-and-stretch the whole friend while it is being squeezed */
         const sq = reducedMotion ? 0 : dentPower;
         modelRoot.scale.set(1 + 0.055 * sq, 1 - 0.075 * sq, 1 + 0.055 * sq);
+
+        /* total turn, for the Turntable trophy (drag and throw both count) */
+        if (spin !== prevSpin) {
+          state.spun += Math.abs(spin - prevSpin);
+          prevSpin = spin;
+          if (!spunAwarded && state.spun >= SPIN_TROPHY) { spunAwarded = true; checkTrophies(); }
+        }
       }
 
       /* how hard we are squishing right now */
@@ -1066,6 +1131,23 @@
         rec.mesh.worldToLocal(rec.localHit);
       }
       return true;
+    }
+
+    /* One horizontal pixel is a fixed slice of turn, so the friend tracks your
+       finger exactly. We also remember how fast you were turning, because that
+       is the throw the friend keeps after you let go. Dragging down tips it
+       toward you: the tip springs back upright on release, the yaw does not. */
+    function spinByDrag(x, y) {
+      const dx = x - dragX, dy = y - dragY;
+      dragX = x; dragY = y;
+      if (dx) {
+        const dRad = dx * SPIN_PER_PX;
+        spin += dRad;
+        spinVel = spinVel * 0.55 + (dRad * 55) * 0.45;   // rad/s, smoothed
+        if (spinVel > 20) spinVel = 20;
+        else if (spinVel < -20) spinVel = -20;
+      }
+      if (dy) tilt = Math.max(-TILT_LIMIT, Math.min(TILT_LIMIT, tilt + dy * TILT_PER_PX));
     }
 
     const toastTimer = { id: 0 };
@@ -1179,6 +1261,10 @@
       hitOk = ok;
       pressing = true;
       pressArmed = ok;
+      /* any press can also become a turn: we just wait to see it move */
+      dragActive = true;
+      dragX = pt.x; dragY = pt.y;
+      spinVel = 0;
       if (ok) {
         lastSquelchAt = 0;
         playSquish(1, activeChar().pitch);
@@ -1190,8 +1276,14 @@
     stage.addEventListener('pointermove', function (e) {
       if (!modelRoot) return;
       pointerInside = true;
-      setPointer(e);
+      const pt = setPointer(e);
       if (!pressing) return;
+      if (dragActive) {
+        spinByDrag(pt.x, pt.y);
+        /* the dent is measured against the model's world matrices, so the
+           turn we just applied has to reach them before we raycast */
+        modelRoot.updateMatrixWorld(true);
+      }
       const ok = probeHit();
       hitOk = ok;
       if (!ok) return;                       // dragging off the model keeps the last contact
@@ -1213,8 +1305,14 @@
 
     function endPress() {
       if (pressing && pressArmed) playBoing(activeChar().pitch);
+      /* a flick keeps going after you let go, with a little whoosh */
+      if (dragActive && Math.abs(spinVel) > 1.2) {
+        playWhoosh(Math.abs(spinVel) / 16);
+        buzz(10);
+      }
       pressing = false;
       pressArmed = false;
+      dragActive = false;
       /* a touch has no hover state: let go and the friend is left alone */
       if (lastPointerType !== 'mouse') { pointerInside = false; hitOk = false; }
     }
@@ -1233,6 +1331,17 @@
         pulse = 1;
         playSquish(0.9, activeChar().pitch);
         countSquish(stage.clientWidth / 2, stage.clientHeight * 0.42);
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        /* turn without a pointer: a quarter turn-ish per nudge */
+        e.preventDefault();
+        if (!modelRoot) return;
+        spinVel = 0;
+        spin += (e.key === 'ArrowRight' ? 1 : -1) * 0.24;
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (!modelRoot) return;
+        const d = (e.key === 'ArrowDown' ? 1 : -1) * 0.10;
+        tilt = Math.max(-TILT_LIMIT, Math.min(TILT_LIMIT, tilt + d));
       }
     });
 
