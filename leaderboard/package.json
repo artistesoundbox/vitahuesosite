@@ -1,0 +1,6 @@
+{
+  "name": "vh-gp-leaderboard",
+  "private": true,
+  "type": "module",
+  "description": "Daily leaderboard API for the City Grand Prix (Cloudflare Worker + D1). type:module is for the local node test harness only — the Worker itself is a plain ES module."
+}

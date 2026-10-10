@@ -246,6 +246,18 @@
     }
     #daily-panel .row-btns { margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     #daily-panel .hint { font-size: 10px; letter-spacing: 0.12em; color: #7d90ae; }
+    #daily-panel .hint.warn { color: #ffc247; letter-spacing: 0.08em; }
+    #daily-panel input[type=text] {
+      font: inherit; font-size: 11.5px; letter-spacing: 0.06em; color: #eafff6;
+      background: rgba(4, 14, 12, 0.85); border: 1px solid rgba(90, 255, 190, 0.35);
+      border-radius: 999px; padding: 5px 12px; width: 9.5em; outline: none;
+    }
+    #daily-panel input[type=text]:focus { border-color: rgba(90, 255, 190, 0.8); }
+    #daily-panel table.world td.pos { color: #ffc247; }
+    #daily-panel table.world tr.me td { color: #9dffcf; }
+    /* drag-steering takes the canvas, so the two steer pads step aside and the
+       pedals stay where the other thumb expects them */
+    #pads.dragsteer #pad-left, #pads.dragsteer #pad-right { display: none; }
     .footer-note { max-width: 900px; margin: 26px auto 0; color: #7d90ae; font-size: 12.5px; line-height: 1.7; text-align: center; }
     @media (max-width: 760px) {
       .wrap { padding-top: 14px; }
@@ -321,13 +333,15 @@
     the road, <b>ramps</b> that span the whole width and put every car in the air, and floating <b>powerups</b>: a boost,
     or a shield that eats one wall. The lap starts on the ground and then leaves it. Out of the north-east corner a
     <b>ramp</b> lifts you clear of the traffic at 12%; the road bends west and winds a <b>full turn around a tower</b>,
-    a corkscrew of 30 units radius you climb one storey at a time; and the top of it opens into a <b>glass tube</b>,
-    a roofed, level run at thirty units with the city either side of you. The whole south straight is the way back
+    a corkscrew of 30 units radius, <b>banked</b> into the turn like a real spiral ramp and climbed one storey at a
+    time; and the top of it opens into a <b>glass tube</b> you pass under a portal frame to enter — a roofed, level run
+    at thirty units with the city either side of you. The whole south straight is the way back
     down. The barriers are there at every height, and the profile is gentle enough that you can hold the throttle over
     every crest — a hill only throws you when its curvature beats gravity, and none of them do. Hold the throttle,
     brake for the chicane, and try not to be the one who parks a starfighter in a wall. A controller works too — left
     stick or d-pad to steer, RT or A for throttle, LT to brake and reverse, <b>right stick to look around</b>, Start
-    to restart. Drag the canvas to look, too, and <b>P</b> pauses.</p>
+    to restart. Drag the canvas to look, too — or press <b>Steer: drag</b> and a thumb anywhere on the screen sets the
+    lock, with a pull up or down for throttle and brake — and <b>P</b> pauses.</p>
 
     <div id="stage">
       <canvas id="screen"></canvas>
@@ -360,6 +374,7 @@
       <button class="ca-btn" id="pause" type="button">⏸ Pause</button>
       <button class="ca-btn" id="daily" type="button">★ Daily challenge</button>
       <button class="ca-btn" id="sound" type="button">🔊 Sound on</button>
+      <button class="ca-btn" id="dragsteer" type="button">✥ Steer: pads</button>
       <div class="picks" id="picks" role="group" aria-label="Choose your racer"></div>
       <div class="daily-note" id="daily-note"></div>
     </div>
@@ -695,10 +710,22 @@
     }
 
     /* ============================================================
-       audio — all synthesised, no files ship
+       audio — two music files, everything else synthesised
+
+       The engine hum used to be the soundtrack. It is now the fallback: the
+       race is scored by the two tracks in racegame/, alternating each race,
+       and the synthesised hum only comes back if neither file can be played
+       (an offline cache, a renamed file) — so the page is never silent and
+       never lies about what it is playing. Skids, blips and the finish fanfare
+       stay synthesised: they are cues, and cues have to land on the frame.
        ============================================================ */
     let actx = null, master = null, engine = null, engineGain = null, skidGain = null;
     let muted = false;
+
+    /* ---- music ---- */
+    const MUSIC_TRACKS = ['racegame/galacticgame1.mp3', 'racegame/galacticgame 2.mp3'];
+    const MUSIC_VOLUME = 0.42;
+    let musicEl = null, musicIdx = 0, musicOk = null, musicWanted = false;
 
     function audioReady() {
       if (actx) return actx;
@@ -730,14 +757,52 @@
       skidGain = actx.createGain(); skidGain.gain.value = 0.0001;
       src.connect(bp).connect(skidGain).connect(master);
       src.start();
+      musicPlay();                 // every user gesture is a chance to start the music
       return actx;
+    }
+    /* An <audio> element rather than a decoded buffer: the tracks are 3.7 and
+       4.4 MB, so they stream from the network (and from the service worker's
+       cache) instead of being pulled into memory whole. `canplay` is what makes
+       a track "ok" — an element that errors falls back to the hum. */
+    function musicInit() {
+      if (musicEl) return musicEl;
+      try {
+        musicEl = new Audio();
+        musicEl.loop = true;
+        musicEl.preload = 'auto';
+        musicEl.volume = muted ? 0 : MUSIC_VOLUME;
+        musicEl.addEventListener('canplay', function () { musicOk = true; });
+        musicEl.addEventListener('error', function () { musicOk = false; });
+      } catch (e) { musicEl = null; }
+      return musicEl;
+    }
+    function musicPlay() {
+      musicWanted = true;
+      const el = musicInit();
+      if (!el) return null;
+      if (muted) { el.pause(); return el; }
+      const want = MUSIC_TRACKS[musicIdx % MUSIC_TRACKS.length];
+      if (!el.currentSrc || el.currentSrc.indexOf(want) === -1) { try { el.src = want; } catch (e) {} }
+      el.volume = MUSIC_VOLUME;
+      const p = el.play();
+      if (p && p.catch) p.catch(function () { /* no gesture yet, or no file: try again next time */ });
+      return el;
+    }
+    /* a new race means the other track — two tracks and a restart key would
+       otherwise mean hearing the same one all evening */
+    function musicNext() {
+      musicIdx++;
+      if (musicEl) { try { musicEl.pause(); } catch (e) {} }
+      return musicPlay();
     }
     function setEngine(rpm, load) {
       if (!actx || !engine) return;
       const f = 42 + rpm * 118;
       engine.osc[0].frequency.setTargetAtTime(f, actx.currentTime, 0.05);
       engine.osc[1].frequency.setTargetAtTime(f * 1.005, actx.currentTime, 0.05);
-      engineGain.gain.setTargetAtTime(muted ? 0 : 0.03 + 0.05 * load, actx.currentTime, 0.08);
+      /* the hum is retired while music is carrying the sound, and comes back
+         on its own if the music never loads */
+      engineGain.gain.setTargetAtTime(muted || musicOk ? 0 : 0.03 + 0.05 * load, actx.currentTime, 0.08);
     }
     function setSkid(on) {
       if (!actx || !skidGain) return;
@@ -890,8 +955,25 @@
        the city
        ============================================================ */
     const TRACK_STEP = 1.0;
+    /* ---- banking ----
+       The corkscrew used to be a flat road bent into a circle: the deck stayed
+       level across its width all the way round, which is the one thing a real
+       spiral ramp never does. The deck now rolls into the corner, by the
+       equilibrium angle for a cornering speed (tan b = v^2 k / g) softened
+       through tanh, so only the tightest corners reach full angle: about 18
+       degrees on the loop's 30-unit radius, two or three on the gentle bends,
+       and zero on the straights.
+
+       It is applied as a *shear*, not a rotation: a point at lateral offset
+       `lat` rises by lat*sin(b) and keeps its plan position. Rotating the
+       cross-section properly would pull the barriers in by cos(b), leaving the
+       drawn wall up to half a unit from the wall you actually hit; shearing
+       costs nothing visually at these angles and leaves the corridor — and
+       every collision number in this file — exactly as it was. */
+    const BANK_REF = 0.028;        // curvature that banks to tanh(1) of full
+    const BANK_MAX = 0.32;         // radians — 18 degrees at full lock
     let trackN = 0;
-    let tX, tZ, tY, tTX, tTZ, tNX, tNZ, tK, tG, tKY;
+    let tX, tZ, tY, tTX, tTZ, tNX, tNZ, tK, tG, tKY, tB;
 
     function buildTrack() {
       const pts = TRACK_PTS.map(function (p) { return new THREE.Vector3(p[0], p[2] || 0, p[1]); });
@@ -941,6 +1023,10 @@
         for (let o = -9; o <= 9; o++) sum += k[(i + o + trackN) % trackN];
         tK[i] = sum / 19;
       }
+      /* the bank the smoothed curvature asks for, precomputed so the road, the
+         cars and the scenery all read the same number for a given s */
+      tB = new Float32Array(trackN);
+      for (let i = 0; i < trackN; i++) tB[i] = BANK_MAX * Math.tanh(tK[i] / BANK_REF);
       /* The circuit's own datum. Catmull-Rom undershoots a little at the
          bottom of the descent — 12cm below the plane of the city slab — and a
          road below the ground it lies on is a road you cannot see. Lifting the
@@ -992,7 +1078,8 @@
         nx: lerp(tNX[i], tNX[j], f), nz: lerp(tNZ[i], tNZ[j], f),
         k: lerp(tK[i], tK[j], f),
         g: lerp(tG[i], tG[j], f),           // slope, dy per unit of road
-        ky: lerp(tKY[i], tKY[j], f)         // vertical curvature: positive = dip
+        ky: lerp(tKY[i], tKY[j], f),        // vertical curvature: positive = dip
+        b: lerp(tB[i], tB[j], f)            // bank, radians: outside edge up
       };
     }
     /* the worst curvature within `ahead` — what a driver should be reacting to */
@@ -1216,7 +1303,7 @@
         const side = (Math.floor(s / 14) % 2 === 0) ? 1 : -1;
         const t = trackAt(s);
         const lat = side * (TRACK_HALF + 3.4);
-        const px = t.px + t.nx * lat, pz = t.pz + t.nz * lat, ry = t.y;
+        const px = t.px + t.nx * lat, pz = t.pz + t.nz * lat, ry = t.y - lat * Math.sin(t.b);
         pushBox(lamps, px, ry + 1.7, pz, 0.24, 3.4, 0.24, POST);
         pushBox(lamps, px - t.nx * side * 0.5, ry + 3.34, pz - t.nz * side * 0.5, 1.1, 0.16, 0.16, POST);
         pushBox(lamps, px - t.nx * side * 0.95, ry + 3.28, pz - t.nz * side * 0.95, 0.5, 0.2, 0.5, BULB);
@@ -1428,7 +1515,7 @@
         const p = trackAt(d.s);
         d.mesh.position.set(
           p.px + p.nx * d.lat,
-          p.y + d.up + Math.sin(t * 0.7 + d.phase) * 0.5,
+          p.y + d.up - d.lat * Math.sin(p.b) + Math.sin(t * 0.7 + d.phase) * 0.5,
           p.pz + p.nz * d.lat
         );
         /* facing back down the road: the face you see is the one coming at you */
@@ -1609,7 +1696,9 @@
          so the skyway costs nothing here: s already knows how high it is */
       const at = function (s, lat, y) {
         const t = trackAt(s);
-        return [t.px + t.nx * lat, t.y + y, t.pz + t.nz * lat];
+        /* the -lat*sin(b) term is the bank: at lat = +9 (the driver's left) a
+           left hander drops the inside edge and lifts the outside one */
+        return [t.px + t.nx * lat, t.y + y - lat * Math.sin(t.b), t.pz + t.nz * lat];
       };
 
       const segs = Math.floor((trackLen - TRACK_STEP * 0.5) / TRACK_STEP);
@@ -1651,7 +1740,10 @@
     /* ---------- a point on the road, in road coordinates ---------- */
     function trackPoint(s, lat, y) {
       const t = trackAt(s);
-      return [t.px + t.nx * lat, t.y + y, t.pz + t.nz * lat];
+      /* banked, like the road it sits on: the shear term is what keeps the
+         glass tube, its portal and every piece of roadside furniture sitting on
+         the tilted deck instead of hovering beside it */
+      return [t.px + t.nx * lat, t.y + y - lat * Math.sin(t.b), t.pz + t.nz * lat];
     }
 
     /* The skyway is a viaduct, and a viaduct that floats reads as a bug: it
@@ -1697,7 +1789,7 @@
           const colour = (Math.floor(s / 26) % 3 === 0) ? NEON_MAGENTA : NEON_CYAN;
           [0, -(TRACK_HALF + 0.5), TRACK_HALF + 0.5].forEach(function (lat, i) {
             const px = t.px + t.nx * lat, pz = t.pz + t.nz * lat;
-            const h = y - 0.3;
+            const h = y - 0.3 - lat * Math.sin(t.b);      // to the banked deck, not the centreline
             if (pierWouldCross(px, pz, y)) return;
             pushBox(piers, px, h / 2, pz, 0.8, h, 0.8, i === 0 ? CONCRETE : EDGE);
           });
@@ -1796,6 +1888,33 @@
             trackPoint(sr + 0.17, p1[0], p1[1]), trackPoint(sr - 0.17, p1[0], p1[1]), STEEL, UP);
         }
       }
+      /* ---- the portal ----
+         The tube is visible from a long way off, but until now it began in
+         mid-air: the ribs run every ten units and none of them announced the
+         mouth. Each end gets a heavier frame than the ribs, run down to the
+         road on both sides, so there is a thing to aim at and pass under — and
+         a lit line inside it, which is what reads at speed once the glass
+         itself has all but vanished. */
+      const PORTAL = { pos: [], nrm: [], col: [], idx: [] };
+      const PORTAL_LIT = { pos: [], nrm: [], col: [], idx: [] };
+      const HEAVY = [0.58, 0.66, 0.78], PORTAL_GLOW = [1.05, 2.1, 2.9];
+      const frame = [[-E, SILL]];
+      arch.forEach(function (p) { frame.push(p); });
+      frame.push([E, SILL]);
+      const portalTop = SPRING + APEX;              // the arch's crown, above the road
+      [s0 + 0.001, s1 - 0.001].forEach(function (sp) {
+        const a = sp - 1.0, b = sp + 1.0;           // two units of depth, an arch you drive through
+        for (let m = 0; m < frame.length - 1; m++) {
+          const p0 = frame[m], p1 = frame[m + 1];
+          q(PORTAL, trackPoint(a, p0[0] * 1.05, p0[1]), trackPoint(b, p0[0] * 1.05, p0[1]),
+            trackPoint(b, p1[0] * 1.05, p1[1]), trackPoint(a, p1[0] * 1.05, p1[1]), HEAVY, UP);
+          q(PORTAL_LIT, trackPoint(a + 0.45, p0[0] * 0.97, p0[1]), trackPoint(b - 0.45, p0[0] * 0.97, p0[1]),
+            trackPoint(b - 0.45, p1[0] * 0.97, p1[1]), trackPoint(a + 0.45, p1[0] * 0.97, p1[1]), PORTAL_GLOW, UP);
+        }
+      });
+      tubeSpan.portal = { ends: [+s0.toFixed(0), +s1.toFixed(0)], top: +portalTop.toFixed(2),
+        sill: SILL, width: +(E * 2).toFixed(1) };
+
       /* and a running light along both sills, which is what you actually
          follow through the tube at speed */
       for (let sr = s0; sr < s1 - 4; sr += 8) {
@@ -1812,6 +1931,10 @@
         blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
       })));
       scene.add(new THREE.Mesh(geometryFrom(ribs), new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+      scene.add(new THREE.Mesh(geometryFrom(PORTAL), new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+      scene.add(new THREE.Mesh(geometryFrom(PORTAL_LIT), new THREE.MeshBasicMaterial({
+        vertexColors: true, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false
+      })));
       scene.add(new THREE.Mesh(geometryFrom(strips), new THREE.MeshBasicMaterial({
         vertexColors: true, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false
       })));
@@ -2430,10 +2553,10 @@
       const bob = r.isPlayer ? 0 : Math.sin(raceTime * 3 + r.idx) * 0.03;
       r.group.position.set(
         look.px + look.nx * r.lat,
-        look.y + HOVER + r.height / 2 + bob + r.hgt,
+        look.y + HOVER + r.height / 2 + bob + r.hgt - r.lat * Math.sin(look.b),
         look.pz + look.nz * r.lat
       );
-      r.group.rotation.set(r.pitch, r.yaw, r.roll);
+      r.group.rotation.set(r.pitch, r.yaw, r.roll + look.b);   // sits with the deck
 
       /* the shadow stays on the road while the hull leaves it, and spreads as
          the hull gets further away: without that a jump has no height in it */
@@ -2516,6 +2639,7 @@
     }
 
     function gridStart() {
+      musicNext();               // each race gets the other track
       raceTime = 0; countdown = 3.0; raceState = 'countdown';
       countdownShown = 0; goHold = 0;
       setLamps(0, '');
@@ -2534,7 +2658,7 @@
         r.boostT = 0; r.boostCd = 0; r.shield = false; r.flashT = 0;
         const h = trackAt(r.s);
         r.yaw = Math.atan2(-h.tx, -h.tz);
-        r.group.position.set(h.px + h.nx * r.lat, h.y + HOVER + r.height / 2, h.pz + h.nz * r.lat);
+        r.group.position.set(h.px + h.nx * r.lat, h.y + HOVER + r.height / 2 - r.lat * Math.sin(h.b), h.pz + h.nz * r.lat);
         r.group.rotation.set(0, r.yaw, 0);
       });
       resetPickups();
@@ -2582,6 +2706,10 @@
     try {
       const raw = JSON.parse(localStorage.getItem(RUNS_KEY) || '[]');
       if (Array.isArray(raw)) runs = raw.filter(function (r) { return r && typeof r.time === 'number' && r.time > 0; });
+      /* runs banked before this page could talk to a board are never sent: they
+         were driven under the old local-only rules, and re-posting history the
+         server has never seen is not the same as posting what you just drove */
+      runs.forEach(function (r) { if (typeof r.sent !== 'number') r.sent = -1; });
     } catch (e) { runs = []; }
 
     function saveRuns() {
@@ -2624,7 +2752,9 @@
         pos: pos, of: fieldSize,
         time: time,
         best: +bestLapOf(me).toFixed(2),
-        stars: starsFor(time, DAILY_PAR)
+        stars: starsFor(time, DAILY_PAR),
+        handle: pilotName,
+        sent: 0                 // 0 = to send, 1 = on the board, -1 = refused there
       };
       runs.push(run);
       saveRuns();
@@ -2669,6 +2799,11 @@
       }
       h += '<h5>today\'s board — ' + today.length + (today.length === 1 ? ' run' : ' runs') + '</h5>' + boardTable(today.slice(0, 5), false);
       h += '<h5>recent runs</h5>' + boardTable(recent, true);
+      h += '<h5>global board' + (BOARD_API ? '' : ' (off)') + ' — day #' + DAILY_DAY + '</h5>' +
+        '<div class="row-btns"><label class="hint" for="pilot">your name on the board</label>' +
+        '<input id="pilot" type="text" maxlength="14" spellcheck="false" autocomplete="off" value="' +
+        escapeHTML(pilotName) + '"><span class="hint" id="global-status">…</span></div>' +
+        '<div id="global-board"></div>';
       return h;
     }
     function renderDailyPanel(run) {
@@ -2677,6 +2812,22 @@
       dailyEl.innerHTML = dailyPanelHTML(run);
       const copy = dailyEl.querySelector('#copy');
       if (copy) copy.addEventListener('click', function () { copyResult(copy); });
+      const pilot = dailyEl.querySelector('#pilot');
+      if (pilot) {
+        pilot.value = pilotName;
+        const commit = function () {
+          const next = cleanPilot(pilot.value);
+          pilot.value = next;
+          if (next !== pilotName) setPilot(next);
+          else renderGlobalBoard();
+        };
+        pilot.addEventListener('change', commit);
+        pilot.addEventListener('blur', commit);
+      }
+      renderGlobalBoard();
+      /* the panel is built on the flag and at boot: both are the moments the
+         board is worth asking again, and both are rare enough not to poll */
+      flushRuns().then(function () { refreshBoard(); });
     }
     function copyResult(btn) {
       const code = dailyEl.querySelector('#share-text');
@@ -2707,6 +2858,196 @@
       try { flash(document.execCommand('copy') ? '✓ Copied' : 'press Ctrl/⌘ C'); }
       catch (e) { flash('press Ctrl/⌘ C'); }
     }
+    /* ============================================================
+       the hosted board
+
+       The local boards above stay the source of truth for what *you* did, and
+       they work with the network unplugged: this adds a global board per day so
+       the same seed can be compared between players. It is deliberately
+       one-way — the game submits and the server decides. Par, hull, modifier
+       and the plausibility bounds are all checked there, from the day number,
+       so nothing in this file can talk the board into a time it did not drive.
+
+       A run that cannot be delivered is flagged and retried, never lost: the
+       flag lives on the run itself (sent: 0 pending, 1 delivered, -1 refused),
+       so a reload or a week offline does not lose the queue.
+       ============================================================ */
+    const BOARD_API = 'https://site-5c345ac2201048e49773f3a2db67be22.freebuff.page';   // the deployed Worker root; '' = this device only
+    const PILOT_KEY = 'vh-gp-pilot', BOARD_TIMEOUT = 8000, SEND_BATCH = 5;
+    let pilotName = 'pilot';
+    try { pilotName = cleanPilot(localStorage.getItem(PILOT_KEY) || ''); } catch (e) { pilotName = 'pilot'; }
+    let boardState = { status: BOARD_API ? 'idle' : 'off', total: 0, top: [], you: null, config: null, note: '' };
+    let boardBusy = false;
+
+    /* the same rule the server applies, so what you see is what it stores */
+    function cleanPilot(raw) {
+      const s = String(raw == null ? '' : raw).replace(/[^\w .\-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 14);
+      return s || 'pilot';
+    }
+    function ordinal(n) {
+      const t = n % 100;
+      if (t >= 11 && t <= 13) return n + 'th';
+      return n + (['th', 'st', 'nd', 'rd'][n % 10] || 'th');
+    }
+    function apiFetch(path, opts) {
+      const ctl = new AbortController();
+      const timer = setTimeout(function () { ctl.abort(); }, BOARD_TIMEOUT);
+      return fetch(BOARD_API + path, Object.assign({ signal: ctl.signal, cache: 'no-store' }, opts || {}))
+        .then(function (res) {
+          return res.text().then(function (text) {
+            let body = null;
+            try { body = text ? JSON.parse(text) : null; } catch (e) { body = null; }
+            return { ok: res.ok, status: res.status, body: body };
+          });
+        })
+        .finally(function () { clearTimeout(timer); });
+    }
+    function applyBoard(b, how) {
+      boardState.status = b.duplicate ? 'dupe' : (how === 'sent' ? 'sent' : 'live');
+      boardState.total = b.total || 0;
+      boardState.top = b.top || [];
+      boardState.you = b.you || null;
+      if (b.config) boardState.config = b.config;
+      boardState.note = '';
+    }
+    function boardPayload(run) {
+      return { day: run.day, seed: run.seed, car: run.car, mod: run.mod, par: run.par,
+        time: run.time, best: run.best, pos: run.pos, of: run.of, handle: pilotName };
+    }
+    async function flushRuns() {
+      if (!BOARD_API || boardBusy) return 0;
+      const pending = runs.filter(function (r) { return r.sent === 0; }).slice(0, SEND_BATCH);
+      if (!pending.length) return 0;
+      boardBusy = true;
+      let delivered = 0;
+      try {
+        for (const run of pending) {
+          let res;
+          try {
+            res = await apiFetch('/api/runs', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(boardPayload(run))
+            });
+          } catch (err) {
+            boardState.status = 'offline';        // no network: keep sent = 0 and try later
+            break;
+          }
+          if (res.status === 200 || res.status === 201) {
+            run.sent = 1; delivered++;
+            if (res.body) applyBoard(res.body, 'sent');
+          } else if (res.status === 409 || res.status === 422 || res.status === 413) {
+            /* the server will never take this one (it names the field), so stop
+               retrying it — but it stays in the local board, flagged */
+            run.sent = -1;
+            run.rejected = (res.body && res.body.error) || ('http ' + res.status);
+            boardState.note = run.rejected;
+          } else if (res.status === 429) {
+            run.sent = 0;
+            boardState.status = 'capped';
+            boardState.note = (res.body && res.body.error) || 'too many runs today';
+            break;
+          } else {
+            run.sent = -1;
+            run.rejected = 'http ' + res.status;
+            boardState.note = run.rejected;
+          }
+        }
+      } finally {
+        boardBusy = false;
+        if (delivered) { saveRuns(); renderDailyNote(); }
+        renderGlobalBoard();
+      }
+      return delivered;
+    }
+    async function refreshBoard() {
+      if (!BOARD_API || !DAILY_ON) return null;
+      if (boardBusy) return null;
+      boardBusy = true;
+      try {
+        boardState.status = boardState.status === 'off' ? 'off' : 'loading';
+        renderGlobalBoard();
+        const res = await apiFetch('/api/board?day=' + DAILY_DAY + '&limit=10&handle=' + encodeURIComponent(pilotName));
+        if (res.body && res.body.ok) applyBoard(res.body, 'live');
+        else {
+          boardState.status = 'error';
+          boardState.note = (res.body && res.body.error) || ('http ' + res.status);
+        }
+      } catch (e) {
+        boardState.status = 'offline';
+      } finally {
+        boardBusy = false;
+        renderGlobalBoard();
+      }
+      return boardState;
+    }
+    /* the board and this page can disagree about today if one of them was
+       deployed after the rules changed: worth saying out loud rather than
+       silently showing two different pars */
+    function boardMismatch() {
+      const c = boardState.config;
+      if (!c) return '';
+      const diffs = [];
+      if (c.car !== RACER_NAMES[DAILY_CAR]) diffs.push('hull');
+      if (c.par !== DAILY_PAR) diffs.push('par');
+      if (c.mod !== DAILY_MOD.id) diffs.push('modifier');
+      return diffs.length ? 'this page and the board disagree about today\'s ' + diffs.join(' / ') + ' — one of them is out of date' : '';
+    }
+    function boardStatusText() {
+      if (!BOARD_API) return 'no board configured — every score below is on this device';
+      switch (boardState.status) {
+        case 'off':      return 'not connected — local only';
+        case 'loading':  return 'asking the board…';
+        case 'offline':  return 'offline — your runs are saved here and will be sent when you are back';
+        case 'error':    return 'board unavailable' + (boardState.note ? ' (' + boardState.note + ')' : '');
+        case 'capped':   return 'no more submissions today' + (boardState.note ? ' — ' + boardState.note : '');
+      }
+      const bits = [];
+      if (boardState.status === 'sent') bits.push('sent ✓' + (boardState.duplicate ? ' (already banked)' : ''));
+      if (boardState.you) bits.push('you are ' + ordinal(boardState.you.rank) + ' of ' + boardState.total);
+      else bits.push(boardState.total + (boardState.total === 1 ? ' run' : ' runs') + ' on the board today');
+      if (boardState.note) bits.push(boardState.note);
+      return bits.join(' · ');
+    }
+    function renderGlobalBoard() {
+      if (!DAILY_ON) return;
+      const host = dailyEl.querySelector('#global-board');
+      const statusEl = dailyEl.querySelector('#global-status');
+      if (!host) return;
+      if (statusEl) statusEl.textContent = boardStatusText();
+      const warn = boardMismatch();
+      const warnHTML = warn ? '<p class="hint warn">' + escapeHTML(warn) + '</p>' : '';
+      if (!BOARD_API) { host.innerHTML = '<p class="hint">local only — nothing leaves this device.</p>'; return; }
+      if (!boardState.top.length) {
+        host.innerHTML = '<p class="hint">' + (boardState.status === 'offline' || boardState.status === 'error'
+          ? 'could not reach the board — your runs are still here, and they are queued to send.'
+          : 'nothing on the board for today yet; the first clean lap is yours.') + '</p>' + warnHTML;
+        return;
+      }
+      let h = '<table class="world">';
+      boardState.top.forEach(function (r) {
+        h += '<tr' + (r.handle === pilotName ? ' class="me"' : '') + '>' +
+          '<td class="pos">' + r.rank + '</td>' +
+          '<td class="nm">' + escapeHTML(r.handle) + '</td>' +
+          '<td class="tm">' + fmtTime(r.time) + '</td>' +
+          '<td class="st">' + STAR_RUN[r.stars] + '</td>' +
+          '<td class="tm">P' + r.pos + '/' + r.of + '</td></tr>';
+      });
+      h += '</table>';
+      if (boardState.you && boardState.you.rank > boardState.top.length) {
+        h += '<p class="hint">your best today: ' + ordinal(boardState.you.rank) + ' of ' + boardState.total +
+          ' · ' + fmtTime(boardState.you.time) + ' ' + STAR_RUN[boardState.you.stars] + '</p>';
+      }
+      host.innerHTML = h + warnHTML;
+    }
+    function setPilot(name) {
+      pilotName = cleanPilot(name);
+      try { localStorage.setItem(PILOT_KEY, pilotName); } catch (e) {}
+      boardState.you = null;
+      refreshBoard();
+      return pilotName;
+    }
+
     function renderDailyNote() {
       if (!DAILY_ON) return;
       const best = bestOnSeed(DAILY_SEED);
@@ -2801,6 +3142,13 @@
       if (pad.steer) steer = pad.steer;
       if (pad.throttle > throttle) throttle = pad.throttle;
       if (pad.brake > brake) brake = pad.brake;
+      /* the thumb on the canvas, if that mode is on: it is the explicit choice,
+         so it wins over the stick, but the pedals still merge by max() */
+      if (dsMode && dsPointer !== null) {
+        if (dsSteer) steer = dsSteer;
+        if (dsGas > throttle) throttle = dsGas;
+        if (dsBrake > brake) brake = dsBrake;
+      }
       return { steer: clamp(steer, -1, 1), throttle: throttle, brake: brake };
     }
 
@@ -2950,6 +3298,7 @@
       touch.steer = 0; touch.throttle = 0; touch.brake = 0;
       pad.steer = 0; pad.throttle = 0; pad.brake = 0;
       pad.lookX = 0; pad.lookY = 0;
+      dsEnd();
       for (let i = 0; i < padReleasers.length; i++) padReleasers[i]();
     }
     bindPad(document.getElementById('pad-left'), function () { touch.steer = 1; }, function () { if (touch.steer > 0) touch.steer = 0; });
@@ -2982,21 +3331,32 @@
 
     /* The mouse equivalent of the right stick: hold and pull the canvas to look
        around. Mouse only — on a phone the same gesture has to stay available
-       for scrolling the page past the game. */
+       for scrolling the page past the game, unless drag-steering is on, in
+       which case a finger on the canvas is the steering and the drag-look is
+       left to the right stick. */
     screenEl.addEventListener('pointerdown', function (e) {
+      if (dsMode && e.pointerType !== 'mouse' && dsPointer === null) {
+        dsPointer = e.pointerId; dsX0 = e.clientX; dsY0 = e.clientY;
+        dsSteer = dsGas = dsBrake = 0;
+        if (screenEl.setPointerCapture) { try { screenEl.setPointerCapture(e.pointerId); } catch (err) {} }
+        return;
+      }
       if (e.pointerType !== 'mouse' || lookStart) return;
       lookStart = { x: e.clientX, y: e.clientY, id: e.pointerId };
       if (screenEl.setPointerCapture) { try { screenEl.setPointerCapture(e.pointerId); } catch (err) {} }
     });
     screenEl.addEventListener('pointermove', function (e) {
+      if (dsMode && e.pointerId === dsPointer) { dsUpdate(e); return; }
       if (!lookStart || e.pointerId !== lookStart.id) return;
       lookDragX = clamp((e.clientX - lookStart.x) / 80, -1, 1);
       lookDragY = clamp((e.clientY - lookStart.y) / 80, -1, 1);
     });
     function endLookDrag(e) {
+      dsEnd(e);
       if (!lookStart || (e && e.pointerId !== lookStart.id)) return;
       lookStart = null; lookDragX = 0; lookDragY = 0;
     }
+    screenEl.addEventListener('lostpointercapture', dsEnd);
     screenEl.addEventListener('pointerup', endLookDrag);
     screenEl.addEventListener('pointercancel', endLookDrag);
 
@@ -3004,6 +3364,9 @@
       muted = !muted;
       soundBtn.textContent = muted ? '🔇 Sound off' : '🔊 Sound on';
       if (master) master.gain.setTargetAtTime(muted ? 0 : 0.5, actx.currentTime, 0.02);
+      if (musicEl) musicEl.volume = muted ? 0 : MUSIC_VOLUME;
+      if (muted) { if (musicEl) try { musicEl.pause(); } catch (e) {} }
+      else musicPlay();
     }
     function toggleMode() {
       const toPhosphor = asciiMat.uniforms.uMode.value < 0.5;
@@ -3061,8 +3424,8 @@
     let rawView = true;
     function toggleRaw() { rawView = !rawView; applyLightRig(); return rawView; }
     soundBtn.addEventListener('click', function () { audioReady(); toggleSound(); });
-    pauseBtn.addEventListener('click', function () { audioReady(); togglePause(); });
-    restartBtn.addEventListener('click', function () { audioReady(); gridStart(); });
+    pauseBtn.addEventListener('click', function () { audioReady(); togglePause(); });      restartBtn.addEventListener('click', function () { audioReady(); gridStart(); });
+      document.getElementById('dragsteer').addEventListener('click', function () { audioReady(); setDragSteer(!dsMode); });
     function restart() { gridStart(); }
     function setPlayer(i) {
       /* the daily fixes your hull, because everyone racing the same day has to
@@ -3126,7 +3489,7 @@
     function snapCamera() {
       const me = racers[playerIdx];
       playerForward(tmpFwd);
-      const ry = roadYAt(me.s);
+      const ry = roadYAt(me.s) - me.lat * Math.sin(trackAt(me.s).b);   // the deck under the hull
       camPos.set(me.group.position.x - tmpFwd.x * 8.4, ry + 2.8 + me.hgt * 0.85, me.group.position.z - tmpFwd.z * 8.4);
       camLook.set(me.group.position.x + tmpFwd.x * 12, ry + 0.75 + me.hgt, me.group.position.z + tmpFwd.z * 12);
       camera.position.copy(camPos);
@@ -3143,6 +3506,58 @@
     let lookYaw = 0, lookPitch = 0;
     let lookDragX = 0, lookDragY = 0;      // a drag, held like a stick
     let lookStart = null;                  // {x, y, yaw, pitch} while dragging
+
+    /* ============================================================
+       steer by drag — the pads' alternative
+
+       The pads are four fixed circles, which is fine until you are holding a
+       phone with one hand. Turn this on and a touch anywhere on the canvas
+       that is not a pad or a button becomes the steering: horizontal drag from
+       where the thumb landed sets the lock (so the thumb never has to travel),
+       and pulling further up or down feathers throttle and brake, which is
+       what makes the mode usable with one thumb.
+
+       It is a mode rather than the default because it is not better, only
+       different — the pads are still there, and only the two STEER pads step
+       aside while this is on, since leaving them up would put two dead
+       circles under the thumbs.
+       ============================================================ */
+    const DS_KEY = 'vh-gp-dragsteer';
+    const DS_RANGE = 88;                   // px of drag for full lock
+    const DS_AXIS = 26;                    // px of vertical travel before it is throttle
+    const DS_TRAVEL = 64;                  // px beyond that for a full pedal
+    let dsMode = false;
+    try { dsMode = localStorage.getItem(DS_KEY) === '1'; } catch (e) {}
+    let dsPointer = null, dsX0 = 0, dsY0 = 0;
+    let dsSteer = 0, dsGas = 0, dsBrake = 0;
+
+    function syncDragControls() {
+      const btn = document.getElementById('dragsteer');
+      if (btn) btn.textContent = dsMode ? '✥ Steer: drag' : '✥ Steer: pads';
+      padsEl.classList.toggle('dragsteer', dsMode);
+    }
+    function setDragSteer(on) {
+      dsMode = !!on;
+      dsPointer = null; dsSteer = dsGas = dsBrake = 0;
+      try { localStorage.setItem(DS_KEY, dsMode ? '1' : '0'); } catch (e) {}
+      syncDragControls();
+      return dsMode;
+    }
+    function dsUpdate(e) {
+      const dx = e.clientX - dsX0;
+      const dy = dsY0 - e.clientY;                       // up is positive
+      /* negated because +steer is the driver's LEFT in this file (the left pad
+         sets +1, and the track normal points to driver-left): a thumb dragged
+         to the right has to turn the car right, not left */
+      dsSteer = clamp(-dx / DS_RANGE, -1, 1);
+      const v = Math.abs(dy) > DS_AXIS ? (dy > 0 ? dy - DS_AXIS : dy + DS_AXIS) : 0;
+      dsGas = v > 0 ? clamp(v / DS_TRAVEL, 0, 1) : 0;
+      dsBrake = v < 0 ? clamp(-v / DS_TRAVEL, 0, 1) : 0;
+    }
+    function dsEnd(e) {
+      if (dsPointer === null || (e && e.pointerId !== dsPointer)) return;
+      dsPointer = null; dsSteer = 0; dsGas = 0; dsBrake = 0;
+    }
 
     function updateLook(dt) {
       const lx = clamp(pad.lookX + lookDragX, -1, 1);
@@ -3291,7 +3706,10 @@
       /* the camera reads the height of the ROAD under the hull, not the hull's
          y: it has the hull's jump folded in separately, at a lower weight, and
          adding both would double the skyway into a slingshot */
-      const roadY = roadYAt(me.s);
+      /* the height of the DECK under the hull, not of the centreline: banked,
+         those differ by lat*sin(bank), and aiming at the centreline would
+         frame the car three units off centre through the corkscrew */
+      const roadY = roadYAt(me.s) - me.lat * Math.sin(trackAt(me.s).b);
       tmpPos.set(
         me.group.position.x + ox * dist,
         roadY + height + lookPitch * 5 + me.hgt * 0.85,
@@ -3408,7 +3826,9 @@
       soundBtn.textContent = muted ? '🔇 Sound off' : '🔊 Sound on';
       pauseBtn.textContent = paused ? '▶ Resume' : '⏸ Pause';
       dailyBtn.textContent = DAILY_ON ? '↩ Free run' : '★ Daily challenge';
+      syncDragControls();
       dailyBtn.addEventListener('click', function () { audioReady(); location.href = modeHref(!DAILY_ON); });
+      window.addEventListener('online', function () { flushRuns().then(function () { refreshBoard(); }); });
       renderDailyNote();
       renderDailyPanel();
       applyLightRig();
@@ -3438,6 +3858,8 @@
             pos: standings().indexOf(mm) + 1, lap: mm.lap, laps: mm.laps.slice(),
             s: +mm.s.toFixed(2), lat: +mm.lat.toFixed(2), v: +mm.v.toFixed(2),
             raceTime: +raceTime.toFixed(2), bestLap: +bestLap.toFixed(2), fps: fps,
+          y: +mm.group.position.y.toFixed(3), roll: +mm.group.rotation.z.toFixed(4),
+          bankDeg: +(trackAt(mm.s).b * 180 / Math.PI).toFixed(2),
             shake: +shake.toFixed(3), offRoad: offRoad,
             boostT: +mm.boostT.toFixed(2), boostCd: +mm.boostCd.toFixed(2), shield: mm.shield,
             hgt: +mm.hgt.toFixed(2), air: mm.air, look: [+lookYaw.toFixed(2), +lookPitch.toFixed(2)],
@@ -3677,6 +4099,8 @@
             return {
               idx: r.idx, player: r.isPlayer, s: +r.s.toFixed(1), lat: +r.lat.toFixed(2),
               v: +r.v.toFixed(1), lap: r.lap, finished: r.finished, yaw: +r.yaw.toFixed(2),
+              s: +r.s.toFixed(2), lat: +r.lat.toFixed(2), y: +r.group.position.y.toFixed(3),
+              roll: +r.group.rotation.z.toFixed(4),
               y: +r.group.position.y.toFixed(2)
             };
           });
@@ -3806,6 +4230,41 @@
         raw: function (v) { if (v !== undefined) { rawView = !!v; applyLightRig(); } return rawView; },
         palette: toggleMode,
         pause: function (v) { if (v !== undefined && v !== paused) togglePause(); return paused; },
+        /* what the soundtrack is actually doing, since "is it playing" is not a
+           question you can answer by listening in a test */
+        music: function () {
+          return { tracks: MUSIC_TRACKS, idx: musicIdx, ok: musicOk, wanted: musicWanted,
+            playing: !!(musicEl && !musicEl.paused), muted: muted,
+            volume: musicEl ? musicEl.volume : null,
+            src: musicEl ? String(musicEl.currentSrc || musicEl.src || '') : null,
+            currentTime: musicEl ? +musicEl.currentTime.toFixed(2) : null,
+            engineGain: engineGain ? +engineGain.gain.value.toFixed(5) : null,
+            skidGain: skidGain ? +skidGain.gain.value.toFixed(5) : null };
+        },
+        /* makes the music fail the way a 404 or an offline cache would, so the
+           "the hum comes back" claim can be tested rather than asserted */
+        musicFail: function () { if (musicEl) musicEl.dispatchEvent(new Event('error')); return musicOk; },
+        dragSteer: function (v) { if (v !== undefined) setDragSteer(v);
+          return { on: dsMode, steer: +dsSteer.toFixed(2), gas: +dsGas.toFixed(2), brake: +dsBrake.toFixed(2),
+            pointer: dsPointer, range: DS_RANGE, axis: DS_AXIS, label: document.getElementById('dragsteer').textContent,
+            steerPadsHidden: getComputedStyle(document.getElementById('pad-left')).display === 'none' }; },
+        /* the bank, as numbers: the surface tilt at a point, the worst angle on
+           the lap, and the deck height across the width so "it tilts" is not
+           taken on faith */
+        bank: function (s) { const t = trackAt(s === undefined ? 0 : s);
+          return { s: +(s === undefined ? 0 : s).toFixed(1), deg: +(t.b * 180 / Math.PI).toFixed(2), b: +t.b.toFixed(4) }; },
+        bankProfile: function () {
+          let max = 0, at = 0, n = 0;
+          for (let i = 0; i < trackN; i++) {
+            if (Math.abs(tB[i]) > Math.abs(max)) { max = tB[i]; at = i; }
+            if (Math.abs(tB[i]) > 0.02) n++;
+          }
+          return { maxDeg: +(max * 180 / Math.PI).toFixed(2), atS: +(at * TRACK_STEP).toFixed(0),
+            bankedUnits: n, shareOfLap: +(n / trackN).toFixed(3), maxDegLimit: +(BANK_MAX * 180 / Math.PI).toFixed(1) };
+        },
+        deck: function (s, lat) { const p = trackPoint(s, lat, 0);
+          return { y: +p[1].toFixed(3), x: +p[0].toFixed(2), z: +p[2].toFixed(2) }; },
+        portal: function () { return tubeSpan && tubeSpan.portal ? tubeSpan.portal : null; },
         /* what the day decided, so a seed's rules can be read rather than
            assumed */
         daily: function () {
@@ -3824,6 +4283,30 @@
           });
         },
         runs: function () { return runs; },
+        /* the hosted board, from the page's side: what it thinks it is doing,
+           and the two calls the panel makes for it */
+        worldBoard: function () { return { api: BOARD_API, pilot: pilotName, status: boardState.status,
+          total: boardState.total, top: boardState.top, you: boardState.you, config: boardState.config,
+          note: boardState.note, statusText: boardStatusText(), mismatch: boardMismatch(),
+          pending: runs.filter(function (r) { return r.sent === 0; }).length,
+          sent: runs.filter(function (r) { return r.sent === 1; }).length,
+          refused: runs.filter(function (r) { return r.sent === -1; }).length,
+          rankOf: boardState.you ? ordinal(boardState.you.rank) : null }; },
+        pilot: function (v) { return v === undefined ? pilotName : setPilot(v); },
+        flushRuns: function () { return flushRuns(); },
+        refreshBoard: function () { return refreshBoard(); },
+        /* submit a run the server will believe, without waiting three laps for
+           one: the same client path, a plausible time */
+        craft: function (over) {
+          const time = (over && over.time) || DAILY_PAR + 6.5;
+          const run = { at: Date.now(), day: DAILY_DAY, seed: DAILY_SEED,
+            car: RACER_NAMES[playerIdx % RACER_NAMES.length], mod: DAILY_MOD.id, par: DAILY_PAR,
+            pos: (over && over.pos) || 2, of: racers.length, time: time,
+            best: (over && over.best) || Math.round((time / 3) * 100) / 100,
+            stars: starsFor(time, DAILY_PAR), handle: pilotName, sent: 0 };
+          runs.push(run); saveRuns(); renderDailyPanel(run); renderDailyNote();
+          return run;
+        },
         clearRuns: function () { runs.length = 0; saveRuns(); renderDailyPanel(); renderDailyNote(); return runs.length; },
         /* A hash of everything the seed generated. "Same day, same circuit" has
            to be a number, or it is only an impression. */
