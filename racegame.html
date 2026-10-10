@@ -249,12 +249,16 @@
     </div>
 
     <h1>CITY GRAND PRIX</h1>
-    <p class="tag">Five aircraft race three laps of a long circuit threaded between the blocks of a city that is
-    awake: towers wear randomly lit windows, the rooftops carry beacons, masts and water tanks, and neon signs hang
-    over the streets. The lap is generated, and so is everything on it — painted <b>arrows</b> that shove you up the
-    road, <b>ramps</b> that put you in the air if you hit them fast, and floating <b>powerups</b>: a boost, or a
-    shield that eats one wall. Hold the throttle, brake for the chicane, and try not to be the one who parks a
-    starfighter in a wall. A controller works too — left stick or d-pad to steer, RT or A for throttle, LT to brake
+    <p class="tag">Five aircraft race three laps of a <b>1,600-unit</b> circuit threaded between the blocks of a city
+    after dark: towers wear windows that go on and off all evening, the rooftops carry beacons that blink out of
+    phase, traffic runs the streets below while fliers cross the canyons above, and neon signs hang over the streets
+    — and drift down them. The lap is generated, and so is everything on it — painted <b>arrows</b> that shove you up
+    the road, <b>ramps</b> that put you in the air if you hit them fast, and floating <b>powerups</b>: a boost, or a
+    shield that eats one wall. The east side <b>climbs</b>: a graded ramp lifts the road off the street, a viaduct
+    carries it 200 units between the towers at upper-floor height, and the whole south straight brings it back down.
+    The barriers are there at every height, and the profile is gentle enough that you can hold the throttle over every
+    crest — a hill only throws you when its curvature beats gravity, and none of them do. Hold the throttle, brake for
+    the chicane, and try not to be the one who parks a starfighter in a wall. A controller works too — left stick or d-pad to steer, RT or A for throttle, LT to brake
     and reverse, <b>right stick to look around</b>, Y for the ▤ view, X for the palette, Start to restart. Drag the
     canvas to look, too. And <b>▤ ASCII view</b> (or <b>V</b>) redraws the whole city as text: each texel becomes a
     brightness, looked up in a character ramp, so a tower turns into a wall of <b>#</b>.</p>
@@ -382,6 +386,7 @@
 
     const BILLBOARD_SKINS = 6;    // neon sign faces the towers can wear
     let billboardMats = [];       // kept, so the signs can flicker too
+    let beaconMats = [];          // the rooftop-beacon groups, each on its own cycle
 
     const RNG_SEED = 20260410;    // the city is identical on every visit
     const WINDOW_SKINS = 4;       // facade textures, worn at random
@@ -389,9 +394,10 @@
     let windowMats = [];          // the four facade materials, for the flicker
 
     /* ---------- the city grid ----------
-       Nine streets each way: the lap runs the -132 and +132 ones, a row of
-       blocks more than the old circuit, which is where the longer straights
-       come from. Anything generated below keys off these numbers. */
+       Nine streets each way. The lap now runs the OUTERMOST of them (-176 and
+       +176), so the blocks are laid out one ring past the streets as well —
+       otherwise the circuit would run with a canyon on its inner side and bare
+       slab on its outer one. Anything generated below keys off these numbers. */
     const CITY_RING = [-176, -132, -88, -44, 0, 44, 88, 132, 176];
     const CITY_HALF = 209;        // the ground slab, a little past the last street
     const STREET_W = 15;          // painted street width (the circuit's asphalt is its own)
@@ -411,6 +417,11 @@
     const RAMP_H = 1.9;
     const RAMP_LIFT = 0.155;      // of your speed, turned into upward speed at the lip
     const GRAVITY = 24;
+    /* how far the road may fall away in a single step before the hull is
+       considered to have left it. Only a ramp's lip does this — the circuit's
+       own profile is smooth — and it is the whole difference between a skyway
+       you can descend at 60 units/s and one that pogo-sticks you down. */
+    const LIP_DROP = 0.35;
     /* ---------- pickups ---------- */
     const PICKUP_R = 2.8;         // how close counts as collected
     const PICKUP_RESPAWN = 11;    // seconds
@@ -426,19 +437,50 @@
     }
 
     /* ---------- the circuit ----------
-       Streets sit on a 44-unit grid; the lap runs the second ring out, which
-       is what makes the straights long: a side is 264 units, about four and a
-       half seconds of flat-out driving at 60 units/s, with the chicane bitten
-       out of the south straight to break it up. Every waypoint is an
-       intersection, so the racing line is always on tarmac. */
+       Streets sit on a 44-unit grid and the lap runs the OUTER ring, so the
+       straights are 352 units — six seconds flat out — and the circuit has a
+       chicane on each of the long ones to fold it back on itself.
+
+       The third number on every waypoint is height, and it is what turns the
+       east side into a skyway: the lap climbs out of the north-east corner on
+       a graded ramp, runs 220 units level with the towers' upper floors, then
+       comes down the whole of the south straight. It is a Catmull-Rom through
+       these points in three dimensions, so the profile is as smooth as the
+       plan and nothing has to be hand-smoothed.
+
+       Two rules keep it safe. The grade never exceeds 14% and — the one that
+       actually matters — the vertical CURVATURE stays far under gravity: a
+       crest throws a car into the air when v²·κ exceeds g, and here the worst
+       κ is about 0.0016, so at 60 units/s it demands 5.8 against a g of 24.
+       You are never launched off a hill you did not choose to ramp. */
     const TRACK_PTS = [
-      [-132, -132], [-88, -132], [-44, -132], [0, -132],
-      [0, -88], [44, -88], [44, -132],
-      [88, -132], [132, -132],
-      [132, -88], [132, -44], [132, 0], [132, 44], [132, 88], [132, 132],
-      [88, 132], [44, 132], [0, 132], [-44, 132], [-88, 132], [-132, 132],
-      [-132, 88], [-132, 44], [-132, 0], [-132, -44], [-132, -88]
+      /* west straight, at street level: 352 units of flat-out */
+      [-176, 176, 0], [-176, 132, 0], [-176, 88, 0], [-176, 44, 0],
+      [-176, 0, 0], [-176, -44, 0], [-176, -88, 0], [-176, -132, 0],
+      [-176, -176, 0],
+      /* north straight, ground, chicane through the middle of it */
+      [-132, -176, 0], [-88, -176, 0],
+      [-88, -132, 0], [-44, -132, 0], [-44, -176, 0],
+      [0, -176, 0], [44, -176, 0], [88, -176, 0], [132, -176, 0],
+      [176, -176, 0],
+      /* east side: the climb, then the skyway between the towers. The plateau
+         is held dead level for two whole streets, which is both what it looks
+         like from up there and the only long stretch of the lap that is high
+         AND level — so it is where the pads and ramps on the deck get put. */
+      [176, -132, 1.3], [176, -88, 4.4], [176, -44, 9.0], [176, 0, 14.8],
+      [176, 44, 20.0], [176, 88, 22.0], [176, 132, 22.0], [176, 176, 21.6],
+      /* South straight: the WHOLE descent, spread across it. It used to dive
+         off the deck in three 44-unit steps, and the measurement caught it:
+         the worst crest on the lap sat at s=1147, the corner where the level
+         deck meets that plunge, demanding 26.5 against a gravity of 24 — the
+         one place on the circuit that could throw a car at boost speed. A
+         descent you can see the whole of is also a descent you can trust. */
+      [132, 176, 20.2], [88, 176, 17.5], [44, 176, 14.0], [0, 176, 10.0],
+      /* the second chicane carries the last of it down */
+      [0, 132, 6.5], [-44, 132, 3.0], [-44, 176, 0.5],
+      [-88, 176, 0], [-132, 176, 0], [-176, 176, 0]
     ];
+
 
     /* How far each hull has to be turned for its nose to point at -Z (the
        game's forward). Read off a rendered top view of every model: veh1 and
@@ -454,6 +496,7 @@
        ============================================================ */
     const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
     const lerp = (a, b, t) => a + (b - a) * t;
+    const fract = v => v - Math.floor(v);
     const TAU = Math.PI * 2;
     let trackLen = 0;
     function wrapS(s) { s %= trackLen; return s < 0 ? s + trackLen : s; }
@@ -637,7 +680,9 @@
           tGlyphs:   { value: null },
           uGrid:     { value: new THREE.Vector2(cols || 1, rows || 1) },
           uGlyphs:   { value: GLYPH_RAMP.length },
-          uExposure: { value: 1.25 },
+          /* raised to hold the text view at the density it had before the rig
+             was dimmed: the same glyphs, or the mode stops being worth having */
+          uExposure: { value: 1.5 },
           uBlack:    { value: 0.05 },
           uGlow:     { value: 0.5 },
           uMode:     { value: 0 },
@@ -658,10 +703,10 @@
        ============================================================ */
     const TRACK_STEP = 1.0;
     let trackN = 0;
-    let tX, tZ, tTX, tTZ, tNX, tNZ, tK;
+    let tX, tZ, tY, tTX, tTZ, tNX, tNZ, tK, tG, tKY;
 
     function buildTrack() {
-      const pts = TRACK_PTS.map(function (p) { return new THREE.Vector3(p[0], 0, p[1]); });
+      const pts = TRACK_PTS.map(function (p) { return new THREE.Vector3(p[0], p[2] || 0, p[1]); });
       const curve = new THREE.CatmullRomCurve3(pts, true, 'catmullrom', 0.5);
       const raw = curve.getPoints(6000);
       const acc = [0];
@@ -672,7 +717,7 @@
       }
       trackLen = total;
       trackN = Math.floor(trackLen / TRACK_STEP);
-      tX = new Float32Array(trackN); tZ = new Float32Array(trackN);
+      tX = new Float32Array(trackN); tZ = new Float32Array(trackN); tY = new Float32Array(trackN);
       let j = 1;
       for (let i = 0; i < trackN; i++) {
         const want = i * TRACK_STEP;
@@ -681,6 +726,7 @@
         const f = t1 > t0 ? (want - t0) / (t1 - t0) : 0;
         tX[i] = lerp(raw[j - 1].x, raw[j].x, f);
         tZ[i] = lerp(raw[j - 1].z, raw[j].z, f);
+        tY[i] = lerp(raw[j - 1].y, raw[j].y, f);
       }
       tTX = new Float32Array(trackN); tTZ = new Float32Array(trackN);
       tNX = new Float32Array(trackN); tNZ = new Float32Array(trackN);
@@ -707,6 +753,42 @@
         for (let o = -9; o <= 9; o++) sum += k[(i + o + trackN) % trackN];
         tK[i] = sum / 19;
       }
+      /* The circuit's own datum. Catmull-Rom undershoots a little at the
+         bottom of the descent — 12cm below the plane of the city slab — and a
+         road below the ground it lies on is a road you cannot see. Lifting the
+         whole profile so its lowest point sits a shade above that plane costs
+         one pass and no geometry changes anywhere else. */
+      let minY = Infinity;
+      for (let i = 0; i < trackN; i++) if (tY[i] < minY) minY = tY[i];
+      for (let i = 0; i < trackN; i++) tY[i] += 0.2 - minY;
+
+      /* the profile's slope and curvature, both per unit of s. The slope is
+         what the hull pitches to; the curvature is the launch test — see the
+         comment on TRACK_PTS. */
+      tG = new Float32Array(trackN);
+      const kg = new Float32Array(trackN);
+      for (let i = 0; i < trackN; i++) {
+        const a = (i - 1 + trackN) % trackN, b = (i + 1) % trackN;
+        tG[i] = (tY[b] - tY[a]) / (2 * TRACK_STEP);
+        kg[i] = (tY[a] - 2 * tY[i] + tY[b]) / (TRACK_STEP * TRACK_STEP);
+      }
+      tKY = new Float32Array(trackN);
+      for (let i = 0; i < trackN; i++) {
+        let sum = 0;
+        for (let o = -9; o <= 9; o++) sum += kg[(i + o + trackN) % trackN];
+        tKY[i] = sum / 19;
+      }
+    }
+
+    /* the height of the road itself at s — every y in the world keys off this,
+       and it is the one thing a hull on the ground is glued to */
+    function roadYAt(s) {
+      s = wrapS(s);
+      const raw = s / TRACK_STEP;
+      const i = Math.floor(raw) % trackN;
+      const j = (i + 1) % trackN;
+      const f = raw - Math.floor(raw);
+      return lerp(tY[i], tY[j], f);
     }
 
     function trackAt(s) {
@@ -717,9 +799,12 @@
       const f = raw - Math.floor(raw);
       return {
         px: lerp(tX[i], tX[j], f), pz: lerp(tZ[i], tZ[j], f),
+        y: lerp(tY[i], tY[j], f),
         tx: lerp(tTX[i], tTX[j], f), tz: lerp(tTZ[i], tTZ[j], f),
         nx: lerp(tNX[i], tNX[j], f), nz: lerp(tNZ[i], tNZ[j], f),
-        k: lerp(tK[i], tK[j], f)
+        k: lerp(tK[i], tK[j], f),
+        g: lerp(tG[i], tG[j], f),           // slope, dy per unit of road
+        ky: lerp(tKY[i], tKY[j], f)         // vertical curvature: positive = dip
       };
     }
     /* the worst curvature within `ahead` — what a driver should be reacting to */
@@ -739,7 +824,7 @@
 
       const ground = new THREE.Mesh(
         new THREE.PlaneGeometry(half * 2, half * 2),
-        new THREE.MeshBasicMaterial({ color: 0x0a0e14 })
+        new THREE.MeshBasicMaterial({ color: 0x070a10 })
       );
       ground.rotation.x = -Math.PI / 2;
       scene.add(ground);
@@ -752,23 +837,31 @@
         pushRect(streets, -half, half, p - STREET_W / 2, p + STREET_W / 2, 0.012);
         pushRect(streets, p - STREET_W / 2, p + STREET_W / 2, -half, half, 0.012);
       });
-      scene.add(new THREE.Mesh(geometryFrom(streets), new THREE.MeshBasicMaterial({ color: 0x232b35 })));
+      scene.add(new THREE.Mesh(geometryFrom(streets), new THREE.MeshBasicMaterial({ color: 0x18202a })));
 
       buildTrackSurface();
+      buildViaduct();
 
       /* Eight blocks by eight: 64 of them, each a pavement platform between two
          streets. One flat colour, so one mesh. */
+      const RING_X = [-CITY_HALF].concat(CITY_RING, [CITY_HALF]);
       const centres = [];
-      for (let i = 0; i < CITY_RING.length - 1; i++) {
-        for (let j = 0; j < CITY_RING.length - 1; j++) {
-          centres.push([(CITY_RING[i] + CITY_RING[i + 1]) / 2, (CITY_RING[j] + CITY_RING[j + 1]) / 2]);
+      for (let i = 0; i < RING_X.length - 1; i++) {
+        for (let j = 0; j < RING_X.length - 1; j++) {
+          /* the outer band between the last street and the edge of the slab is
+             33 units, not 44, so its pavement keeps a smaller footprint — at
+             a full 15-half it would shove out over the circuit */
+          const gap = Math.min(RING_X[i + 1] - RING_X[i], RING_X[j + 1] - RING_X[j]);
+          centres.push([(RING_X[i] + RING_X[i + 1]) / 2, (RING_X[j] + RING_X[j + 1]) / 2,
+            Math.min(BLOCK_HALF, gap / 2 - 3.5)]);
         }
       }
       const slabs = { pos: [], nrm: [], idx: [] };
       centres.forEach(function (c) {
-        pushRect(slabs, c[0] - BLOCK_HALF, c[0] + BLOCK_HALF, c[1] - BLOCK_HALF, c[1] + BLOCK_HALF, 0.018);
+        const h = c[2];
+        pushRect(slabs, c[0] - h, c[0] + h, c[1] - h, c[1] + h, 0.018);
       });
-      scene.add(new THREE.Mesh(geometryFrom(slabs), new THREE.MeshBasicMaterial({ color: 0x171d25 })));
+      scene.add(new THREE.Mesh(geometryFrom(slabs), new THREE.MeshBasicMaterial({ color: 0x121820 })));
 
       const boxes = [];
       centres.forEach(function (c) {
@@ -817,18 +910,33 @@
         if (parts.idx.length) scene.add(new THREE.Mesh(geometryFrom(parts), windowMats[s]));
       }
 
-      /* rooftop beacons: the one light on a building nobody can mistake for a
-         window, and the only thing up there the fog cannot swallow */
-      const beacons = { pos: [], nrm: [], col: [], idx: [] };
+      /* Rooftop beacons: the one light on a building nobody can mistake for a
+         window, and the only thing up there the fog cannot swallow.
+
+         Six groups, chosen by WHERE the beacon is rather than by the order it
+         was built in — a scatter of the position, so neighbouring rooftops
+         land in different groups and the skyline blinks out of phase instead
+         of flashing in unison. One mesh and one material per group, and the
+         material's colour is switched hard between lit and dark in the frame
+         loop. Six draw calls for a whole skyline of warning lights, and the
+         hash is deterministic, so the city is still the same city every time. */
       const BEACON_COLOURS = [[1, 0.28, 0.32], [0.45, 1, 0.78], [1, 0.82, 0.36], [0.55, 0.78, 1]];
+      const beaconGroups = [];
+      for (let i = 0; i < 6; i++) beaconGroups.push({ pos: [], nrm: [], col: [], idx: [] });
+      const beaconGroupOf = function (x, z) {
+        return Math.abs(Math.round(x * 0.37 + z * 0.61)) % beaconGroups.length;
+      };
+      const addBeacon = function (x, y, z, s, colour) {
+        pushBox(beaconGroups[beaconGroupOf(x, z)], x, y, z, s, s, s, colour);
+      };
       boxes.forEach(function (b) {
         if (b.beacon > 0.4) return;
         const c = BEACON_COLOURS[Math.floor(rnd() * BEACON_COLOURS.length)];
         const s = 0.7 + rnd() * 0.6;
-        pushBox(beacons, b.x, b.h + s * 0.6, b.z, s, s, s, c);
+        addBeacon(b.x, b.h + s * 0.6, b.z, s, c);
         if (rnd() < 0.45) {
           const o = (rnd() - 0.5) * Math.min(b.w, b.d) * 0.5;
-          pushBox(beacons, b.x + o, b.h + 0.5, b.z - o, 0.5, 0.5, 0.5,
+          addBeacon(b.x + o, b.h + 0.5, b.z - o, 0.5,
             BEACON_COLOURS[Math.floor(rnd() * BEACON_COLOURS.length)]);
         }
       });
@@ -842,7 +950,7 @@
           const mh = 5 + rnd() * 15;
           pushBox(clutter, b.x, b.h + mh / 2, b.z, 0.36, mh, 0.36, DARK[1]);
           if (rnd() < 0.6) {
-            pushBox(beacons, b.x, b.h + mh + 0.35, b.z, 0.55, 0.55, 0.55, BEACON_COLOURS[0]);
+            addBeacon(b.x, b.h + mh + 0.35, b.z, 0.55, BEACON_COLOURS[0]);
           }
         }
         if (rnd() < 0.4) {
@@ -856,22 +964,30 @@
         }
       });
       scene.add(new THREE.Mesh(geometryFrom(clutter), new THREE.MeshLambertMaterial({ vertexColors: true })));
-      scene.add(new THREE.Mesh(geometryFrom(beacons), new THREE.MeshBasicMaterial({ vertexColors: true })));
+      beaconGroups.forEach(function (A, i) {
+        if (!A.idx.length) return;
+        const mat = new THREE.MeshBasicMaterial({ vertexColors: true });
+        mat.userData.rate = 0.34 + i * 0.17;      // each group on its own cycle
+        mat.userData.phase = i * 0.31;
+        mat.userData.duty = 0.2 + (i % 3) * 0.06; // and its own dwell
+        beaconMats.push(mat);
+        scene.add(new THREE.Mesh(geometryFrom(A), mat));
+      });
 
       /* Street lamps. Planted along the circuit rather than over the whole
          grid, because the road you actually drive is the one that has to read
          as lit — and they follow the same spline as the asphalt, chicane and
          all, for free. */
       const lamps = { pos: [], nrm: [], col: [], idx: [] };
-      const POST = [0.20, 0.22, 0.26], BULB = [1, 0.84, 0.52];
+      const POST = [0.13, 0.15, 0.19], BULB = [1.35, 1.02, 0.6];
       for (let s = 8; s < trackLen; s += 14) {
         const side = (Math.floor(s / 14) % 2 === 0) ? 1 : -1;
         const t = trackAt(s);
         const lat = side * (TRACK_HALF + 3.4);
-        const px = t.px + t.nx * lat, pz = t.pz + t.nz * lat;
-        pushBox(lamps, px, 1.7, pz, 0.24, 3.4, 0.24, POST);
-        pushBox(lamps, px - t.nx * side * 0.5, 3.34, pz - t.nz * side * 0.5, 1.1, 0.16, 0.16, POST);
-        pushBox(lamps, px - t.nx * side * 0.95, 3.28, pz - t.nz * side * 0.95, 0.5, 0.2, 0.5, BULB);
+        const px = t.px + t.nx * lat, pz = t.pz + t.nz * lat, ry = t.y;
+        pushBox(lamps, px, ry + 1.7, pz, 0.24, 3.4, 0.24, POST);
+        pushBox(lamps, px - t.nx * side * 0.5, ry + 3.34, pz - t.nz * side * 0.5, 1.1, 0.16, 0.16, POST);
+        pushBox(lamps, px - t.nx * side * 0.95, ry + 3.28, pz - t.nz * side * 0.95, 0.5, 0.2, 0.5, BULB);
       }
       scene.add(new THREE.Mesh(geometryFrom(lamps), new THREE.MeshLambertMaterial({ vertexColors: true })));
 
@@ -911,28 +1027,202 @@
        them lit in random colours — warm offices, cold offices, the odd pink
        sign. It is used as the map AND the emissive map, so the lit cells are
        the only part that glows. */
+    /* ---------- windows that change their minds ----------
+       One canvas per facade skin, used as both the map and the emissive map,
+       so a cell painted dark is a window that is OFF and a cell painted bright
+       is one that glows. Keeping the canvas means a window can be switched
+       later without touching geometry: repaint its cell, say the texture
+       changed, and a block two streets away lights up. It also means the cost
+       of a living skyline is a handful of fillRects per second rather than a
+       mesh per lit window. */
+    const windowSkins = [];
+    const WIN = { cols: 16, rows: 32, cell: 16 };
+    const WINDOW_ON = 0.42;          // the odds a cell is dark when a skin is built
+
+    /* one cell, lit or dark. The dark colour is the concrete the skin was
+       primed with, so switching a window off leaves no rectangle behind. */
+    function windowCell(skin, x, y, on) {
+      const g = skin.ctx, CELL = WIN.cell;
+      if (on) {
+        const pick = skin.rnd(), l = 0.34 + skin.rnd() * 0.62;
+        const rgb = pick < 0.58 ? [255, 206, 132]
+          : (pick < 0.80 ? [150, 214, 255]
+          : (pick < 0.92 ? [255, 118, 212] : [132, 255, 214]));
+        g.fillStyle = 'rgb(' + rgb.map(function (v) { return Math.round(v * l); }).join(',') + ')';
+      } else {
+        g.fillStyle = '#242b35';
+      }
+      g.fillRect(x * CELL + 3, y * CELL + 4, CELL - 6, CELL - 9);
+      skin.lit[y * WIN.cols + x] = on ? 1 : 0;
+    }
+
+    /* A facade texture: dark concrete, a grid of windows, and a majority of
+       them lit in random colours — warm offices, cold offices, the odd strip
+       of neon. Concrete a shade darker than it once was, and MORE of the cells
+       dark: the night got deeper, and the lit ones had to be given room to be
+       the thing you notice. */
     function makeWindowTexture(seed) {
-      const rnd = mulberry32(seed);
-      const COLS = 16, ROWS = 32, CELL = 16;
+      const COLS = WIN.cols, ROWS = WIN.rows, CELL = WIN.cell;
       const c = document.createElement('canvas');
       c.width = COLS * CELL; c.height = ROWS * CELL;
-      const g = c.getContext('2d');
-      g.fillStyle = '#2f3743';    // concrete, not a void: the key light has to catch something
-      g.fillRect(0, 0, c.width, c.height);
+      const skin = {
+        canvas: c, ctx: c.getContext('2d'), rnd: mulberry32(seed),
+        lit: new Uint8Array(COLS * ROWS), tex: null, cells: COLS * ROWS
+      };
+      skin.ctx.fillStyle = '#242b35';    // concrete, not a void
+      skin.ctx.fillRect(0, 0, c.width, c.height);
       for (let y = 0; y < ROWS; y++) {
         for (let x = 0; x < COLS; x++) {
-          if (rnd() < 0.32) continue;                 // a dark office
-          const pick = rnd(), l = 0.45 + rnd() * 0.5;
-          const rgb = pick < 0.62 ? [255, 216, 140]
-            : (pick < 0.86 ? [190, 226, 255] : [255, 150, 220]);
-          g.fillStyle = 'rgb(' + rgb.map(function (v) { return Math.round(v * l); }).join(',') + ')';
-          g.fillRect(x * CELL + 3, y * CELL + 4, CELL - 6, CELL - 9);
+          if (skin.rnd() < WINDOW_ON) { skin.lit[y * COLS + x] = 0; continue; }   // a dark office
+          windowCell(skin, x, y, true);
         }
       }
       const t = new THREE.CanvasTexture(c);
       t.colorSpace = THREE.SRGBColorSpace;
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      skin.tex = t;
+      windowSkins.push(skin);
       return t;
+    }
+
+    /* ============================================================
+       the city, alive
+       Three things move: traffic in the streets and in the canyons,
+       neon boards drifting down the road ahead of you, and the
+       windows themselves. Every one of them is cheap on purpose — a
+       single draw call for every vehicle in the city, one quad per
+       drifting sign, a few canvas cells per window change — because
+       what matters is that the city is busy, not that it costs
+       anything to keep busy.
+       ============================================================ */
+    let trafficMesh = null;
+    const trafficCraft = [];
+    let drifters = [];
+    let windowRepaints = 0, windowsChanged = 0, windowNext = 0.6;
+    const lifeDummy = new THREE.Object3D();
+
+    function buildTraffic() {
+      const rnd = mulberry32(RNG_SEED ^ 0x7a17);
+      /* Street traffic keeps off the outermost ring: that is the racing
+         surface. It runs the seven streets inside it — including the streets
+         the skyway flies over, which is exactly the traffic you look down on
+         when you are up on the deck. */
+      CITY_RING.forEach(function (v) {
+        if (Math.abs(v) > 170) return;
+        [-1, 1].forEach(function (dir) {
+          const along = rnd() < 0.5;
+          const n = 2 + Math.floor(rnd() * 2);
+          for (let i = 0; i < n; i++) {
+            trafficCraft.push({
+              axis: along ? 0 : 1, lane: v + dir * 3.1,
+              pos: (rnd() * 2 - 1) * CITY_HALF, dir: dir,
+              speed: 19 + rnd() * 18, y: 1.05 + rnd() * 0.7
+            });
+          }
+        });
+      });
+      /* And the fliers: up in the canyons over the ring, crossing the skyway at
+         roof height so they pass overhead while you are up there. */
+      [-176, 176].forEach(function (v) {
+        for (let i = 0; i < 5; i++) {
+          trafficCraft.push({
+            axis: i % 2, lane: v + (rnd() < 0.5 ? -3.2 : 3.2),
+            pos: (rnd() * 2 - 1) * CITY_HALF, dir: rnd() < 0.5 ? -1 : 1,
+            speed: 28 + rnd() * 26, y: 29 + rnd() * 22
+          });
+        }
+      });
+      const geo = new THREE.BoxGeometry(2.6, 0.42, 0.72);
+      trafficMesh = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial(), trafficCraft.length);
+      /* the instance matrices move every frame and the geometry's own bounds
+         sit at the origin, so leave culling off rather than compute a sphere
+         the size of the city */
+      trafficMesh.frustumCulled = false;
+      const col = new THREE.Color();
+      const LIGHTS = [0xffd9a0, 0xff5f5f, 0x9fe8ff, 0xffa8f0, 0xd8ffd0];
+      trafficCraft.forEach(function (q, i) {
+        col.setHex(LIGHTS[i % LIGHTS.length]).multiplyScalar(1.3);
+        trafficMesh.setColorAt(i, col);
+      });
+      if (trafficMesh.instanceColor) trafficMesh.instanceColor.needsUpdate = true;
+      scene.add(trafficMesh);
+      updateTraffic(0);
+    }
+
+    function updateTraffic(dt) {
+      if (!trafficMesh || !trafficCraft.length) return;
+      for (let i = 0; i < trafficCraft.length; i++) {
+        const q = trafficCraft[i];
+        q.pos += q.dir * q.speed * dt;
+        if (q.pos > CITY_HALF) q.pos = -CITY_HALF;
+        else if (q.pos < -CITY_HALF) q.pos = CITY_HALF;
+        lifeDummy.position.set(q.axis === 0 ? q.pos : q.lane, q.y, q.axis === 0 ? q.lane : q.pos);
+        lifeDummy.rotation.set(0, q.axis === 0
+          ? (q.dir > 0 ? 0 : Math.PI)
+          : (q.dir > 0 ? Math.PI / 2 : -Math.PI / 2), 0);
+        lifeDummy.updateMatrix();
+        trafficMesh.setMatrixAt(i, lifeDummy.matrix);
+      }
+      trafficMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    /* Neon boards, adrift. They ride the road itself — same spline, same
+       height channel — so they fly down the canyon and over the skyway with you
+       instead of being pinned to a facade, and they carry the real sign
+       textures so they read as the same city's advertising. */
+    function buildDrifters() {
+      const rnd = mulberry32(RNG_SEED ^ 0x0dd1);
+      const geo = new THREE.PlaneGeometry(7.2, 3.4);
+      for (let i = 0; i < 9; i++) {
+        const mat = new THREE.MeshBasicMaterial({
+          map: billboardMats[i % billboardMats.length].map,
+          side: THREE.DoubleSide, fog: true
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        scene.add(mesh);
+        drifters.push({
+          mesh: mesh, s: rnd() * trackLen, lat: (rnd() * 2 - 1) * 4.4,
+          up: 6.5 + rnd() * 13, speed: 3 + rnd() * 7,
+          phase: rnd() * TAU, sway: 0.4 + rnd() * 0.7
+        });
+      }
+      updateDrifters(0, 0);
+    }
+
+    function updateDrifters(dt, t) {
+      for (let i = 0; i < drifters.length; i++) {
+        const d = drifters[i];
+        d.s = wrapS(d.s + d.speed * dt);
+        const p = trackAt(d.s);
+        d.mesh.position.set(
+          p.px + p.nx * d.lat,
+          p.y + d.up + Math.sin(t * 0.7 + d.phase) * 0.5,
+          p.pz + p.nz * d.lat
+        );
+        /* facing back down the road: the face you see is the one coming at you */
+        d.mesh.rotation.set(0, Math.atan2(-p.tx, -p.tz), Math.sin(t * d.sway + d.phase) * 0.06);
+      }
+    }
+
+    /* Switch a few windows somewhere in the city. One skin at a time and only a
+       dozen or so cells, because the real cost here is the texture upload and
+       not the painting: this is a city changing its mind, not a light show. */
+    function updateWindows(dt) {
+      if (!windowSkins.length) return;
+      windowNext -= dt;
+      if (windowNext > 0) return;
+      windowNext = 0.5 + Math.random() * 0.45;
+      const skin = windowSkins[Math.floor(Math.random() * windowSkins.length)];
+      for (let n = 0; n < 14; n++) {
+        const i = Math.floor(Math.random() * skin.cells);
+        /* the same odds the skin was built with, so the city does not slowly
+           brighten or fade: each window is simply re-rolled */
+        const on = Math.random() >= WINDOW_ON;
+        if (on !== !!skin.lit[i]) windowsChanged++;
+        windowCell(skin, i % WIN.cols, Math.floor(i / WIN.cols), on);
+      }
+      skin.tex.needsUpdate = true;
+      windowRepaints++;
     }
 
     /* A neon sign face. Six skins, each with its own palette and its own little
@@ -1083,9 +1373,11 @@
           for (let i = 0; i < 6; i++) colourTarget.push(colour[0], colour[1], colour[2]);
         }
       }
+      /* every piece of the road is placed at the height of the road itself,
+         so the skyway costs nothing here: s already knows how high it is */
       const at = function (s, lat, y) {
         const t = trackAt(s);
-        return [t.px + t.nx * lat, y, t.pz + t.nz * lat];
+        return [t.px + t.nx * lat, t.y + y, t.pz + t.nz * lat];
       };
 
       const segs = Math.floor((trackLen - TRACK_STEP * 0.5) / TRACK_STEP);
@@ -1104,14 +1396,20 @@
         }
       }
 
-      const flat = function (positions, colour) {
+      const flat = function (positions, colour, dbl) {
         const g = new THREE.BufferGeometry();
         g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        return new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: colour }));
+        return new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: colour, side: dbl ? THREE.DoubleSide : THREE.FrontSide }));
       };
-      scene.add(flat(road, 0x8b97a6));
+      /* The tarmac is markedly darker than it was, and that is most of why the
+         painted arrows and the kerbs now read as the brightest things on the
+         road: a pale grey surface was competing with the markings on it. The
+         centre dashes stay pure white — they are how you read which way the
+         road goes at speed — and the double side is for the skyway, which you
+         can see from underneath. */
+      scene.add(flat(road, 0x5a626e, true));
       scene.add(flat(dash, 0xffffff));
-      scene.add(flat(bar, 0x5b6878));
+      scene.add(flat(bar, 0x3b434e));
       const curbGeo = new THREE.BufferGeometry();
       curbGeo.setAttribute('position', new THREE.Float32BufferAttribute(curb.pos, 3));
       curbGeo.setAttribute('color', new THREE.Float32BufferAttribute(curb.col, 3));
@@ -1121,7 +1419,54 @@
     /* ---------- a point on the road, in road coordinates ---------- */
     function trackPoint(s, lat, y) {
       const t = trackAt(s);
-      return [t.px + t.nx * lat, y, t.pz + t.nz * lat];
+      return [t.px + t.nx * lat, t.y + y, t.pz + t.nz * lat];
+    }
+
+    /* The skyway is a viaduct, and a viaduct that floats reads as a bug: it
+       needs legs. Three piers per station, sunk from the deck to the street,
+       merged into one mesh like the rest of the city. */
+    function buildViaduct() {
+      const piers = { pos: [], nrm: [], col: [], idx: [] };
+      /* and a neon running light down each edge of the deck, which is the one
+         piece of the viaduct you actually see from the street it flies over */
+      const glow = { pos: [], nrm: [], col: [], idx: [] };
+      const CONCRETE = [0.15, 0.17, 0.21], EDGE = [0.42, 0.47, 0.55];
+      const NEON_CYAN = [0.25, 1.55, 2.1], NEON_MAGENTA = [2.1, 0.4, 1.5];
+      const quad = function (a, b, c, d, colour) {
+        const base = glow.pos.length / 3;
+        [a, b, c, a, c, d].forEach(function (p) {
+          glow.pos.push(p[0], p[1], p[2]);
+          glow.nrm.push(0, 1, 0);
+          glow.col.push(colour[0], colour[1], colour[2]);
+        });
+        glow.idx.push(base, base + 1, base + 2, base + 3, base + 4, base + 5);
+      };
+      let s = 18;
+      while (s < trackLen) {
+        const y = roadYAt(s);
+        if (y > 2.5) {
+          const t = trackAt(s);
+          const s1 = s + 26;
+          const colour = (Math.floor(s / 26) % 3 === 0) ? NEON_MAGENTA : NEON_CYAN;
+          [0, -(TRACK_HALF + 0.5), TRACK_HALF + 0.5].forEach(function (lat, i) {
+            const px = t.px + t.nx * lat, pz = t.pz + t.nz * lat;
+            const h = y - 0.3;
+            pushBox(piers, px, h / 2, pz, 0.8, h, 0.8, i === 0 ? CONCRETE : EDGE);
+          });
+          [-1, 1].forEach(function (side) {
+            const lat = side * (TRACK_HALF + 0.55);
+            quad(trackPoint(s, lat, -1.15), trackPoint(s, lat, -0.45),
+              trackPoint(s1, lat, -0.45), trackPoint(s1, lat, -1.15), colour);
+          });
+        }
+        s += 26;
+      }
+      if (piers.idx.length) {
+        scene.add(new THREE.Mesh(geometryFrom(piers), new THREE.MeshLambertMaterial({ vertexColors: true })));
+      }
+      if (glow.idx.length) {
+        scene.add(new THREE.Mesh(geometryFrom(glow), new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+      }
     }
     /* worst curvature over a window of road, used to keep furniture away from
        corners: a boost pad that fires you into a hairpin is a trap, and a ramp
@@ -1139,6 +1484,16 @@
        ramp that is a 0.16-unit rise, nothing), and the corners at 0.02 up to
        0.082. The line sits between the bends and the corners. */
     function isStraight(s, back, ahead) { return Math.abs(worstCurvature(s, back, ahead)) < 0.012; }
+    /* A feature needs a FLAT straight, not merely a straight one. An arrow pad
+       on a ski jump is not a boost — you are already climbing — and a ramp with
+       a downhill behind it lands you somewhere you did not aim for. The skyway
+       is a grade, so this is what keeps the furniture off it. */
+    function isFlat(s, back, ahead) {
+      for (let d = -back; d <= ahead; d += TRACK_STEP * 2) {
+        if (Math.abs(trackAt(s + d).g) > 0.045) return false;
+      }
+      return true;
+    }
 
     /* ============================================================
        road furniture — every pad, ramp and pickup on the lap is
@@ -1160,22 +1515,32 @@
       const rnd = mulberry32(RNG_SEED ^ 0x5eed1);
       const bag = ['boost', 'ramp', 'boost', 'ramp', 'ramp', 'boost'];
       let bi = Math.floor(rnd() * bag.length);
-      let s = 26, placed = 0;
+      /* Windows differ by kind, and that is the whole reason this lap has a
+         decent number of features on it. A pad only has to be committed to,
+         so it needs 12 units behind it and 32 in front; a ramp launches you
+         and then has to catch you, so it keeps the wider window. Asking both
+         for 16/44 over a lap that is twice as twisty as the old one left three
+         pads on 1,600 units of road, which reads as a bug and is really just
+         an over-strict filter. */
+      const window = function (s, kind) {
+        const pad = kind === 'boost';
+        const back = pad ? 12 : 14, ahead = pad ? 32 : 40;
+        return isStraight(s, back, ahead) && isFlat(s, back, ahead);
+      };
+      let s = 26, placed = 0, kind = bag[bi % bag.length];
       while (s < trackLen - 46) {
-        /* measured over the feature's own length plus a look-ahead: whatever is
-           here has to be committed to, and the road has to let you */
-        if (!isStraight(s, 16, 44)) { s += 8; continue; }
+        kind = bag[bi % bag.length];
+        if (!window(s, kind)) { s += 6; continue; }
         /* and it needs room after the one before it: a pad you cannot reach the
            speed for, or a ramp you land in the middle of another ramp */
-        if (placed && rnd() < 0.22) { s += 14; continue; }
-        const kind = bag[bi % bag.length];
+        if (placed && rnd() < 0.12) { s += 14; continue; }
         bi++;
         if (kind === 'boost') {
           features.push({
             kind: 'boost', s0: s, s1: s + BOOST_LEN, s: s + BOOST_LEN * 0.5,
             lat: clamp(targetLine(s), -3.4, 3.4), half: BOOST_HALF
           });
-          s += 54 + rnd() * 40;
+          s += 46 + rnd() * 32;
         } else {
           /* a ramp takes a lane and leaves the other one clear, so there is
              always a way past it — and hitting it flat out is a choice */
@@ -1184,7 +1549,7 @@
             kind: 'ramp', s0: s, s1: s + RAMP_LEN, s: s + RAMP_LEN * 0.5,
             lat: side * 3.5, half: RAMP_HALF, h: RAMP_H
           });
-          s += 74 + rnd() * 60;
+          s += 62 + rnd() * 48;
         }
         placed++;
       }
@@ -1231,7 +1596,7 @@
         const base = 0.03;
         const lift = h * 0.38;         // where the tread turns bright
         const midS = f.s1 - RAMP_LEN * 0.3;
-        const DARK = [0.30, 0.32, 0.36], HOT = [1, 0.72, 0.2];
+        const DARK = [0.17, 0.19, 0.23], HOT = [1.35, 0.78, 0.12];
         /* tread: dark up to the lift, then a bright band into the lip */
         quad(ramp, trackPoint(f.s0, l, base), trackPoint(f.s0, r, base), trackPoint(midS, r, lift), trackPoint(midS, l, lift), DARK);
         quad(ramp, trackPoint(midS, l, lift), trackPoint(midS, r, lift), trackPoint(f.s1, r, lipY), trackPoint(f.s1, l, lipY), HOT);
@@ -1315,7 +1680,7 @@
         }
         p.mesh.rotation.y += dt * 1.8;
         p.mesh.rotation.x += dt * 0.7;
-        p.mesh.position.y = p.y + Math.sin(t * 1.7 + p.phase) * 0.16;
+        p.mesh.position.y = roadYAt(p.s) + p.y + Math.sin(t * 1.7 + p.phase) * 0.16;
         for (let ri = 0; ri < racers.length; ri++) {
           const r = racers[ri];
           let ds = p.s - r.s;
@@ -1606,9 +1971,20 @@
         }
       } else if (support > r.hgt + 0.001) {
         r.hgt = support;                               // riding up the tread
-      } else if (r.hgt > support + 0.02) {
-        r.air = true;                                  // the lip just went by
-        r.vy = Math.max(0, r.v) * RAMP_LIFT;
+      } else if (r.hgt > support + LIP_DROP || (r.v * r.v * Math.max(0, -look.ky) > GRAVITY)) {
+        /* two ways to leave the road, and only two. A LIP: the surface dropped
+           by more than LIP_DROP in one step, which is a ramp ending and nothing
+           else. Or a CREST: the hill curves away faster than gravity can pull
+           the hull down over it, v²·κ > g. Without that test the old 0.02 unit
+           tolerance made every hill a staircase — the hull goes ballistic
+           whenever the road falls faster than 1.2 units a second, which a 13%
+           descent does — so the skyway could only be climbed and never come
+           down. With it, a smooth profile keeps the hull glued the whole way,
+           which is what "safe from falling" has to actually mean. */
+        r.air = true;
+        r.vy = (r.hgt > support + LIP_DROP)
+          ? Math.max(0, r.v) * RAMP_LIFT
+          : Math.max(0, r.v * look.g);
       } else {
         r.hgt = support;
       }
@@ -1654,13 +2030,17 @@
          of a jump — you can see the hull pitch over at the top */
       const wantPitch = r.air
         ? clamp(r.vy * 0.022, -0.2, 0.2)
-        : clamp(thr * 0.05 - clamp(inp.brake, 0, 1) * 0.045, -0.055, 0.055);
+        : clamp(thr * 0.05 - clamp(inp.brake, 0, 1) * 0.045, -0.055, 0.055)
+          /* and sit along the hill: nose up on the climb, down on the other
+             side. Without this the hull drives the skyway perfectly level,
+             which reads as a rendering mistake rather than a gradient. */
+          + Math.atan(look.g);
       r.pitch += (wantPitch - r.pitch) * Math.min(1, 5 * dt);
 
       const bob = r.isPlayer ? 0 : Math.sin(raceTime * 3 + r.idx) * 0.03;
       r.group.position.set(
         look.px + look.nx * r.lat,
-        HOVER + r.height / 2 + bob + r.hgt,
+        look.y + HOVER + r.height / 2 + bob + r.hgt,
         look.pz + look.nz * r.lat
       );
       r.group.rotation.set(r.pitch, r.yaw, r.roll);
@@ -1676,7 +2056,7 @@
       /* a shield flashing off, a hull glowing while it is boosted */
       r.flashT = Math.max(0, (r.flashT || 0) - dt);
       if (r.mesh) {
-        const base = rawView ? 0.16 : 0.5;
+        const base = rawView ? 0.24 : 0.55;
         r.mesh.material.emissiveIntensity = base +
           (boosting ? 0.35 : 0) + (r.flashT > 0 ? r.flashT * 0.9 : 0);
       }
@@ -1764,7 +2144,7 @@
         r.boostT = 0; r.boostCd = 0; r.shield = false; r.flashT = 0;
         const h = trackAt(r.s);
         r.yaw = Math.atan2(-h.tx, -h.tz);
-        r.group.position.set(h.px + h.nx * r.lat, HOVER + r.height / 2, h.pz + h.nz * r.lat);
+        r.group.position.set(h.px + h.nx * r.lat, h.y + HOVER + r.height / 2, h.pz + h.nz * r.lat);
         r.group.rotation.set(0, r.yaw, 0);
       });
       resetPickups();
@@ -1809,7 +2189,9 @@
        HUD
        ============================================================ */
     let mapCells = [];
-    const MAP_W = 34, MAP_H = 17, MAP_X0 = -150, MAP_Z0 = -150, MAP_SPAN = 300;
+    /* the map has to cover the whole slab now that the lap runs its outer
+       edge: at the old 300-unit span the circuit fell off the minimap */
+    const MAP_W = 34, MAP_H = 17, MAP_X0 = -CITY_HALF, MAP_Z0 = -CITY_HALF, MAP_SPAN = CITY_HALF * 2;
     function buildMinimap() {
       mapCells = [];
       for (let y = 0; y < MAP_H; y++) mapCells.push(new Array(MAP_W).fill(' '));
@@ -2043,18 +2425,30 @@
     /* The two views want opposite lighting. ASCII needs a dim scene so the
        ramp has headroom; the solid view needs a real rig, or it reads as a
        dark grey diagram. */
+    /* A night rig, and deliberately a dark one. The old one lit the city like
+       an overcast afternoon, which left the neon nothing to do: every facade
+       was pale concrete and the signs were competing with the walls they hung
+       on. The towers are structure, not subject. Dimming the ambience and
+       letting the windows, the signs, the arrows and the hulls carry the frame
+       is what makes a neon city read as one — and the hulls get a little MORE
+       self-illumination rather than less, because a racer has to stay the
+       brightest object in its own shot. */
     function applyLightRig() {
       const solid = rawView;
-      if (hemiLight) hemiLight.intensity = solid ? 0.95 : 0.4;
-      if (keyLight) keyLight.intensity = solid ? 2.5 : 1.0;
-      if (rimLight) rimLight.intensity = solid ? 0.7 : 0.32;
+      if (hemiLight) hemiLight.intensity = solid ? 0.58 : 0.3;
+      if (keyLight) keyLight.intensity = solid ? 1.55 : 0.8;
+      if (rimLight) rimLight.intensity = solid ? 0.5 : 0.26;
       if (renderer) {
         renderer.toneMapping = solid ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
-        renderer.toneMappingExposure = solid ? 1.22 : 1;
+        renderer.toneMappingExposure = solid ? 1.06 : 1;
       }
-      if (scene && scene.fog) { scene.fog.near = solid ? 95 : 30; scene.fog.far = solid ? 520 : 150; }
+      /* the 3D fog pulls in with the darker rig — depth now reads as darkness —
+         but the ASCII pass keeps its old reach. There, glyph DENSITY is the
+         medium: fading the skyline out early does not darken the picture, it
+         deletes part of it, and half a screen of spaces is not a mood. */
+      if (scene && scene.fog) { scene.fog.near = solid ? 80 : 30; scene.fog.far = solid ? 450 : 150; }
       racers.forEach(function (r) {
-        if (r.mesh) r.mesh.material.emissiveIntensity = solid ? 0.16 : 0.5;
+        if (r.mesh) r.mesh.material.emissiveIntensity = solid ? 0.24 : 0.55;
       });
     }
 
@@ -2137,8 +2531,9 @@
     function snapCamera() {
       const me = racers[playerIdx];
       playerForward(tmpFwd);
-      camPos.set(me.group.position.x - tmpFwd.x * 8.4, 2.8 + me.hgt * 0.85, me.group.position.z - tmpFwd.z * 8.4);
-      camLook.set(me.group.position.x + tmpFwd.x * 12, 0.75 + me.hgt, me.group.position.z + tmpFwd.z * 12);
+      const ry = roadYAt(me.s);
+      camPos.set(me.group.position.x - tmpFwd.x * 8.4, ry + 2.8 + me.hgt * 0.85, me.group.position.z - tmpFwd.z * 8.4);
+      camLook.set(me.group.position.x + tmpFwd.x * 12, ry + 0.75 + me.hgt, me.group.position.z + tmpFwd.z * 12);
       camera.position.copy(camPos);
       camera.lookAt(camLook);
     }
@@ -2226,12 +2621,17 @@
       updatePickups(dt, t);
 
       /* the arrows and the signs breathe, all from one material each */
+      /* Both of these are now driven ABOVE 1.0 at the peak. With ACES tone
+         mapping a colour over 1 rolls off toward white instead of clipping,
+         which is what makes a painted arrow flare and a sign flicker rather
+         than merely get brighter. On the darker tarmac they are the things
+         the eye lands on first, which is exactly the intent. */
       if (boostMat) {
-        const pulse = 0.72 + 0.28 * Math.sin(t * 5.2);
-        boostMat.color.setRGB(1 * pulse, 0.76 * pulse, 0.28 * pulse);
+        const pulse = 1.0 + 0.4 * Math.sin(t * 5.2);
+        boostMat.color.setRGB(1.18 * pulse, 0.86 * pulse, 0.30 * pulse);
       }
       for (let i = 0; i < billboardMats.length; i++) {
-        billboardMats[i].color.setScalar(0.82 + 0.18 * Math.sin(t * (1.1 + i * 0.31) + i * 2.4));
+        billboardMats[i].color.setScalar(1.0 + 0.45 * Math.sin(t * (1.1 + i * 0.31) + i * 2.4));
       }
 
       /* --- lap records --- */
@@ -2254,11 +2654,24 @@
         setEngine(rpm, clamp(me.input.throttle, 0, 1));
       }
 
-      /* --- the city breathes: each facade skin swells on its own slow
-             wavelength, so the windows are never quite still --- */
+      /* --- the city breathes, four ways at once ---
+         Each facade skin swells on its own wavelength; a dozen windows
+         somewhere change their minds; the rooftop beacons blink in six
+         out-of-phase groups; traffic runs the streets below and the fliers
+         cross the canyons above; and the neon boards drift down the road
+         toward you. All of it is one draw call per fleet, six for the whole
+         skyline's warning lights, and a few canvas cells a second. */
       for (let w = 0; w < windowMats.length; w++) {
-        windowMats[w].emissiveIntensity = 0.86 + Math.sin(t * (0.35 + w * 0.17) + w * 2.1) * 0.14;
+        windowMats[w].emissiveIntensity = 0.84 + Math.sin(t * (0.21 + w * 0.13) + w * 2.1) * 0.18;
       }
+      for (let b = 0; b < beaconMats.length; b++) {
+        const bm = beaconMats[b];
+        const blink = fract(t * bm.userData.rate + bm.userData.phase);
+        bm.color.setScalar(blink < bm.userData.duty ? 1.45 : 0.2);
+      }
+      updateWindows(dt);
+      updateTraffic(dt);
+      updateDrifters(dt, t);
 
       /* --- chase camera --- */
       playerForward(tmpFwd);
@@ -2273,14 +2686,18 @@
       const ox = -tmpFwd.x * swing - (-tmpFwd.z) * swingZ;
       const oz = -tmpFwd.z * swing + (-tmpFwd.x) * swingZ;
       const aimBack = 1 - Math.abs(lookYaw) / LOOK_MAX;
+      /* the camera reads the height of the ROAD under the hull, not the hull's
+         y: it has the hull's jump folded in separately, at a lower weight, and
+         adding both would double the skyway into a slingshot */
+      const roadY = roadYAt(me.s);
       tmpPos.set(
         me.group.position.x + ox * dist,
-        height + lookPitch * 5 + me.hgt * 0.85,
+        roadY + height + lookPitch * 5 + me.hgt * 0.85,
         me.group.position.z + oz * dist
       );
       tmpLook.set(
         me.group.position.x + tmpFwd.x * (12 + me.v * 0.1) * aimBack,
-        0.75 + me.hgt,
+        roadY + 0.75 + me.hgt,
         me.group.position.z + tmpFwd.z * (12 + me.v * 0.1) * aimBack
       );
       const k = 1 - Math.exp(-(raceState === 'countdown' ? 2.4 : 7.5) * dt);
@@ -2356,7 +2773,7 @@
       scene.background = new THREE.Color(0x05070d);
       /* the fog has to give the bigger skyline room to fade: at the old 115 the
          far side of the circuit was a wall of nothing */
-      scene.fog = new THREE.Fog(0x05070d, 30, 150);
+      scene.fog = new THREE.Fog(0x03050a, 30, 150);
       camera = new THREE.PerspectiveCamera(50, 1, 0.4, 900);
 
       /* Deliberately dim for an ASCII ramp: if a lit face saturates it stamps
@@ -2374,6 +2791,8 @@
 
       buildTrack();
       buildCity();
+      buildTraffic();          // after the city: it keeps off the racing ring
+      buildDrifters();         // and after it for the sign textures
       buildFeatures();
       buildPickups();
       buildVehicles(buf);
@@ -2425,6 +2844,98 @@
             mode: asciiMat ? asciiMat.uniforms.uMode.value : null,
             speeds: racers.map(function (r) { return +r.v.toFixed(1); }),
             lats: racers.map(function (r) { return +r.lat.toFixed(2); })
+          };
+        },
+        /* what is actually moving in the city, so "alive" is a number and not
+           an impression: how many vehicles exist, how far they have travelled,
+           how many windows have changed their minds, and what the beacon
+           groups are doing right now */
+        life: function (already) {
+          already = !!already;
+          return {
+            craft: trafficCraft.length,
+            craftPos: trafficCraft.slice(0, 3).map(function (q) { return +q.pos.toFixed(1); }),
+            drifters: drifters.map(function (d) { return { s: +d.s.toFixed(0), y: +d.mesh.position.y.toFixed(2) }; }),
+            beaconGroups: beaconMats.length,
+            beaconNow: beaconMats.map(function (m) { return +m.color.r.toFixed(2); }),
+            beaconRates: beaconMats.map(function (m) { return +m.userData.rate.toFixed(2); }),
+            windowSkins: windowSkins.length,
+            windowRepaints: windowRepaints,
+            windowsChanged: windowsChanged,
+            litFraction: +(windowSkins.reduce(function (a, s) {
+              let n = 0; for (let i = 0; i < s.lit.length; i++) if (s.lit[i]) n++;
+              return a + n;
+            }, 0) / windowSkins.reduce(function (a, s) { return a + s.cells; }, 0)).toFixed(3),
+            draws: scene.children.length
+          };
+        },
+        /* The light rig, switchable, so "darker" can be measured in one scene
+           instead of argued from constants. rig(false) puts the old day-ish
+           rig back; rig(true) is the night rig the game ships. Nothing else
+           changes, which is the whole point: the same frame, one variable. */
+        rig: function (night) {
+          const useNight = night !== false;
+          if (hemiLight) hemiLight.intensity = useNight ? 0.58 : 0.95;
+          if (keyLight) keyLight.intensity = useNight ? 1.55 : 2.5;
+          if (rimLight) rimLight.intensity = useNight ? 0.5 : 0.7;
+          if (renderer) renderer.toneMappingExposure = useNight ? 1.06 : 1.22;
+          return { hemi: hemiLight && hemiLight.intensity, key: keyLight && keyLight.intensity,
+            rim: rimLight && rimLight.intensity, exposure: renderer && renderer.toneMappingExposure };
+        },
+        /* how much of the lap is actually eligible for road furniture. The
+           placement walks the spline looking for a straight, flat window, and
+           when a lap gets longer and twistier the interesting question is not
+           "how many pads" but "how much road was even usable" — otherwise a
+           sparse lap looks like a tuning bug when it is a geometry one. */
+        scan: function (step) {
+          step = step || 4;
+          let straight = 0, flat = 0, both = 0, n = 0;
+          const run = function (back, ahead) {
+            let s = 0; straight = 0; flat = 0; both = 0; n = 0;
+            for (; s < trackLen; s += step) {
+              n++;
+              const si = isStraight(s, back, ahead), fi = isFlat(s, back, ahead);
+              if (si) straight++;
+              if (fi) flat++;
+              if (si && fi) both++;
+            }
+          };
+          run(16, 44);
+          return { step: step, samples: n, straightUnits: straight * step,
+            flatUnits: flat * step, usableUnits: both * step, trackLen: +trackLen.toFixed(0) };
+        },
+        /* The lap's vertical profile, measured rather than asserted. Two
+           numbers decide whether the skyway is safe: the worst crest curvature
+           (v²·κ is what has to stay under g, or a hill launches you) and the
+           deepest grade (at 60 units/s a 14% descent drops 0.14 units per
+           frame, against the 0.35 the hull is allowed before it treats the
+           drop as a lip). */
+        profile: function () {
+          let maxUp = 0, maxDown = 0, crest = 0, dip = 0, hi = -1e9, lo = 1e9, high = 0;
+          let crestAt = 0, dipAt = 0, upAt = 0, downAt = 0;
+          for (let i = 0; i < trackN; i++) {
+            if (tG[i] > maxUp) { maxUp = tG[i]; upAt = i * TRACK_STEP; }
+            if (tG[i] < maxDown) { maxDown = tG[i]; downAt = i * TRACK_STEP; }
+            if (-tKY[i] > crest) { crest = -tKY[i]; crestAt = i * TRACK_STEP; }
+            if (tKY[i] > dip) { dip = tKY[i]; dipAt = i * TRACK_STEP; }
+            if (tY[i] > hi) hi = tY[i];
+            if (tY[i] < lo) lo = tY[i];
+            if (tY[i] > 2.5) high++;
+          }
+          const demand = function (v) { return v * v * crest; };
+          return {
+            trackLen: +trackLen.toFixed(1),
+            lowest: +lo.toFixed(2), highest: +hi.toFixed(2),
+            elevatedUnits: +(high * TRACK_STEP).toFixed(0),
+            maxClimbPct: +(maxUp * 100).toFixed(1), maxDescentPct: +(maxDown * 100).toFixed(1),
+            worstCrest: +crest.toFixed(5), worstCrestAt: +crestAt.toFixed(0),
+            worstDip: +dip.toFixed(5), worstDipAt: +dipAt.toFixed(0),
+            climbAt: +upAt.toFixed(0), descentAt: +downAt.toFixed(0),
+            crestDemandAt60: +demand(MAX_SPEED).toFixed(2),
+            crestDemandAtBoost: +demand(MAX_SPEED * BOOST_TOP).toFixed(2),
+            gravity: GRAVITY,
+            dropPerFrameAt60: +(MAX_SPEED / 60 * -maxDown).toFixed(3),
+            lipDrop: LIP_DROP
           };
         },
         countdown: function () {
@@ -2489,7 +3000,10 @@
         /* the vertical state, for testing a ramp without watching it */
         air: function () {
           const r = racers[playerIdx];
-          return { hgt: +r.hgt.toFixed(3), vy: +r.vy.toFixed(2), air: r.air, ground: +rampHeightAt(r.s, r.lat).toFixed(3) };
+          return { hgt: +r.hgt.toFixed(3), vy: +r.vy.toFixed(2), air: r.air,
+            ground: +rampHeightAt(r.s, r.lat).toFixed(3),
+            road: +roadYAt(r.s).toFixed(3), pitch: +r.pitch.toFixed(4),
+            groupY: +r.group.position.y.toFixed(3) };
         },
         /* every mesh in the scene, with its triangle count and where it sits:
            what the generator built, measured instead of eyeballed */
