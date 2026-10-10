@@ -157,6 +157,21 @@
       #map { display: none; }
       #hud { font-size: 12px; }
     }
+
+    /* ---------- phones: the pads belong to the screen, not to the stage ------
+       The stage sits under the title and the blurb, so pads anchored to its
+       bottom were a screenful of scrolling away from the thumbs that need
+       them — no use at all in a game you steer with them. They pin to the
+       viewport instead (the script stows them once the game itself is scrolled
+       off, so they never float over the text), and the speed bar lifts clear.
+       Same condition the script uses to decide a device gets pads at all. */
+    @media (pointer: coarse), (max-width: 760px) {
+      #pads { position: fixed; inset: auto 0 0 0; height: 0; }
+      #pads.stowed { display: none; }
+      /* the safe-area term keeps them out from under a phone's home bar */
+      .pad { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+      #speed { bottom: 96px; }
+    }
   </style>
 </head>
 <body>
@@ -1850,6 +1865,17 @@
     bindPad(document.getElementById('pad-brake'), function () { touch.brake = 1; }, function () { touch.brake = 0; });
     if (window.matchMedia && (window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 760)) {
       padsEl.classList.add('on');
+    }
+
+    /* Pinned to the viewport, so they need stowing when the game has been
+       scrolled away: the console under the stage has its own buttons, and a set
+       of steering pads lying over them is worse than no pads. */
+    if (typeof IntersectionObserver !== 'undefined') {
+      new IntersectionObserver(function (entries) {
+        for (let i = 0; i < entries.length; i++) {
+          padsEl.classList.toggle('stowed', !entries[i].isIntersecting);
+        }
+      }, { threshold: 0.1 }).observe(stageEl);
     }
 
     /* The mouse equivalent of the right stick: hold and pull the canvas to look
