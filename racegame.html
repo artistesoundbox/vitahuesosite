@@ -11,8 +11,7 @@
       gtag('config', 'G-EY4SD4FCN4');
     </script>
   <meta charset="UTF-8" />
-  <title>City Grand Prix — five racers through a live city · Vitamina Hueso @ Manteca Studios</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>City Grand Prix — five racers through a live city · Vitamina Hueso @ Manteca Studios</title>    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#04070d" />
   <script type="importmap">
   {
@@ -216,6 +215,37 @@
     }
     .pick:hover { border-color: rgba(160, 255, 220, 0.9); }
     .pick[aria-pressed="true"] { background: rgba(30, 110, 88, 0.9); border-color: #fff; box-shadow: 0 0 14px rgba(90, 255, 190, 0.5); color: #fff; }
+    .pick.locked { opacity: 0.5; cursor: not-allowed; }
+
+    /* ---------- the daily challenge panel ---------- */
+    .daily-note { flex-basis: 100%; font-size: 11px; letter-spacing: 0.13em; color: #7de3ff; }
+    .daily-note:empty { display: none; }
+    #daily-panel {
+      display: none; margin-top: 14px; padding: 13px 16px 15px;
+      border: 1px solid rgba(90, 255, 190, 0.25); border-radius: 14px;
+      background: rgba(8, 20, 18, 0.5); backdrop-filter: blur(6px);
+      font-size: 12px; color: #a9bcd8;
+    }
+    #daily-panel.on { display: block; }
+    #daily-panel h4 { margin: 0 0 9px; font-size: 12.5px; letter-spacing: 0.16em; color: #9dffcf; font-weight: 600; }
+    #daily-panel h4 small { display: block; margin-top: 5px; font-size: 10.5px; font-weight: 400; letter-spacing: 0.1em; color: #8fb3c6; }
+    #daily-panel h5 { margin: 14px 0 6px; font-size: 10px; letter-spacing: 0.18em; color: #6f8ea0; text-transform: uppercase; font-weight: 600; }
+    #daily-panel table { border-collapse: collapse; width: auto; max-width: 100%; }
+    #daily-panel td { padding: 2px 0; white-space: nowrap; font-size: 11.5px; }
+    #daily-panel td.pos { width: 1.9em; color: #7de3ff; }
+    #daily-panel td.nm { padding-right: 16px; color: #dff3ff; }
+    #daily-panel td.tm { text-align: right; padding-right: 16px; color: #9dffcf; }
+    #daily-panel td.st { color: #ffc247; letter-spacing: 0.1em; padding-right: 16px; }
+    #daily-panel .share {
+      margin: 11px 0 2px; padding: 11px 13px; border-radius: 10px;
+      background: rgba(4, 10, 9, 0.75); border: 1px dashed rgba(90, 255, 190, 0.4);
+    }
+    #daily-panel .share code {
+      display: block; white-space: pre-wrap; font-size: 11.5px; line-height: 1.6; color: #eafff6;
+      font-family: ui-monospace, Menlo, Consolas, "Courier New", monospace;
+    }
+    #daily-panel .row-btns { margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    #daily-panel .hint { font-size: 10px; letter-spacing: 0.12em; color: #7d90ae; }
     .footer-note { max-width: 900px; margin: 26px auto 0; color: #7d90ae; font-size: 12.5px; line-height: 1.7; text-align: center; }
     @media (max-width: 760px) {
       .wrap { padding-top: 14px; }
@@ -232,11 +262,46 @@
        off, so they never float over the text), and the speed bar lifts clear.
        Same condition the script uses to decide a device gets pads at all. */
     @media (pointer: coarse), (max-width: 760px) {
+      /* One place for the phone's wasted edges and the size of a thumb pad, so
+         the pads and the speed bar cannot disagree about either. viewport-fit=
+         cover is what makes env() report a real number on a notched phone: an
+         inset that is never non-zero is an inset that never kept anything out
+         from under the home bar. */
+      :root {
+        --safe-b: env(safe-area-inset-bottom, 0px);
+        --safe-l: env(safe-area-inset-left, 0px);
+        --safe-r: env(safe-area-inset-right, 0px);
+        --pad: clamp(54px, 18vw, 72px);
+        --pad-gap: clamp(6px, 2vw, 10px);
+        --pad-edge: clamp(8px, 3vw, 14px);
+      }
       #pads { position: fixed; inset: auto 0 0 0; height: 0; }
       #pads.stowed { display: none; }
-      /* the safe-area term keeps them out from under a phone's home bar */
-      .pad { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
-      #speed { bottom: 96px; }
+      /* the pad shrinks with the screen. At a flat 72px the two INNER pads met
+         by 33px on a 320-point phone — BRK sitting under the thumb reaching for
+         steer-right — so the size, the gap and the margin all scale instead. */
+      .pad {
+        width: var(--pad); height: var(--pad);
+        bottom: calc(16px + var(--safe-b));
+        left: auto; right: auto;
+        font-size: calc(var(--pad) * 0.3);
+      }
+      #pad-left { left: calc(var(--pad-edge) + var(--safe-l)); }
+      #pad-right { left: calc(var(--pad-edge) + var(--pad) + var(--pad-gap) + var(--safe-l)); }
+      #pad-brake { right: calc(var(--pad-edge) + var(--pad) + var(--pad-gap) + var(--safe-r)); font-size: calc(var(--pad) * 0.2); }
+      #pad-gas { right: calc(var(--pad-edge) + var(--safe-r)); font-size: calc(var(--pad) * 0.2); }
+      /* The speed bar is pinned to the VIEWPORT, like the pads, and not to the
+         stage. In landscape the stage is 330 tall in a 390-tall screen, so a
+         bar anchored to the stage's bottom lands inside the band the pads
+         occupy — measured as a 75px overlap. Pinned, it clears them by
+         construction at any scroll position, and it stays in view the whole
+         time you are driving, which is where a speed readout belongs. */
+      #speed {
+        position: fixed;
+        left: calc(var(--pad-edge) + var(--safe-l));
+        bottom: calc(32px + var(--safe-b) + var(--pad));
+      }
+      .wrap { padding-left: var(--safe-l); padding-right: var(--safe-r); }
     }
   </style>
 </head>
@@ -249,19 +314,20 @@
     </div>
 
     <h1>CITY GRAND PRIX</h1>
-    <p class="tag">Five aircraft race three laps of a <b>1,600-unit</b> circuit threaded between the blocks of a city
+    <p class="tag">Five aircraft race three laps of an <b>1,800-unit</b> circuit threaded between the blocks of a city
     after dark: towers wear windows that go on and off all evening, the rooftops carry beacons that blink out of
     phase, traffic runs the streets below while fliers cross the canyons above, and neon signs hang over the streets
     — and drift down them. The lap is generated, and so is everything on it — painted <b>arrows</b> that shove you up
-    the road, <b>ramps</b> that put you in the air if you hit them fast, and floating <b>powerups</b>: a boost, or a
-    shield that eats one wall. The east side <b>climbs</b>: a graded ramp lifts the road off the street, a viaduct
-    carries it 200 units between the towers at upper-floor height, and the whole south straight brings it back down.
-    The barriers are there at every height, and the profile is gentle enough that you can hold the throttle over every
-    crest — a hill only throws you when its curvature beats gravity, and none of them do. Hold the throttle, brake for
-    the chicane, and try not to be the one who parks a starfighter in a wall. A controller works too — left stick or d-pad to steer, RT or A for throttle, LT to brake
-    and reverse, <b>right stick to look around</b>, Y for the ▤ view, X for the palette, Start to restart. Drag the
-    canvas to look, too. And <b>▤ ASCII view</b> (or <b>V</b>) redraws the whole city as text: each texel becomes a
-    brightness, looked up in a character ramp, so a tower turns into a wall of <b>#</b>.</p>
+    the road, <b>ramps</b> that span the whole width and put every car in the air, and floating <b>powerups</b>: a boost,
+    or a shield that eats one wall. The lap starts on the ground and then leaves it. Out of the north-east corner a
+    <b>ramp</b> lifts you clear of the traffic at 12%; the road bends west and winds a <b>full turn around a tower</b>,
+    a corkscrew of 30 units radius you climb one storey at a time; and the top of it opens into a <b>glass tube</b>,
+    a roofed, level run at thirty units with the city either side of you. The whole south straight is the way back
+    down. The barriers are there at every height, and the profile is gentle enough that you can hold the throttle over
+    every crest — a hill only throws you when its curvature beats gravity, and none of them do. Hold the throttle,
+    brake for the chicane, and try not to be the one who parks a starfighter in a wall. A controller works too — left
+    stick or d-pad to steer, RT or A for throttle, LT to brake and reverse, <b>right stick to look around</b>, Start
+    to restart. Drag the canvas to look, too, and <b>P</b> pauses.</p>
 
     <div id="stage">
       <canvas id="screen"></canvas>
@@ -291,11 +357,13 @@
       <div class="readout">Racers <b id="count">—</b></div>
       <div class="readout">Best lap <b id="best">--:--.--</b></div>
       <button class="ca-btn" id="restart" type="button">↺ Restart race</button>
-      <button class="ca-btn" id="mode" type="button">◨ Colour</button>
-      <button class="ca-btn" id="raw" type="button">▤ ASCII view</button>
+      <button class="ca-btn" id="pause" type="button">⏸ Pause</button>
+      <button class="ca-btn" id="daily" type="button">★ Daily challenge</button>
       <button class="ca-btn" id="sound" type="button">🔊 Sound on</button>
       <div class="picks" id="picks" role="group" aria-label="Choose your racer"></div>
+      <div class="daily-note" id="daily-note"></div>
     </div>
+    <div id="daily-panel"></div>
 
     <p class="footer-note">
       The five models arrive as 51.5 MB of glTF and 791,380 triangles; an offline pass keeps each hull's original
@@ -342,8 +410,10 @@
     const padsEl   = document.getElementById('pads');
     const bestEl   = document.getElementById('best');
     const countEl  = document.getElementById('count');
-    const modeBtn  = document.getElementById('mode');
-    const rawBtn   = document.getElementById('raw');
+    const pauseBtn = document.getElementById('pause');
+    const dailyBtn = document.getElementById('daily');
+    const dailyEl  = document.getElementById('daily-panel');
+    const dailyNoteEl = document.getElementById('daily-note');
     const soundBtn = document.getElementById('sound');
     const restartBtn = document.getElementById('restart');
     const powerEl  = document.getElementById('power');
@@ -375,7 +445,7 @@
        The two are coupled: raising the authority without the loss and damping
        also raises the speed a corner can be held at. */
     const STEER_ACCEL  = 130;     // lateral authority at full grip
-    const GRIP_LOSS    = 0.45;    // how much of it speed costs you
+    let GRIP_LOSS      = 0.45;    // how much of it speed costs you — the daily can harden it
     const LATERAL_DAMP = 9;
     const CENTRIFUGAL  = 0.55;    // how hard a corner throws you wide
     const GRIP_FROM_V  = 12;      // below this, side force fades in
@@ -389,7 +459,7 @@
     let beaconMats = [];          // the rooftop-beacon groups, each on its own cycle
     let cityBoxes = [];           // every tower, kept so the clearance can be checked
 
-    const RNG_SEED = 20260410;    // the city is identical on every visit
+    let RNG_SEED = 20260410;    // the city is identical on every visit — see the daily below
     const WINDOW_SKINS = 4;       // facade textures, worn at random
     const WINDOW_W = 11;          // world units per texture tile across a facade
     let windowMats = [];          // the four facade materials, for the flicker
@@ -443,23 +513,53 @@
       };
     }
 
+    /* ---------- the corkscrew ----------
+       One full turn of the lap climbs a spiral around a single tower, and
+       these three numbers are its geometry: the centre of the tower, and the
+       radius of the turn. The turn is TANGENT to the east straight — the line
+       x=176 touches the circle at exactly one point — which is what lets the
+       road leave the straight, wind a whole turn around the tower and rejoin
+       the very same line 22 units higher with no kink anywhere. */
+    const HELIX_CX = 146, HELIX_CZ = -30, HELIX_R = 30;
+    /* the tower the loop winds around: slender, because it has to fit inside
+       its own block, and tall, because you climb past its windows twice */
+    const HELIX_TOWER = { w: 13, d: 13, h: 62 };
+
     /* ---------- the circuit ----------
        Streets sit on a 44-unit grid and the lap runs the OUTER ring, so the
        straights are 352 units — six seconds flat out — and the circuit has a
        chicane on each of the long ones to fold it back on itself.
 
-       The third number on every waypoint is height, and it is what turns the
-       east side into a skyway: the lap climbs out of the north-east corner on
-       a graded ramp, runs 220 units level with the towers' upper floors, then
-       comes down the whole of the south straight. It is a Catmull-Rom through
-       these points in three dimensions, so the profile is as smooth as the
-       plan and nothing has to be hand-smoothed.
+       The elevation is a story in four acts, and the third number on every
+       waypoint is the whole of it:
 
-       Two rules keep it safe. The grade never exceeds 14% and — the one that
-       actually matters — the vertical CURVATURE stays far under gravity: a
-       crest throws a car into the air when v²·κ exceeds g, and here the worst
-       κ is about 0.0016, so at 60 units/s it demands 5.8 against a g of 24.
-       You are never launched off a hill you did not choose to ramp. */
+         1. GROUND. The west straight (start/finish) and the whole north
+            straight run flat at street level, past the shopfronts.
+         2. THE RAMP. Out of the north-east corner the road tilts up at 12%
+            and does not stop: 66 units of ramp lift you clear of the traffic,
+            and then the road bends west into...
+         3. THE CORKSCREW. One full 360° turn, 30 units of radius, winding
+            around the tower in the block at (146, -30). The same plan point is
+            entered 8 units up and left 30 units up: you wind a turn around the
+            building, one storey at a time, with the city turning around you.
+            Being a circle in plan it never crosses itself — it sails over
+            streets and between blocks, which is what makes it read as a ramp
+            through a city rather than a fairground ride.
+         4. THE GLASS TUBE. The top of the loop opens onto a level plateau at
+            32 units, and that stretch is walled and roofed in glass — the one
+            part of the lap under cover — before the south straight brings the
+            whole thing back down to the tarmac and the lap continues.
+
+       It is a Catmull-Rom through these points in three dimensions, so the
+       profile is as smooth as the plan and nothing has to be hand-smoothed.
+
+       Two rules keep it safe, and both are measured rather than asserted. The
+       grade never exceeds 14% — the ramp runs 11–13% and the corkscrew a
+       constant 11.7% — and, the one that actually matters, the vertical
+       CURVATURE stays far under gravity: a crest throws a car into the air
+       when v²·κ exceeds g, so the flattening at the top of the loop and the
+       top of the descent are each spread over tens of units. The measured
+       worst crest demands about 10 against a g of 24 at speed. */
     const TRACK_PTS = [
       /* west straight, at street level: 352 units of flat-out */
       [-176, 176, 0], [-176, 132, 0], [-176, 88, 0], [-176, 44, 0],
@@ -470,22 +570,44 @@
       [-88, -132, 0], [-44, -132, 0], [-44, -176, 0],
       [0, -176, 0], [44, -176, 0], [88, -176, 0], [132, -176, 0],
       [176, -176, 0],
-      /* east side: the climb, then the skyway between the towers. The plateau
-         is held dead level for two whole streets, which is both what it looks
-         like from up there and the only long stretch of the lap that is high
-         AND level — so it is where the pads and ramps on the deck get put. */
-      [176, -132, 1.3], [176, -88, 4.4], [176, -44, 9.0], [176, 0, 14.8],
-      [176, 44, 20.0], [176, 88, 22.0], [176, 132, 22.0], [176, 176, 21.6],
-      /* South straight: the WHOLE descent, spread across it. It used to dive
-         off the deck in three 44-unit steps, and the measurement caught it:
-         the worst crest on the lap sat at s=1147, the corner where the level
-         deck meets that plunge, demanding 26.5 against a gravity of 24 — the
-         one place on the circuit that could throw a car at boost speed. A
-         descent you can see the whole of is also a descent you can trust. */
-      [132, 176, 20.2], [88, 176, 17.5], [44, 176, 14.0], [0, 176, 10.0],
-      /* the second chicane carries the last of it down */
-      [0, 132, 6.5], [-44, 132, 3.0], [-44, 176, 0.5],
-      [-88, 176, 0], [-132, 176, 0], [-176, 176, 0]
+      /* east side, still on the ground, and then the ramp proper: 66 units of
+         a steady 12%, evenly spaced, which lifts you clear of the traffic. */
+      [176, -132, 0], [176, -96, 0],
+      [176, -74, 2.7], [176, -52, 5.3],
+      /* the corkscrew: entered at (176, -30) heading up the straight, one turn
+         of 30 units radius around the tower, and left at the same point 18
+         units higher. A waypoint every 30° of the turn, and the height rises
+         with the angle, so the grade comes out a steady 9.6% all the way. */
+      [176, -30, 8.0],
+      [172.0, -15.0, 9.5], [161.0, -4.0, 11.0], [146.0, 0.0, 12.5],
+      [131.0, -4.0, 14.0], [120.0, -15.0, 15.5], [116.0, -30.0, 17.0],
+      [120.0, -45.0, 18.5], [131.0, -56.0, 20.0], [146.0, -60.0, 21.5],
+      [161.0, -56.0, 23.0], [172.0, -45.0, 24.5],
+      [176, -30, 26.0],
+      /* THE GLIDE-OUT. The climb does not finish in the loop and it does not
+         finish in one step either: the grade falls away in equal 25-unit
+         steps — 9.6%, 8, 6.4, 5.6, 3.3, level — so the crest that ends the
+         climb is spread over 130 units of road. The measurement is what put
+         this here: topping the loop out directly made a crest that asked 36
+         units of the car against gravity's 24, which throws you off the top of
+         the corkscrew at boost speed. Spread like this it asks about 6. */
+      [176, -5, 28.0], [176, 20, 29.6], [176, 45, 31.0], [176, 75, 32.0],
+      /* and then a genuinely level run at 32 — which is where the glass goes,
+         and where the furniture on the deck gets put */
+      [176, 110, 32.0], [176, 176, 31.7],
+      /* South straight: the WHOLE descent, spread across it. Diving off the
+         deck in three 44-unit steps is what used to put the worst crest on the
+         lap — the measurement caught it demanding 26.5 against a gravity of 24
+         — so the whole south side is the run-out. A descent you can see the
+         whole of is also a descent you can trust. */
+      [132, 176, 30.5], [88, 176, 27.0], [44, 176, 23.0], [0, 176, 19.0],
+      /* the second chicane carries the last of it down. NOTE: the first point
+         of this list is also the corner these points run into, and it is NOT
+         repeated at the end — a duplicate control point gave the closed spline
+         a zero-length segment to interpolate through, and it answered with a
+         4-unit curl at the start line. */
+      [0, 132, 15.5], [-44, 132, 12.0], [-44, 176, 8.5],
+      [-88, 176, 5.5], [-132, 176, 2.8]
     ];
 
 
@@ -497,6 +619,65 @@
        cluster of glyphs on screen, or it disappears into the road markings */
     const BODY_COLOURS = [0xd6f0ff, 0xffe6ac, 0xd8ffcc, 0xffd0e2, 0xe8dcff];
     const RACER_NAMES = ['VX-1', 'VX-2', 'FALCON', 'MIRAGE', 'NEEDLE'];
+
+    /* ============================================================
+       the daily challenge
+
+       The circuit is already generated from one seed, so a daily does not need
+       a new generator — it needs the seed to BE the day. ?daily takes today,
+       ?seed=N takes any day that has been sent to you, and both put the same
+       city, the same hull and the same rules in front of everyone who loads
+       them, which is the whole point of a daily. Everything under here comes
+       off that single number, so a shared link replays a day exactly.
+
+       The day counts calendar days in LOCAL time from the epoch: it turns over
+       at midnight wherever you are, which is what a daily is meant to mean.
+       ============================================================ */
+    const DAY_MS = 86400000;
+    function dayOfDate(t) {
+      return Math.floor((t.getTime() - t.getTimezoneOffset() * 60000) / DAY_MS);
+    }
+    function dateOfDay(n) {
+      const t = new Date(n * DAY_MS);
+      const mo = String(t.getUTCMonth() + 1), d = String(t.getUTCDate());
+      return t.getUTCFullYear() + '-' + (mo.length < 2 ? '0' + mo : mo) + '-' + (d.length < 2 ? '0' + d : d);
+    }
+    /* A small integer into a well-mixed 32-bit seed. Neighbouring days have to
+       look nothing alike, and neighbouring integers through a raw LCG do. */
+    function hash32(x) {
+      x = Math.imul((x | 0) ^ (x >>> 16), 0x45d9f3b);
+      x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+      return (x ^ (x >>> 16)) >>> 0;
+    }
+    const PARAMS = new URLSearchParams(location.search);
+    const SEED_ARG = PARAMS.get('seed');
+    const SEED_OK = SEED_ARG !== null && /^\d{1,9}$/.test(SEED_ARG);
+    const DAILY_ON = PARAMS.has('daily') || SEED_OK;
+    const DAILY_DAY = SEED_OK ? parseInt(SEED_ARG, 10) : dayOfDate(new Date());
+    const DAILY_SEED = hash32(0x9e3779b9 ^ Math.imul(DAILY_DAY, 0x85ebca6b));
+    /* The day's rules: which hull is yours, what the lap is worth, and which
+       modifier is in play. Three draws off the same seed, taken from different
+       bits of it so they do not travel together. */
+    const DAILY_MODS = [
+      { id: 'standard', label: 'standard run', note: 'nothing taken away' },
+      { id: 'slick', label: 'slick tarmac', note: 'grip falls off harder in the corners' },
+      { id: 'clean', label: 'clean lap', note: 'no powerups anywhere on the circuit' }
+    ];
+    const DAILY_CAR = DAILY_SEED % RACER_NAMES.length;
+    const DAILY_PAR = 100 + ((DAILY_SEED >>> 5) % 17);          // par: 1:40 to 1:56
+    const DAILY_MOD = DAILY_MODS[(DAILY_SEED >>> 13) % DAILY_MODS.length];
+    const DAILY_DATE = dateOfDay(DAILY_DAY);
+    const NO_POWERUPS = DAILY_ON && DAILY_MOD.id === 'clean';
+    /* Where the mode button goes: the same page, one query flag apart, keeping
+       the debug handle if this tab was opened with it. */
+    function modeHref(daily) {
+      const q = daily ? '?daily' : '';
+      return location.pathname + q + (PARAMS.has('debug') ? (daily ? '&debug' : '?debug') : '');
+    }
+    if (DAILY_ON) {
+      RNG_SEED = DAILY_SEED;                                    // the day IS the city
+      if (DAILY_MOD.id === 'slick') GRIP_LOSS = 0.62;
+    }
 
     /* ============================================================
        small helpers
@@ -853,6 +1034,7 @@
 
       buildTrackSurface();
       buildViaduct();
+      buildGlassTube();
 
       /* Eight blocks by eight: 64 of them, each a pavement platform between two
          streets. One flat colour, so one mesh. */
@@ -894,21 +1076,47 @@
              this used to be — and tighten only in the 33-unit outer band. */
           const w = Math.min(7 + rnd() * 9, reachX * 2 - 1.5);
           const d = Math.min(7 + rnd() * 9, reachZ * 2 - 1.5);
+          const bx = c[0] + (rnd() - 0.5) * 2 * Math.max(0, reachX - w * 0.5);
+          const bz = c[1] + (rnd() - 0.5) * 2 * Math.max(0, reachZ - d * 0.5);
+          const bh = 8 + Math.pow(rnd(), 1.35) * 52;
+          const tone = 0.45 + rnd() * 0.5;
+          const skin = Math.floor(rnd() * WINDOW_SKINS);
+          const beacon = rnd();
+          /* and then the road has its say — see towerHeadroom. The draws all
+             happen in the order they always did, so only the towers the new
+             ramp actually flies over come out different. */
+          const head = towerHeadroom(bx, bz, w / 2, d / 2);
+          if (head < 4) continue;                  // the road runs through here
           boxes.push({
-            x: c[0] + (rnd() - 0.5) * 2 * Math.max(0, reachX - w * 0.5),
-            z: c[1] + (rnd() - 0.5) * 2 * Math.max(0, reachZ - d * 0.5),
-            w: w, d: d,
-            /* taller on average than the old circuit's, because a skyline has
-               to hold up at 350 units across rather than 170 */
-            h: 8 + Math.pow(rnd(), 1.35) * 52,
-            tone: 0.45 + rnd() * 0.5,
-            skin: Math.floor(rnd() * WINDOW_SKINS),
-            beacon: rnd(),
+            x: bx, z: bz, w: w, d: d,
+            h: Math.min(bh, head),                 // cut back to fit underneath
+            tone: tone,
+            skin: skin,
+            beacon: beacon,
             /* which way the tower sits inside its block, so a sign can be hung
                on the face that looks out at a street */
             c: c
           });
         }
+      });
+
+      /* The tower the corkscrew winds around. It is planted here rather than
+         left to the generator, because the thing the road circles has to
+         always BE a tower in the middle of its own loop — and any tower the
+         generator already put in that block is dropped, so the spire and the
+         block's own buildings cannot grow through each other. */
+      const keep = boxes.filter(function (b) {
+        const gapX = Math.abs(b.x - HELIX_CX) - (b.w + HELIX_TOWER.w) / 2;
+        const gapZ = Math.abs(b.z - HELIX_CZ) - (b.d + HELIX_TOWER.d) / 2;
+        return !(gapX < 1.5 && gapZ < 1.5);
+      });
+      boxes.length = 0;
+      keep.forEach(function (b) { boxes.push(b); });
+      boxes.push({
+        x: HELIX_CX, z: HELIX_CZ,
+        w: HELIX_TOWER.w, d: HELIX_TOWER.d, h: HELIX_TOWER.h,
+        tone: 0.78, skin: 1, beacon: 0.05,
+        c: [HELIX_CX, HELIX_CZ, BLOCK_HALF, 11, 11]
       });
 
       /* Four facade skins, and every tower wears one at random, so no two
@@ -1465,6 +1673,21 @@
         });
         glow.idx.push(base, base + 1, base + 2, base + 3, base + 4, base + 5);
       };
+      /* Is another deck in the way of this leg? The corkscrew leaves the road
+         stacked over itself: the loop returns to the point it left, 22 units
+         higher, so an upper deck stands directly over a lower one. A pier that
+         ignored that would spear straight through the road below it, so each
+         leg is measured against the centreline first and a leg that would
+         cross a lower deck is simply not built — the deck above it stays, on
+         the legs it does have. */
+      const pierWouldCross = function (px, pz, top) {
+        for (let i = 0; i < trackN; i++) {
+          const dx = tX[i] - px, dz = tZ[i] - pz;
+          if (dx * dx + dz * dz > 2.25) continue;
+          if (tY[i] > 1.0 && tY[i] < top - 1.5) return true;
+        }
+        return false;
+      };
       let s = 18;
       while (s < trackLen) {
         const y = roadYAt(s);
@@ -1475,6 +1698,7 @@
           [0, -(TRACK_HALF + 0.5), TRACK_HALF + 0.5].forEach(function (lat, i) {
             const px = t.px + t.nx * lat, pz = t.pz + t.nz * lat;
             const h = y - 0.3;
+            if (pierWouldCross(px, pz, y)) return;
             pushBox(piers, px, h / 2, pz, 0.8, h, 0.8, i === 0 ? CONCRETE : EDGE);
           });
           [-1, 1].forEach(function (side) {
@@ -1492,6 +1716,108 @@
         scene.add(new THREE.Mesh(geometryFrom(glow), new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
       }
     }
+    /* ============================================================
+       the glass tube — the covered section of the lap
+       ============================================================ */
+    let tubeSpan = null;           // what the glass covers, for the debug handle
+
+    /* The top of the corkscrew is the one long LEVEL stretch at altitude, and
+       that is where the roof goes. The stretch is FOUND rather than declared:
+       the longest unbroken run of road that is both high and level is the
+       plateau wherever the profile happens to put it, so retuning the
+       elevation moves the glass with it instead of leaving it hanging in the
+       air over a gradient.
+
+       The glass is additive rather than physical. On a night this dark a real
+       transmission model turns into a grey smear across everything behind it;
+       adding a little cyan to what is already there reads as a pane you are
+       looking THROUGH, which is the whole point of a glass tube. Steel ribs
+       every ten units keep it legible as a structure, and a running light
+       along each sill gives it an edge for the chase camera to follow. */
+    function buildGlassTube() {
+      let best = null, run = null;
+      const closeRun = function () {
+        if (run && (!best || (run.b - run.a) > (best.b - best.a))) best = run;
+        run = null;
+      };
+      for (let i = 0; i < trackN; i++) {
+        if (tY[i] > 30.5 && Math.abs(tG[i]) < 0.02) {
+          if (run) run.b = i; else run = { a: i, b: i };
+        } else closeRun();
+      }
+      closeRun();
+      if (!best || (best.b - best.a) < 40) return null;
+
+      const E = TRACK_HALF + 2.6;          // the glass stands outside the barrier
+      const SILL = 0.9, SPRING = 5.0, APEX = 3.0;
+      const s0 = best.a * TRACK_STEP, s1 = best.b * TRACK_STEP;
+      const span = s1 - s0;
+      tubeSpan = { s0: +s0.toFixed(0), s1: +s1.toFixed(0), length: +span.toFixed(0), top: +tY[best.a].toFixed(1) };
+
+      const glass = { pos: [], nrm: [], idx: [] };
+      const ribs = { pos: [], nrm: [], col: [], idx: [] };
+      const strips = { pos: [], nrm: [], col: [], idx: [] };
+      const q = function (A, a, b, c, d, colour, nrm) {
+        const base = A.pos.length / 3;
+        [a, b, c, a, c, d].forEach(function (p) {
+          A.pos.push(p[0], p[1], p[2]);
+          A.nrm.push(nrm[0], nrm[1], nrm[2]);
+          if (A.col) A.col.push(colour[0], colour[1], colour[2]);
+        });
+        A.idx.push(base, base + 1, base + 2, base + 3, base + 4, base + 5);
+      };
+      /* the roof's cross-section as (lat, height above the road) */
+      const arch = [];
+      for (let k = 0; k <= 8; k++) {
+        const u = -1 + k / 4;
+        arch.push([u * E, SPRING + APEX * Math.sqrt(Math.max(0, 1 - u * u))]);
+      }
+      const UP = [0, 1, 0], STEEL = [0.36, 0.41, 0.48], GLOW = [1.7, 2.5, 3.1];
+
+      const SEGS = Math.max(2, Math.round(span / 6));
+      for (let k = 0; k < SEGS; k++) {
+        const sa = s0 + (span * k) / SEGS, sb = s0 + (span * (k + 1)) / SEGS;
+        [-1, 1].forEach(function (side) {
+          const lat = side * E;
+          q(glass, trackPoint(sa, lat, SILL), trackPoint(sb, lat, SILL),
+            trackPoint(sb, lat, SPRING), trackPoint(sa, lat, SPRING), null, [side, 0, 0]);
+        });
+        for (let m = 0; m < arch.length - 1; m++) {
+          const p0 = arch[m], p1 = arch[m + 1];
+          q(glass, trackPoint(sa, p0[0], p0[1]), trackPoint(sb, p0[0], p0[1]),
+            trackPoint(sb, p1[0], p1[1]), trackPoint(sa, p1[0], p1[1]), null, UP);
+        }
+      }
+      /* the ribs: a thin steel arch every ten units, end frames included */
+      for (let sr = s0 + 2.5; sr <= s1 - 1.5; sr += 10) {
+        for (let m = 0; m < arch.length - 1; m++) {
+          const p0 = arch[m], p1 = arch[m + 1];
+          q(ribs, trackPoint(sr - 0.17, p0[0], p0[1]), trackPoint(sr + 0.17, p0[0], p0[1]),
+            trackPoint(sr + 0.17, p1[0], p1[1]), trackPoint(sr - 0.17, p1[0], p1[1]), STEEL, UP);
+        }
+      }
+      /* and a running light along both sills, which is what you actually
+         follow through the tube at speed */
+      for (let sr = s0; sr < s1 - 4; sr += 8) {
+        const sb = Math.min(s1, sr + 8);
+        [-1, 1].forEach(function (side) {
+          const lat = side * (E - 0.25);
+          q(strips, trackPoint(sr, lat, SILL + 0.22), trackPoint(sb, lat, SILL + 0.22),
+            trackPoint(sb, lat, SILL + 0.52), trackPoint(sr, lat, SILL + 0.52), GLOW, [side, 0, 0]);
+        });
+      }
+
+      scene.add(new THREE.Mesh(geometryFrom(glass), new THREE.MeshBasicMaterial({
+        color: 0x8adeff, transparent: true, opacity: 0.085,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+      })));
+      scene.add(new THREE.Mesh(geometryFrom(ribs), new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+      scene.add(new THREE.Mesh(geometryFrom(strips), new THREE.MeshBasicMaterial({
+        vertexColors: true, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false
+      })));
+      return tubeSpan;
+    }
+
     /* worst curvature over a window of road, used to keep furniture away from
        corners: a boost pad that fires you into a hairpin is a trap, and a ramp
        in a corner is a wall */
@@ -1517,6 +1843,35 @@
         if (Math.abs(trackAt(s + d).g) > 0.045) return false;
       }
       return true;
+    }
+
+    /* How high a box may stand at (x, z) before the road runs into it.
+
+       The circuit stopped being a ring the moment it grew a corkscrew: it now
+       leaves the street grid, crosses a street twice, threads two blocks and
+       passes over itself. "Keep buildings clear of the four lines at ±176" can
+       no longer describe that. What CAN be described is the road's own
+       centreline — tX, tZ and tY are sampled every unit — so a tower is simply
+       measured against it. If any piece of road passes over the tower's
+       footprint (out to the barrier) and the road there is lower than the
+       tower is tall, the tower is cut back until it passes underneath. Where
+       the road is at street level it cannot pass underneath at all and the
+       tower goes — the same invariant the ring always had, now measured against
+       every metre of the lap instead of four straight lines.
+
+       Towers that merely stand BESIDE the road are untouched: the test is the
+       distance from the road to the tower's rectangle, not to a radius, so a
+       canyon wall two units off the barrier is left exactly as tall as it was. */
+    function towerHeadroom(x, z, halfW, halfD) {
+      const reach = TRACK_HALF + 3.0;              // tarmac + barrier + clear of the glass
+      let limit = Infinity;
+      for (let i = 0; i < trackN; i++) {
+        const dx = Math.abs(tX[i] - x) - halfW, dz = Math.abs(tZ[i] - z) - halfD;
+        if (dx > reach || dz > reach) continue;
+        if (Math.hypot(Math.max(0, dx), Math.max(0, dz)) > reach) continue;
+        if (tY[i] - 2.0 < limit) limit = tY[i] - 2.0;
+      }
+      return limit;
     }
 
     /* ============================================================
@@ -1670,6 +2025,9 @@
     };
 
     function buildPickups() {
+      /* a clean day has no powerups at all: they are not built, so they cannot
+         be collected, and the lap reads as the harder thing it is */
+      if (NO_POWERUPS) return;
       const rnd = mulberry32(RNG_SEED ^ 0x9117);
       /* one geometry per kind, shared by every pickup of that kind */
       const geo = new THREE.OctahedronGeometry(0.62, 0);
@@ -1734,7 +2092,7 @@
        racers
        ============================================================ */
     const racers = [];
-    let playerIdx = 0;
+    let playerIdx = DAILY_ON ? DAILY_CAR : 0;
     let raceState = 'loading';
     let raceTime = 0, countdown = 3.0;
     let countdownShown = 0;    // which numeral the gantry last lit to
@@ -2210,11 +2568,168 @@
       });
       return h + '</table>';
     }
+    /* ============================================================
+       the daily: what you did, and what you can paste
+
+       Runs are banked in localStorage under the day they were driven, so the
+       board you are looking at is always the board for THIS seed and a shared
+       link lands someone on their own copy of the same day. Only daily runs are
+       recorded: a free run is a free run, and mixing the two would put a lazy
+       Sunday practice lap at the top of a challenge board.
+       ============================================================ */
+    const RUNS_KEY = 'vh-gp-runs', RUNS_KEEP = 60;
+    let runs = [];
+    try {
+      const raw = JSON.parse(localStorage.getItem(RUNS_KEY) || '[]');
+      if (Array.isArray(raw)) runs = raw.filter(function (r) { return r && typeof r.time === 'number' && r.time > 0; });
+    } catch (e) { runs = []; }
+
+    function saveRuns() {
+      /* the cap is applied to the list itself, not just to what gets written,
+         or the two drift apart over a long session */
+      if (runs.length > RUNS_KEEP) runs.splice(0, runs.length - RUNS_KEEP);
+      try { localStorage.setItem(RUNS_KEY, JSON.stringify(runs)); } catch (e) {}
+    }
+    function escapeHTML(s) {
+      return String(s).replace(/[&<>]/g, function (c) {
+        return c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;';
+      });
+    }
+    /* Three stars for par, two inside 6%, one inside 15%. */
+    function starsFor(time, par) {
+      if (!time || time <= 0 || !par) return 0;
+      if (time <= par) return 3;
+      if (time <= par * 1.06) return 2;
+      if (time <= par * 1.15) return 1;
+      return 0;
+    }
+    const STAR_RUN = ['☆☆☆', '★☆☆', '★★☆', '★★★'];
+    function runsOnSeed(seed) {
+      return runs.filter(function (r) { return r.seed === seed; });
+    }
+    function bestOnSeed(seed) {
+      let best = 0;
+      runsOnSeed(seed).forEach(function (r) { if (!best || r.time < best) best = r.time; });
+      return best;
+    }
+    function recordRun(me, pos, fieldSize) {
+      const time = +me.finishTime.toFixed(2);
+      const run = {
+        at: Date.now(),
+        day: DAILY_DAY,
+        seed: DAILY_SEED,
+        car: RACER_NAMES[playerIdx % RACER_NAMES.length],
+        mod: DAILY_MOD.id,
+        par: DAILY_PAR,
+        pos: pos, of: fieldSize,
+        time: time,
+        best: +bestLapOf(me).toFixed(2),
+        stars: starsFor(time, DAILY_PAR)
+      };
+      runs.push(run);
+      saveRuns();
+      return run;
+    }
+    /* The shareable string. Two lines, because that is what fits in a message,
+       and it carries the replay link so the person reading it can drive the
+       exact same day rather than a description of it. */
+    function shareText(run) {
+      return 'City Grand Prix — daily #' + run.day + ' (' + dateOfDay(run.day) + ')\n' +
+        'P' + run.pos + '/' + run.of + ' · ' + fmtTime(run.time) +
+        ' · best lap ' + fmtTime(run.best) +
+        ' · par ' + fmtTime(run.par) + ' · ' + STAR_RUN[run.stars] + '\n' +
+        run.mod + ' · ' + run.car + ' · replay: ' +
+        location.pathname.split('/').pop() + '?seed=' + run.day;
+    }
+    function boardTable(list, withDay) {
+      if (!list.length) return '<p class="hint">nothing recorded yet.</p>';
+      let h = '<table>';
+      list.forEach(function (r, i) {
+        h += '<tr><td class="pos">' + (i + 1) + '</td><td class="nm">' + escapeHTML(r.car) + '</td>' +
+          '<td class="tm">' + fmtTime(r.time) + '</td>' +
+          '<td class="st">' + STAR_RUN[r.stars] + '</td>' +
+          (withDay ? '<td class="nm">#' + r.day + '</td>' : '') +
+          '<td class="tm">P' + r.pos + '/' + r.of + '</td></tr>';
+      });
+      return h + '</table>';
+    }
+    function dailyPanelHTML(run) {
+      const today = runsOnSeed(DAILY_SEED).sort(function (a, b) { return a.time - b.time; });
+      const recent = runs.slice(-6).reverse();
+      let h = '<h4>' + STAR_RUN[3] + ' DAILY CHALLENGE #' + DAILY_DAY +
+        '<small>' + DAILY_DATE + ' · ' + RACER_NAMES[DAILY_CAR] + ' · par ' + fmtTime(DAILY_PAR) +
+        ' · ' + DAILY_MOD.label + ' — ' + DAILY_MOD.note + '</small></h4>';
+      const mine = run || runsOnSeed(DAILY_SEED).slice(-1)[0];
+      if (mine) {
+        h += '<div class="share"><code id="share-text">' + escapeHTML(shareText(mine)) + '</code>' +
+          '<div class="row-btns"><button class="ca-btn" id="copy" type="button">⧉ Copy result</button>' +
+          '<span class="hint">your last run — paste it anywhere; the link replays this exact day</span></div></div>';
+      } else {
+        h += '<p class="hint">three laps and your result lands here, ready to copy.</p>';
+      }
+      h += '<h5>today\'s board — ' + today.length + (today.length === 1 ? ' run' : ' runs') + '</h5>' + boardTable(today.slice(0, 5), false);
+      h += '<h5>recent runs</h5>' + boardTable(recent, true);
+      return h;
+    }
+    function renderDailyPanel(run) {
+      if (!DAILY_ON) return;
+      dailyEl.classList.add('on');
+      dailyEl.innerHTML = dailyPanelHTML(run);
+      const copy = dailyEl.querySelector('#copy');
+      if (copy) copy.addEventListener('click', function () { copyResult(copy); });
+    }
+    function copyResult(btn) {
+      const code = dailyEl.querySelector('#share-text');
+      if (!code) return;
+      const text = code.textContent;
+      const flash = function (label) {
+        btn.textContent = label;
+        setTimeout(function () { btn.textContent = '⧉ Copy result'; }, 2000);
+      };
+      /* The clipboard API wants a secure context and a permission, and neither
+         is guaranteed — but the text is on screen and selectable, so a refusal
+         is not a dead end. */
+      const select = function () {
+        try {
+          const rng = document.createRange();
+          rng.selectNodeContents(code);
+          const sel = window.getSelection();
+          sel.removeAllRanges(); sel.addRange(rng);
+        } catch (e) {}
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { flash('✓ Copied'); }, function () {
+          select(); flash('press Ctrl/⌘ C');
+        });
+        return;
+      }
+      select();
+      try { flash(document.execCommand('copy') ? '✓ Copied' : 'press Ctrl/⌘ C'); }
+      catch (e) { flash('press Ctrl/⌘ C'); }
+    }
+    function renderDailyNote() {
+      if (!DAILY_ON) return;
+      const best = bestOnSeed(DAILY_SEED);
+      dailyNoteEl.textContent = 'DAY ' + DAILY_DAY + ' · ' + DAILY_DATE +
+        ' · ' + RACER_NAMES[DAILY_CAR] + ' · par ' + fmtTime(DAILY_PAR) +
+        ' · ' + DAILY_MOD.label +
+        (best ? ' · your best ' + fmtTime(best) + ' ' + STAR_RUN[starsFor(best, DAILY_PAR)]
+              : ' · no run today yet');
+    }
+
     function finishRace() {
       raceState = 'finished';
       fanfare();
       resultsEl.classList.add('show');
       lastResults = '';        // the next frame builds the board the moment it is up
+      /* the run is banked the instant the flag falls, so a reload — or walking
+         away and coming back tomorrow — cannot lose it */
+      if (DAILY_ON) {
+        const me = racers[playerIdx];
+        const list = standings();
+        renderDailyPanel(recordRun(me, list.indexOf(me) + 1, racers.length));
+        renderDailyNote();
+      }
     }
 
     /* ============================================================
@@ -2350,8 +2865,7 @@
         padWas[name] = is;
       };
       edge('a', 0, function () { if (!actx) audioReady(); });
-      edge('x', 2, function () { toggleMode(); });
-      edge('y', 3, function () { toggleRaw(); showMsg(rawView ? '3D VIEW' : 'ASCII VIEW', 900); });
+      edge('back', 8, function () { togglePause(); });
       edge('lb', 4, function () { if (!actx) audioReady(); toggleSound(); });
       edge('start', 9, function () { if (!actx) audioReady(); gridStart(); showMsg('RESTART', 800); });
     }
@@ -2377,24 +2891,66 @@
       keys[e.key] = true;
       if (e.key === 'r' || e.key === 'R') restart();
       if (e.key === 'm' || e.key === 'M') toggleSound();
-      if (e.key === 'v' || e.key === 'V') toggleMode();
-      if (e.key === '3' || e.key === 'e') toggleRaw();
+      if (e.key === 'p' || e.key === 'P') togglePause();
       if (e.key === 'c' || e.key === 'C') { autoPilot = !autoPilot; showMsg(autoPilot ? 'autopilot ON' : 'autopilot OFF', 900); }
     });
     window.addEventListener('keyup', function (e) { keys[e.key] = false; });
-    window.addEventListener('blur', function () { for (const k in keys) keys[k] = false; });
+    window.addEventListener('blur', function () { releaseAllInputs(); });
+    /* On a phone, switching apps or taking a call usually fires
+       visibilitychange rather than blur — and coming back to a game with the
+       throttle pinned is worse than any of the other things a phone can do. */
+    document.addEventListener('visibilitychange', function () { if (document.hidden) releaseAllInputs(); });
 
+    /* One pad, one finger. A pad claims the first pointer that lands on it and
+       keeps it until that exact pointer goes up, which is what lets two thumbs
+       work at once: gas and steer are two pointers on two pads and neither
+       cancels the other. Clearing every pad on any pointerup would be wrong
+       instead — the second thumb would cancel the first.
+
+       Two things this deliberately does not do. It does not release on
+       pointerleave: a thumb that slides half a centimetre off the pad is still
+       pressing it, and on a phone that happens constantly — measuring it cut
+       the throttle mid-corner with the finger still down. And it does not
+       assume the pointerup comes back to the pad: if the browser declined the
+       capture the up event lands on whatever is under the finger, so a window
+       listener releases the pad by pointer id and the throttle cannot stick. */
+    const padReleasers = [];
     function bindPad(el, on, off) {
-      const set = function (v) { el.classList.toggle('held', v); if (v) on(); else off(); };
+      let heldBy = null;
+      const set = function (v) {
+        el.classList.toggle('held', v);
+        if (v) on(); else off();
+      };
+      const release = function (id) {
+        if (heldBy === null) return;
+        if (id !== undefined && id !== heldBy) return;
+        heldBy = null;
+        set(false);
+      };
+      padReleasers.push(function () { heldBy = null; set(false); });
       el.addEventListener('pointerdown', function (e) {
         e.preventDefault();
         if (!actx) audioReady();
         if (el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch (err) {} }
+        if (heldBy !== null) return;                   // already answering a thumb
+        heldBy = e.pointerId;
         set(true);
       });
-      el.addEventListener('pointerup', function () { set(false); });
-      el.addEventListener('pointercancel', function () { set(false); });
-      el.addEventListener('pointerleave', function () { set(false); });
+      el.addEventListener('pointerup', function (e) { release(e.pointerId); });
+      el.addEventListener('pointercancel', function (e) { release(e.pointerId); });
+      el.addEventListener('lostpointercapture', function (e) { release(e.pointerId); });
+      window.addEventListener('pointerup', function (e) { release(e.pointerId); });
+      window.addEventListener('pointercancel', function (e) { release(e.pointerId); });
+    }
+
+    /* Every input let go at once, for the moment the page stops being the thing
+       the user is looking at. */
+    function releaseAllInputs() {
+      for (const k in keys) keys[k] = false;
+      touch.steer = 0; touch.throttle = 0; touch.brake = 0;
+      pad.steer = 0; pad.throttle = 0; pad.brake = 0;
+      pad.lookX = 0; pad.lookY = 0;
+      for (let i = 0; i < padReleasers.length; i++) padReleasers[i]();
     }
     bindPad(document.getElementById('pad-left'), function () { touch.steer = 1; }, function () { if (touch.steer > 0) touch.steer = 0; });
     bindPad(document.getElementById('pad-right'), function () { touch.steer = -1; }, function () { if (touch.steer < 0) touch.steer = 0; });
@@ -2452,7 +3008,20 @@
     function toggleMode() {
       const toPhosphor = asciiMat.uniforms.uMode.value < 0.5;
       asciiMat.uniforms.uMode.value = toPhosphor ? 1 : 0;
-      modeBtn.textContent = toPhosphor ? '◨ Phosphor' : '◨ Colour';
+      return toPhosphor ? 'phosphor' : 'colour';
+    }
+
+    /* Pause. The simulation stops dead and the picture does not: the city keeps
+       its pulse, because the windows, the beacons and the signs all run off the
+       wall clock rather than off dt — so a paused lap still looks alive while
+       nothing on the road moves a hundredth of a unit. */
+    let paused = false;
+    function togglePause() {
+      paused = !paused;
+      pauseBtn.textContent = paused ? '▶ Resume' : '⏸ Pause';
+      if (paused) { showMsg('PAUSED', 0); setEngine(0.3, 0); setSkid(false); }
+      else msgEl.classList.remove('show');
+      return paused;
     }
     /* The two views want opposite lighting. ASCII needs a dim scene so the
        ramp has headroom; the solid view needs a real rig, or it reads as a
@@ -2484,27 +3053,21 @@
       });
     }
 
-    /* The plain 3D render is the game now; the ASCII pass is the toggle you can
-       flip on. A new key, so a choice stored by an older build cannot drag
-       anyone back into text mode. */
+    /* The 3D render is the game, and now it is the only thing the game SHOWS:
+       the ASCII pass and the phosphor palette are still here — turning either
+       off would be a bigger change than the toolbar deserves — but they are
+       debug views now, reachable from the handle below and from nowhere else.
+       Two renderers on a toolbar is a game explaining itself twice. */
     let rawView = true;
-    try {
-      const saved = localStorage.getItem('vh-gp-view');
-      if (saved) rawView = saved === '3d';
-    } catch (e) {}
-    function toggleRaw() {
-      rawView = !rawView;
-      rawBtn.textContent = rawView ? '▤ ASCII view' : '▤ 3D view';
-      try { localStorage.setItem('vh-gp-view', rawView ? '3d' : 'ascii'); } catch (e) {}
-      applyLightRig();
-      return rawView;
-    }
-    rawBtn.addEventListener('click', toggleRaw);
+    function toggleRaw() { rawView = !rawView; applyLightRig(); return rawView; }
     soundBtn.addEventListener('click', function () { audioReady(); toggleSound(); });
-    modeBtn.addEventListener('click', toggleMode);
+    pauseBtn.addEventListener('click', function () { audioReady(); togglePause(); });
     restartBtn.addEventListener('click', function () { audioReady(); gridStart(); });
     function restart() { gridStart(); }
     function setPlayer(i) {
+      /* the daily fixes your hull, because everyone racing the same day has to
+         be racing the same thing */
+      if (DAILY_ON) { showMsg('DAILY HULL IS FIXED — ' + RACER_NAMES[DAILY_CAR], 1500); return playerIdx; }
       playerIdx = i;
       racers.forEach(function (r) { r.isPlayer = (r.idx === i); });
       Array.prototype.forEach.call(picksEl.children, function (c, j) {
@@ -2601,7 +3164,14 @@
     }
 
     function frame() {
-      const dt = Math.min(clock.getDelta(), 1 / 25);
+      /* dt is what the world runs on. Paused, it is zero — every car, every
+         window timer, the race clock and the camera all stop together — while
+         the render below carries on drawing, so a paused lap is a still frame
+         of a live city rather than a frozen picture. The delta is still read
+         off the clock either way, or unpausing would hand the world the whole
+         pause in one step. */
+      const raw = clock.getDelta();
+      const dt = paused ? 0 : Math.min(raw, 1 / 25);
       const t = clock.elapsedTime;
       pollPad();
       updateLook(dt);
@@ -2789,6 +3359,7 @@
         b.type = 'button';
         b.className = 'pick';
         b.setAttribute('aria-pressed', i === playerIdx ? 'true' : 'false');
+        if (DAILY_ON) { b.classList.add('locked'); b.setAttribute('aria-disabled', 'true'); }
         b.innerHTML = (i + 1) + '<span class="nm"> ' + name + '</span>';
         b.addEventListener('click', function () { audioReady(); setPlayer(i); });
         picksEl.appendChild(b);
@@ -2835,7 +3406,11 @@
       countEl.textContent = String(racers.length);
       bestEl.textContent = fmtTime(bestLap);
       soundBtn.textContent = muted ? '🔇 Sound off' : '🔊 Sound on';
-      rawBtn.textContent = rawView ? '▤ ASCII view' : '▤ 3D view';
+      pauseBtn.textContent = paused ? '▶ Resume' : '⏸ Pause';
+      dailyBtn.textContent = DAILY_ON ? '↩ Free run' : '★ Daily challenge';
+      dailyBtn.addEventListener('click', function () { audioReady(); location.href = modeHref(!DAILY_ON); });
+      renderDailyNote();
+      renderDailyPanel();
       applyLightRig();
 
       window.addEventListener('resize', resize);
@@ -2963,6 +3538,31 @@
           });
           return { towers: cityBoxes.length, tarmacHalf: TRACK_HALF, barrierAt: WALL_AT,
             minClearanceOfTarmac: +worst.toFixed(2), worstCase: at };
+        },
+        /* what the glass actually covers, and the tower the loop winds around,
+           so the corkscrew can be checked as numbers rather than by squinting
+           at a screenshot */
+        tube: function () {
+          return {
+            span: tubeSpan,
+            tower: { cx: HELIX_CX, cz: HELIX_CZ, r: HELIX_R, w: HELIX_TOWER.w, h: HELIX_TOWER.h }
+          };
+        },
+        /* the corkscrew measured: how many units of it there are per turn, how
+           high it climbs and what grade that comes to */
+        helix: function () {
+          let n = 0, lo = 1e9, hi = -1e9, loS = 0, hiS = 0;
+          for (let s = 0; s < trackLen; s += TRACK_STEP) {
+            const t = trackAt(s);
+            const d = Math.hypot(t.px - HELIX_CX, t.pz - HELIX_CZ);
+            if (Math.abs(d - HELIX_R) < 1.5 && t.y > 6 && t.y < 31) {
+              n++; if (t.y < lo) { lo = t.y; loS = s; } if (t.y > hi) { hi = t.y; hiS = s; }
+            }
+          }
+          const units = n * TRACK_STEP;
+          return { units: +units.toFixed(0), from: +loS.toFixed(0), to: +hiS.toFixed(0),
+            lowest: +lo.toFixed(2), highest: +hi.toFixed(2), climb: +(hi - lo).toFixed(2),
+            gradePct: +(100 * (hi - lo) / Math.max(1, units)).toFixed(1) };
         },
         /* what is actually moving in the city, so "alive" is a number and not
            an impression: how many vehicles exist, how far they have travelled,
@@ -3154,6 +3754,19 @@
           for (let s = 0; s < trackLen; s += 24) out.push(+worstCurvature(s, 4, 40).toFixed(4));
           return out;
         },
+        /* the lap sampled point by point: plan curvature, grade, height and
+           where on the map, so a spike can be NAMED rather than hunted for */
+        probe: function (from, step, count) {
+          step = step || 1; count = count || 60;
+          const out = [];
+          for (let k = 0; k < count; k++) {
+            const s = wrapS((from || 0) + k * step);
+            const t = trackAt(s);
+            out.push({ s: +s.toFixed(1), k: +t.k.toFixed(4), g: +t.g.toFixed(4),
+              x: +t.px.toFixed(1), z: +t.pz.toFixed(1), y: +t.y.toFixed(2) });
+          }
+          return out;
+        },
         look: function (y, p) {
           if (y !== undefined) lookYaw = clamp(y, -LOOK_MAX, LOOK_MAX);
           if (p !== undefined) lookPitch = clamp(p, -0.5, 0.85);
@@ -3191,6 +3804,39 @@
         },
         zoom: function (m) { if (m !== undefined) camDistMul = clamp(m, 0.25, 8); return camDistMul; },
         raw: function (v) { if (v !== undefined) { rawView = !!v; applyLightRig(); } return rawView; },
+        palette: toggleMode,
+        pause: function (v) { if (v !== undefined && v !== paused) togglePause(); return paused; },
+        /* what the day decided, so a seed's rules can be read rather than
+           assumed */
+        daily: function () {
+          return { on: DAILY_ON, day: DAILY_DAY, date: DAILY_DATE, seed: DAILY_SEED,
+            car: DAILY_CAR, carName: RACER_NAMES[DAILY_CAR], par: DAILY_PAR,
+            mod: DAILY_MOD.id, noPowerups: NO_POWERUPS, gripLoss: GRIP_LOSS,
+            playerIdx: playerIdx, laps: RACE_LAPS, runs: runs.length,
+            panelShown: dailyEl.classList.contains('on'), note: dailyNoteEl.textContent,
+            button: dailyBtn.textContent, dayOfDate: dayOfDate(new Date()), dateOfDay: dateOfDay };
+        },
+        starsFor: starsFor,
+        share: function () { return dailyEl.querySelector('#share-text') ? dailyEl.querySelector('#share-text').textContent : null; },
+        board: function () {
+          return Array.prototype.map.call(dailyEl.querySelectorAll('tr'), function (tr) {
+            return Array.prototype.map.call(tr.children, function (td) { return td.textContent; }).join(' | ');
+          });
+        },
+        runs: function () { return runs; },
+        clearRuns: function () { runs.length = 0; saveRuns(); renderDailyPanel(); renderDailyNote(); return runs.length; },
+        /* A hash of everything the seed generated. "Same day, same circuit" has
+           to be a number, or it is only an impression. */
+        fingerprint: function () {
+          let h = 2166136261;
+          const mix = function (v) { h ^= (Math.round(v * 100) | 0); h = Math.imul(h, 16777619); };
+          mix(trackLen); mix(cityBoxes.length);
+          cityBoxes.forEach(function (b) { mix(b.x); mix(b.z); mix(b.w); mix(b.h); });
+          features.forEach(function (f) { mix(f.s); mix(f.lat); mix(f.kind === 'ramp' ? 1 : 2); });
+          mix(pickups.length);
+          pickups.forEach(function (p) { mix(p.s); mix(p.lat); });
+          return (h >>> 0).toString(16);
+        },
         pad: function () { return { live: pad.live, steer: pad.steer, throttle: pad.throttle, brake: pad.brake }; },
         shake: function (v) { if (v !== undefined) shake = v; return shake; },
         rumble: rumble,
