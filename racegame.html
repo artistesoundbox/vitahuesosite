@@ -11,7 +11,7 @@
       gtag('config', 'G-EY4SD4FCN4');
     </script>
   <meta charset="UTF-8" />
-  <title>ASCII City Grand Prix — five racers through a text city · Vitamina Hueso @ Manteca Studios</title>
+  <title>City Grand Prix — five racers through a live city · Vitamina Hueso @ Manteca Studios</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#04070d" />
   <script type="importmap">
@@ -162,13 +162,13 @@
       <a class="btn small" href="index.html">⌂ HOME</a>
     </div>
 
-    <h1>ASCII CITY GRAND PRIX</h1>
-    <p class="tag">Five aircraft race three laps of a circuit threaded between the blocks of a city that is drawn
-    entirely as text. The city, the road and the racers are real 3D — every frame is rendered tiny, then each
-    texel is turned into a brightness, looked up in a character ramp and stamped out as a glyph, which is why a
-    tower becomes a wall of <b>#</b> and the sky stays empty. Hold the throttle, brake for the chicane, and try not
-    to be the one who parks a starfighter in a wall. A controller works too — left stick or d-pad to steer, RT or A for
-    throttle, LT to brake and reverse, Y for the ▤ view, X for the palette, Start to restart.</p>
+    <h1>CITY GRAND PRIX</h1>
+    <p class="tag">Five aircraft race three laps of a circuit threaded between the blocks of a city that is awake:
+    towers wear randomly lit windows, the rooftops carry beacons, and each hull still wears the paint it was exported
+    with. Hold the throttle, brake for the chicane, and try not to be the one who parks a starfighter in a wall.
+    A controller works too — left stick or d-pad to steer, RT or A for throttle, LT to brake and reverse, Y for the
+    ▤ view, X for the palette, Start to restart. And <b>▤ ASCII view</b> (or <b>V</b>) redraws the whole city as
+    text: each texel becomes a brightness, looked up in a character ramp, so a tower turns into a wall of <b>#</b>.</p>
 
     <div id="stage">
       <canvas id="screen"></canvas>
@@ -193,17 +193,17 @@
       <div class="readout">Best lap <b id="best">--:--.--</b></div>
       <button class="ca-btn" id="restart" type="button">↺ Restart race</button>
       <button class="ca-btn" id="mode" type="button">◨ Colour</button>
-      <button class="ca-btn" id="raw" type="button">▤ ASCII</button>
+      <button class="ca-btn" id="raw" type="button">▤ ASCII view</button>
       <button class="ca-btn" id="sound" type="button">🔊 Sound on</button>
       <div class="picks" id="picks" role="group" aria-label="Choose your racer"></div>
     </div>
 
     <p class="footer-note">
-      The five models arrive as 51 MB of glTF; an offline pass collapses them to 249 KB of raw triangles, because
-      an ASCII grid gives a racer about 120 characters and would throw the rest away — that pass also centres,
-      scales and turns each hull to a known facing. Driving runs on a closed spline: speed decides how much
-      steering authority you keep and how hard the corner throws you wide, so a corner taken flat out puts you in
-      the wall.
+      The five models arrive as 51.5 MB of glTF and 791,380 triangles; an offline pass keeps each hull's original
+      paint, UVs and 8,000 triangles and writes the lot as one 1.5 MB binary plus its textures, because clustering
+      448,000 triangles into a racer four units long buys nothing you can see. Driving runs on a closed spline: speed
+      decides how much steering authority you keep and how hard a corner throws you wide, so a corner taken flat out
+      puts you in the wall.
     </p>
   </div>
 
@@ -211,16 +211,18 @@
     import * as THREE from 'three';
 
     /* ============================================================
-       ASCII City Grand Prix
+       City Grand Prix
 
-       One WebGL context, two passes per frame:
+       The game is the plain 3D render. The ASCII view is a toggle that
+       swaps in a second pass:
          1. the city and the racers rendered into a tiny render target
             (about 150 x 40 — one texel per character cell)
          2. a single full-screen quad that reads each texel, works out a
             brightness, picks a glyph out of a ramp and stamps it from a
             glyph atlas, tinted by the colour that was sampled there.
-       The second pass is one draw call, which is why a screenful of text
-       costs almost nothing.
+       That second pass is one draw call, which is why a screenful of text
+       costs almost nothing — and the scene is lit dimmer while it is up,
+       because a saturated texel stamps the densest glyph everywhere.
        ============================================================ */
 
     const stageEl  = document.getElementById('stage');
@@ -268,6 +270,9 @@
     const VEHICLE_SIZE = 4.0;     // longest footprint of a racer
 
     const RNG_SEED = 20260410;    // the city is identical on every visit
+    const WINDOW_SKINS = 4;       // facade textures, worn at random
+    const WINDOW_W = 11;          // world units per texture tile across a facade
+    let windowMats = [];          // the four facade materials, for the flicker
 
     function mulberry32(a) {
       return function () {
@@ -640,27 +645,137 @@
             z: c[1] + (rnd() - 0.5) * 2 * (11 - d * 0.5),
             w: w, d: d,
             h: 8 + Math.pow(rnd(), 1.4) * 40,
-            tone: 0.45 + rnd() * 0.5
+            tone: 0.45 + rnd() * 0.5,
+            skin: Math.floor(rnd() * WINDOW_SKINS),
+            beacon: rnd()
           });
         }
       });
-      const inst = new THREE.InstancedMesh(
-        new THREE.BoxGeometry(1, 1, 1),
-        new THREE.MeshLambertMaterial({ color: 0xffffff }),
-        boxes.length
-      );
-      const m4 = new THREE.Matrix4();
-      const col = new THREE.Color();
-      boxes.forEach(function (b, i) {
-        m4.makeScale(b.w, b.h, b.d);
-        m4.setPosition(b.x, b.h / 2, b.z);
-        inst.setMatrixAt(i, m4);
-        col.setRGB(b.tone * 0.6, b.tone * 0.72, b.tone * 0.92);
-        inst.setColorAt(i, col);
+
+      /* Four facade skins, and every tower wears one at random, so no two
+         blocks light their windows the same way. */
+      windowMats = [];
+      for (let s = 0; s < WINDOW_SKINS; s++) {
+        const tex = makeWindowTexture(RNG_SEED + s * 977);
+        windowMats.push(new THREE.MeshLambertMaterial({
+          map: tex,
+          emissive: 0xffffff,
+          emissiveMap: tex,       // only the lit cells glow
+          emissiveIntensity: 1,
+          vertexColors: true
+        }));
+      }
+      for (let s = 0; s < WINDOW_SKINS; s++) {
+        const parts = { pos: [], nrm: [], uv: [], col: [], idx: [] };
+        let base = 0;
+        boxes.forEach(function (b) {
+          if (b.skin !== s) return;
+          base = addWindowBox(parts, b, base);
+        });
+        if (parts.idx.length) scene.add(new THREE.Mesh(geometryFrom(parts), windowMats[s]));
+      }
+
+      /* rooftop beacons: the one light on a building nobody can mistake for a
+         window, and the only thing up there the fog cannot swallow */
+      const beacons = { pos: [], nrm: [], col: [], idx: [] };
+      const BEACON_COLOURS = [[1, 0.28, 0.32], [0.45, 1, 0.78], [1, 0.82, 0.36], [0.55, 0.78, 1]];
+      boxes.forEach(function (b) {
+        if (b.beacon > 0.4) return;
+        const c = BEACON_COLOURS[Math.floor(rnd() * BEACON_COLOURS.length)];
+        const s = 0.7 + rnd() * 0.6;
+        pushBox(beacons, b.x, b.h + s * 0.6, b.z, s, s, s, c);
+        if (rnd() < 0.45) {
+          const o = (rnd() - 0.5) * Math.min(b.w, b.d) * 0.5;
+          pushBox(beacons, b.x + o, b.h + 0.5, b.z - o, 0.5, 0.5, 0.5,
+            BEACON_COLOURS[Math.floor(rnd() * BEACON_COLOURS.length)]);
+        }
       });
-      inst.instanceMatrix.needsUpdate = true;
-      if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
-      scene.add(inst);
+      scene.add(new THREE.Mesh(geometryFrom(beacons), new THREE.MeshBasicMaterial({ vertexColors: true })));
+    }
+
+    /* A facade texture: dark concrete, a grid of windows, and a random third of
+       them lit in random colours — warm offices, cold offices, the odd pink
+       sign. It is used as the map AND the emissive map, so the lit cells are
+       the only part that glows. */
+    function makeWindowTexture(seed) {
+      const rnd = mulberry32(seed);
+      const COLS = 16, ROWS = 32, CELL = 16;
+      const c = document.createElement('canvas');
+      c.width = COLS * CELL; c.height = ROWS * CELL;
+      const g = c.getContext('2d');
+      g.fillStyle = '#2f3743';    // concrete, not a void: the key light has to catch something
+      g.fillRect(0, 0, c.width, c.height);
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          if (rnd() < 0.32) continue;                 // a dark office
+          const pick = rnd(), l = 0.45 + rnd() * 0.5;
+          const rgb = pick < 0.62 ? [255, 216, 140]
+            : (pick < 0.86 ? [190, 226, 255] : [255, 150, 220]);
+          g.fillStyle = 'rgb(' + rgb.map(function (v) { return Math.round(v * l); }).join(',') + ')';
+          g.fillRect(x * CELL + 3, y * CELL + 4, CELL - 6, CELL - 9);
+        }
+      }
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      return t;
+    }
+
+    /* Six quads per tower, with the UVs scaled per face so one window is the
+       same size on a 7-wide shed and a 40-storey slab alike. That is the whole
+       reason this is merged by hand instead of instanced: a shared box UV would
+       stretch a single window across an entire facade, and per-instance UV
+       scaling would need a shader. The vertical unit is doubled because the
+       texture packs 16 windows across but 32 down. */
+    function addWindowBox(A, b, base) {
+      const g = new THREE.BoxGeometry(b.w, b.h, b.d);
+      const uv = g.attributes.uv;
+      const span = [[b.d, b.h], [b.d, b.h], [b.w, b.d], [b.w, b.d], [b.w, b.h], [b.w, b.h]];
+      for (let f = 0; f < 6; f++) {
+        const su = span[f][0] / WINDOW_W, sv = span[f][1] / (WINDOW_W * 2);
+        for (let k = 0; k < 4; k++) {
+          const i = f * 4 + k;
+          uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv);
+        }
+      }
+      const p = g.attributes.position, n = g.attributes.normal;
+      for (let i = 0; i < p.count; i++) {
+        A.pos.push(p.getX(i) + b.x, p.getY(i) + b.h / 2, p.getZ(i) + b.z);
+        A.nrm.push(n.getX(i), n.getY(i), n.getZ(i));
+        A.uv.push(uv.getX(i), uv.getY(i));
+        A.col.push(b.tone * 0.70, b.tone * 0.80, b.tone);
+      }
+      const ix = g.index;
+      for (let i = 0; i < ix.count; i++) A.idx.push(base + ix.getX(i));
+      g.dispose();
+      return base + p.count;
+    }
+
+    /* An axis-aligned block with one flat colour per vertex — enough for a
+       light, which is never textured and only ever has to be bright. */
+    function pushBox(A, cx, cy, cz, w, h, d, colour) {
+      const g = new THREE.BoxGeometry(w, h, d);
+      g.translate(cx, cy, cz);
+      const p = g.attributes.position, n = g.attributes.normal;
+      const base = A.pos.length / 3;
+      for (let i = 0; i < p.count; i++) {
+        A.pos.push(p.getX(i), p.getY(i), p.getZ(i));
+        A.nrm.push(n.getX(i), n.getY(i), n.getZ(i));
+        A.col.push(colour[0], colour[1], colour[2]);
+      }
+      const ix = g.index;
+      for (let i = 0; i < ix.count; i++) A.idx.push(base + ix.getX(i));
+      g.dispose();
+    }
+
+    function geometryFrom(A) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(A.pos, 3));
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(A.nrm, 3));
+      if (A.uv && A.uv.length) g.setAttribute('uv', new THREE.Float32BufferAttribute(A.uv, 2));
+      if (A.col && A.col.length) g.setAttribute('color', new THREE.Float32BufferAttribute(A.col, 3));
+      g.setIndex(A.idx);
+      return g;
     }
 
     /* The lap surface, built as flat quads rather than a smooth strip: the
@@ -728,27 +843,48 @@
     function buildVehicles(buf) {
       const dv = new DataView(buf);
       const n = dv.getUint32(4, true);
+      const loader = new THREE.TextureLoader();
       let o = 8;
       for (let i = 0; i < n; i++) {
         const nameLen = dv.getUint32(o, true); o += 4 + nameLen;
+        const texLen = dv.getUint32(o, true);
+        let texName = '';
+        if (texLen) texName = new TextDecoder().decode(new Uint8Array(buf, o + 4, texLen));
+        o += 4 + texLen;
         const dim = [dv.getFloat32(o, true), dv.getFloat32(o + 4, true), dv.getFloat32(o + 8, true)]; o += 12;
         const vc = dv.getUint32(o, true), tc = dv.getUint32(o + 4, true); o += 8;
         const pos = new Float32Array(buf.slice(o, o + vc * 12)); o += vc * 12;
         const nrm = new Float32Array(buf.slice(o, o + vc * 12)); o += vc * 12;
+        const uv = new Float32Array(buf.slice(o, o + vc * 8)); o += vc * 8;
         const idx = new Uint32Array(buf.slice(o, o + tc * 12)); o += tc * 12;
 
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
         geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+        geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
         geo.setIndex(new THREE.BufferAttribute(idx, 1));
 
         const colour = BODY_COLOURS[i % BODY_COLOURS.length];
-        const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
-          color: colour,
+        const material = new THREE.MeshLambertMaterial({
+          /* white once there is a real livery to show, so the paint is the
+             paint; the flat tint stays for the moment before it decodes and
+             for any hull the export left untextured */
+          color: texName ? 0xffffff : colour,
           emissive: new THREE.Color(colour),
           emissiveIntensity: 0.5,      // ASCII wants glowing hulls; 3D does not
           side: THREE.DoubleSide
-        }));
+        });
+        const mesh = new THREE.Mesh(geo, material);
+        if (texName) {
+          /* the texture streams in behind the binary: the race starts on the
+             tinted hull and the livery lands a moment later */
+          loader.load('racegame/' + texName, function (t) {
+            t.colorSpace = THREE.SRGBColorSpace;
+            t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+            material.map = t;
+            material.needsUpdate = true;
+          });
+        }
         const scale = VEHICLE_SIZE / Math.max(dim[0], dim[2]);
         const h = dim[1] * scale;
         mesh.scale.setScalar(scale);
@@ -847,15 +983,25 @@
          the end of your race */
       if (braking > 0 && r.v <= 0.4) r.v -= REVERSE_ACC * braking * dt;
       else r.v -= BRAKE * braking * dt;
-      r.v -= (DRAG * r.v * r.v + ROLL_DRAG) * dt;
+      /* Resistance always has to OPPOSE motion. Subtracting a positive number
+         from a negative v accelerates a reversing hull instead of slowing it,
+         and the same term applied to a parked one rolls it backwards off the
+         grid on its own — both of which the clamp at -REVERSE_MAX then hides
+         as "driving in reverse at full pelt for no reason". */
+      const resist = (DRAG * r.v * r.v + ROLL_DRAG) * dt;
+      if (r.v > 0) r.v = Math.max(0, r.v - resist);
+      else r.v = Math.min(0, r.v + resist);
 
       let off = false;
       const sideways = Math.abs(r.lat);
       if (sideways > TRACK_HALF) {
         if (sideways < WALL_AT) {
           /* the shoulder is firm but always beatable: this drag has to stay
-             under ACCEL, or a crash strands you off the road for good */
-          r.v -= (SHOULDER_DRAG + (sideways - TRACK_HALF) * SHOULDER_SLOPE) * dt;
+             under ACCEL, or a crash strands you off the road for good — and
+             like every other resistance it must oppose motion, not sign */
+          const shoulder = (SHOULDER_DRAG + (sideways - TRACK_HALF) * SHOULDER_SLOPE) * dt;
+          if (r.v > 0) r.v = Math.max(0, r.v - shoulder);
+          else r.v = Math.min(0, r.v + shoulder);
           off = true;
         } else {
           /* a barrier shoves the hull back towards the tarmac and keeps
@@ -1197,7 +1343,7 @@
       if (rimLight) rimLight.intensity = solid ? 0.7 : 0.32;
       if (renderer) {
         renderer.toneMapping = solid ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
-        renderer.toneMappingExposure = solid ? 1.05 : 1;
+        renderer.toneMappingExposure = solid ? 1.22 : 1;
       }
       if (scene && scene.fog) { scene.fog.near = solid ? 70 : 25; scene.fog.far = solid ? 340 : 115; }
       racers.forEach(function (r) {
@@ -1205,12 +1351,18 @@
       });
     }
 
-    let rawView = false;
-    try { rawView = localStorage.getItem('vh-ascii-gp-view') === '3d'; } catch (e) {}
+    /* The plain 3D render is the game now; the ASCII pass is the toggle you can
+       flip on. A new key, so a choice stored by an older build cannot drag
+       anyone back into text mode. */
+    let rawView = true;
+    try {
+      const saved = localStorage.getItem('vh-gp-view');
+      if (saved) rawView = saved === '3d';
+    } catch (e) {}
     function toggleRaw() {
       rawView = !rawView;
-      rawBtn.textContent = rawView ? '▤ 3D view' : '▤ ASCII';
-      try { localStorage.setItem('vh-ascii-gp-view', rawView ? '3d' : 'ascii'); } catch (e) {}
+      rawBtn.textContent = rawView ? '▤ ASCII view' : '▤ 3D view';
+      try { localStorage.setItem('vh-gp-view', rawView ? '3d' : 'ascii'); } catch (e) {}
       applyLightRig();
       return rawView;
     }
@@ -1274,8 +1426,8 @@
     function snapCamera() {
       const me = racers[playerIdx];
       playerForward(tmpFwd);
-      camPos.set(me.group.position.x - tmpFwd.x * 8.4, 3.9, me.group.position.z - tmpFwd.z * 8.4);
-      camLook.set(me.group.position.x + tmpFwd.x * 12, 0.55, me.group.position.z + tmpFwd.z * 12);
+      camPos.set(me.group.position.x - tmpFwd.x * 8.4, 2.8, me.group.position.z - tmpFwd.z * 8.4);
+      camLook.set(me.group.position.x + tmpFwd.x * 12, 0.75, me.group.position.z + tmpFwd.z * 12);
       camera.position.copy(camPos);
       camera.lookAt(camLook);
     }
@@ -1334,12 +1486,21 @@
         setEngine(rpm, clamp(me.input.throttle, 0, 1));
       }
 
+      /* --- the city breathes: each facade skin swells on its own slow
+             wavelength, so the windows are never quite still --- */
+      for (let w = 0; w < windowMats.length; w++) {
+        windowMats[w].emissiveIntensity = 0.86 + Math.sin(t * (0.35 + w * 0.17) + w * 2.1) * 0.14;
+      }
+
       /* --- chase camera --- */
       playerForward(tmpFwd);
+      /* The rest height is deliberately lower than the racing one: parked on the
+         grid, the hull sits close to the lens, and from 3.9 up a tilted-down
+         camera puts it half out of the bottom of the frame. */
       const dist = 8.4 + me.v * 0.045;
-      const height = 3.9 + me.v * 0.02;
+      const height = 2.8 + me.v * 0.022;
       tmpPos.set(me.group.position.x - tmpFwd.x * dist, height, me.group.position.z - tmpFwd.z * dist);
-      tmpLook.set(me.group.position.x + tmpFwd.x * (12 + me.v * 0.1), 0.55, me.group.position.z + tmpFwd.z * (12 + me.v * 0.1));
+      tmpLook.set(me.group.position.x + tmpFwd.x * (12 + me.v * 0.1), 0.75, me.group.position.z + tmpFwd.z * (12 + me.v * 0.1));
       const k = 1 - Math.exp(-(raceState === 'countdown' ? 2.4 : 7.5) * dt);
       camPos.lerp(tmpPos, k);
       camLook.lerp(tmpLook, k);
@@ -1437,7 +1598,7 @@
       countEl.textContent = String(racers.length);
       bestEl.textContent = fmtTime(bestLap);
       soundBtn.textContent = muted ? '🔇 Sound off' : '🔊 Sound on';
-      rawBtn.textContent = rawView ? '▤ 3D view' : '▤ ASCII';
+      rawBtn.textContent = rawView ? '▤ ASCII view' : '▤ 3D view';
       applyLightRig();
 
       window.addEventListener('resize', resize);
@@ -1446,7 +1607,7 @@
 
       loadEl.classList.add('hidden');
       renderer.setAnimationLoop(frame);
-      document.title = 'ASCII City Grand Prix — ' + racers.length + ' racers ready';
+      document.title = 'City Grand Prix — ' + racers.length + ' racers ready';
       document.body.dataset.ready = '1';
     }
 
@@ -1467,6 +1628,10 @@
             raceTime: +raceTime.toFixed(2), bestLap: +bestLap.toFixed(2), fps: fps,
             shake: +shake.toFixed(3), offRoad: offRoad,
             pad: pad.live, padSteer: +pad.steer.toFixed(2), padThrottle: +pad.throttle.toFixed(2),
+            input: { steer: +mm.input.steer.toFixed(2), throttle: +mm.input.throttle.toFixed(2), brake: +mm.input.brake.toFixed(2) },
+            keysDown: Object.keys(keys).filter(function (k) { return keys[k]; }),
+            touch: { steer: touch.steer, throttle: touch.throttle, brake: touch.brake },
+            autoPilot: autoPilot,
             trackLen: +trackLen.toFixed(1), cols: cols, rows: rows,
             cell: [+cellW.toFixed(2), +cellH.toFixed(2)],
             mode: asciiMat ? asciiMat.uniforms.uMode.value : null,

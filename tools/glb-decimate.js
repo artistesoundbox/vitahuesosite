@@ -5,18 +5,18 @@
  *
  * Why this exists
  * ---------------
- * The five race vehicles total 51 MB and ~791,000 triangles. An ASCII grid
- * draws a car with roughly 120 characters, so almost all of that detail is
- * destroyed by the renderer before anybody sees it. This collapses each model
- * down to a couple of thousand triangles and writes one small binary the game
- * loads in a single request.
+ * The five race vehicles total 51 MB and ~791,000 triangles. Their original
+ * embedded textures are JPEG/PNG, which a browser decodes natively, so this
+ * pass keeps the surface detail and throws away the geometry detail the game
+ * cannot show: each hull comes out at a couple of thousand triangles, with its
+ * UVs intact and its base-colour texture written out beside the binary.
  *
  * What it does, per model:
  *   1. bakes every mesh through its node's world matrix into one triangle soup
  *      (the Sketchfab exports carry rotation/scale nodes, and veh3/veh4 sit far
  *      off the origin, so the raw accessor data is not usable as-is)
- *   2. drops texture/material data on purpose — the ASCII pass only reads
- *      luminance and silhouette, so paint would be wasted bytes
+ *   2. writes the material's base-colour image next to the output (raw bytes —
+ *      the file's own header says PNG or JPEG, so it needs no re-encoding)
  *   3. recentres it (X/Z on the origin, floor at y = 0) and scales the largest
  *      horizontal extent to exactly 1.0, so the game can size and place every
  *      vehicle identically — note it does NOT try to guess which way is
@@ -26,16 +26,21 @@
  *      off a rendered top view instead and applied per vehicle in the game.
  *   4. vertex-cluster decimation (average of each occupied grid cell) with a
  *      binary search on the grid resolution to land near the target triangle
- *      count, then rebuilds smooth area-weighted normals
+ *      count, then rebuilds smooth area-weighted normals. UVs are averaged with
+ *      the positions, and the cell key includes the UV, so vertices either side
+ *      of a texture seam never merge and the mapping stays sharp.
  *
  * Output format (little endian):
- *   u32 magic 'VRS1', u32 vehicleCount
+ *   u32 magic 'VRS2', u32 vehicleCount
  *   per vehicle: u32 nameLen + name bytes
+ *                u32 texLen + texture file name bytes ('' = untextured)
  *                f32 dimX, dimY, dimZ      (canonical, length on Z = 1.0)
  *                u32 vertCount, u32 triCount
- *                f32[verts*3] positions, f32[verts*3] normals, u32[tris*3] indices
+ *                f32[verts*3] positions, f32[verts*3] normals, f32[verts*2] uvs,
+ *                u32[tris*3] indices
  */
 const fs = require('fs');
+const path = require('path');
 
 const GLB_MAGIC = 0x46546c67;
 const CHUNK_JSON = 0x4e4f534a;
@@ -44,6 +49,8 @@ const CHUNK_BIN = 0x004e4942;
 const COMPONENT = { 5120: Int8Array, 5121: Uint8Array, 5122: Int16Array, 5123: Uint16Array, 5125: Uint32Array, 5126: Float32Array };
 const COMP_BYTES = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
 const ITEMS = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT2: 4, MAT3: 9, MAT4: 16 };
+
+const UV_RES = 48;      // UV cells used to keep texture seams from merging
 
 /* ---------- glTF reading ---------- */
 
@@ -125,13 +132,15 @@ function nodeMatrices(json) {
   return world;
 }
 
-/* Every mesh, baked into one triangle soup in model space. */
+/* Every mesh, baked into one triangle soup in model space. UVs ride along. */
 function soup(file) {
   const { json, bin } = readGLB(file);
   const world = nodeMatrices(json);
   const positions = [];
+  const uvs = [];
   const indices = [];
   let vertBase = 0;
+  let sawUv = false;
 
   (json.nodes || []).forEach(function (n, ni) {
     if (n.mesh == null) return;
@@ -139,14 +148,17 @@ function soup(file) {
     (json.meshes[n.mesh].primitives || []).forEach(function (p) {
       if (p.attributes.POSITION == null) return;
       const pos = readAccessor(json, bin, p.attributes.POSITION);
-      const p3 = pos.itemSize;
+      const uv = p.attributes.TEXCOORD_0 != null ? readAccessor(json, bin, p.attributes.TEXCOORD_0) : null;
+      if (uv) sawUv = true;
       for (let i = 0; i < pos.count; i++) {
-        const x = pos.array[i * p3], y = pos.array[i * p3 + 1], z = pos.array[i * p3 + 2];
+        const x = pos.array[i * 3], y = pos.array[i * 3 + 1], z = pos.array[i * 3 + 2];
         positions.push(
           m[0] * x + m[4] * y + m[8] * z + m[12],
           m[1] * x + m[5] * y + m[9] * z + m[13],
           m[2] * x + m[6] * y + m[10] * z + m[14]
         );
+        if (uv) uvs.push(uv.array[i * 2], uv.array[i * 2 + 1]);
+        else uvs.push(0, 0);
       }
       if (p.indices != null) {
         const idx = readAccessor(json, bin, p.indices);
@@ -158,7 +170,34 @@ function soup(file) {
     });
   });
 
-  return { positions: Float32Array.from(positions), indices: Uint32Array.from(indices) };
+  return {
+    positions: Float32Array.from(positions),
+    uvs: Float32Array.from(uvs),
+    indices: Uint32Array.from(indices),
+    sawUv: sawUv
+  };
+}
+
+/* The base-colour image of the first material that has one, written out as-is.
+   glTF stores images as complete PNG/JPEG files, so there is nothing to encode. */
+function dumpTexture(file, json, bin, outDir, stem) {
+  const materials = json.materials || [];
+  for (let i = 0; i < materials.length; i++) {
+    const pbr = materials[i].pbrMetallicRoughness || {};
+    if (!pbr.baseColorTexture) continue;
+    const tex = (json.textures || [])[pbr.baseColorTexture.index];
+    if (!tex || tex.source == null) continue;
+    const img = (json.images || [])[tex.source];
+    if (!img || img.bufferView == null) continue;
+    const bv = json.bufferViews[img.bufferView];
+    const bytes = bin.slice(bv.byteOffset || 0, (bv.byteOffset || 0) + bv.byteLength);
+    const ext = img.mimeType === 'image/png' ? '.png' : (img.mimeType === 'image/jpeg' ? '.jpg' : '');
+    if (!ext) continue;
+    const name = stem + ext;
+    fs.writeFileSync(path.join(outDir, name), bytes);
+    return { name: name, bytes: bv.byteLength, material: materials[i].name || ('#' + i) };
+  }
+  return null;
 }
 
 /* ---------- canonicalising ---------- */
@@ -175,11 +214,11 @@ function bounds(positions) {
   return { lo, hi };
 }
 
-/* Length onto Z (rotating 90 deg if the model is longer across), centred on
-   X/Z, grounded at y = 0, and scaled so the length is exactly 1. */
-function canonicalise(positions, indices) {
-  let b = bounds(positions);
-  let size = [b.hi[0] - b.lo[0], b.hi[1] - b.lo[1], b.hi[2] - b.lo[2]];
+/* Centred on X/Z, grounded at y = 0, scaled so the longest horizontal extent is
+   exactly 1 — the game applies its own facing fix on top of this. */
+function canonicalise(positions) {
+  const b = bounds(positions);
+  const size = [b.hi[0] - b.lo[0], b.hi[1] - b.lo[1], b.hi[2] - b.lo[2]];
   const length = Math.max(size[0], size[2], 1e-6);
   const scale = 1 / length;
   const cx = (b.lo[0] + b.hi[0]) / 2, cz = (b.lo[2] + b.hi[2]) / 2;
@@ -188,18 +227,18 @@ function canonicalise(positions, indices) {
     positions[i + 1] = (positions[i + 1] - b.lo[1]) * scale;
     positions[i + 2] = (positions[i + 2] - cz) * scale;
   }
-  return {
-    dim: [size[0] * scale, size[1] * scale, size[2] * scale],
-    tris: indices.length / 3
-  };
+  return [size[0] * scale, size[1] * scale, size[2] * scale];
 }
 
 /* ---------- decimation ---------- */
 
 /* Vertex clustering: average every vertex that shares a grid cell, then keep
    the triangles that survive with three distinct corners. Cheap, dependency
-   free, and kind to silhouettes at the resolutions ASCII can actually show. */
-function cluster(positions, indices, res) {
+   free, and kind to silhouettes at the resolutions the game can actually show.
+   The cell key carries the UV as well as the position: a position-only key
+   welds vertices that sit either side of a texture seam and smears the paint
+   across the whole hull. */
+function cluster(positions, uvs, indices, res) {
   const b = bounds(positions);
   const size = [b.hi[0] - b.lo[0], b.hi[1] - b.lo[1], b.hi[2] - b.lo[2]];
   const longest = Math.max(size[0], size[1], size[2], 1e-6);
@@ -210,31 +249,42 @@ function cluster(positions, indices, res) {
   const n = positions.length / 3;
   const remap = new Int32Array(n);
   const map = new Map();
-  const sums = [];   // [sx, sy, sz, count]
+  const sums = [];   // [sx, sy, sz, count, su, sv]
   for (let i = 0; i < n; i++) {
     const x = positions[i * 3], y = positions[i * 3 + 1], z = positions[i * 3 + 2];
+    const u = uvs[i * 2], v = uvs[i * 2 + 1];
     const ix = Math.min(nx - 1, Math.floor((x - b.lo[0]) / cell));
     const iy = Math.min(ny - 1, Math.floor((y - b.lo[1]) / cell));
     const iz = Math.floor((z - b.lo[2]) / cell);
-    const key = ix + iy * nx + iz * nx * ny + '';
+    /* rounded, not floored: a UV of exactly 0 or 1 must not land in a thin
+       extra cell of its own, and negative UVs must stay distinct from small
+       positive ones (wrapping happens at sample time, not here) */
+    const iu = Math.round(u * UV_RES);
+    const iv = Math.round(v * UV_RES);
+    const key = ix + ',' + iy + ',' + iz + ',' + iu + ',' + iv;
     let id = map.get(key);
     if (id === undefined) {
-      id = sums.length / 4;
+      id = sums.length / 6;
       map.set(key, id);
-      sums.push(x, y, z, 1);
+      sums.push(x, y, z, 1, u, v);
     } else {
-      sums[id * 4] += x; sums[id * 4 + 1] += y; sums[id * 4 + 2] += z; sums[id * 4 + 3]++;
+      sums[id * 6] += x; sums[id * 6 + 1] += y; sums[id * 6 + 2] += z;
+      sums[id * 6 + 3] += 1;
+      sums[id * 6 + 4] += u; sums[id * 6 + 5] += v;
     }
     remap[i] = id;
   }
 
-  const vertCount = sums.length / 4;
+  const vertCount = sums.length / 6;
   const outPos = new Float32Array(vertCount * 3);
+  const outUv = new Float32Array(vertCount * 2);
   for (let i = 0; i < vertCount; i++) {
-    const c = sums[i * 4 + 3];
-    outPos[i * 3] = sums[i * 4] / c;
-    outPos[i * 3 + 1] = sums[i * 4 + 1] / c;
-    outPos[i * 3 + 2] = sums[i * 4 + 2] / c;
+    const c = sums[i * 6 + 3];
+    outPos[i * 3] = sums[i * 6] / c;
+    outPos[i * 3 + 1] = sums[i * 6 + 1] / c;
+    outPos[i * 3 + 2] = sums[i * 6 + 2] / c;
+    outUv[i * 2] = sums[i * 6 + 4] / c;
+    outUv[i * 2 + 1] = sums[i * 6 + 5] / c;
   }
 
   const seen = new Set();
@@ -250,15 +300,15 @@ function cluster(positions, indices, res) {
     seen.add(key);
     outIdx.push(a, bb, c);
   }
-  return { positions: outPos, indices: Uint32Array.from(outIdx), vertCount };
+  return { positions: outPos, uvs: outUv, indices: Uint32Array.from(outIdx), vertCount };
 }
 
 /* Search the grid resolution that lands closest to the triangle budget. */
-function decimate(positions, indices, targetTris) {
-  let lo = 6, hi = 160, best = null;
+function decimate(positions, uvs, indices, targetTris) {
+  let lo = 2, hi = 200, best = null;
   for (let step = 0; step < 9; step++) {
     const mid = Math.round((lo + hi) / 2);
-    const r = cluster(positions, indices, mid);
+    const r = cluster(positions, uvs, indices, mid);
     const tris = r.indices.length / 3;
     if (!best || Math.abs(tris - targetTris) < Math.abs(best.tris - targetTris)) best = { res: mid, tris, r };
     if (tris > targetTris) hi = mid - 1;
@@ -290,29 +340,39 @@ function normals(positions, indices) {
 
 /* ---------- writing ---------- */
 
-function build(file, target) {
+function build(file, outDir, stem, target) {
+  const { json, bin } = readGLB(file);
   const raw = soup(file);
-  const meta = canonicalise(raw.positions, raw.indices);
-  const dec = decimate(raw.positions, raw.indices, target);
+  const dim = canonicalise(raw.positions);
+  const dec = decimate(raw.positions, raw.uvs, raw.indices, target);
   const pos = dec.r.positions;
   const idx = dec.r.indices;
-  const nrm = normals(pos, idx);
-  return { pos, idx, nrm, dim: meta.dim, before: meta.tris, after: idx.length / 3, res: dec.res };
+  const tex = dumpTexture(file, json, bin, outDir, stem);
+  return {
+    pos: pos, idx: idx, uv: dec.r.uvs, nrm: normals(pos, idx),
+    dim: dim, before: raw.indices.length / 3, after: idx.length / 3,
+    res: dec.res, sawUv: raw.sawUv, tex: tex
+  };
 }
 
 function write(outFile, vehicles) {
   let bytes = 8;
   vehicles.forEach(function (v) {
-    bytes += 4 + Buffer.byteLength(v.name) + 12 + 8 + v.pos.length * 4 * 2 + v.idx.length * 4;
+    bytes += 4 + Buffer.byteLength(v.name) + 4 + Buffer.byteLength(v.texName);
+    bytes += 12 + 8;
+    bytes += v.pos.length * 4 * 2 + v.uv.length * 4 + v.idx.length * 4;
   });
   const buf = Buffer.alloc(bytes);
   let o = 0;
-  buf.writeUInt32LE(0x31535256, o); o += 4;           // 'VRS1'
+  buf.writeUInt32LE(0x32535256, o); o += 4;           // 'VRS2'
   buf.writeUInt32LE(vehicles.length, o); o += 4;
   vehicles.forEach(function (v) {
     const name = Buffer.from(v.name, 'utf8');
     buf.writeUInt32LE(name.length, o); o += 4;
     name.copy(buf, o); o += name.length;
+    const tex = Buffer.from(v.texName, 'utf8');
+    buf.writeUInt32LE(tex.length, o); o += 4;
+    tex.copy(buf, o); o += tex.length;
     buf.writeFloatLE(v.dim[0], o); o += 4;
     buf.writeFloatLE(v.dim[1], o); o += 4;
     buf.writeFloatLE(v.dim[2], o); o += 4;
@@ -320,6 +380,7 @@ function write(outFile, vehicles) {
     buf.writeUInt32LE(v.idx.length / 3, o); o += 4;
     Buffer.from(v.pos.buffer, v.pos.byteOffset, v.pos.byteLength).copy(buf, o); o += v.pos.byteLength;
     Buffer.from(v.nrm.buffer, v.nrm.byteOffset, v.nrm.byteLength).copy(buf, o); o += v.nrm.byteLength;
+    Buffer.from(v.uv.buffer, v.uv.byteOffset, v.uv.byteLength).copy(buf, o); o += v.uv.byteLength;
     Buffer.from(v.idx.buffer, v.idx.byteOffset, v.idx.byteLength).copy(buf, o); o += v.idx.byteLength;
   });
   fs.writeFileSync(outFile, buf);
@@ -332,26 +393,31 @@ if (args.length < 3) {
   process.exit(1);
 }
 const outFile = args[0];
-const target = 2200;
+const outDir = path.dirname(outFile) || '.';
+const target = 8000;
 const vehicles = [];
-let beforeTris = 0, beforeBytes = 0;
+let beforeTris = 0, beforeBytes = 0, texBytes = 0;
 args.slice(1).forEach(function (f) {
   const t0 = Date.now();
-  const v = build(f, target);
+  const name = f.replace(/^.*[\\/]/, '').replace(/\.glb$/i, '');
+  const v = build(f, outDir, 'tex-' + name, target);
   beforeTris += v.before;
   beforeBytes += fs.statSync(f).size;
-  const name = f.replace(/^.*[\\/]/, '').replace(/\.glb$/i, '');
-  vehicles.push({ name: name, pos: v.pos, idx: v.idx, nrm: v.nrm, dim: v.dim });
+  const texName = v.tex ? v.tex.name : '';
+  if (v.tex) texBytes += v.tex.bytes;
+  vehicles.push({ name: name, pos: v.pos, idx: v.idx, uv: v.uv, nrm: v.nrm, dim: v.dim, texName: texName });
   console.log(name.padEnd(6) +
     ' tris ' + String(v.before).padStart(7) + ' -> ' + String(v.after).padStart(5) +
     '  verts ' + String(v.pos.length / 3).padStart(5) +
     '  grid ' + String(v.res).padStart(3) +
+    '  uv ' + (v.sawUv ? 'yes' : 'NO') +
+    '  tex ' + (v.tex ? v.tex.name + ' (' + (v.tex.bytes / 1024).toFixed(0) + ' KB)' : 'none') +
     '  dims ' + v.dim.map(function (d) { return d.toFixed(3); }).join(' x ') +
     '  ' + (Date.now() - t0) + 'ms');
 });
 const outBytes = write(outFile, vehicles);
 console.log('---');
-console.log('wrote ' + outFile + '  ' + (outBytes / 1024).toFixed(1) + ' KB');
+console.log('wrote ' + outFile + '  ' + (outBytes / 1024).toFixed(1) + ' KB  +  ' +
+  (texBytes / 1048576).toFixed(2) + ' MB of textures');
 console.log('source ' + (beforeBytes / 1048576).toFixed(1) + ' MB / ' + beforeTris.toLocaleString('en-US') +
   ' tris  ->  ' + vehicles.reduce(function (s, v) { return s + v.idx.length / 3; }, 0).toLocaleString('en-US') + ' tris');
-console.log('shrink: ' + (beforeBytes / outBytes).toFixed(0) + 'x smaller by bytes');
