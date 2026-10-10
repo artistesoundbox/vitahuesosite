@@ -37,14 +37,24 @@
  *     is calibrated to the position cell rather than guessed: the base-colour
  *     texture spans roughly the model's canonical width, so 1/UV_RES is about
  *     the same distance on the surface as one grid cell.
- *   - direction, because these are aircraft. A wing is a couple of hundredths
- *     of a unit thick, and with position alone the top and bottom surfaces
- *     land in the same cell, weld, and the wing collapses into a torn sheet
- *     with the sky showing through it. Bucketing the vertex normal keeps two
- *     opposing surfaces apart, which is what "the hull looks shredded" is.
- *     Do not "fix" that by tightening the UV bucket instead: a stricter key
- *     with the same triangle budget forces a coarser position grid, and the
- *     geometry gets worse, not better.
+ * Two more ideas live here as switches, both OFF, because they were measured
+ * and both made things worse (veh1, target 16,000):
+ *   - CUBE=1 clusters in cube-normalised space, on the theory that these
+ *     aircraft are thin (a wing is 0.02 of a unit thick, the span is 1.9) and
+ *     a cell size taken from the longest axis starves the thin one. Every axis
+ *     then gets the same cell count, the grid has to drop to keep the budget,
+ *     and area kept came out slightly worse: 68.8% against 70.1%.
+ *   - NRM=1 adds the surface direction to the key, on the theory that the two
+ *     faces of a wing must not weld. It does stop that, and that is the
+ *     problem: the vertex count stops responding to the grid resolution at
+ *     all, the binary search runs to its floor, and the mesh comes out folded
+ *     with 234% of its original area — worse than either alternative. There is
+ *     no setting of it that lands on a budget.
+ * What actually helped was simply spending more triangles (57.2% of the area
+ * kept at 8,000, 70.1% at 16,000, 80.7% at 32,000 — the loss is greebles and
+ * panel detail smaller than a cell collapsing, not the hull tearing in half).
+ * Do not "fix" a torn-looking hull by tightening the UV bucket either: a
+ * stricter key with the same budget forces a coarser position grid.
  *
  * The report prints two health numbers per model, because a decimated mesh can
  * hit its triangle target and still be wrong: the surface area it kept, and
@@ -72,12 +82,14 @@ const COMPONENT = { 5120: Int8Array, 5121: Uint8Array, 5122: Int16Array, 5123: U
 const COMP_BYTES = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
 const ITEMS = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT2: 4, MAT3: 9, MAT4: 16 };
 
-/* UV buckets across the atlas for the cluster key — see the header note. */
-const UV_RES = 48;
-/* Direction buckets per axis in the cluster key: coarse on purpose, so a
-   slightly curved surface still merges while the two sides of a thin wing do
-   not. 1.5 per unit means the normal components are split at about 0.67. */
-const NRM_BUCKETS = 1.5;
+/* Both of these are overridable from the environment so a decimation setting
+   can be compared against another one instead of argued about:
+     TRIS=8000 UV_RES=48 NRM=0 node tools/glb-decimate.js ...
+   NRM=0 turns the direction part of the key off. */
+const UV_RES = Number(process.env.UV_RES || 48);
+const NRM_BUCKETS = Number(process.env.NRM || 0);       // 0 = no direction in the key
+/* cluster in cube-normalised space — see the header. */
+const CUBE = process.env.CUBE === '1';
 
 /* ---------- glTF reading ---------- */
 
@@ -159,15 +171,19 @@ function nodeMatrices(json) {
   return world;
 }
 
-/* Every mesh, baked into one triangle soup in model space. UVs ride along. */
+/* Every mesh, baked into one triangle soup in model space. UVs and vertex
+   normals ride along; the normals are only used as a clustering key, and are
+   rebuilt as smooth area-weighted normals after the decimation. */
 function soup(file) {
   const { json, bin } = readGLB(file);
   const world = nodeMatrices(json);
   const positions = [];
   const uvs = [];
+  const nrms = [];
   const indices = [];
   let vertBase = 0;
   let sawUv = false;
+  let sawNrm = false;
 
   (json.nodes || []).forEach(function (n, ni) {
     if (n.mesh == null) return;
@@ -176,7 +192,9 @@ function soup(file) {
       if (p.attributes.POSITION == null) return;
       const pos = readAccessor(json, bin, p.attributes.POSITION);
       const uv = p.attributes.TEXCOORD_0 != null ? readAccessor(json, bin, p.attributes.TEXCOORD_0) : null;
+      const nrm = p.attributes.NORMAL != null ? readAccessor(json, bin, p.attributes.NORMAL) : null;
       if (uv) sawUv = true;
+      if (nrm) sawNrm = true;
       for (let i = 0; i < pos.count; i++) {
         const x = pos.array[i * 3], y = pos.array[i * 3 + 1], z = pos.array[i * 3 + 2];
         positions.push(
@@ -186,6 +204,15 @@ function soup(file) {
         );
         if (uv) uvs.push(uv.array[i * 2], uv.array[i * 2 + 1]);
         else uvs.push(0, 0);
+        if (nrm) {
+          /* rotated by the node's world matrix, which for these exports only
+             ever carries rotation and uniform scale, but normalise anyway */
+          const nx = m[0] * nrm.array[i * 3] + m[4] * nrm.array[i * 3 + 1] + m[8] * nrm.array[i * 3 + 2];
+          const ny = m[1] * nrm.array[i * 3] + m[5] * nrm.array[i * 3 + 1] + m[9] * nrm.array[i * 3 + 2];
+          const nz = m[2] * nrm.array[i * 3] + m[6] * nrm.array[i * 3 + 1] + m[10] * nrm.array[i * 3 + 2];
+          const l = Math.hypot(nx, ny, nz) || 1;
+          nrms.push(nx / l, ny / l, nz / l);
+        } else nrms.push(0, 0, 0);
       }
       if (p.indices != null) {
         const idx = readAccessor(json, bin, p.indices);
@@ -200,8 +227,10 @@ function soup(file) {
   return {
     positions: Float32Array.from(positions),
     uvs: Float32Array.from(uvs),
+    normals: Float32Array.from(nrms),
     indices: Uint32Array.from(indices),
-    sawUv: sawUv
+    sawUv: sawUv,
+    sawNrm: sawNrm
   };
 }
 
@@ -262,34 +291,45 @@ function canonicalise(positions) {
 /* Vertex clustering: average every vertex that shares a grid cell, then keep
    the triangles that survive with three distinct corners. Cheap, dependency
    free, and kind to silhouettes at the resolutions the game can actually show.
-   The cell key carries the UV as well as the position: a position-only key
-   welds vertices that sit either side of a texture seam and smears the paint
-   across the whole hull. */
-function cluster(positions, uvs, indices, res) {
+   The cell key carries the UV and the surface direction as well as the
+   position — see the header for why each of those is load-bearing. */
+function cluster(positions, uvs, nrms, indices, res, cube) {
   const b = bounds(positions);
   const size = [b.hi[0] - b.lo[0], b.hi[1] - b.lo[1], b.hi[2] - b.lo[2]];
   const longest = Math.max(size[0], size[1], size[2], 1e-6);
   const cell = longest / res;
   const uvRes = UV_RES;
-  const nx = Math.max(1, Math.ceil(size[0] / cell) + 1);
-  const ny = Math.max(1, Math.ceil(size[1] / cell) + 1);
+  /* per-axis scale: with cube=true every axis is stretched to the longest one
+     for the purposes of the grid, so all three get `res` cells and a thin wing
+     is not squashed into one of them. Undone again when the sums are written. */
+  const sc = cube
+    ? [longest / Math.max(size[0], 1e-6), longest / Math.max(size[1], 1e-6), longest / Math.max(size[2], 1e-6)]
+    : [1, 1, 1];
+  const nx = Math.max(1, Math.ceil((size[0] * sc[0]) / cell) + 1);
+  const ny = Math.max(1, Math.ceil((size[1] * sc[1]) / cell) + 1);
+  const nz = Math.max(1, Math.ceil((size[2] * sc[2]) / cell) + 1);
 
   const n = positions.length / 3;
   const remap = new Int32Array(n);
   const map = new Map();
-  const sums = [];   // [sx, sy, sz, count, su, sv]
+  const sums = [];   // [sx, sy, sz, count, su, sv] — positions in normalised space
   for (let i = 0; i < n; i++) {
-    const x = positions[i * 3], y = positions[i * 3 + 1], z = positions[i * 3 + 2];
+    const x = (positions[i * 3] - b.lo[0]) * sc[0];
+    const y = (positions[i * 3 + 1] - b.lo[1]) * sc[1];
+    const z = (positions[i * 3 + 2] - b.lo[2]) * sc[2];
     const u = uvs[i * 2], v = uvs[i * 2 + 1];
-    const ix = Math.min(nx - 1, Math.floor((x - b.lo[0]) / cell));
-    const iy = Math.min(ny - 1, Math.floor((y - b.lo[1]) / cell));
-    const iz = Math.floor((z - b.lo[2]) / cell);
+    const ix = Math.min(nx - 1, Math.floor(x / cell));
+    const iy = Math.min(ny - 1, Math.floor(y / cell));
+    const iz = Math.min(nz - 1, Math.floor(z / cell));
     /* rounded, not floored: a UV of exactly 0 or 1 must not land in a thin
        extra cell of its own, and negative UVs must stay distinct from small
        positive ones (wrapping happens at sample time, not here) */
     const iu = Math.round(u * uvRes);
     const iv = Math.round(v * uvRes);
-    const key = ix + ',' + iy + ',' + iz + ',' + iu + ',' + iv;
+    const inx = Math.round(nrms[i * 3] * NRM_BUCKETS);
+    const iny = Math.round(nrms[i * 3 + 1] * NRM_BUCKETS);
+    const inz = Math.round(nrms[i * 3 + 2] * NRM_BUCKETS);
+    const key = ix + ',' + iy + ',' + iz + ',' + iu + ',' + iv + ',' + inx + ',' + iny + ',' + inz;
     let id = map.get(key);
     if (id === undefined) {
       id = sums.length / 6;
@@ -300,6 +340,8 @@ function cluster(positions, uvs, indices, res) {
       sums[id * 6 + 3] += 1;
       sums[id * 6 + 4] += u; sums[id * 6 + 5] += v;
     }
+    /* averaged UVs are only half the story: the normals are rebuilt from the
+       decimated triangles afterwards, so nothing else has to be carried */
     remap[i] = id;
   }
 
@@ -308,9 +350,9 @@ function cluster(positions, uvs, indices, res) {
   const outUv = new Float32Array(vertCount * 2);
   for (let i = 0; i < vertCount; i++) {
     const c = sums[i * 6 + 3];
-    outPos[i * 3] = sums[i * 6] / c;
-    outPos[i * 3 + 1] = sums[i * 6 + 1] / c;
-    outPos[i * 3 + 2] = sums[i * 6 + 2] / c;
+    outPos[i * 3] = sums[i * 6] / c / sc[0] + b.lo[0];
+    outPos[i * 3 + 1] = sums[i * 6 + 1] / c / sc[1] + b.lo[1];
+    outPos[i * 3 + 2] = sums[i * 6 + 2] / c / sc[2] + b.lo[2];
     outUv[i * 2] = sums[i * 6 + 4] / c;
     outUv[i * 2 + 1] = sums[i * 6 + 5] / c;
   }
@@ -332,11 +374,11 @@ function cluster(positions, uvs, indices, res) {
 }
 
 /* Search the grid resolution that lands closest to the triangle budget. */
-function decimate(positions, uvs, indices, targetTris) {
-  let lo = 2, hi = 200, best = null;
-  for (let step = 0; step < 9; step++) {
+function decimate(positions, uvs, nrms, indices, targetTris, cube) {
+  let lo = 2, hi = 400, best = null;
+  for (let step = 0; step < 11; step++) {
     const mid = Math.round((lo + hi) / 2);
-    const r = cluster(positions, uvs, indices, mid);
+    const r = cluster(positions, uvs, nrms, indices, mid, cube);
     const tris = r.indices.length / 3;
     if (!best || Math.abs(tris - targetTris) < Math.abs(best.tris - targetTris)) best = { res: mid, tris, r };
     if (tris > targetTris) hi = mid - 1;
@@ -366,20 +408,60 @@ function normals(positions, indices) {
   return out;
 }
 
+/* ---------- health metrics ---------- */
+
+/* Total surface area. A decimation that welds a wing's two faces together, or
+   drops whole regions of the hull, loses area — so the fraction kept is a
+   direct read on whether the result is still the shape it started as. */
+function surfaceArea(positions, indices) {
+  let area = 0;
+  for (let t = 0; t < indices.length; t += 3) {
+    const a = indices[t] * 3, b = indices[t + 1] * 3, c = indices[t + 2] * 3;
+    const ax = positions[b] - positions[a], ay = positions[b + 1] - positions[a + 1], az = positions[b + 2] - positions[a + 2];
+    const bx = positions[c] - positions[a], by = positions[c + 1] - positions[a + 1], bz = positions[c + 2] - positions[a + 2];
+    area += Math.hypot(ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx) * 0.5;
+  }
+  return area;
+}
+
+/* The fraction of edges used by exactly one triangle. Where the surface is
+   closed this is near zero; tearing it open — the failure mode that makes a
+   hull look shredded — shows up here immediately. (The source is not closed
+   either: these exports arrive as several chunks, so their own seams count.) */
+function openEdgeFraction(indices) {
+  const count = new Map();
+  const add = function (a, b) {
+    const key = a < b ? a + ':' + b : b + ':' + a;
+    count.set(key, (count.get(key) || 0) + 1);
+  };
+  for (let t = 0; t < indices.length; t += 3) {
+    add(indices[t], indices[t + 1]);
+    add(indices[t + 1], indices[t + 2]);
+    add(indices[t + 2], indices[t]);
+  }
+  let open = 0;
+  count.forEach(function (n) { if (n === 1) open++; });
+  return count.size ? open / count.size : 0;
+}
+
 /* ---------- writing ---------- */
 
 function build(file, outDir, stem, target) {
   const { json, bin } = readGLB(file);
   const raw = soup(file);
   const dim = canonicalise(raw.positions);
-  const dec = decimate(raw.positions, raw.uvs, raw.indices, target);
+  const dec = decimate(raw.positions, raw.uvs, raw.normals, raw.indices, target, CUBE);
   const pos = dec.r.positions;
   const idx = dec.r.indices;
   const tex = dumpTexture(file, json, bin, outDir, stem);
+  const areaBefore = surfaceArea(raw.positions, raw.indices);
+  const areaAfter = surfaceArea(pos, idx);
   return {
     pos: pos, idx: idx, uv: dec.r.uvs, nrm: normals(pos, idx),
     dim: dim, before: raw.indices.length / 3, after: idx.length / 3,
-    res: dec.res, sawUv: raw.sawUv, tex: tex
+    res: dec.res, sawUv: raw.sawUv, tex: tex,
+    areaKept: areaBefore > 0 ? areaAfter / areaBefore : 1,
+    openEdges: openEdgeFraction(idx)
   };
 }
 
@@ -416,18 +498,19 @@ function write(outFile, vehicles) {
 }
 
 const args = process.argv.slice(2);
-if (args.length < 3) {
+if (args.length < 2) {
   console.log('usage: node tools/glb-decimate.js <out.bin> <model.glb> [more.glb ...]');
   process.exit(1);
 }
 const outFile = args[0];
 const outDir = path.dirname(outFile) || '.';
+let worstArea = 1, worstOpen = 0;
 /* 8,000 triangles was a budget for a hull that was only ever a glowing ASCII
-   silhouette. The plain 3D view is the game now, and at a 4-unit hull the
-   paint is the whole point — the decimation error still lands sub-pixel but
-   the *mapping* is what suffers, because clustering also moves the UVs. 16,000
-   halves that without becoming a download. */
-const target = 16000;
+   silhouette. The plain 3D view is the game now and the paint is the point, so
+   the budget goes up: 16,000 keeps 70% of the model's surface area against 57%
+   at 8,000, and the binary lands each hull within a few hundred triangles of
+   it. The binary has to search finer than it used to, hence the range. */
+const target = Number(process.env.TRIS || 16000);
 const vehicles = [];
 let beforeTris = 0, beforeBytes = 0, texBytes = 0;
 args.slice(1).forEach(function (f) {
@@ -439,6 +522,8 @@ args.slice(1).forEach(function (f) {
   const texName = v.tex ? v.tex.name : '';
   if (v.tex) texBytes += v.tex.bytes;
   vehicles.push({ name: name, pos: v.pos, idx: v.idx, uv: v.uv, nrm: v.nrm, dim: v.dim, texName: texName });
+  worstArea = Math.min(worstArea, v.areaKept);
+  worstOpen = Math.max(worstOpen, v.openEdges);
   console.log(name.padEnd(6) +
     ' tris ' + String(v.before).padStart(7) + ' -> ' + String(v.after).padStart(5) +
     '  verts ' + String(v.pos.length / 3).padStart(5) +
@@ -446,6 +531,8 @@ args.slice(1).forEach(function (f) {
     '  uv ' + (v.sawUv ? 'yes' : 'NO') +
     '  tex ' + (v.tex ? v.tex.name + ' (' + (v.tex.bytes / 1024).toFixed(0) + ' KB)' : 'none') +
     '  dims ' + v.dim.map(function (d) { return d.toFixed(3); }).join(' x ') +
+    '  area kept ' + (v.areaKept * 100).toFixed(1).padStart(5) + '%' +
+    '  open edges ' + (v.openEdges * 100).toFixed(1).padStart(4) + '%' +
     '  ' + (Date.now() - t0) + 'ms');
 });
 const outBytes = write(outFile, vehicles);
@@ -454,3 +541,4 @@ console.log('wrote ' + outFile + '  ' + (outBytes / 1024).toFixed(1) + ' KB  +  
   (texBytes / 1048576).toFixed(2) + ' MB of textures');
 console.log('source ' + (beforeBytes / 1048576).toFixed(1) + ' MB / ' + beforeTris.toLocaleString('en-US') +
   ' tris  ->  ' + vehicles.reduce(function (s, v) { return s + v.idx.length / 3; }, 0).toLocaleString('en-US') + ' tris');
+console.log('worst area kept ' + (worstArea * 100).toFixed(1) + '%   worst open edges ' + (worstOpen * 100).toFixed(1) + '%');
