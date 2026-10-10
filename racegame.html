@@ -1050,21 +1050,34 @@
     const features = [];      // boost arrows and ramps, in lap order
     let boostMat = null;      // one material for every arrow, so they pulse together
 
+    /* Two thirds of a lap is corner or the gentle bend into one, so there are
+       only four stretches here worth using and about 600 units of them. Which
+       is why the kinds come out of a shuffled bag rather than from an
+       independent roll each time: rolling per spot is what produced a lap of
+       three boost pads and no ramps at all. The bag guarantees a mix, the
+       draw-out of the bag is seeded, and the spot itself is still whichever
+       stretch happens to be free. */
     function buildFeatures() {
       const rnd = mulberry32(RNG_SEED ^ 0x5eed1);
-      let s = 26;
-      while (s < trackLen - 40) {
-        /* measured over the pad's own length plus a look-ahead: whatever is
+      const bag = ['boost', 'ramp', 'boost', 'ramp', 'ramp', 'boost'];
+      let bi = Math.floor(rnd() * bag.length);
+      let s = 26, placed = 0;
+      while (s < trackLen - 46) {
+        /* measured over the feature's own length plus a look-ahead: whatever is
            here has to be committed to, and the road has to let you */
-        if (!isStraight(s, 16, 40)) { s += 10; continue; }
-        const roll = rnd();
-        if (roll < 0.34) {
+        if (!isStraight(s, 16, 44)) { s += 8; continue; }
+        /* and it needs room after the one before it: a pad you cannot reach the
+           speed for, or a ramp you land in the middle of another ramp */
+        if (placed && rnd() < 0.22) { s += 14; continue; }
+        const kind = bag[bi % bag.length];
+        bi++;
+        if (kind === 'boost') {
           features.push({
             kind: 'boost', s0: s, s1: s + BOOST_LEN, s: s + BOOST_LEN * 0.5,
-            lat: clamp(targetLine(s), -3.2, 3.2), half: BOOST_HALF
+            lat: clamp(targetLine(s), -3.4, 3.4), half: BOOST_HALF
           });
-          s += 120 + rnd() * 110;
-        } else if (roll < 0.56) {
+          s += 54 + rnd() * 40;
+        } else {
           /* a ramp takes a lane and leaves the other one clear, so there is
              always a way past it — and hitting it flat out is a choice */
           const side = rnd() < 0.5 ? -1 : 1;
@@ -1072,10 +1085,9 @@
             kind: 'ramp', s0: s, s1: s + RAMP_LEN, s: s + RAMP_LEN * 0.5,
             lat: side * 3.5, half: RAMP_HALF, h: RAMP_H
           });
-          s += 190 + rnd() * 130;
-        } else {
-          s += 70 + rnd() * 100;
+          s += 74 + rnd() * 60;
         }
+        placed++;
       }
       buildFeatureGeometry();
     }
@@ -2212,6 +2224,8 @@
             s: +mm.s.toFixed(2), lat: +mm.lat.toFixed(2), v: +mm.v.toFixed(2),
             raceTime: +raceTime.toFixed(2), bestLap: +bestLap.toFixed(2), fps: fps,
             shake: +shake.toFixed(3), offRoad: offRoad,
+            boostT: +mm.boostT.toFixed(2), boostCd: +mm.boostCd.toFixed(2), shield: mm.shield,
+            hgt: +mm.hgt.toFixed(2), air: mm.air, look: [+lookYaw.toFixed(2), +lookPitch.toFixed(2)],
             pad: pad.live, padSteer: +pad.steer.toFixed(2), padThrottle: +pad.throttle.toFixed(2),
             input: { steer: +mm.input.steer.toFixed(2), throttle: +mm.input.throttle.toFixed(2), brake: +mm.input.brake.toFixed(2) },
             keysDown: Object.keys(keys).filter(function (k) { return keys[k]; }),
