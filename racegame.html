@@ -267,13 +267,22 @@
     const SHOULDER_SLOPE = 4;     // over*14, which out-pulled the engine (27) and
                                   // left a crashed hull unable to move or steer
     /* Two numbers, two jobs. STEER_ACCEL is how hard the hull can push
-       sideways, which is what decides the speed a corner can be held at;
-       LATERAL_DAMP turns that into a top sideways *speed* of about 10 units/s
-       (authority divided by damping), which is what stops full lock from
-       slamming you into the barrier in half a second. */
+       sideways, LATERAL_DAMP turns that into a top sideways *speed* of about
+       authority divided by damping, and that sideways speed is the one that
+       matters to a driver: it is how long a lane change takes.
+
+       It was 3 units/s at full speed — a 14-unit road took nearly five seconds
+       to cross, so a 5-unit boost pad or a powerup sitting off the racing line
+       was simply unreachable, which is exactly what "left and right feel
+       constricted" was. Grip now falls off at 0.45 rather than 0.7 and the
+       damping is 9, which puts a lane change at about 8 units/s flat out — the
+       road crossed in under two seconds — while a corner still throws you wide
+       at 17 units/s if you take it too fast, so the corner model is intact.
+       The two are coupled: raising the authority without the loss and damping
+       also raises the speed a corner can be held at. */
     const STEER_ACCEL  = 130;     // lateral authority at full grip
-    const GRIP_LOSS    = 0.7;     // how much of it speed costs you
-    const LATERAL_DAMP = 13;
+    const GRIP_LOSS    = 0.45;    // how much of it speed costs you
+    const LATERAL_DAMP = 9;
     const CENTRIFUGAL  = 0.55;    // how hard a corner throws you wide
     const GRIP_FROM_V  = 12;      // below this, side force fades in
     const TRACK_HALF   = 7.0;     // asphalt half-width
@@ -302,7 +311,7 @@
        Boost arrows and ramps are placed along the spline from the seed, on the
        straights only, so a feature can never arrive mid-corner. */
     const BOOST_LEN = 9;          // how long the painted arrows are
-    const BOOST_HALF = 2.6;       // and how wide a stripe of road they claim
+    const BOOST_HALF = 3.2;       // and how wide a stripe of road they claim
     const BOOST_GAIN = 13;        // units/s handed over on contact
     const BOOST_TIME = 1.5;       // seconds of raised ceiling per hit
     const BOOST_TOP = 1.22;       // how much more top speed that buys
@@ -313,7 +322,7 @@
     const RAMP_LIFT = 0.155;      // of your speed, turned into upward speed at the lip
     const GRAVITY = 24;
     /* ---------- pickups ---------- */
-    const PICKUP_R = 2.3;         // how close counts as collected
+    const PICKUP_R = 2.8;         // how close counts as collected
     const PICKUP_RESPAWN = 11;    // seconds
     const POWER_TIME = 3.4;       // boost powerup duration
 
@@ -1990,7 +1999,12 @@
       const lx = clamp(pad.lookX + lookDragX, -1, 1);
       const ly = clamp(pad.lookY + lookDragY, -1, 1);
       if (lx || ly) {
-        lookYaw = clamp(lookYaw - lx * 2.6 * dt, -LOOK_MAX, LOOK_MAX);
+        /* Positive lookYaw swings the view to the driver's RIGHT, so stick
+           right (and a drag to the right) increases it. This is the one sign
+           in the whole control scheme that is worth writing down: it was
+           backwards, and the only symptom was a camera that turned the wrong
+           way on a stick nobody was holding. */
+        lookYaw = clamp(lookYaw + lx * 2.6 * dt, -LOOK_MAX, LOOK_MAX);
         lookPitch = clamp(lookPitch + ly * 1.7 * dt, -0.5, 0.85);
       } else {
         lookYaw *= Math.exp(-2.8 * dt);
@@ -2285,6 +2299,30 @@
         air: function () {
           const r = racers[playerIdx];
           return { hgt: +r.hgt.toFixed(3), vy: +r.vy.toFixed(2), air: r.air, ground: +rampHeightAt(r.s, r.lat).toFixed(3) };
+        },
+        /* every mesh in the scene, with its triangle count and where it sits:
+           what the generator built, measured instead of eyeballed */
+        scene: function () {
+          const out = [];
+          scene.children.forEach(function (o) {
+            const g = o.geometry;
+            const tris = g ? (g.index ? g.index.count / 3 : (g.attributes.position ? g.attributes.position.count / 3 : 0)) : 0;
+            let bb = null;
+            if (g && g.attributes.position && tris) {
+              g.computeBoundingBox();
+              const b = g.boundingBox;
+              bb = [+b.min.x.toFixed(1), +b.min.y.toFixed(1), +b.min.z.toFixed(1),
+                    +b.max.x.toFixed(1), +b.max.y.toFixed(1), +b.max.z.toFixed(1)];
+            }
+            out.push({
+              tris: Math.round(tris), bbox: bb,
+              map: !!(o.material && o.material.map),
+              vcol: !!(o.material && o.material.vertexColors),
+              pos: o.position && o.position.length() > 0 ? [+o.position.x.toFixed(1), +o.position.y.toFixed(2), +o.position.z.toFixed(1)] : null
+            });
+          });
+          return { children: out.length, draws: renderer.info.render.calls,
+            drawnTris: renderer.info.render.triangles, meshes: out };
         },
         /* the curvature profile of the lap, sampled the way the generator sees
            it: this is what decides whether a stretch counts as a straight */

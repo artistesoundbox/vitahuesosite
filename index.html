@@ -27,12 +27,15 @@
     }
     </script>
     <style>
-        /* Icon grid: 4 per row, left to right (banner above, labels under each) */
+        /* Icon grid: 3 per row, left to right (banner above, labels under each).
+           Ten tiles at three across is four rows rather than five, so the stack
+           is shorter than it was — which the fit-to-screen rules at the bottom
+           of this block like. */
         .button-container {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 30px 26px;
-            max-width: 560px;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 26px 20px;
+            max-width: 780px;
             margin: 0 auto;
             align-items: start;
             justify-items: center;
@@ -112,6 +115,22 @@
         }
         .ca-art-link:hover #gev-art-img {
             box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
+        }
+
+        /* CITY GRAND PRIX art button — amber/cyan glow, to match the game's
+           neon and its boost arrows */
+        #gp-art-img {
+            display: block;
+            max-width: 215px;
+            width: 100%;
+            height: auto;
+            margin: 0 auto;
+            border-radius: 18px;
+            box-shadow: 0 0 22px rgba(255, 194, 71, 0.32);
+            transition: box-shadow 0.25s ease;
+        }
+        .ca-art-link:hover #gp-art-img {
+            box-shadow: 0 0 26px rgba(120, 255, 220, 0.55);
         }
 
         /* SQUISHY art button — same spec, pink glow to match the blob */
@@ -202,7 +221,7 @@
         .button-container { gap: 30px 26px; }
         .music-link { width: auto; margin: 0; }
         #site-banner-img { width: min(330px, 60vw); }
-        #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #sq-art-img, #music-img {
+        #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #sq-art-img, #gp-art-img, #music-img {
             display: block;
             margin: 0 auto;   /* keep the chip centered under the column */
             width: auto;
@@ -225,18 +244,19 @@
             text-shadow: 0 0 5px rgba(10, 22, 48, 0.95), 0 0 10px rgba(10, 22, 48, 0.8), 0 2px 4px rgba(4, 7, 13, 0.9);
         }
 
-        /* Phones: 2 icons per row, bigger art, roomier breathing space */
+        /* Phones: still three across — the column is narrower, so the art is
+           capped by the same fit-to-screen heights and the labels shrink. */
         @media (max-width: 640px) {
             .button-container {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-                gap: 30px 18px;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 22px 10px;
                 max-width: 560px;
             }
-            #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #sq-art-img, #music-img {
+            #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #sq-art-img, #gp-art-img, #music-img {
                 max-width: min(100%, 210px);
                 max-height: clamp(110px, 19vh, 190px);
             }
-            .art-label { font-size: 12px; letter-spacing: 0.06em; }
+            .art-label { font-size: 11px; letter-spacing: 0.04em; }
         }
     </style>
 </head>
@@ -310,6 +330,13 @@
                 <a href="gods-eye-view/" class="ca-art-link" id="gods-eye-button" aria-label="God's Eye View – live intelligence console">
                     <img src="godseyeicon.png" alt="God's Eye View" id="gev-art-img" />
                     <span class="art-label">God's Eye View</span>
+                </a>
+
+            <!-- City Grand Prix — the aircraft racer through a live city -->
+
+                <a href="racegame.html" class="ca-art-link" id="gp-button" aria-label="City Grand Prix – five aircraft race a generated city circuit">
+                    <img src="racericon.png" alt="City Grand Prix – race the generated city" id="gp-art-img" />
+                    <span class="art-label">City Grand Prix</span>
                 </a>
 
         <!-- MY MUSIC — the fivetilogy on BandLab -->

@@ -82,6 +82,10 @@ const COMPONENT = { 5120: Int8Array, 5121: Uint8Array, 5122: Int16Array, 5123: U
 const COMP_BYTES = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
 const ITEMS = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT2: 4, MAT3: 9, MAT4: 16 };
 
+/* The atlas these exports ship: 1024 x 1024, read out of the headers of all
+   five, and the unit the reported UV error is measured in. */
+const TEXELS = 1024;
+
 /* Both of these are overridable from the environment so a decimation setting
    can be compared against another one instead of argued about:
      TRIS=8000 UV_RES=48 NRM=0 node tools/glb-decimate.js ...
@@ -357,6 +361,23 @@ function cluster(positions, uvs, nrms, indices, res, cube) {
     outUv[i * 2 + 1] = sums[i * 6 + 5] / c;
   }
 
+  /* How far the decimation moved each vertex's UV, in whole texels of a 1024
+     atlas. This is the number that decides whether the paint still lands where
+     the exporter put it, and it is not visible in any triangle count: the two
+     vertices either side of a seam both survive, at slightly wrong places, and
+     the livery smears. Measured, not assumed. */
+  const uvErr = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const id = remap[i];
+    const c = sums[id * 6 + 3];
+    const du = (sums[id * 6 + 4] / c - uvs[i * 2]) * TEXELS;
+    const dv = (sums[id * 6 + 5] / c - uvs[i * 2 + 1]) * TEXELS;
+    uvErr[i] = Math.hypot(du, dv);
+  }
+  const sorted = Array.prototype.slice.call(uvErr).sort(function (a, b) { return a - b; });
+  const pick = function (f) { return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * f))]; };
+  const uvStats = { p50: pick(0.5), p95: pick(0.95), max: sorted[sorted.length - 1] || 0 };
+
   const seen = new Set();
   const outIdx = [];
   for (let t = 0; t < indices.length; t += 3) {
@@ -370,7 +391,7 @@ function cluster(positions, uvs, nrms, indices, res, cube) {
     seen.add(key);
     outIdx.push(a, bb, c);
   }
-  return { positions: outPos, uvs: outUv, indices: Uint32Array.from(outIdx), vertCount };
+  return { positions: outPos, uvs: outUv, indices: Uint32Array.from(outIdx), vertCount, uvStats };
 }
 
 /* Search the grid resolution that lands closest to the triangle budget. */
@@ -459,7 +480,7 @@ function build(file, outDir, stem, target) {
   return {
     pos: pos, idx: idx, uv: dec.r.uvs, nrm: normals(pos, idx),
     dim: dim, before: raw.indices.length / 3, after: idx.length / 3,
-    res: dec.res, sawUv: raw.sawUv, tex: tex,
+    res: dec.res, sawUv: raw.sawUv, tex: tex, uvStats: dec.r.uvStats,
     areaKept: areaBefore > 0 ? areaAfter / areaBefore : 1,
     openEdges: openEdgeFraction(idx)
   };
@@ -504,7 +525,7 @@ if (args.length < 2) {
 }
 const outFile = args[0];
 const outDir = path.dirname(outFile) || '.';
-let worstArea = 1, worstOpen = 0;
+let worstArea = 1, worstOpen = 0, worstUv = 0;
 /* 8,000 triangles was a budget for a hull that was only ever a glowing ASCII
    silhouette. The plain 3D view is the game now and the paint is the point, so
    the budget goes up: 16,000 keeps 70% of the model's surface area against 57%
@@ -524,6 +545,7 @@ args.slice(1).forEach(function (f) {
   vehicles.push({ name: name, pos: v.pos, idx: v.idx, uv: v.uv, nrm: v.nrm, dim: v.dim, texName: texName });
   worstArea = Math.min(worstArea, v.areaKept);
   worstOpen = Math.max(worstOpen, v.openEdges);
+  worstUv = Math.max(worstUv, v.uvStats.p95);
   console.log(name.padEnd(6) +
     ' tris ' + String(v.before).padStart(7) + ' -> ' + String(v.after).padStart(5) +
     '  verts ' + String(v.pos.length / 3).padStart(5) +
@@ -532,6 +554,7 @@ args.slice(1).forEach(function (f) {
     '  tex ' + (v.tex ? v.tex.name + ' (' + (v.tex.bytes / 1024).toFixed(0) + ' KB)' : 'none') +
     '  dims ' + v.dim.map(function (d) { return d.toFixed(3); }).join(' x ') +
     '  area kept ' + (v.areaKept * 100).toFixed(1).padStart(5) + '%' +
+    '  uv err ' + v.uvStats.p50.toFixed(1) + '/' + v.uvStats.p95.toFixed(1) + ' tex' +
     '  open edges ' + (v.openEdges * 100).toFixed(1).padStart(4) + '%' +
     '  ' + (Date.now() - t0) + 'ms');
 });
@@ -541,4 +564,5 @@ console.log('wrote ' + outFile + '  ' + (outBytes / 1024).toFixed(1) + ' KB  +  
   (texBytes / 1048576).toFixed(2) + ' MB of textures');
 console.log('source ' + (beforeBytes / 1048576).toFixed(1) + ' MB / ' + beforeTris.toLocaleString('en-US') +
   ' tris  ->  ' + vehicles.reduce(function (s, v) { return s + v.idx.length / 3; }, 0).toLocaleString('en-US') + ' tris');
-console.log('worst area kept ' + (worstArea * 100).toFixed(1) + '%   worst open edges ' + (worstOpen * 100).toFixed(1) + '%');
+console.log('worst area kept ' + (worstArea * 100).toFixed(1) + '%   worst open edges ' + (worstOpen * 100).toFixed(1) +
+  '%   worst uv error p95 ' + worstUv.toFixed(1) + ' texels of ' + TEXELS);
