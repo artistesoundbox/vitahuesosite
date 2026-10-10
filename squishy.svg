@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Squishy – a soft cosmic blob">
+  <defs>
+    <radialGradient id="sq-bg" cx="50%" cy="34%" r="78%">
+      <stop offset="0" stop-color="#2a1f52"/>
+      <stop offset="0.55" stop-color="#101733"/>
+      <stop offset="1" stop-color="#05070f"/>
+    </radialGradient>
+    <radialGradient id="sq-skin" cx="35%" cy="28%" r="82%">
+      <stop offset="0" stop-color="#ffd7e6"/>
+      <stop offset="0.42" stop-color="#ff74a4"/>
+      <stop offset="0.82" stop-color="#ef3d7d"/>
+      <stop offset="1" stop-color="#b81f5c"/>
+    </radialGradient>
+    <radialGradient id="sq-halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ff74a4" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ff74a4" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="sq-glint" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sq-pool" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff74a4" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#ff74a4" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="72" fill="url(#sq-bg)"/>
+
+  <!-- little stars -->
+  <g fill="#cfe0ff">
+    <circle cx="86" cy="96" r="3.4" opacity="0.85"/>
+    <circle cx="428" cy="132" r="2.6" opacity="0.7"/>
+    <circle cx="118" cy="392" r="2.2" opacity="0.6"/>
+    <circle cx="396" cy="368" r="3" opacity="0.75"/>
+    <circle cx="256" cy="62" r="2.4" opacity="0.55"/>
+  </g>
+
+  <ellipse cx="256" cy="430" rx="158" ry="34" fill="url(#sq-pool)"/>
+  <circle cx="256" cy="256" r="186" fill="url(#sq-halo)"/>
+
+  <!-- the squishy body -->
+  <ellipse cx="256" cy="262" rx="152" ry="140" fill="url(#sq-skin)"/>
+
+  <!-- blush -->
+  <ellipse cx="150" cy="300" rx="30" ry="17" fill="#ff9dc0" opacity="0.75"/>
+  <ellipse cx="362" cy="300" rx="30" ry="17" fill="#ff9dc0" opacity="0.75"/>
+
+  <!-- eyes -->
+  <ellipse cx="203" cy="238" rx="21" ry="27" fill="#150f2b"/>
+  <ellipse cx="309" cy="238" rx="21" ry="27" fill="#150f2b"/>
+  <circle cx="210" cy="228" r="7.5" fill="#ffffff"/>
+  <circle cx="316" cy="228" r="7.5" fill="#ffffff"/>
+
+  <!-- smile -->
+  <path d="M226 300 q30 34 60 0" fill="none" stroke="#7c1035" stroke-width="9" stroke-linecap="round" opacity="0.9"/>
+
+  <!-- glossy highlight -->
+  <ellipse cx="204" cy="168" rx="52" ry="30" fill="url(#sq-glint)" opacity="0.6"
+           transform="rotate(-20 204 168)"/>
+</svg>

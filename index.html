@@ -114,6 +114,21 @@
             box-shadow: 0 0 26px rgba(80, 150, 255, 0.5);
         }
 
+        /* SQUISHY art button — same spec, pink glow to match the blob */
+        #sq-art-img {
+            display: block;
+            max-width: 215px;
+            width: 100%;
+            height: auto;
+            margin: 0 auto;
+            border-radius: 18px;
+            box-shadow: 0 0 22px rgba(255, 100, 160, 0.35);
+            transition: box-shadow 0.25s ease;
+        }
+        .ca-art-link:hover #sq-art-img {
+            box-shadow: 0 0 26px rgba(255, 130, 175, 0.6);
+        }
+
         /* MY MUSIC link — chip under the buttons (BandLab albums page) */
         .music-link {
             pointer-events: auto;
@@ -187,7 +202,7 @@
         .button-container { gap: 30px 26px; }
         .music-link { width: auto; margin: 0; }
         #site-banner-img { width: min(330px, 60vw); }
-        #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #music-img {
+        #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #sq-art-img, #music-img {
             display: block;
             margin: 0 auto;   /* keep the chip centered under the column */
             width: auto;
@@ -217,7 +232,7 @@
                 gap: 30px 18px;
                 max-width: 560px;
             }
-            #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #music-img {
+            #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #sq-art-img, #music-img {
                 max-width: min(100%, 210px);
                 max-height: clamp(110px, 19vh, 190px);
             }
@@ -267,6 +282,13 @@
                 <a href="trainyouralien.html" class="ca-art-link" id="tya-button" aria-label="Train Your Alien – raise a little cosmic friend">
                     <img src="trainyouralien/trainyouralien.png" alt="Train Your Alien – raise a little cosmic friend" id="tya-art-img" />
                     <span class="art-label">Train Your Alien</span>
+                </a>
+
+            <!-- SQUISHY — the soft-body toy blob -->
+
+                <a href="squishy.html" class="ca-art-link" id="sq-button" aria-label="Squishy – a soft cosmic blob you can squash">
+                    <img src="squishy.svg" alt="Squishy – a soft cosmic blob" id="sq-art-img" />
+                    <span class="art-label">Squishy</span>
                 </a>
 
             <!-- SEBLERSKERS — the viking island saga -->
