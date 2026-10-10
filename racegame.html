@@ -246,9 +246,19 @@
     const BRAKE        = 62;
     const DRAG         = 0.0026;  // v squared
     const ROLL_DRAG    = 0.9;
-    const STEER_ACCEL  = 120;     // lateral authority at full grip
+    const REVERSE_MAX  = 9;       // units per second, in reverse
+    const REVERSE_ACC  = 13;
+    const SHOULDER_DRAG = 6;      // must stay well under ACCEL: it used to be 13 +
+    const SHOULDER_SLOPE = 4;     // over*14, which out-pulled the engine (27) and
+                                  // left a crashed hull unable to move or steer
+    /* Two numbers, two jobs. STEER_ACCEL is how hard the hull can push
+       sideways, which is what decides the speed a corner can be held at;
+       LATERAL_DAMP turns that into a top sideways *speed* of about 10 units/s
+       (authority divided by damping), which is what stops full lock from
+       slamming you into the barrier in half a second. */
+    const STEER_ACCEL  = 130;     // lateral authority at full grip
     const GRIP_LOSS    = 0.7;     // how much of it speed costs you
-    const LATERAL_DAMP = 3.2;
+    const LATERAL_DAMP = 13;
     const CENTRIFUGAL  = 0.55;    // how hard a corner throws you wide
     const GRIP_FROM_V  = 12;      // below this, side force fades in
     const TRACK_HALF   = 7.0;     // asphalt half-width
@@ -393,6 +403,7 @@
        the ASCII pass
        ============================================================ */
     let renderer, scene, camera, asciiScene, asciiCam, asciiMat, rt, glyphTex;
+    let hemiLight = null, keyLight = null, rimLight = null;
     let glyphCount = 0, cols = 150, rows = 40, cellW = 8.4, cellH = 15.3, dpr = 1;
 
     const GLYPH_RAMP = ' .,:;i1tfLCOG08@';
@@ -733,7 +744,8 @@
         const colour = BODY_COLOURS[i % BODY_COLOURS.length];
         const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
           color: colour,
-          emissive: new THREE.Color(colour).multiplyScalar(0.5),
+          emissive: new THREE.Color(colour),
+          emissiveIntensity: 0.5,      // ASCII wants glowing hulls; 3D does not
           side: THREE.DoubleSide
         }));
         const scale = VEHICLE_SIZE / Math.max(dim[0], dim[2]);
@@ -793,9 +805,9 @@
     /* the fastest a hull can hold a corner of curvature k */
     function cornerSpeed(k) {
       let v = MAX_SPEED;
-      for (let i = 0; i < 7; i++) {
-        if (STEER_ACCEL * gripAt(v) >= Math.abs(k) * v * v) break;
-        v *= 0.86;
+      for (let i = 0; i < 9; i++) {
+        if (STEER_ACCEL * gripAt(v) >= Math.abs(k) * v * v * CENTRIFUGAL) break;
+        v *= 0.9;
       }
       return clamp(v, 15, MAX_SPEED);
     }
@@ -809,7 +821,9 @@
     function driveRacer(r, dt) {
       const inp = r.input;
       const look = trackAt(r.s);
-      const speedFactor = clamp(r.v / GRIP_FROM_V, 0, 1);
+      /* never all the way to zero: with no lateral authority at all a stopped
+         hull can neither steer off a shoulder nor line up a restart */
+      const speedFactor = clamp(Math.abs(r.v) / GRIP_FROM_V, 0.3, 1);
 
       /* --- steering: authority falls with speed, and needs speed at all --- */
       if (r.isPlayer) {
@@ -826,29 +840,55 @@
       /* --- speed --- */
       let thr = clamp(inp.throttle, 0, 1);
       if (raceState === 'countdown' || raceState === 'loading') thr = 0;
+      const braking = clamp(inp.brake, 0, 1);
       r.v += ACCEL * thr * dt;
-      r.v -= BRAKE * clamp(inp.brake, 0, 1) * dt;
+      /* stopped and still leaning on the brake = reverse, so a wall is never
+         the end of your race */
+      if (braking > 0 && r.v <= 0.4) r.v -= REVERSE_ACC * braking * dt;
+      else r.v -= BRAKE * braking * dt;
       r.v -= (DRAG * r.v * r.v + ROLL_DRAG) * dt;
 
       let off = false;
-      if (Math.abs(r.lat) > TRACK_HALF) {
-        const over = Math.abs(r.lat) - TRACK_HALF;
-        if (over < WALL_AT - TRACK_HALF) {
-          r.v -= (13 + over * 14) * dt;          // the shoulder eats speed
+      const sideways = Math.abs(r.lat);
+      if (sideways > TRACK_HALF) {
+        if (sideways < WALL_AT) {
+          /* the shoulder is firm but always beatable: this drag has to stay
+             under ACCEL, or a crash strands you off the road for good */
+          r.v -= (SHOULDER_DRAG + (sideways - TRACK_HALF) * SHOULDER_SLOPE) * dt;
           off = true;
         } else {
-          r.lat = Math.sign(r.lat) * (WALL_AT - 0.06);
-          r.latV = -r.latV * 0.3;
-          if (r.v > 8) { r.v *= 0.45; if (r.isPlayer) crunch(); }
-          else r.v *= 0.9;
+          /* a barrier shoves the hull back towards the tarmac and keeps
+             pushing, so scraping can never pin you. The price is paid once per
+             contact — charging it every frame is what used to trap the player. */
+          const side = Math.sign(r.lat);
+          r.lat = side * (WALL_AT - 0.02);
+          r.latV = -side * 3;
+          if (!r.wallTouch) {
+            r.wallTouch = true;
+            if (r.v > 10) { r.v *= 0.5; if (r.isPlayer) crunch(); }
+          }
         }
       }
+      if (sideways < WALL_AT - 0.35) r.wallTouch = false;
       if (r.isPlayer) setSkid(off);
 
-      r.v = clamp(r.v, 0, MAX_SPEED);
+      r.v = clamp(r.v, -REVERSE_MAX, MAX_SPEED);
 
       const prevS = r.s;
       r.s = wrapS(r.s + r.v * dt);
+
+      /* a marshal's nudge: wedged off the road and going nowhere for three
+         seconds, and the hull is put back on the tarmac. Nothing is worse in a
+         toy than being trapped by it. */
+      if (r.isPlayer && raceState === 'racing') {
+        if (Math.abs(r.lat) > TRACK_HALF - 0.5 && Math.abs(r.v) < 2.5) {
+          r.stuckFor = (r.stuckFor || 0) + dt;
+          if (r.stuckFor > 3) {
+            r.lat = 0; r.latV = 0; r.v = 7; r.stuckFor = 0;
+            showMsg('MARSHAL NUDGE', 1000);
+          }
+        } else r.stuckFor = 0;
+      }
 
       /* --- crossing the line --- */
       if (prevS > trackLen - 16 && r.s < 16 && r.v > 0) {
@@ -1003,9 +1043,12 @@
     const touch = { steer: 0, throttle: 0, brake: 0 };
 
     function readInput() {
+      /* positive steer means towards +lat, and the track's normal points to
+         the driver's LEFT — so the left key is the positive one. Getting this
+         backwards is invisible in the code and obvious the moment you drive. */
       let steer = 0, throttle = 0, brake = 0;
-      if (keys['ArrowLeft'] || keys['a'] || keys['A']) steer -= 1;
-      if (keys['ArrowRight'] || keys['d'] || keys['D']) steer += 1;
+      if (keys['ArrowLeft'] || keys['a'] || keys['A']) steer += 1;
+      if (keys['ArrowRight'] || keys['d'] || keys['D']) steer -= 1;
       if (keys['ArrowUp'] || keys['w'] || keys['W']) throttle = 1;
       if (keys['ArrowDown'] || keys['s'] || keys['S']) brake = 1;
       if (touch.steer) steer = touch.steer;
@@ -1038,8 +1081,8 @@
       el.addEventListener('pointercancel', function () { set(false); });
       el.addEventListener('pointerleave', function () { set(false); });
     }
-    bindPad(document.getElementById('pad-left'), function () { touch.steer = -1; }, function () { if (touch.steer < 0) touch.steer = 0; });
-    bindPad(document.getElementById('pad-right'), function () { touch.steer = 1; }, function () { if (touch.steer > 0) touch.steer = 0; });
+    bindPad(document.getElementById('pad-left'), function () { touch.steer = 1; }, function () { if (touch.steer > 0) touch.steer = 0; });
+    bindPad(document.getElementById('pad-right'), function () { touch.steer = -1; }, function () { if (touch.steer < 0) touch.steer = 0; });
     bindPad(document.getElementById('pad-gas'), function () { touch.throttle = 1; }, function () { touch.throttle = 0; });
     bindPad(document.getElementById('pad-brake'), function () { touch.brake = 1; }, function () { touch.brake = 0; });
     if (window.matchMedia && (window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 760)) {
@@ -1056,10 +1099,31 @@
       asciiMat.uniforms.uMode.value = toPhosphor ? 1 : 0;
       modeBtn.textContent = toPhosphor ? '◨ Phosphor' : '◨ Colour';
     }
+    /* The two views want opposite lighting. ASCII needs a dim scene so the
+       ramp has headroom; the solid view needs a real rig, or it reads as a
+       dark grey diagram. */
+    function applyLightRig() {
+      const solid = rawView;
+      if (hemiLight) hemiLight.intensity = solid ? 0.95 : 0.4;
+      if (keyLight) keyLight.intensity = solid ? 2.5 : 1.0;
+      if (rimLight) rimLight.intensity = solid ? 0.7 : 0.32;
+      if (renderer) {
+        renderer.toneMapping = solid ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
+        renderer.toneMappingExposure = solid ? 1.05 : 1;
+      }
+      if (scene && scene.fog) { scene.fog.near = solid ? 70 : 25; scene.fog.far = solid ? 340 : 115; }
+      racers.forEach(function (r) {
+        if (r.mesh) r.mesh.material.emissiveIntensity = solid ? 0.16 : 0.5;
+      });
+    }
+
     let rawView = false;
+    try { rawView = localStorage.getItem('vh-ascii-gp-view') === '3d'; } catch (e) {}
     function toggleRaw() {
       rawView = !rawView;
       rawBtn.textContent = rawView ? '▤ 3D view' : '▤ ASCII';
+      try { localStorage.setItem('vh-ascii-gp-view', rawView ? '3d' : 'ascii'); } catch (e) {}
+      applyLightRig();
       return rawView;
     }
     rawBtn.addEventListener('click', toggleRaw);
@@ -1246,11 +1310,12 @@
       scene.fog = new THREE.Fog(0x05070d, 25, 115);
       camera = new THREE.PerspectiveCamera(50, 1, 0.4, 620);
 
-      /* deliberately dim for an ASCII ramp: if a lit face saturates it stamps
-         the densest glyph everywhere and the whole screen becomes one texture */
-      scene.add(new THREE.HemisphereLight(0xbcd7ff, 0x141c26, 0.4));
-      const key = new THREE.DirectionalLight(0xffffff, 1.0); key.position.set(40, 90, 30); scene.add(key);
-      const rim = new THREE.DirectionalLight(0x66ffcc, 0.32); rim.position.set(-50, 30, -60); scene.add(rim);
+      /* Deliberately dim for an ASCII ramp: if a lit face saturates it stamps
+         the densest glyph everywhere and the screen turns into one texture.
+         The solid 3D view gets its own, much brighter rig (applyLightRig). */
+      hemiLight = new THREE.HemisphereLight(0xbcd7ff, 0x141c26, 0.4); scene.add(hemiLight);
+      keyLight = new THREE.DirectionalLight(0xffffff, 1.0); keyLight.position.set(40, 90, 30); scene.add(keyLight);
+      rimLight = new THREE.DirectionalLight(0x66ffcc, 0.32); rimLight.position.set(-50, 30, -60); scene.add(rimLight);
 
       buildAsciiPass();
 
@@ -1268,6 +1333,8 @@
       countEl.textContent = String(racers.length);
       bestEl.textContent = fmtTime(bestLap);
       soundBtn.textContent = muted ? '🔇 Sound off' : '🔊 Sound on';
+      rawBtn.textContent = rawView ? '▤ 3D view' : '▤ ASCII';
+      applyLightRig();
 
       window.addEventListener('resize', resize);
       if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(stageEl);
