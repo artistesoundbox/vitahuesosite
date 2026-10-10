@@ -107,6 +107,72 @@
     }
     #load.hidden { opacity: 0; pointer-events: none; }
 
+    /* ---------- the 3-2-1 countdown ----------
+       Before this the countdown was the same centred text element every other
+       message uses, showing "3", "2", "1" — readable, but not a start. This
+       is its own overlay: a gantry of lamps that fill as the numbers fall
+       (F1 style), the numeral itself at display size, and a green GO that
+       lingers a beat before the whole thing fades. It never eats input —
+       #hud is pointer-events:none, and the throttle lock during 'countdown'
+       is what actually holds the grid. */
+    #start-lights {
+      position: absolute; inset: 0; display: flex;
+      flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+      opacity: 0; transition: opacity 0.25s ease;
+    }
+    #start-lights.show { opacity: 1; }
+    #start-lights .lamps { display: flex; gap: 12px; }
+    #start-lights .lamps i {
+      width: 21px; height: 21px; border-radius: 50%;
+      background: #101d19; border: 1px solid rgba(160, 255, 220, 0.3);
+      box-shadow: inset 0 0 9px rgba(0, 0, 0, 0.85); transition: background 0.12s ease, box-shadow 0.12s ease;
+    }
+    #start-lights .lamps i.lit { background: #ff3b30; border-color: #ff9b93; box-shadow: 0 0 20px rgba(255, 60, 50, 0.85); }
+    #start-lights .lamps i.go { background: #29ff8e; border-color: #c4ffe2; box-shadow: 0 0 26px rgba(40, 255, 150, 0.95); }
+    #start-lights .cd {
+      font-size: clamp(54px, 11vw, 124px); font-weight: 700; line-height: 1;
+      color: #fff; text-shadow: 0 0 42px rgba(90, 255, 190, 0.9), 0 6px 20px rgba(0, 0, 0, 0.9);
+    }
+    #start-lights .cd.go { color: #6dffb4; text-shadow: 0 0 50px rgba(60, 255, 170, 0.95), 0 6px 20px rgba(0, 0, 0, 0.9); }
+    #start-lights .cd.pop { animation: cdPop 0.5s cubic-bezier(0.2, 0.9, 0.25, 1); }
+    @keyframes cdPop { from { transform: scale(1.6); opacity: 0.1; } to { transform: scale(1); opacity: 1; } }
+
+    /* ---------- the results board ----------
+       Shown the moment the player crosses the line and updated every frame
+       after, so it fills in as the rest of the field finishes rather than
+       freezing on a half-empty page. */
+    #results {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      max-height: calc(100% - 24px); overflow: hidden;
+      padding: 15px 18px 13px;
+      background: rgba(5, 14, 12, 0.84);
+      border: 1px solid rgba(90, 255, 190, 0.5); border-radius: 14px;
+      box-shadow: 0 20px 55px rgba(0, 0, 0, 0.65), 0 0 40px rgba(90, 255, 190, 0.12);
+      backdrop-filter: blur(6px);
+      opacity: 0; transition: opacity 0.3s ease;
+    }
+    #results.show { opacity: 1; }
+    #results h4 {
+      margin: 0 0 10px; font-size: 13px; font-weight: 600;
+      letter-spacing: 0.16em; color: #9dffcf; white-space: nowrap;
+    }
+    #results h4 small {
+      display: block; margin-top: 5px; font-size: 10.5px; font-weight: 400;
+      letter-spacing: 0.1em; color: #8fb3c6;
+    }
+    #results table { border-collapse: collapse; width: 100%; }
+    #results td { padding: 3px 0; white-space: nowrap; }
+    #results tr.hd td { font-size: 9.5px; letter-spacing: 0.16em; color: #6f8ea0; padding-bottom: 5px; }
+    #results td.pos { width: 1.8em; color: #7de3ff; }
+    #results td.nm { padding-right: 18px; color: #dff3ff; }
+    #results td.tm { text-align: right; padding-right: 16px; color: #9dffcf; }
+    #results td.best { text-align: right; color: #ffc247; }
+    #results tr.run td.tm { color: #6f8ea0; font-style: italic; }
+    #results tr.me td { color: #fff; font-weight: 700; }
+    #results tr.me td.pos { color: #ffe066; }
+    #results tr.me td.best { color: #ffe066; }
+    #results .hint { margin-top: 9px; font-size: 10px; letter-spacing: 0.12em; color: #7d90ae; }
+
     /* ---------- touch controls ---------- */
     #pads { position: absolute; inset: 0; pointer-events: none; display: none; z-index: 4; }
     #pads.on { display: block; }
@@ -201,7 +267,12 @@
         <div class="power" id="power"></div>
         <pre id="map"></pre>
         <div id="speed"></div>
+        <div id="start-lights">
+          <div class="lamps"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="cd" id="cd"></div>
+        </div>
         <div id="msg"></div>
+        <div id="results"></div>
       </div>
       <div id="pads">
         <button class="pad" id="pad-left" type="button" aria-label="Steer left">◀</button>
@@ -259,6 +330,10 @@
     const mapEl    = document.getElementById('map');
     const speedEl  = document.getElementById('speed');
     const msgEl    = document.getElementById('msg');
+    const lightsEl = document.getElementById('start-lights');
+    const cdEl     = document.getElementById('cd');
+    const lampEls  = lightsEl.querySelectorAll('.lamps i');
+    const resultsEl = document.getElementById('results');
     const picksEl  = document.getElementById('picks');
     const padsEl   = document.getElementById('pads');
     const bestEl   = document.getElementById('best');
@@ -1265,6 +1340,9 @@
     let playerIdx = 0;
     let raceState = 'loading';
     let raceTime = 0, countdown = 3.0;
+    let countdownShown = 0;    // which numeral the gantry last lit to
+    let goHold = 0;            // seconds the green GO lingers before it fades
+    let lastResults = '';      // signature of the board, so it is only rebuilt when it changes
     let bestLap = 0;
     try { bestLap = parseFloat(localStorage.getItem('vh-ascii-gp-best') || '0') || 0; } catch (e) {}
     let autoPilot = false;
@@ -1644,12 +1722,38 @@
     function standings() {
       return racers.slice().sort(function (a, b) {
         if (a.finished !== b.finished) return a.finished ? -1 : 1;
+        /* two cars that have both crossed the line are ordered by when they
+           did it. Ordering them by s was wrong: a finished hull keeps driving,
+           so it could "pass" another finisher on the road and be placed ahead
+           of a car that had actually beaten it. */
+        if (a.finished && b.finished) return a.finishTime - b.finishTime;
         if (a.lap !== b.lap) return b.lap - a.lap;
         return b.s - a.s;
       });
     }
+    function bestLapOf(r) { return r.laps.length ? Math.min.apply(null, r.laps) : 0; }
+
+    /* the start gantry: fill the lamps one per second as the numbers fall */
+    function setLamps(n, cls) {
+      for (let i = 0; i < lampEls.length; i++) lampEls[i].className = i < n ? cls : '';
+    }
+    function popCount(text, isGo) {
+      cdEl.textContent = text;
+      cdEl.classList.toggle('go', !!isGo);
+      cdEl.classList.remove('pop');
+      void cdEl.offsetWidth;      // force a reflow, or a repeat numeral will not re-animate
+      cdEl.classList.add('pop');
+    }
+
     function gridStart() {
-      raceTime = 0; countdown = 3.0; raceState = 'countdown'; showMsg.n = 0;
+      raceTime = 0; countdown = 3.0; raceState = 'countdown';
+      countdownShown = 0; goHold = 0;
+      setLamps(0, '');
+      cdEl.textContent = '';
+      cdEl.classList.remove('pop', 'go');
+      lightsEl.classList.add('show');
+      resultsEl.classList.remove('show');
+      lastResults = '';
       let slot = 1;
       racers.forEach(function (r, i) { r.gridSlot = (i === playerIdx) ? 0 : slot++; });
       racers.forEach(function (r) {        r.s = wrapS(4 + r.gridSlot * 8.5);
@@ -1665,7 +1769,6 @@
       });
       resetPickups();
       snapCamera();
-      showMsg('READY');
     }
     function showMsg(html, ms) {
       msgEl.innerHTML = html;
@@ -1673,14 +1776,33 @@
       clearTimeout(showMsg.t);
       if (ms) showMsg.t = setTimeout(function () { msgEl.classList.remove('show'); }, ms);
     }
+    /* ---- the board that lands when the player takes the flag ----
+       Every racer's total time and best lap, sorted by the standings, with the
+       still-running ones showing how far round they are instead of a time they
+       do not have yet. It refreshes as they finish. */
+    function resultsHTML() {
+      const list = standings();
+      const me = racers[playerIdx];
+      const pos = list.indexOf(me) + 1;
+      let h = '<h4>FINISHED — P' + pos + '/' + racers.length +
+        '<small>your best lap ' + fmtTime(bestLapOf(me)) + ' · R to race again</small></h4>' +
+        '<table><tr class="hd"><td class="pos">#</td><td class="nm">RACER</td>' +
+        '<td class="tm">TOTAL</td><td class="best">BEST LAP</td></tr>';
+      list.forEach(function (r, i) {
+        h += '<tr class="' + (r.isPlayer ? 'me ' : '') + (r.finished ? 'fin' : 'run') + '">' +
+          '<td class="pos">' + (i + 1) + '</td>' +
+          '<td class="nm">' + RACER_NAMES[r.idx % RACER_NAMES.length] + '</td>' +
+          '<td class="tm">' + (r.finished ? fmtTime(r.finishTime)
+            : 'lap ' + Math.min(r.lap + 1, RACE_LAPS) + '/' + RACE_LAPS) + '</td>' +
+          '<td class="best">' + fmtTime(bestLapOf(r)) + '</td></tr>';
+      });
+      return h + '</table>';
+    }
     function finishRace() {
       raceState = 'finished';
       fanfare();
-      const me = racers[playerIdx];
-      const pos = standings().indexOf(me) + 1;
-      const laps = me.laps.length ? me.laps : [0];
-      showMsg('FINISHED — P' + pos + '/' + racers.length +
-        '<small>your best lap ' + fmtTime(Math.min.apply(null, laps)) + ' · R to race again</small>');
+      resultsEl.classList.add('show');
+      lastResults = '';        // the next frame builds the board the moment it is up
     }
 
     /* ============================================================
@@ -1711,7 +1833,8 @@
     function drawHud() {
       const me = racers[playerIdx];
       const pos = standings().indexOf(me) + 1;
-      rowEl.innerHTML = 'P<b>' + pos + '</b>/' + racers.length + '  TIME<b>' + fmtTime(raceTime) + '</b>';
+      rowEl.innerHTML = 'P<b>' + pos + '</b>/' + racers.length + '  TIME<b>' +
+        fmtTime(me.finished ? me.finishTime : raceTime) + '</b>';
       lapEl.textContent = 'LAP ' + Math.min(me.lap + 1, RACE_LAPS) + '/' + RACE_LAPS + '   BEST ' + fmtTime(bestLap);
       /* what you are carrying, and for how much longer — a powerup you cannot
          see is a powerup you will not use */
@@ -2059,18 +2182,28 @@
       /* --- state --- */
       if (raceState === 'countdown') {
         countdown -= dt;
-        const n = Math.ceil(countdown);
-        if (countdown > 0.4) {
-          if (showMsg.n !== n) { showMsg.n = n; blip(440, 0.14, 'square', 0.13); showMsg(String(n)); }
+        /* hold the numerals until the tail of the last second, so "1" is on
+           screen when the lights go green instead of having just vanished */
+        const n = Math.max(1, Math.ceil(countdown));
+        if (countdown > 0.45) {
+          if (countdownShown !== n) {
+            countdownShown = n;
+            setLamps(4 - n, 'lit');       // one more lamp per second, F1 style
+            popCount(String(n));
+            blip(440, 0.14, 'square', 0.13);
+          }
         } else {
           raceState = 'racing';
           raceTime = 0;
           racers.forEach(function (r) { r.lastLapAt = 0; r.lastS = r.s; });
-          showMsg('GO', 700);
+          setLamps(5, 'go');
+          popCount('GO', true);
+          goHold = 0.85;
           blip(880, 0.32, 'square', 0.15);
         }
       } else if (raceState !== 'loading') {
         raceTime += dt;
+        if (goHold > 0) { goHold -= dt; if (goHold <= 0) lightsEl.classList.remove('show'); }
       }
 
       /* --- what the player is asking for --- */
@@ -2106,6 +2239,12 @@
         bestLap = me.laps[me.laps.length - 1];
         bestEl.textContent = fmtTime(bestLap);
         try { localStorage.setItem('vh-ascii-gp-best', String(bestLap)); } catch (e) {}
+      }
+
+      /* --- the results board, live from the moment the flag drops --- */
+      if (raceState === 'finished') {
+        const html = resultsHTML();
+        if (html !== lastResults) { resultsEl.innerHTML = html; lastResults = html; }
       }
 
       /* --- engine note: five fake gears, so it pulls --- */
@@ -2286,6 +2425,22 @@
             mode: asciiMat ? asciiMat.uniforms.uMode.value : null,
             speeds: racers.map(function (r) { return +r.v.toFixed(1); }),
             lats: racers.map(function (r) { return +r.lat.toFixed(2); })
+          };
+        },
+        countdown: function () {
+          return {
+            state: raceState, countdown: +countdown.toFixed(2), shown: countdownShown, goHold: +goHold.toFixed(2),
+            numeral: cdEl.textContent, numeralClass: cdEl.className,
+            overlay: lightsEl.classList.contains('show'),
+            lamps: Array.prototype.map.call(lampEls, function (el) { return el.className || '-'; })
+          };
+        },
+        results: function () {
+          return {
+            shown: resultsEl.classList.contains('show'),
+            rows: Array.prototype.map.call(resultsEl.querySelectorAll('tr'), function (tr) {
+              return Array.prototype.map.call(tr.children, function (td) { return td.textContent; }).join(' | ');
+            })
           };
         },
         all: function () {
