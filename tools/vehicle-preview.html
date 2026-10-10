@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>vehicle preview — authoring aid</title>
+  <script type="importmap">
+  { "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  } }
+  </script>
+  <style>
+    body { margin: 0; background: #0b0d12; color: #cfe4ff; font: 13px/1.5 system-ui, sans-serif; }
+    h1 { font-size: 15px; letter-spacing: .18em; text-transform: uppercase; padding: 16px 20px 0; color: #9fb0cc; }
+    .legend { padding: 4px 20px 12px; color: #8fa4c6; font-size: 12px; }
+    .legend b { color: #ff6b6b; } .legend i { color: #6b9bff; font-style: normal; } .legend u { color: #7dffa0; text-decoration: none; }
+    .grid { display: flex; flex-wrap: wrap; gap: 14px; padding: 0 20px 60px; }
+    .card { border: 1px solid rgba(120,160,255,.25); border-radius: 12px; padding: 10px; background: #0f1420; }
+    .card h2 { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; margin: 0 0 8px; color: #ffd0e2; }
+    .card .meta { font-size: 11px; color: #7d90ae; margin-top: 6px; }
+    .views { display: flex; gap: 8px; }
+    canvas { display: block; border-radius: 8px; background: #05070d; }
+    .cap { text-align: center; font-size: 10px; color: #7d90ae; margin-top: 3px; }
+  </style>
+</head>
+<body>
+  <h1>racegame — decimated vehicle preview</h1>
+  <p class="legend">
+    Arrows: <b>red = +Z</b> · <i>blue = +X</i> · <u>green = +Y (up)</u>.
+    The top view puts <b>+Z pointing down the screen</b> and +X to the right.
+    Every model is normalised to 1.0 long on Z, so what you see is real proportions.
+  </p>
+  <div class="grid" id="grid"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+
+    /* the top view is the one that answers "which way does it point": with
+       up = (0,0,-1) on a camera looking straight down, world +Z reads as
+       screen-down and world +X reads as screen-right. */
+    const VIEWS = [
+      { key: 'TOP  (screen-down = +Z, screen-right = +X)', cam: [0, 3.4, 0], up: [0, 0, -1], size: 420 },
+      { key: 'three-quarter', cam: [1.7, 1.15, 2.4], up: [0, 1, 0], size: 260 },
+      { key: 'side (+X)',     cam: [3.2, 0.55, 0],   up: [0, 1, 0], size: 260 }
+    ];
+
+    function rendererFor(size) {
+      const r = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      r.setPixelRatio(1);
+      r.setSize(size, size, false);
+      r.outputColorSpace = THREE.SRGBColorSpace;
+      return r;
+    }
+
+    function arrows() {
+      const g = new THREE.Group();
+      const mk = (dir, color) => {
+        const m = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.012, 0.012, 0.42, 6),
+          new THREE.MeshBasicMaterial({ color })
+        );
+        const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+        m.quaternion.copy(q);
+        m.position.copy(dir.clone().normalize().multiplyScalar(0.72));
+        const head = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.12, 8), new THREE.MeshBasicMaterial({ color }));
+        head.quaternion.copy(q);
+        head.position.copy(dir.clone().normalize().multiplyScalar(0.95));
+        g.add(m); g.add(head);
+      };
+      mk(new THREE.Vector3(0, 0, 1), 0xff5555);
+      mk(new THREE.Vector3(1, 0, 0), 0x5588ff);
+      mk(new THREE.Vector3(0, 1, 0), 0x66ff88);
+      return g;
+    }
+
+    async function main() {
+      const res = await fetch('../racegame/vehicles.bin');
+      const buf = await res.arrayBuffer();
+      const dv = new DataView(buf);
+      const count = dv.getUint32(4, true);
+      const grid = document.getElementById('grid');
+      let o = 8;
+
+      for (let i = 0; i < count; i++) {
+        const nameLen = dv.getUint32(o, true); o += 4;
+        const name = new TextDecoder().decode(new Uint8Array(buf, o, nameLen)); o += nameLen;
+        const dim = [dv.getFloat32(o, true), dv.getFloat32(o + 4, true), dv.getFloat32(o + 8, true)]; o += 12;
+        const vertCount = dv.getUint32(o, true), triCount = dv.getUint32(o + 4, true); o += 8;
+        const pos = new Float32Array(buf.slice(o, o + vertCount * 12)); o += vertCount * 12;
+        const nrm = new Float32Array(buf.slice(o, o + vertCount * 12)); o += vertCount * 12;
+        const idx = new Uint32Array(buf.slice(o, o + triCount * 12)); o += triCount * 12;
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+        geo.setIndex(new THREE.BufferAttribute(idx, 1));
+
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = '<h2>' + name + '</h2>';
+        const row = document.createElement('div');
+        row.className = 'views';
+        card.appendChild(row);
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = dim[0].toFixed(3) + ' wide x ' + dim[1].toFixed(3) + ' tall x ' + dim[2].toFixed(3) +
+          ' long · ' + vertCount + ' verts · ' + triCount + ' tris';
+        card.appendChild(meta);
+        /* a numeric cross-check on the eyeballing: an aircraft's wing axis has
+           its mass in two lumps (left wing, right wing) with a dip over the
+           narrow fuselage, while the fuselage axis carries mass through the
+           middle. So compare the vertex count in the centre band against the
+           two bands either side, per horizontal axis. */
+        const body = [];
+        for (let k = 0; k < pos.length; k += 3) if (pos[k + 1] < dim[1] * 0.45) body.push(pos[k], pos[k + 2]);
+        const bands = function (axis) {
+          const out = [0, 0, 0];
+          for (let k = 0; k < body.length; k += 2) {
+            const v = body[k + axis];
+            const band = v < -0.166 ? 0 : (v > 0.166 ? 2 : 1);
+            out[band]++;
+          }
+          return out;
+        };
+        const bx = bands(0), bz = bands(1);
+        const hint = document.createElement('div');
+        hint.className = 'meta';
+        hint.textContent = 'centre/outer mass  X bands ' + bx.join(':') + (bx[1] < (bx[0] + bx[2]) / 2 ? '  (bimodal -> wingspan)' : '  (unimodal -> fuselage)') +
+          '   Z bands ' + bz.join(':') + (bz[1] < (bz[0] + bz[2]) / 2 ? '  (bimodal -> wingspan)' : '  (unimodal -> fuselage)');
+        card.appendChild(hint);
+        grid.appendChild(card);
+
+        VIEWS.forEach(function (v) {
+          const holder = document.createElement('div');
+          const r = rendererFor(v.size);
+          const scene = new THREE.Scene();
+          scene.background = new THREE.Color(0x05070d);
+          const cam = new THREE.PerspectiveCamera(30, 1, 0.01, 40);
+          cam.position.set(v.cam[0], v.cam[1], v.cam[2]);
+          cam.up.set(v.up[0], v.up[1], v.up[2]);
+          cam.lookAt(0, 0.14, 0);
+
+          scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x201628, 1.0));
+          const key = new THREE.DirectionalLight(0xffffff, 2.0); key.position.set(2.5, 3.5, 2.5); scene.add(key);
+          const rim = new THREE.DirectionalLight(0x88aaff, 1.1); rim.position.set(-2.5, 1.0, -2.5); scene.add(rim);
+
+          const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xb9c6dd, metalness: 0.15, roughness: 0.55 }));
+          const holderGroup = new THREE.Group();
+          holderGroup.add(mesh);
+          holderGroup.add(arrows());
+          scene.add(holderGroup);
+
+          const floor = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshStandardMaterial({ color: 0x1a2030 }));
+          floor.rotation.x = -Math.PI / 2; floor.position.y = -0.001; scene.add(floor);
+
+          r.render(scene, cam);
+          const cap = document.createElement('div');
+          cap.className = 'cap';
+          cap.textContent = v.key;
+          const wrap = document.createElement('div');
+          wrap.appendChild(r.domElement);
+          wrap.appendChild(cap);
+          holder.appendChild(wrap);
+          row.appendChild(holder);
+        });
+      }
+      document.title = 'preview ready — ' + count + ' vehicles';
+    }
+    main();
+  </script>
+</body>
+</html>

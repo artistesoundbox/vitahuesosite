@@ -635,7 +635,7 @@
     /* yaw stays where you leave it, so you can look a friend in the back of
        the head; the tip always springs back upright like a weeble. */
     let spin = 0, spinVel = 0, tilt = 0, prevSpin = 0;
-    let dragActive = false, dragX = 0, dragY = 0, spunAwarded = false;
+    let dragActive = false, dragX = 0, dragY = 0, spunAwarded = false, lastSpinMoveAt = 0;
 
     /* combo + energy */
     const COMBO_WINDOW = 900;    // ms between squishes to keep a combo alive
@@ -1148,7 +1148,14 @@
       if (dx) {
         const dRad = dx * SPIN_PER_PX;
         spin += dRad;
-        spinVel = spinVel * 0.55 + (dRad * 55) * 0.45;   // rad/s, smoothed
+        /* Measure the throw from real elapsed time, not from a guess at the
+           frame rate: a flick has to feel the same on a 120Hz phone as it does
+           on a 60Hz laptop. The average is time-weighted for the same reason. */
+        const now = performance.now();
+        const dtm = Math.max(0.004, Math.min(0.12, (now - lastSpinMoveAt) / 1000));
+        lastSpinMoveAt = now;
+        const v = dRad / dtm;
+        spinVel += (v - spinVel) * (1 - Math.exp(-dtm / 0.045));
         if (spinVel > 20) spinVel = 20;
         else if (spinVel < -20) spinVel = -20;
       }
@@ -1270,6 +1277,7 @@
       dragActive = true;
       dragX = pt.x; dragY = pt.y;
       spinVel = 0;
+      lastSpinMoveAt = performance.now();
       if (ok) {
         lastSquelchAt = 0;
         playSquish(1, activeChar().pitch);
