@@ -784,6 +784,7 @@
       const seen = new Set();
       root.traverse(function (o) {
         if (!o.isMesh || !o.geometry) return;
+        if (o.visible === false) return;      // hidden baked shadow shells: no physics wasted on them
         const g = o.geometry;
         if (seen.has(g)) return;                       // shared geometry: deform it once
         seen.add(g);
@@ -849,6 +850,9 @@
       loader.load(ch.file, function (gltf) {
         const inner = gltf.scene;
         inner.traverse(function (o) {
+          /* Some Sketchfab exports carry a full-size duplicate of the body as a
+             "shadow" shell, which simply darkens the character if we draw it. */
+          if (o.isMesh && /shadow/i.test(o.name || '')) { o.visible = false; return; }
           if (o.isMesh && o.material) {
             const mats = Array.isArray(o.material) ? o.material : [o.material];
             mats.forEach(function (m) {
