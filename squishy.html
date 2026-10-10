@@ -303,7 +303,8 @@
       <a class="btn small" href="index.html">⌂ HOME</a>
     </div>
     <h1 style="margin-top:24px">SQUISHY</h1>
-    <p class="tag">Eight little cartoon friends with real soft bodies. Press one, drag across it, poke it with a key —
+    <p class="tag">Eight little cartoon friends with real soft bodies. Press one, drag across it to cave it in,
+    flick it sideways to send it spinning, poke it with a key —
     the surface caves in right under your finger and creeps back into shape on its own, with a squelch
     that is different for every character. Squish fast to build a combo, fill the meter and set off a
     <b>SUPER SQUISH</b>. No ads, no downloads, nothing to install.</p>
@@ -311,10 +312,10 @@
 
   <main>
     <div id="squishy-stage" tabindex="0" role="application"
-         aria-label="Squishy toy. Press and drag with a pointer to squash the character, or press space to poke it.">
+         aria-label="Squishy toy. Press and drag with a pointer to squash the character, drag sideways to spin it around, or press space to poke it.">
       <div class="stage-badge">Squishes <b id="squish-count">0</b></div>
       <button class="ca-btn stage-sound" id="mute-btn" type="button" aria-pressed="false">🔊 Sound on</button>
-      <div class="stage-hint" id="squish-hint">Click &amp; drag to squish<span class="hint-extra"> &middot; space to poke</span></div>
+      <div class="stage-hint" id="squish-hint">Drag to squish &amp; spin<span class="hint-extra"> &middot; space to poke &middot; &larr; &rarr; turn</span></div>
       <div class="toast" id="squish-toast" role="status" aria-live="polite"></div>
       <div class="combo-pop" id="combo-pop" aria-hidden="true"></div>
       <div class="super-flash" id="super-flash" aria-hidden="true"></div>
@@ -335,14 +336,17 @@
         <span>Super</span>
         <div class="energy-track"><div class="energy-fill" id="energy-fill"></div></div>
       </div>
-      <div class="trophy" id="trophy">🏆 0/6</div>
+      <div class="trophy" id="trophy">🏆 0/7</div>
       <div class="chars" id="chars" role="group" aria-label="Characters"></div>
+      <button class="ca-btn" id="spin-btn" type="button">🌀 Spin</button>
       <button class="ca-btn" id="surprise-btn" type="button">🎲 Surprise me</button>
     </div>
 
     <p class="footer-note">
       Each character is a real glTF model, and every one of its vertices owns a spring, so a squeeze
-      caves in actual geometry rather than faking it with a texture. Squeeze sounds are synthesised live
+      caves in actual geometry rather than faking it with a texture. Drag sideways to turn a friend
+      around: the yaw stays where you leave it, while a tipped-over friend stands itself back up.
+      Squeeze sounds are synthesised live
       in the browser — no audio files ship at all, and every character has its own voice. Your squish count,
       combos, trophies and last-picked friend are saved on this device only.
     </p>
@@ -382,6 +386,7 @@
     const energyFill = document.getElementById('energy-fill');
     const trophyEl = document.getElementById('trophy');
     const surpriseBtn = document.getElementById('surprise-btn');
+    const spinBtn = document.getElementById('spin-btn');
     const flashEl  = document.getElementById('super-flash');
     const veilEl   = document.getElementById('load-veil');
     const veilText = document.getElementById('load-text');
@@ -1366,6 +1371,14 @@
       selectCharacter(next);
     });
 
+    /* give the current friend a shove, for anyone who would rather click than drag */
+    spinBtn.addEventListener('click', function () {
+      if (!modelRoot || reducedMotion) return;
+      spinVel = (Math.random() < 0.5 ? -1 : 1) * (9 + Math.random() * 5);
+      playWhoosh(0.75);
+      spawnBurst(stage.clientWidth / 2, stage.clientHeight * 0.42, 8, 0.7);
+    });
+
     function showFallback() {
       stage.textContent = '';
       const wrap = document.createElement('div');
@@ -1420,6 +1433,8 @@
             rotY: modelRoot ? modelRoot.rotation.y : null,
             maxDisp: maxDisp, dentPower: dentPower, combo: combo,
             energy: energy, squishes: state.squishes, supers: state.supers,
+            spin: spin, spinVel: spinVel, tilt: tilt, spun: state.spun, dragActive: dragActive,
+            rotX: modelRoot ? modelRoot.rotation.x : null,
             trophies: state.trophies.slice(), cache: cache.size
           };
         },
