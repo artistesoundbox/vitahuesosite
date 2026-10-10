@@ -11,14 +11,15 @@
       gtag('config', 'G-EY4SD4FCN4');
     </script>
   <meta charset="UTF-8" />
-  <title>Squishy – a soft little cosmic blob · Vitamina Hueso @ Manteca Studios</title>
+  <title>Squishy – squeeze a shelf of little cartoon friends · Vitamina Hueso @ Manteca Studios</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#04070d" />
-  <link rel="icon" type="image/svg+xml" href="squishy.svg" />
+  <link rel="icon" type="image/png" href="squishy.png" />
   <script type="importmap">
   {
     "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
     }
   }
   </script>
@@ -58,7 +59,7 @@
     }
     header p.tag {
       font-size: clamp(15px, 2vw, 18px); line-height: 1.6;
-      color: #a9bcd8; max-width: 820px;
+      color: #a9bcd8; max-width: 860px;
     }
     .top-row {
       display: flex; align-items: center; justify-content: space-between;
@@ -85,7 +86,7 @@
     #squishy-stage {
       position: relative;
       width: 100%;
-      height: clamp(330px, 56vh, 560px);
+      height: clamp(340px, 58vh, 580px);
       border-radius: 26px;
       overflow: hidden;
       cursor: grab;
@@ -98,30 +99,37 @@
         #060913;
       border: 1px solid rgba(180, 90, 255, 0.28);
       box-shadow: inset 0 0 60px rgba(120, 60, 200, 0.16), 0 20px 50px rgba(0, 0, 0, 0.55);
+      transition: box-shadow 0.3s ease, filter 0.3s ease;
     }
     #squishy-stage:active { cursor: grabbing; }
     #squishy-stage:focus-visible { border-color: rgba(210, 150, 255, 0.9); }
     #squishy-stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    /* the particle layer sits above the WebGL canvas and never eats input */
+    canvas.fx-canvas {
+      position: absolute; inset: 0; z-index: 2; pointer-events: none;
+    }
+    #squishy-stage.super {
+      box-shadow: inset 0 0 90px rgba(255, 120, 200, 0.35), 0 20px 60px rgba(255, 90, 150, 0.35);
+    }
 
     .stage-hint {
       position: absolute; left: 0; right: 0; bottom: 14px; text-align: center;
       font-size: 12.5px; letter-spacing: 0.22em; text-transform: uppercase;
       color: #8fa4c6; pointer-events: none; transition: opacity 0.6s ease;
+      z-index: 3;
     }
     .stage-hint.dim { opacity: 0.35; }
 
     .stage-badge {
       position: absolute; top: 12px; left: 16px; pointer-events: none;
       font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase;
-      color: #9fb0cc;
+      color: #9fb0cc; z-index: 3; text-shadow: 0 2px 8px rgba(0,0,0,0.7);
     }
     .stage-badge b { color: #ffd0e2; font-size: 14px; letter-spacing: 0.08em; }
-    .stage-sound {
-      position: absolute; top: 10px; right: 10px; z-index: 3;
-    }
+    .stage-sound { position: absolute; top: 10px; right: 10px; z-index: 4; }
 
     .toast {
-      position: absolute; top: 16px; left: 50%; z-index: 3;
+      position: absolute; top: 16px; left: 50%; z-index: 5;
       transform: translate(-50%, -14px);
       padding: 9px 20px; border-radius: 999px;
       font-size: 13px; letter-spacing: 0.1em;
@@ -133,7 +141,52 @@
     }
     .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-    /* ---- console under the stage: counter, skins, sound ---- */
+    /* floating reaction word ("Squeak!", "Boop!") that follows the poke */
+    .react {
+      position: absolute; z-index: 3; pointer-events: none;
+      font-size: 15px; font-weight: 700; letter-spacing: 0.04em;
+      color: #fff3f9; text-shadow: 0 0 12px rgba(255, 90, 150, 0.9), 0 2px 6px rgba(0,0,0,0.8);
+      animation: react-rise 900ms ease-out forwards;
+      white-space: nowrap;
+    }
+    @keyframes react-rise {
+      0%   { opacity: 0; transform: translate(-50%, 6px) scale(0.7); }
+      22%  { opacity: 1; transform: translate(-50%, -6px) scale(1.12); }
+      100% { opacity: 0; transform: translate(-50%, -52px) scale(1); }
+    }
+
+    /* combo popup, centred in the stage */
+    .combo-pop {
+      position: absolute; top: 42%; left: 50%; z-index: 3; pointer-events: none;
+      transform: translate(-50%, -50%) scale(0.6);
+      font-size: clamp(26px, 5vw, 44px); font-weight: 800; letter-spacing: 0.06em;
+      color: #fff; text-shadow: 0 0 22px rgba(255, 120, 200, 0.95), 0 3px 10px rgba(0,0,0,0.8);
+      opacity: 0; transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+    .combo-pop.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+    .super-flash {
+      position: absolute; inset: 0; z-index: 2; pointer-events: none;
+      background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.9), rgba(255,120,220,0.4) 45%, transparent 72%);
+      opacity: 0; transition: opacity 0.4s ease;
+    }
+    .super-flash.on { opacity: 0.75; transition: opacity 0.06s ease; }
+
+    /* loading veil */
+    #load-veil {
+      position: absolute; inset: 0; z-index: 6;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; background: rgba(6, 9, 19, 0.78);
+      backdrop-filter: blur(3px); transition: opacity 0.35s ease;
+    }
+    #load-veil.hidden { opacity: 0; pointer-events: none; }
+    #load-veil .load-emoji { font-size: 40px; animation: bob 1.6s ease-in-out infinite; }
+    @keyframes bob { 0%,100% { transform: translateY(-5px) scale(1); } 50% { transform: translateY(5px) scale(0.94); } }
+    #load-veil .load-text { font-size: 12px; letter-spacing: 0.26em; text-transform: uppercase; color: #b9c8e2; }
+    #load-track { width: min(300px, 62%); height: 6px; border-radius: 99px; background: rgba(255,255,255,0.12); overflow: hidden; }
+    #load-fill { height: 100%; width: 0%; border-radius: 99px; background: linear-gradient(90deg, #ff74a4, #b07cff); transition: width 0.15s ease; }
+
+    /* ---- console under the stage ---- */
     .console {
       display: flex; gap: 14px 22px; align-items: center; flex-wrap: wrap;
       margin-top: 16px; padding: 14px 18px;
@@ -144,25 +197,51 @@
     .readout b { display: inline-block; margin: 0 6px; font-size: 20px; letter-spacing: 0.04em; color: #ffd0e2; }
     .readout .next { display: block; margin-top: 3px; font-size: 10.5px; letter-spacing: 0.12em; color: #7d90ae; }
 
-    .skins { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-left: auto; }
-    .swatch {
-      position: relative; width: 38px; height: 38px; padding: 0;
-      border-radius: 50%; cursor: pointer;
-      background: var(--c); border: 2px solid rgba(255, 255, 255, 0.25);
-      transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+    .combo {
+      font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase;
+      color: #7d90ae; padding: 7px 14px; border-radius: 999px;
+      border: 1px solid rgba(255, 120, 170, 0.25); white-space: nowrap;
+      transition: all 0.18s ease;
     }
-    .swatch:hover { transform: translateY(-2px); }
-    .swatch[aria-pressed="true"] {
-      border-color: #ffffff;
-      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.28), 0 0 20px var(--c);
+    .combo.hot {
+      color: #fff; background: rgba(90, 20, 60, 0.75);
+      border-color: rgba(255, 140, 190, 0.9);
+      box-shadow: 0 0 20px rgba(255, 90, 150, 0.55);
+      transform: scale(1.06);
     }
-    .swatch.locked { filter: grayscale(0.8) brightness(0.45); }
-    .swatch.locked::after {
-      content: '🔒'; position: absolute; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 15px; filter: grayscale(0) brightness(1.6);
+
+    .energy { display: flex; align-items: center; gap: 10px; min-width: 190px; }
+    .energy span { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #9fb0cc; white-space: nowrap; }
+    .energy-track {
+      flex: 1; height: 9px; border-radius: 99px; overflow: hidden;
+      background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.10);
     }
-    .swatch:focus-visible { outline: 2px solid #ffd0e2; outline-offset: 3px; }
+    .energy-fill {
+      height: 100%; width: 0%; border-radius: 99px;
+      background: linear-gradient(90deg, #6aa8ff, #b07cff 45%, #ff74a4);
+      transition: width 0.16s ease;
+    }
+    .energy.full .energy-fill { background: linear-gradient(90deg, #ffe27a, #ff74a4, #6ae0ff); animation: pulse 0.7s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.7); } }
+
+    .chars { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-left: auto; }
+    .charbtn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 8px 14px; border-radius: 999px; cursor: pointer;
+      font-size: 12.5px; letter-spacing: 0.06em; font-family: inherit;
+      color: #e7dcff; background: rgba(30, 16, 50, 0.66);
+      border: 1px solid rgba(180, 90, 255, 0.45);
+      transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+      white-space: nowrap;
+    }
+    .charbtn .em { font-size: 16px; }
+    .charbtn:hover { transform: translateY(-2px); border-color: rgba(220, 160, 255, 0.9); }
+    .charbtn[aria-pressed="true"] {
+      background: rgba(96, 26, 78, 0.92); border-color: #ffffff;
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25), 0 0 18px rgba(255, 100, 160, 0.55);
+    }
+    .charbtn:focus-visible { outline: 2px solid #ffd0e2; outline-offset: 3px; }
+    .charbtn.seen .em { filter: none; }
 
     .ca-btn {
       padding: 11px 22px; font-size: 12px; letter-spacing: 0.18em;
@@ -175,9 +254,10 @@
       color: #fff; border-color: rgba(220, 160, 255, 0.95);
       box-shadow: 0 0 20px rgba(180, 90, 255, 0.45);
     }
+    .trophy { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #9fb0cc; white-space: nowrap; }
 
     .footer-note {
-      max-width: 860px; margin: 34px auto 0; padding: 0 6vw;
+      max-width: 880px; margin: 34px auto 0; padding: 0 6vw;
       color: #7d90ae; font-size: 12.5px; line-height: 1.7; text-align: center;
     }
 
@@ -202,103 +282,162 @@
     .fallback p { color: #a9bcd8; font-size: 14px; text-align: center; max-width: 420px; line-height: 1.6; }
 
     @media (prefers-reduced-motion: reduce) {
-      .fallback-blob { animation: none; }
+      .fallback-blob, #load-veil .load-emoji, .energy.full .energy-fill { animation: none; }
     }
-    @media (max-width: 640px) {
+    @media (max-width: 700px) {
       header { padding-top: 30px; }
-      .skins { margin-left: 0; width: 100%; }
-      .hint-extra { display: none; }   /* keep the hint on one line on phones */
+      .chars { margin-left: 0; width: 100%; }
+      .charbtn .nm { display: none; }        /* emoji-only picker on phones */
+      .charbtn { padding: 9px 12px; }
+      .hint-extra { display: none; }         /* keep the hint on one line */
+      .energy { min-width: 150px; width: 100%; }
     }
   </style>
 </head>
 <body>
 
   <header>
-    <img src="squishy.svg" alt="Squishy" class="title-art" />
+    <img src="squishy.png" alt="Squishy" class="title-art" />
     <div class="top-row" style="margin-top:18px">
       <a class="btn small nav-back" href="index.html">◀ BACK</a>
       <a class="btn small" href="index.html">⌂ HOME</a>
     </div>
     <h1 style="margin-top:24px">SQUISHY</h1>
-    <p class="tag">A soft little cosmic blob. Press it, drag across it, poke it with a key —
-    the surface caves in right under your finger and then creeps back into shape on its own,
-    with a wet jiggly sound for every squeeze. Squish your way up the shelf of skins:
-    the more you poke, the more blobs you unlock. No ads, no downloads, nothing to install.</p>
+    <p class="tag">Eight little cartoon friends with real soft bodies. Press one, drag across it, poke it with a key —
+    the surface caves in right under your finger and creeps back into shape on its own, with a squelch
+    that is different for every character. Squish fast to build a combo, fill the meter and set off a
+    <b>SUPER SQUISH</b>. No ads, no downloads, nothing to install.</p>
   </header>
 
   <main>
     <div id="squishy-stage" tabindex="0" role="application"
-         aria-label="Squishy blob. Press and drag with a pointer to squash it, or press space to poke it.">
+         aria-label="Squishy toy. Press and drag with a pointer to squash the character, or press space to poke it.">
       <div class="stage-badge">Squishes <b id="squish-count">0</b></div>
       <button class="ca-btn stage-sound" id="mute-btn" type="button" aria-pressed="false">🔊 Sound on</button>
       <div class="stage-hint" id="squish-hint">Click &amp; drag to squish<span class="hint-extra"> &middot; space to poke</span></div>
       <div class="toast" id="squish-toast" role="status" aria-live="polite"></div>
+      <div class="combo-pop" id="combo-pop" aria-hidden="true"></div>
+      <div class="super-flash" id="super-flash" aria-hidden="true"></div>
+      <div id="load-veil" class="hidden">
+        <div class="load-emoji" id="load-emoji">🐱</div>
+        <div class="load-text" id="load-text">Loading</div>
+        <div id="load-track"><div id="load-fill"></div></div>
+      </div>
     </div>
 
     <div class="console">
       <div class="readout">
         Total squishes <b id="squish-total">0</b>
-        <span class="next" id="next-unlock"></span>
+        <span class="next" id="now-line">Now squishing: Cat</span>
       </div>
-      <div class="skins" id="skins" role="group" aria-label="Blob skins"></div>
+      <div class="combo" id="combo-chip">Combo &times;1</div>
+      <div class="energy" id="energy">
+        <span>Super</span>
+        <div class="energy-track"><div class="energy-fill" id="energy-fill"></div></div>
+      </div>
+      <div class="trophy" id="trophy">🏆 0/6</div>
+      <div class="chars" id="chars" role="group" aria-label="Characters"></div>
+      <button class="ca-btn" id="surprise-btn" type="button">🎲 Surprise me</button>
     </div>
 
     <p class="footer-note">
-      Every one of this blob's ~3,200 surface vertices rides its own little spring, so the dent
-      is real geometry — not a texture trick. Squeeze sounds are synthesised live in the browser
-      (filtered noise plus a rubbery sine), so the page ships with no audio files at all.
-      Your squish count and unlocked skins are saved on this device only.
+      Each character is a real glTF model, and every one of its vertices owns a spring, so a squeeze
+      caves in actual geometry rather than faking it with a texture. Squeeze sounds are synthesised live
+      in the browser — no audio files ship at all, and every character has its own voice. Your squish count,
+      combos, trophies and last-picked friend are saved on this device only.
     </p>
   </main>
 
   <script type="module">
     import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
     /* ============================================================
-       Squishy — a soft-body toy blob.
-       The body is a sphere whose vertices each own a spring: they
-       get pushed inward around the pointer's contact point and pull
-       themselves home again, which gives the cave-in and the slow,
-       slightly bouncy rise back. Sounds are synthesised with the
-       Web Audio API. Nothing here needs a network asset beyond the
-       three.js module the import map above already fetches.
+       Squishy — a shelf of soft cartoon friends.
+
+       Every character is a real glTF model. When it loads we freeze
+       a copy of each mesh's rest positions and rest normals, then per
+       frame each vertex runs its own little spring toward "rest spot
+       minus the local dent". A dent is a soft ball of influence
+       around the pointer's contact point, measured in the mesh's own
+       space, and inside it every vertex sinks along its own outward
+       normal. That is what makes a fox's snout and a fish's tail
+       squash believably without any per-model tweaking.
+
+       Sounds are synthesised with the Web Audio API, so the page
+       ships with no audio files at all.
        ============================================================ */
 
-    const stage     = document.getElementById('squishy-stage');
-    const hintEl    = document.getElementById('squish-hint');
-    const countEl   = document.getElementById('squish-count');
-    const totalEl   = document.getElementById('squish-total');
-    const nextEl    = document.getElementById('next-unlock');
-    const toastEl   = document.getElementById('squish-toast');
-    const skinsEl   = document.getElementById('skins');
-    const muteBtn   = document.getElementById('mute-btn');
+    const stage    = document.getElementById('squishy-stage');
+    const hintEl   = document.getElementById('squish-hint');
+    const countEl  = document.getElementById('squish-count');
+    const totalEl  = document.getElementById('squish-total');
+    const nowEl    = document.getElementById('now-line');
+    const toastEl  = document.getElementById('squish-toast');
+    const charsEl  = document.getElementById('chars');
+    const muteBtn  = document.getElementById('mute-btn');
+    const comboEl  = document.getElementById('combo-chip');
+    const comboPop = document.getElementById('combo-pop');
+    const energyEl = document.getElementById('energy');
+    const energyFill = document.getElementById('energy-fill');
+    const trophyEl = document.getElementById('trophy');
+    const surpriseBtn = document.getElementById('surprise-btn');
+    const flashEl  = document.getElementById('super-flash');
+    const veilEl   = document.getElementById('load-veil');
+    const veilText = document.getElementById('load-text');
+    const veilEmoji= document.getElementById('load-emoji');
+    const veilFill = document.getElementById('load-fill');
 
     const reducedMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
 
-    /* ---------- skins + progress (saved on this device only) ---------- */
-    const STORE_KEY = 'vh-squishy-v1';
-    const SKINS = [
-      { name: 'Bubblegum',   color: 0xff5a8a, unlock: 0   },
-      { name: 'Mint Pop',    color: 0x4ee8a8, unlock: 5   },
-      { name: 'Blueberry',   color: 0x6aa8ff, unlock: 15  },
-      { name: 'Tangerine',   color: 0xff9d4d, unlock: 30  },
-      { name: 'Grape Fizz',  color: 0xb07cff, unlock: 50  },
-      { name: 'Cosmic Slime',color: 0x9dff5c, unlock: 80  },
-      { name: 'Cloud',       color: 0xeaf0ff, unlock: 120 }
+    /* ---------- the cast ---------- */
+    /* `pitch` is the voice: 1 = the reference squelch, lower = deeper,
+       higher = squeakier. `words` are the little reactions it blurts out. */
+    const CHARACTERS = [
+      { id: 'cat',   name: 'Cat',      emoji: '🐱', file: 'cartoon_cat.glb',          pitch: 1.22, rotY: 0,
+        words: ['Purr…', 'Boop!', 'Mrrow!', 'Meowch!'] },
+      { id: 'dog',   name: 'Dog',      emoji: '🐶', file: 'cartoon_dog.glb',          pitch: 1.02, rotY: 0,
+        words: ['Woof!', 'Boop!', 'Ruff!', 'Squish!'] },
+      { id: 'bunny', name: 'Bunny',    emoji: '🐰', file: 'cartoon_easter_bunny.glb', pitch: 1.38, rotY: 0,
+        words: ['Squeak!', 'Eep!', 'Hop!', 'Boing!'] },
+      { id: 'lion',  name: 'Lion',     emoji: '🦁', file: 'cartoon_lion.glb',         pitch: 0.68, rotY: 0,
+        words: ['Grrr!', 'Mrow!', 'Roar…', 'Oof!'] },
+      { id: 'bird',  name: 'Bird',     emoji: '🐦', file: 'cartoon_bird.glb',         pitch: 1.42, rotY: 0,
+        words: ['Chirp!', 'Peep!', 'Tweet!', 'Flap!'] },
+      { id: 'fish',  name: 'Fish',     emoji: '🐟', file: 'cartoon_fish.glb',         pitch: 0.88, rotY: 0,
+        words: ['Blub!', 'Glub!', 'Bubble!', 'Splash!'] },
+      { id: 'crow',  name: 'Crow',     emoji: '🐦‍⬛', file: 'cartoon_crow.glb',         pitch: 0.82, rotY: 0,
+        words: ['Caw!', 'Kraa!', 'Squawk!', 'Creak!'] },
+      { id: 'punk',  name: 'Punk Guy', emoji: '🤘', file: 'cartoon_punk_guy.glb',     pitch: 0.76, rotY: Math.PI,
+        words: ['Oi!', 'Squish it!', 'Heh.', 'Boing!'] }
     ];
 
-    let squishes = 0;
-    let skinIndex = 0;
-    let muted = false;
+    const TROPHIES = [
+      { id: 'first',    name: 'First Squish',    icon: '👆', test: function (s) { return s.squishes >= 1; } },
+      { id: 'warmup',   name: 'Finger Warm-Up',  icon: '🔥', test: function (s) { return s.squishes >= 25; } },
+      { id: 'combo',    name: 'Combo Master',    icon: '⚡', test: function (s) { return s.maxCombo >= 10; } },
+      { id: 'collector',name: 'Full Set',        icon: '🎭', test: function (s) { return s.tried.length >= CHARACTERS.length; } },
+      { id: 'super',    name: 'Super Squisher',  icon: '💥', test: function (s) { return s.supers >= 1; } },
+      { id: 'deep',     name: 'Blob Wrangler',   icon: '🏅', test: function (s) { return s.squishes >= 150; } }
+    ];
+
+    /* ---------- saved progress (this device only) ---------- */
+    const STORE_KEY = 'vh-squishy-v2';
+    const state = { squishes: 0, supers: 0, maxCombo: 0, tried: [], trophies: [], muted: false, charId: 'cat' };
     try {
       const saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
-      if (Number.isFinite(saved.squishes) && saved.squishes >= 0) squishes = Math.floor(saved.squishes);
-      if (Number.isInteger(saved.skin) && saved.skin >= 0 && saved.skin < SKINS.length) skinIndex = saved.skin;
-      if (saved.muted === true) muted = true;
+      if (Number.isFinite(saved.squishes)   && saved.squishes >= 0) state.squishes = Math.floor(saved.squishes);
+      if (Number.isFinite(saved.supers)     && saved.supers >= 0)   state.supers = Math.floor(saved.supers);
+      if (Number.isFinite(saved.maxCombo)   && saved.maxCombo >= 0) state.maxCombo = Math.floor(saved.maxCombo);
+      if (Array.isArray(saved.tried))     state.tried = saved.tried.filter(function (x) { return typeof x === 'string'; });
+      if (Array.isArray(saved.trophies))  state.trophies = saved.trophies.filter(function (x) { return typeof x === 'string'; });
+      if (saved.muted === true) state.muted = true;
+      if (typeof saved.charId === 'string' && CHARACTERS.some(function (c) { return c.id === saved.charId; })) state.charId = saved.charId;
     } catch (e) { /* private mode: keep the defaults */ }
+    if (state.tried.indexOf(state.charId) === -1) state.tried.push(state.charId);
 
     function save() {
-      try { localStorage.setItem(STORE_KEY, JSON.stringify({ squishes: squishes, skin: skinIndex, muted: muted })); }
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
       catch (e) { /* nothing to do — the toy still works */ }
     }
 
@@ -315,7 +454,7 @@
       if (!Ctx) return null;
       try { actx = new Ctx(); } catch (e) { return null; }
       master = actx.createGain();
-      master.gain.value = muted ? 0 : 0.5;
+      master.gain.value = state.muted ? 0 : 0.5;
       master.connect(actx.destination);
       const len = Math.max(1, Math.floor(actx.sampleRate * 0.4));
       noiseBuf = actx.createBuffer(1, len, actx.sampleRate);
@@ -324,59 +463,60 @@
       return actx;
     }
 
-    function playSquish(strength) {
-      if (muted) return;
+    /* a wet squelch whose pitch is the character's voice */
+    function playSquish(strength, pitch) {
+      if (state.muted) return;
       try {
         const ctx = audioReady(); if (!ctx) return;
         if (ctx.state === 'suspended') ctx.resume();
         const t = ctx.currentTime;
         const s = Math.max(0.25, Math.min(1, strength));
-        /* wet body: band-passed noise sweeping downward */
+        const v = pitch || 1;
         const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
         const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 2.2;
-        bp.frequency.setValueAtTime(1700, t);
-        bp.frequency.exponentialRampToValueAtTime(420, t + 0.20);
+        bp.frequency.setValueAtTime(1700 * v, t);
+        bp.frequency.exponentialRampToValueAtTime(420 * v, t + 0.20);
         const ng = ctx.createGain();
         ng.gain.setValueAtTime(0.0001, t);
         ng.gain.exponentialRampToValueAtTime(0.30 * s, t + 0.022);
         ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
-        src.connect(bp).connect(ng).connect(master);
+        src.connect(bp).connect(ng).connect(master || ctx.destination);
         src.start(t); src.stop(t + 0.30);
-        /* rubbery thump underneath it */
         const osc = ctx.createOscillator(); osc.type = 'sine';
-        osc.frequency.setValueAtTime(180, t);
-        osc.frequency.exponentialRampToValueAtTime(72, t + 0.18);
+        osc.frequency.setValueAtTime(180 * v, t);
+        osc.frequency.exponentialRampToValueAtTime(72 * v, t + 0.18);
         const og = ctx.createGain();
         og.gain.setValueAtTime(0.0001, t);
         og.gain.exponentialRampToValueAtTime(0.16 * s, t + 0.02);
         og.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
-        osc.connect(og).connect(master);
+        osc.connect(og).connect(master || ctx.destination);
         osc.start(t); osc.stop(t + 0.24);
       } catch (e) { /* audio is a bonus, never a failure */ }
     }
 
-    function playBoing() {
-      if (muted) return;
+    function playBoing(pitch) {
+      if (state.muted) return;
       try {
         const ctx = audioReady(); if (!ctx) return;
         if (ctx.state === 'suspended') ctx.resume();
         const t = ctx.currentTime;
+        const v = pitch || 1;
         const o = ctx.createOscillator(); o.type = 'triangle';
-        o.frequency.setValueAtTime(460, t);
-        o.frequency.exponentialRampToValueAtTime(205, t + 0.16);
-        o.frequency.exponentialRampToValueAtTime(295, t + 0.30);
+        o.frequency.setValueAtTime(460 * v, t);
+        o.frequency.exponentialRampToValueAtTime(205 * v, t + 0.16);
+        o.frequency.exponentialRampToValueAtTime(295 * v, t + 0.30);
         const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1700;
         const g = ctx.createGain();
         g.gain.setValueAtTime(0.0001, t);
         g.gain.exponentialRampToValueAtTime(0.13, t + 0.015);
         g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
-        o.connect(lp).connect(g).connect(master);
+        o.connect(lp).connect(g).connect(master || ctx.destination);
         o.start(t); o.stop(t + 0.45);
       } catch (e) {}
     }
 
     function playChime() {
-      if (muted) return;
+      if (state.muted) return;
       try {
         const ctx = audioReady(); if (!ctx) return;
         if (ctx.state === 'suspended') ctx.resume();
@@ -389,38 +529,81 @@
           g.gain.setValueAtTime(0.0001, s);
           g.gain.exponentialRampToValueAtTime(0.11, s + 0.03);
           g.gain.exponentialRampToValueAtTime(0.0001, s + 0.55);
-          o.connect(g).connect(master);
+          o.connect(g).connect(master || ctx.destination);
           o.start(s); o.stop(s + 0.6);
         });
       } catch (e) {}
     }
 
+    /* the payoff fanfare: a quick rising arpeggio plus a low boom */
+    function playFanfare() {
+      if (state.muted) return;
+      try {
+        const ctx = audioReady(); if (!ctx) return;
+        if (ctx.state === 'suspended') ctx.resume();
+        const t = ctx.currentTime;
+        [523, 659, 784, 1047, 1319].forEach(function (f, i) {
+          const o = ctx.createOscillator(); o.type = 'sawtooth';
+          o.frequency.value = f;
+          const g = ctx.createGain();
+          const s = t + i * 0.06;
+          g.gain.setValueAtTime(0.0001, s);
+          g.gain.exponentialRampToValueAtTime(0.10, s + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001, s + 0.34);
+          const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2600;
+          o.connect(lp).connect(g).connect(master || ctx.destination);
+          o.start(s); o.stop(s + 0.36);
+        });
+        const o = ctx.createOscillator(); o.type = 'sine';
+        o.frequency.setValueAtTime(120, t);
+        o.frequency.exponentialRampToValueAtTime(48, t + 0.5);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.22, t + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+        o.connect(g).connect(master || ctx.destination);
+        o.start(t); o.stop(t + 0.62);
+      } catch (e) {}
+    }
+
+    function buzz(ms) {
+      try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {}
+    }
+
     /* ============================================================
        Rendering (three.js)
        ============================================================ */
-    const DOT_MIN   = 0.42;   // contact cone: vertices within ~65° of the poke dent
-    const MAX_DEPTH = 0.44;   // deepest cave-in, in world units (blob radius is 1.5)
-    const SPRING_K  = 52;     // stiffness — the "slow rise"
-    const SPRING_D  = 6.4;    // damping — leaves a small, happy overshoot
-    const R = 1.5;
+    const TARGET_SIZE  = 2.9;    // the model's largest dimension, in world units
+    const RADIUS_W     = 0.62;   // dent radius, world units
+    const MAX_DEPTH_W  = 0.34;   // deepest cave-in, world units
+    const SPRING_K     = 52;     // stiffness — the "slow rise"
+    const SPRING_D     = 6.4;    // damping — leaves a small, happy overshoot
 
-    let renderer = null, scene = null, camera = null, body = null, faceGroup = null, eyesGroup = null, shadow = null;
-    let geo = null, posAttr = null, base = null, dirs = null, vel = null, N = 0;
-    let material = null;
-    const targetColor = new THREE.Color(SKINS[skinIndex].color);
+    let renderer = null, scene = null, camera = null, shadow = null;
+    let modelRoot = null;        // wrapper: idle sway + squash/stretch live here
+    let records = [];            // one per unique geometry in the active model
+    let activeIdx = 0;
+    let loading = false;
 
-    const impact = new THREE.Vector3(0, 0, 1);   // contact direction, in the blob's local space
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
-    const hitPoint = new THREE.Vector3();
-    const lastSoundDir = new THREE.Vector3(0, 0, 1);
-    const tmpVec = new THREE.Vector3();
-    const faceParts = [];   // { object, base position, outward direction to sample the dent with }
+    const worldHit = new THREE.Vector3();
+    const camShake = { amt: 0, x: 0, y: 0 };
 
     let pointerInside = false, pressing = false, pressArmed = false, hitOk = false;
     let lastPointerType = 'mouse';
     let pressAmt = 0, pulse = 0, dentPower = 0, dentActive = false, dentDepth = 0;
     let lastSquelchAt = 0;
+
+    /* combo + energy */
+    const COMBO_WINDOW = 900;    // ms between squishes to keep a combo alive
+    const ENERGY_NEED  = 30;     // squish-points to trigger a SUPER SQUISH
+    let combo = 1, lastSquishAt = 0, energy = 0;
+
+    const loader = new GLTFLoader();
+    const cache = new Map();     // file -> { wrapper, records }
+
+    function activeChar() { return CHARACTERS[activeIdx]; }
 
     function init() {
       try {
@@ -439,8 +622,8 @@
       camera.position.set(0, 0.15, 6.2);
       camera.lookAt(0, 0, 0);
 
-      /* a tiny canvas becomes the environment map: that's what gives the
-         toy its glossy, soft-plastic sheen without loading an HDRI */
+      /* a tiny canvas becomes the environment map: that is what gives the
+         toy its soft, glossy sheen without loading an HDRI */
       try {
         const c = document.createElement('canvas'); c.width = 64; c.height = 32;
         const g = c.getContext('2d');
@@ -463,44 +646,13 @@
         tex.dispose();
       } catch (e) { /* without an env map the lights below still carry it */ }
 
-      scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x2a1830, 0.6));
-      const key = new THREE.DirectionalLight(0xffffff, 1.7); key.position.set(3.5, 4.5, 5.5); scene.add(key);
+      scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x2a1830, 0.75));
+      const key = new THREE.DirectionalLight(0xffffff, 1.9); key.position.set(3.5, 4.5, 5.5); scene.add(key);
       const rim = new THREE.PointLight(0x66ccff, 26, 30); rim.position.set(-4.2, -1.6, 3.2); scene.add(rim);
       const warm = new THREE.PointLight(0xff77aa, 20, 30); warm.position.set(2.6, -3.2, -2.2); scene.add(warm);
 
-      /* ---- body: a sphere, one spring per vertex ---- */
-      geo = new THREE.SphereGeometry(R, 64, 48);
-      posAttr = geo.attributes.position;
-      N = posAttr.count;
-      const arr = posAttr.array;
-      base = new Float32Array(arr);              // rest positions
-      dirs = new Float32Array(N * 3);            // outward unit direction of each vertex
-      vel = new Float32Array(N * 3);             // spring velocity
-      for (let i = 0; i < N; i++) {
-        const i3 = i * 3;
-        const x = arr[i3], y = arr[i3 + 1], z = arr[i3 + 2];
-        const len = Math.hypot(x, y, z) || 1;
-        dirs[i3] = x / len; dirs[i3 + 1] = y / len; dirs[i3 + 2] = z / len;
-      }
-
-      material = new THREE.MeshPhysicalMaterial({
-        color: targetColor.clone(),
-        roughness: 0.30,
-        metalness: 0.0,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.10,
-        sheen: 0.5,
-        sheenRoughness: 0.55,
-        sheenColor: new THREE.Color(0xffffff),
-        envMapIntensity: 1.0
-      });
-      body = new THREE.Mesh(geo, material);
-      body.frustumCulled = false;
-      scene.add(body);
-
-      buildFace();
       buildShadow();
-
+      buildFx();
       renderer.setAnimationLoop(frame);
 
       const ro = (typeof ResizeObserver !== 'undefined') ? new ResizeObserver(resize) : null;
@@ -508,59 +660,10 @@
       window.addEventListener('resize', resize);
       resize();
 
-      /* a little plop hello, once things have settled */
-      if (!reducedMotion) {
-        setTimeout(function () { impact.set(0, -1, 0); pulse = 1; }, 520);
-      }
+      loadCharacter(activeIdx, true);
     }
 
-    /* Every facial feature is glued to the patch of surface it sits on, so it
-       follows that patch's cave-in and never pops out of (or sinks into) the blob. */
-    function registerFacePart(obj, x, y, z) {
-      const base = new THREE.Vector3(x, y, z);
-      const dir = base.clone();
-      if (dir.lengthSq() < 1e-8) return;
-      dir.normalize();
-      obj.position.copy(base);
-      faceParts.push({ obj: obj, base: base, dir: dir });
-    }
-
-    /* ---- the face rides along with the dent ---- */
-    function buildFace() {
-      faceGroup = new THREE.Group();
-      body.add(faceGroup);
-
-      const eyeMat   = new THREE.MeshStandardMaterial({ color: 0x140f26, roughness: 0.15, metalness: 0.0 });
-      const glintMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const cheekMat = new THREE.MeshStandardMaterial({ color: 0xff8fb8, roughness: 0.6, metalness: 0.0 });
-      const mouthMat = new THREE.MeshStandardMaterial({ color: 0x6d0d2c, roughness: 0.45, metalness: 0.0 });
-
-      const eyeGeo   = new THREE.SphereGeometry(0.23, 24, 18);
-      const glintGeo = new THREE.SphereGeometry(0.075, 12, 10);
-      const cheekGeo = new THREE.SphereGeometry(0.16, 16, 12);
-
-      eyesGroup = new THREE.Group();
-      faceGroup.add(eyesGroup);
-      [-1, 1].forEach(function (side) {
-        const eye = new THREE.Mesh(eyeGeo, eyeMat);
-        registerFacePart(eye, 0.45 * side, 0.30, 1.34);
-        eyesGroup.add(eye);
-        const glint = new THREE.Mesh(glintGeo, glintMat);
-        registerFacePart(glint, 0.51 * side, 0.37, 1.54);
-        eyesGroup.add(glint);
-        const cheek = new THREE.Mesh(cheekGeo, cheekMat);
-        registerFacePart(cheek, 0.78 * side, -0.05, 1.24);
-        cheek.scale.set(1, 0.72, 0.55);
-        faceGroup.add(cheek);
-      });
-
-      const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.20, 0.045, 10, 26, Math.PI), mouthMat);
-      registerFacePart(mouth, 0, -0.18, 1.485);
-      mouth.rotation.z = Math.PI;   // the half-ring's ends point up: a smile
-      faceGroup.add(mouth);
-    }
-
-    /* ---- a soft contact shadow so the blob sits on something ---- */
+    /* ---- a soft contact shadow so the friend sits on something ---- */
     function buildShadow() {
       const c = document.createElement('canvas'); c.width = c.height = 128;
       const g = c.getContext('2d');
@@ -571,12 +674,238 @@
       g.fillStyle = rg; g.fillRect(0, 0, 128, 128);
       const tex = new THREE.CanvasTexture(c);
       shadow = new THREE.Mesh(
-        new THREE.PlaneGeometry(3.6, 3.6),
-        new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.8 })
+        new THREE.PlaneGeometry(3.8, 3.8),
+        new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.75 })
       );
       shadow.rotation.x = -Math.PI / 2;
-      shadow.position.y = -1.66;
+      shadow.position.y = -1.6;
       scene.add(shadow);
+    }
+
+    /* ============================================================
+       Particles — a plain 2D canvas above the WebGL one, so bursts
+       cost nothing in the 3D scene and never eat pointer input.
+       ============================================================ */
+    let fx = null, fxc = null, parts = [];
+
+    function buildFx() {
+      fx = document.createElement('canvas');
+      fx.className = 'fx-canvas';
+      stage.appendChild(fx);
+      fxc = fx.getContext('2d');
+    }
+
+    const SPARK_COLORS = ['#ff74a4', '#ffd166', '#6ae0ff', '#b07cff', '#9dff5c', '#ffffff'];
+    const SPARK_EMOJI  = ['✨', '💖', '⭐', '💫'];
+
+    function spawnBurst(x, y, n, power) {
+      const heavy = power || 1;
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const sp = (0.9 + Math.random() * 2.6) * heavy;
+        parts.push({
+          x: x, y: y,
+          vx: Math.cos(a) * sp * 60,
+          vy: Math.sin(a) * sp * 60 - 90,
+          life: 0.75 + Math.random() * 0.7,
+          age: 0,
+          size: 3 + Math.random() * 5,
+          rot: Math.random() * Math.PI,
+          spin: (Math.random() - 0.5) * 9,
+          color: SPARK_COLORS[(Math.random() * SPARK_COLORS.length) | 0],
+          emoji: Math.random() < 0.22 ? SPARK_EMOJI[(Math.random() * SPARK_EMOJI.length) | 0] : null
+        });
+      }
+      if (parts.length > 260) parts = parts.slice(parts.length - 260);
+    }
+
+    function drawFx(dt) {
+      if (!fxc || !fx) return;
+      const w = fx.width / (fx._dpr || 1), h = fx.height / (fx._dpr || 1);
+      fxc.clearRect(0, 0, w, h);
+      if (!parts.length) return;
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const p = parts[i];
+        p.age += dt;
+        if (p.age >= p.life) { parts.splice(i, 1); continue; }
+        p.vy += 640 * dt;            // gravity
+        p.vx *= (1 - 0.9 * dt);      // drag
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        p.rot += p.spin * dt;
+        const k = 1 - p.age / p.life;
+        fxc.globalAlpha = Math.max(0, Math.min(1, k));
+        if (p.emoji) {
+          fxc.save();
+          fxc.translate(p.x, p.y);
+          fxc.rotate(p.rot);
+          fxc.font = (p.size * 3.4) + 'px system-ui, sans-serif';
+          fxc.textAlign = 'center'; fxc.textBaseline = 'middle';
+          fxc.fillText(p.emoji, 0, 0);
+          fxc.restore();
+        } else {
+          fxc.save();
+          fxc.translate(p.x, p.y);
+          fxc.rotate(p.rot);
+          fxc.fillStyle = p.color;
+          fxc.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+          fxc.restore();
+        }
+      }
+      fxc.globalAlpha = 1;
+    }
+
+    /* ============================================================
+       Loading a character
+       ============================================================ */
+    function setVeil(show, emoji, text, pct) {
+      veilEmoji.textContent = emoji || '🐱';
+      if (text != null) veilText.textContent = text;
+      veilFill.style.width = Math.round(Math.max(0, Math.min(1, pct || 0)) * 100) + '%';
+      veilEl.classList.toggle('hidden', !show);
+    }
+
+    function normalize(root) {
+      root.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(root);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      root.scale.setScalar(TARGET_SIZE / maxDim);
+      root.updateMatrixWorld(true);
+      const box2 = new THREE.Box3().setFromObject(root);
+      const center = box2.getCenter(new THREE.Vector3());
+      root.position.sub(center);         // sit the model on the origin
+      root.updateMatrixWorld(true);
+    }
+
+    /* Freeze each unique geometry's rest shape once, so every vertex can
+       spring home again no matter how badly we maul it. */
+    function buildRecords(root) {
+      const recs = [];
+      const seen = new Set();
+      root.traverse(function (o) {
+        if (!o.isMesh || !o.geometry) return;
+        const g = o.geometry;
+        if (seen.has(g)) return;                       // shared geometry: deform it once
+        seen.add(g);
+        const pos = g.attributes.position;
+        if (!pos) return;
+        if (!g.attributes.normal) g.computeVertexNormals();
+        const nrmAttr = g.attributes.normal;
+        const N = pos.count;
+        const ws = o.getWorldScale(new THREE.Vector3());
+        const invScale = 1 / (Math.abs(ws.x) || 1);    // mesh-local units per world unit
+        recs.push({
+          geo: g,
+          pos: pos,
+          base: new Float32Array(pos.array),
+          nrm: new Float32Array(nrmAttr.array),
+          vel: new Float32Array(N * 3),
+          N: N,
+          mesh: o,
+          invScale: invScale,
+          radius: RADIUS_W * invScale,
+          depth: MAX_DEPTH_W * invScale,
+          localHit: new THREE.Vector3(0, 1e9, 0)
+        });
+      });
+      return recs;
+    }
+
+    function resetRecords(recs) {
+      for (let r = 0; r < recs.length; r++) {
+        const rec = recs[r];
+        rec.pos.array.set(rec.base);
+        rec.vel.fill(0);
+        rec.localHit.set(0, 1e9, 0);
+        rec.pos.needsUpdate = true;
+      }
+    }
+
+    function activate(idx) {
+      const entry = cache.get(CHARACTERS[idx].file);
+      if (!entry) return;
+      if (modelRoot) { scene.remove(modelRoot); endPress(); }
+      activeIdx = idx;
+      modelRoot = entry.wrapper;
+      records = entry.records;
+      modelRoot.rotation.y = CHARACTERS[idx].rotY;
+      scene.add(modelRoot);
+      modelRoot.updateMatrixWorld(true);
+      resetRecords(records);
+      if (state.tried.indexOf(CHARACTERS[idx].id) === -1) state.tried.push(CHARACTERS[idx].id);
+      state.charId = CHARACTERS[idx].id;
+      save();
+      renderChars();
+      nowEl.textContent = 'Now squishing: ' + CHARACTERS[idx].name;
+      checkTrophies();
+    }
+
+    function loadCharacter(idx, firstLoad) {
+      const ch = CHARACTERS[idx];
+      if (cache.has(ch.file)) { activate(idx); if (firstLoad) hintEl.classList.remove('dim'); return; }
+      if (loading) return;
+      loading = true;
+      setVeil(true, ch.emoji, 'Loading ' + ch.name, 0.04);
+      loader.load(ch.file, function (gltf) {
+        const inner = gltf.scene;
+        inner.traverse(function (o) {
+          if (o.isMesh && o.material) {
+            const mats = Array.isArray(o.material) ? o.material : [o.material];
+            mats.forEach(function (m) {
+              if (m.map) m.map.colorSpace = THREE.SRGBColorSpace;
+              m.envMapIntensity = 0.85;
+              if (m.side === THREE.FrontSide) m.side = THREE.DoubleSide;  // a squashed mesh shows its inside
+            });
+          }
+        });
+        normalize(inner);
+        const wrapper = new THREE.Group();
+        wrapper.add(inner);
+        const recs = buildRecords(inner);
+        cache.set(ch.file, { wrapper: wrapper, records: recs });
+        loading = false;
+        setVeil(true, ch.emoji, ch.name + ' ready', 1);
+        setTimeout(function () { setVeil(false); }, 260);
+        activate(idx);
+        if (firstLoad) hintEl.classList.remove('dim');
+      }, function (ev) {
+        if (ev && ev.total) setVeil(true, ch.emoji, 'Loading ' + ch.name, ev.loaded / ev.total);
+        else setVeil(true, ch.emoji, 'Loading ' + ch.name, 0.35);
+      }, function () {
+        loading = false;
+        setVeil(false);
+        showToast('Could not load ' + ch.name + ' — check squishy/' + ch.file);
+      });
+    }
+
+    function selectCharacter(idx) {
+      if (idx === activeIdx && modelRoot) return;
+      if (!cache.has(CHARACTERS[idx].file)) { loadCharacter(idx); return; }
+      playChime();
+      activate(idx);
+      spawnBurst(stage.clientWidth / 2, stage.clientHeight / 2, 10, 0.7);
+    }
+
+    function renderChars() {
+      charsEl.textContent = '';
+      CHARACTERS.forEach(function (ch, i) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'charbtn' + (state.tried.indexOf(ch.id) !== -1 ? ' seen' : '');
+        b.setAttribute('aria-pressed', i === activeIdx ? 'true' : 'false');
+        b.setAttribute('aria-label', ch.name);
+        b.title = ch.name;
+        b.dataset.index = String(i);
+        const em = document.createElement('span'); em.className = 'em'; em.textContent = ch.emoji;
+        const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = ch.name;
+        b.appendChild(em); b.appendChild(nm);
+        b.addEventListener('click', function () { selectCharacter(i); });
+        charsEl.appendChild(b);
+      });
+    }
+
+    function renderTrophy() {
+      trophyEl.textContent = '🏆 ' + state.trophies.length + '/' + TROPHIES.length;
     }
 
     function resize() {
@@ -586,67 +915,70 @@
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      if (fx) {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        fx._dpr = dpr;
+        fx.width = Math.max(1, Math.round(w * dpr));
+        fx.height = Math.max(1, Math.round(h * dpr));
+        fxc.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
     }
 
     /* ============================================================
        The squish itself: every vertex springs toward its target,
-       which is its rest spot minus the local dent.
+       which is its rest spot pushed inward all around the contact.
        ============================================================ */
     function stepSprings(dt) {
-      const arr = posAttr.array;
       const steps = dt > 1 / 90 ? 2 : 1;
       const h = dt / steps;
       const on = dentActive;
-      const depth = dentDepth;
-      const ix = impact.x, iy = impact.y, iz = impact.z;
       let maxDisp = 0;
 
-      for (let s = 0; s < steps; s++) {
-        for (let i = 0; i < N; i++) {
-          const i3 = i * 3;
-          const dx = dirs[i3], dy = dirs[i3 + 1], dz = dirs[i3 + 2];
+      for (let r = 0; r < records.length; r++) {
+        const rec = records[r];
+        const arr = rec.pos.array, base = rec.base, nrm = rec.nrm, vel = rec.vel, N = rec.N;
+        const lx = rec.localHit.x, ly = rec.localHit.y, lz = rec.localHit.z;
+        const R2 = rec.radius * rec.radius;
+        const dep = dentDepth * rec.invScale;
 
-          let tx = base[i3], ty = base[i3 + 1], tz = base[i3 + 2];
-          if (on) {
-            const dot = dx * ix + dy * iy + dz * iz;
-            if (dot > DOT_MIN) {
-              let f = (dot - DOT_MIN) / (1 - DOT_MIN);
-              f = f * f * (3 - 2 * f);       // smoothstep falloff across the cone
-              const p = depth * f;
-              tx -= dx * p; ty -= dy * p; tz -= dz * p;
+        for (let s = 0; s < steps; s++) {
+          for (let i = 0; i < N; i++) {
+            const i3 = i * 3;
+            let tx = base[i3], ty = base[i3 + 1], tz = base[i3 + 2];
+
+            if (on) {
+              const dx = base[i3] - lx, dy = base[i3 + 1] - ly, dz = base[i3 + 2] - lz;
+              const d2 = dx * dx + dy * dy + dz * dz;
+              if (d2 < R2) {
+                let f = 1 - d2 / R2;
+                f = f * f * (3 - 2 * f);            // smoothstep falloff across the dent
+                const p = dep * f;
+                /* sink along this vertex's own resting normal: that is what
+                   makes any model cave in, not just a sphere */
+                tx -= nrm[i3] * p; ty -= nrm[i3 + 1] * p; tz -= nrm[i3 + 2] * p;
+              }
+            }
+
+            const cx = arr[i3], cy = arr[i3 + 1], cz = arr[i3 + 2];
+            let vx = vel[i3], vy = vel[i3 + 1], vz = vel[i3 + 2];
+            vx += ((tx - cx) * SPRING_K - vx * SPRING_D) * h;
+            vy += ((ty - cy) * SPRING_K - vy * SPRING_D) * h;
+            vz += ((tz - cz) * SPRING_K - vz * SPRING_D) * h;
+
+            const nx = cx + vx * h, ny = cy + vy * h, nz = cz + vz * h;
+            vel[i3] = vx; vel[i3 + 1] = vy; vel[i3 + 2] = vz;
+            arr[i3] = nx; arr[i3 + 1] = ny; arr[i3 + 2] = nz;
+
+            if (s === steps - 1) {
+              const ax = nx - base[i3], ay = ny - base[i3 + 1], az = nz - base[i3 + 2];
+              const sq = ax * ax + ay * ay + az * az;
+              if (sq > maxDisp) maxDisp = sq;
             }
           }
-
-          const cx = arr[i3], cy = arr[i3 + 1], cz = arr[i3 + 2];
-          let vx = vel[i3], vy = vel[i3 + 1], vz = vel[i3 + 2];
-          vx += ((tx - cx) * SPRING_K - vx * SPRING_D) * h;
-          vy += ((ty - cy) * SPRING_K - vy * SPRING_D) * h;
-          vz += ((tz - cz) * SPRING_K - vz * SPRING_D) * h;
-
-          const nx = cx + vx * h, ny = cy + vy * h, nz = cz + vz * h;
-          vel[i3] = vx; vel[i3 + 1] = vy; vel[i3 + 2] = vz;
-          arr[i3] = nx; arr[i3 + 1] = ny; arr[i3 + 2] = nz;
-
-          if (s === steps - 1) {
-            const ax = nx - base[i3], ay = ny - base[i3 + 1], az = nz - base[i3 + 2];
-            const sq = ax * ax + ay * ay + az * az;
-            if (sq > maxDisp) maxDisp = sq;
-          }
         }
+        rec.pos.needsUpdate = true;
       }
-      posAttr.needsUpdate = true;
       return Math.sqrt(maxDisp);
-    }
-
-    /* how far the surface has caved in at a given local direction */
-    function dentOffsetAt(dirVec, out) {
-      if (!dentActive) { out.set(0, 0, 0); return out; }
-      const dot = dirVec.x * impact.x + dirVec.y * impact.y + dirVec.z * impact.z;
-      if (dot <= DOT_MIN) { out.set(0, 0, 0); return out; }
-      let f = (dot - DOT_MIN) / (1 - DOT_MIN);
-      f = f * f * (3 - 2 * f);
-      const p = dentDepth * f;
-      return out.set(-dirVec.x * p, -dirVec.y * p, -dirVec.z * p);
     }
 
     const clock = new THREE.Clock();
@@ -655,12 +987,15 @@
       const dt = Math.min(clock.getDelta(), 1 / 30);
       const t = clock.elapsedTime;
 
-      /* idle life: a gentle float, so the blob never looks frozen */
-      body.position.y = reducedMotion ? 0 : Math.sin(t * 1.4) * 0.05;
-      body.rotation.y = reducedMotion ? 0 : Math.sin(t * 0.65) * 0.12;
-      body.rotation.x = reducedMotion ? 0 : Math.cos(t * 0.9) * 0.045;
-
-      material.color.lerp(targetColor, Math.min(1, dt * 8));
+      if (modelRoot) {
+        const rotY = activeChar().rotY;
+        modelRoot.rotation.y = rotY + (reducedMotion ? 0 : Math.sin(t * 0.5) * 0.10);
+        modelRoot.rotation.x = reducedMotion ? 0 : Math.cos(t * 0.8) * 0.03;
+        modelRoot.position.y = reducedMotion ? 0 : Math.sin(t * 1.3) * 0.04;
+        /* squash-and-stretch the whole friend while it is being squeezed */
+        const sq = reducedMotion ? 0 : dentPower;
+        modelRoot.scale.set(1 + 0.055 * sq, 1 - 0.075 * sq, 1 + 0.055 * sq);
+      }
 
       /* how hard we are squishing right now */
       const want = pressing && pressArmed ? 1 : ((pointerInside && hitOk) ? 0.34 : 0);
@@ -669,23 +1004,27 @@
       if (pulse > 0.001) { pulse *= Math.exp(-5.2 * dt); if (pulse < 0.001) pulse = 0; }
       dentPower = Math.min(1, pressAmt + pulse);
       dentActive = dentPower > 0.012;
-      dentDepth = MAX_DEPTH * dentPower;
+      dentDepth = MAX_DEPTH_W * dentPower;
 
       const maxDisp = stepSprings(dt);
-      if (dentActive || maxDisp > 0.0035) geo.computeVertexNormals();
-
-      /* each feature follows its own patch of the surface */
-      for (let i = 0; i < faceParts.length; i++) {
-        const part = faceParts[i];
-        dentOffsetAt(part.dir, tmpVec);
-        part.obj.position.set(part.base.x + tmpVec.x, part.base.y + tmpVec.y, part.base.z + tmpVec.z);
+      if (modelRoot && (dentActive || maxDisp > 0.0035)) {
+        for (let r = 0; r < records.length; r++) records[r].geo.computeVertexNormals();
       }
-      const squint = 1 - 0.42 * dentPower;
-      eyesGroup.scale.y += (squint - eyesGroup.scale.y) * Math.min(1, dt * 18);
-      eyesGroup.position.y += ((-0.10 * dentPower) - eyesGroup.position.y) * Math.min(1, dt * 18);
 
-      shadow.scale.setScalar(1 - 0.06 * dentPower);
+      /* combo decay */
+      if (combo > 1 && performance.now() - lastSquishAt > COMBO_WINDOW) setCombo(1);
 
+      /* camera kick */
+      if (camShake.amt > 0.0005) {
+        camShake.amt *= Math.exp(-6.5 * dt);
+        camShake.x = (Math.random() * 2 - 1) * camShake.amt;
+        camShake.y = (Math.random() * 2 - 1) * camShake.amt;
+      } else { camShake.amt = 0; camShake.x = 0; camShake.y = 0; }
+      camera.position.set(camShake.x, 0.15 + camShake.y, 6.2);
+
+      if (shadow) shadow.scale.setScalar(1 - 0.06 * dentPower);
+
+      drawFx(dt);
       renderer.render(scene, camera);
     }
 
@@ -696,17 +1035,20 @@
       const r = stage.getBoundingClientRect();
       pointer.x = ((e.clientX - r.left) / r.width) * 2 - 1;
       pointer.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
     }
 
     function probeHit() {
-      if (!body) return false;
+      if (!modelRoot) return false;
       raycaster.setFromCamera(pointer, camera);
-      const hits = raycaster.intersectObject(body, false);
+      const hits = raycaster.intersectObject(modelRoot, true);
       if (!hits.length) return false;
-      hitPoint.copy(hits[0].point);
-      body.worldToLocal(hitPoint);
-      if (hitPoint.lengthSq() < 1e-8) return false;
-      hitPoint.normalize();
+      worldHit.copy(hits[0].point);
+      for (let r = 0; r < records.length; r++) {
+        const rec = records[r];
+        rec.localHit.copy(worldHit);
+        rec.mesh.worldToLocal(rec.localHit);
+      }
       return true;
     }
 
@@ -715,119 +1057,149 @@
       toastEl.textContent = text;
       toastEl.classList.add('show');
       clearTimeout(toastTimer.id);
-      toastTimer.id = setTimeout(function () { toastEl.classList.remove('show'); }, 2400);
+      toastTimer.id = setTimeout(function () { toastEl.classList.remove('show'); }, 2600);
     }
 
-    function unlockedAt(n) {
-      return SKINS.filter(function (s) { return n >= s.unlock; }).length;
+    function react(text, x, y) {
+      const el = document.createElement('div');
+      el.className = 'react';
+      el.textContent = text;
+      el.style.left = Math.round(x) + 'px';
+      el.style.top = Math.round(y) + 'px';
+      stage.appendChild(el);
+      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 950);
     }
 
-    function renderSkins() {
-      skinsEl.textContent = '';
-      SKINS.forEach(function (skin, i) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'swatch' + (squishes >= skin.unlock ? '' : ' locked');
-        b.style.setProperty('--c', '#' + new THREE.Color(skin.color).getHexString());
-        b.dataset.index = String(i);
-        const locked = squishes < skin.unlock;
-        b.title = locked ? (skin.name + ' — ' + (skin.unlock - squishes) + ' more squishes') : skin.name;
-        b.setAttribute('aria-label', skin.name + (locked ? ' (locked)' : ''));
-        b.setAttribute('aria-pressed', i === skinIndex ? 'true' : 'false');
-        b.addEventListener('click', function () { chooseSkin(i); });
-        skinsEl.appendChild(b);
+    let comboPopTimer = { id: 0 };
+    function setCombo(n) {
+      combo = n;
+      comboEl.innerHTML = 'Combo &times;' + n;
+      comboEl.classList.toggle('hot', n >= 3);
+    }
+    function popCombo(text) {
+      comboPop.textContent = text;
+      comboPop.classList.add('show');
+      clearTimeout(comboPopTimer.id);
+      comboPopTimer.id = setTimeout(function () { comboPop.classList.remove('show'); }, 620);
+    }
+
+    function setEnergy(v) {
+      energy = Math.max(0, Math.min(ENERGY_NEED, v));
+      energyFill.style.width = Math.round((energy / ENERGY_NEED) * 100) + '%';
+      energyEl.classList.toggle('full', energy >= ENERGY_NEED - 0.001);
+    }
+
+    function checkTrophies() {
+      let won = false;
+      TROPHIES.forEach(function (tr) {
+        if (state.trophies.indexOf(tr.id) !== -1) return;
+        if (tr.test(state)) {
+          state.trophies.push(tr.id);
+          showToast(tr.icon + ' Trophy: ' + tr.name);
+          won = true;
+        }
       });
+      if (won) { playChime(); save(); }
+      renderTrophy();
     }
 
-    function chooseSkin(i) {
-      const skin = SKINS[i];
-      if (squishes < skin.unlock) {
-        playSquish(0.4);
-        showToast('🔒 ' + skin.name + ' — ' + (skin.unlock - squishes) + ' more squishes');
-        return;
-      }
-      skinIndex = i;
-      targetColor.setHex(skin.color);
-      Array.prototype.forEach.call(skinsEl.children, function (el, j) {
-        el.setAttribute('aria-pressed', j === skinIndex ? 'true' : 'false');
-      });
-      playSquish(0.55);
+    function superSquish() {
+      state.supers++;
       save();
+      flashEl.classList.add('on');
+      setTimeout(function () { flashEl.classList.remove('on'); }, 90);
+      stage.classList.add('super');
+      setTimeout(function () { stage.classList.remove('super'); }, 650);
+      camShake.amt = 0.16;
+      playFanfare();
+      buzz([24, 40, 24, 40, 60]);
+      popCombo('SUPER SQUISH!');
+      const w = stage.clientWidth, h = stage.clientHeight;
+      spawnBurst(w / 2, h / 2, 70, 1.8);
+      spawnBurst(w * 0.26, h * 0.42, 22, 1.3);
+      spawnBurst(w * 0.74, h * 0.42, 22, 1.3);
+      showToast('💥 SUPER SQUISH! ×' + state.supers);
+      checkTrophies();
     }
 
-    function updateProgressUI() {
-      countEl.textContent = String(squishes);
-      totalEl.textContent = String(squishes);
-      const next = SKINS.filter(function (s) { return squishes < s.unlock; })[0];
-      nextEl.textContent = next ? ('Next skin at ' + next.unlock + ' squishes') : 'All skins unlocked ✦';
-    }
+    function countSquish(clientX, clientY) {
+      const now = performance.now();
+      if (now - lastSquishAt <= COMBO_WINDOW) combo = Math.min(combo + 1, 99);
+      else combo = 1;
+      lastSquishAt = now;
+      if (combo > state.maxCombo) state.maxCombo = combo;
+      setCombo(combo);
 
-    function countSquish() {
-      const had = unlockedAt(squishes);
-      squishes++;
-      updateProgressUI();
-      renderSkins();
-      save();
-      const now = unlockedAt(squishes);
-      if (now > had) {
-        const fresh = SKINS[unlockedAt(squishes) - 1];
-        showToast('✦ Unlocked: ' + fresh.name);
-        playChime();
+      state.squishes++;
+      countEl.textContent = String(state.squishes);
+      totalEl.textContent = String(state.squishes);
+
+      setEnergy(energy + combo);
+      if (energy >= ENERGY_NEED) { setEnergy(0); superSquish(); }
+      else if (combo >= 3) popCombo('COMBO ×' + combo);
+
+      if (clientX != null) {
+        const ch = activeChar();
+        react(ch.words[(Math.random() * ch.words.length) | 0], clientX, clientY);
+        spawnBurst(clientX, clientY, 7, 0.85);
       }
+      hintEl.classList.add('dim');
+      save();
+      checkTrophies();
     }
 
     stage.addEventListener('pointerdown', function (e) {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       /* the sound toggle lives inside the stage — let it keep its own click */
       if (e.target && e.target.closest && e.target.closest('button')) return;
+      if (!modelRoot) return;
       lastPointerType = e.pointerType || 'mouse';
       pointerInside = true;
-      setPointer(e);
+      const pt = setPointer(e);
       if (typeof stage.setPointerCapture === 'function') {
         try { stage.setPointerCapture(e.pointerId); } catch (err) {}
       }
       const ok = probeHit();
-      if (ok) impact.copy(hitPoint);
       hitOk = ok;
       pressing = true;
       pressArmed = ok;
       if (ok) {
-        lastSoundDir.copy(impact);
-        playSquish(1);
-        countSquish();
-        hintEl.classList.add('dim');
+        lastSquelchAt = 0;
+        playSquish(1, activeChar().pitch);
+        buzz(lastPointerType === 'mouse' ? 12 : 22);
+        countSquish(pt.x, pt.y);
       }
     });
 
     stage.addEventListener('pointermove', function (e) {
+      if (!modelRoot) return;
       pointerInside = true;
       setPointer(e);
+      if (!pressing) return;
       const ok = probeHit();
       hitOk = ok;
-      if (!ok) return;                       // dragging off the blob keeps the last contact
-      impact.copy(hitPoint);
-      if (pressing && !pressArmed) {         // the press started just off the blob: arm it now
+      if (!ok) return;                       // dragging off the model keeps the last contact
+      if (pressing && !pressArmed) {         // the press started just off it: arm it now
         pressArmed = true;
-        lastSoundDir.copy(impact);
-        playSquish(0.7);
+        lastSquelchAt = 0;
+        playSquish(0.7, activeChar().pitch);
       }
       if (pressing && pressArmed) {
         /* dragging across the surface: a soft squelch now and then */
         const now = performance.now();
-        const dot = impact.x * lastSoundDir.x + impact.y * lastSoundDir.y + impact.z * lastSoundDir.z;
-        if (now - lastSquelchAt > 260 && dot < 0.99) {
-          playSquish(0.5);
+        if (now - lastSquelchAt > 260) {
+          playSquish(0.5, activeChar().pitch);
           lastSquelchAt = now;
-          lastSoundDir.copy(impact);
+          buzz(8);
         }
       }
     });
 
     function endPress() {
-      if (pressing && pressArmed) playBoing();
+      if (pressing && pressArmed) playBoing(activeChar().pitch);
       pressing = false;
       pressArmed = false;
-      /* a touch has no hover state: let go and the blob is left alone */
+      /* a touch has no hover state: let go and the friend is left alone */
       if (lastPointerType !== 'mouse') { pointerInside = false; hitOk = false; }
     }
     stage.addEventListener('pointerup', endPress);
@@ -837,32 +1209,36 @@
       if (e.pointerType === 'mouse' && !pressing) { pointerInside = false; hitOk = false; }
     });
 
-    /* keyboard: space or enter gives the blob a good poke */
+    /* keyboard: space or enter gives the friend a good poke */
     stage.addEventListener('keydown', function (e) {
       if (e.key === ' ' || e.key === 'Enter' || e.key === 'Spacebar') {
         e.preventDefault();
-        impact.set(0, 0, 1);
+        if (!modelRoot) return;
         pulse = 1;
-        hintEl.classList.add('dim');
-        countSquish();
-        playSquish(0.9);
-        setTimeout(playBoing, 230);
+        playSquish(0.9, activeChar().pitch);
+        countSquish(stage.clientWidth / 2, stage.clientHeight * 0.42);
       }
     });
 
     function applyMasterGain() {
       if (master && actx) {
-        try { master.gain.setTargetAtTime(muted ? 0 : 0.5, actx.currentTime, 0.02); } catch (err) {}
+        try { master.gain.setTargetAtTime(state.muted ? 0 : 0.5, actx.currentTime, 0.02); } catch (err) {}
       }
     }
 
     muteBtn.addEventListener('click', function () {
-      muted = !muted;
-      muteBtn.textContent = muted ? '🔇 Sound off' : '🔊 Sound on';
-      muteBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
-      if (!muted) { audioReady(); applyMasterGain(); playSquish(0.5); }
+      state.muted = !state.muted;
+      muteBtn.textContent = state.muted ? '🔇 Sound off' : '🔊 Sound on';
+      muteBtn.setAttribute('aria-pressed', state.muted ? 'true' : 'false');
+      if (!state.muted) { audioReady(); applyMasterGain(); playSquish(0.5, activeChar().pitch); }
       else { applyMasterGain(); }
       save();
+    });
+
+    surpriseBtn.addEventListener('click', function () {
+      let next = activeIdx;
+      while (next === activeIdx && CHARACTERS.length > 1) next = (Math.random() * CHARACTERS.length) | 0;
+      selectCharacter(next);
     });
 
     function showFallback() {
@@ -881,11 +1257,57 @@
     }
 
     /* ---------- boot ---------- */
-    muteBtn.textContent = muted ? '🔇 Sound off' : '🔊 Sound on';
-    muteBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
-    updateProgressUI();
-    renderSkins();
+    activeIdx = Math.max(0, CHARACTERS.findIndex(function (c) { return c.id === state.charId; }));
+    muteBtn.textContent = state.muted ? '🔇 Sound off' : '🔊 Sound on';
+    muteBtn.setAttribute('aria-pressed', state.muted ? 'true' : 'false');
+    countEl.textContent = String(state.squishes);
+    totalEl.textContent = String(state.squishes);
+    nowEl.textContent = 'Now squishing: ' + CHARACTERS[activeIdx].name;
+    renderChars();
+    renderTrophy();
+    setCombo(1);
+    setEnergy(0);
     init();
+
+    /* a tiny debug handle, only when ?debug is in the URL */
+    if (location.search.indexOf('debug') !== -1) {
+      window.__squishy = {
+        select: function (id) {
+          const i = CHARACTERS.findIndex(function (c) { return c.id === id; });
+          if (i >= 0) selectCharacter(i);
+          return i;
+        },
+        state: function () {
+          let verts = 0, maxDisp = 0;
+          for (let r = 0; r < records.length; r++) {
+            const rec = records[r];
+            verts += rec.N;
+            const arr = rec.pos.array;
+            for (let i = 0; i < rec.N; i++) {
+              const i3 = i * 3;
+              const dx = arr[i3] - rec.base[i3], dy = arr[i3 + 1] - rec.base[i3 + 1], dz = arr[i3 + 2] - rec.base[i3 + 2];
+              const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+              if (d > maxDisp) maxDisp = d;
+            }
+          }
+          return {
+            ready: !!modelRoot, active: activeChar().id, records: records.length, verts: verts,
+            rotY: modelRoot ? modelRoot.rotation.y : null,
+            maxDisp: maxDisp, dentPower: dentPower, combo: combo,
+            energy: energy, squishes: state.squishes, supers: state.supers,
+            trophies: state.trophies.slice(), cache: cache.size
+          };
+        },
+        press: function () {
+          pointer.set(0, 0); pointerInside = true;
+          const ok = probeHit();
+          hitOk = ok; pressing = true; pressArmed = ok;
+          if (ok) { pulse = 1; lastSquelchAt = 0; }
+          return ok;
+        },
+        release: function () { pressing = false; pressArmed = false; pulse = 0; pointerInside = false; hitOk = false; return true; }
+      };
+    }
   </script>
 
   <script src="banner.js"></script>
