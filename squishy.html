@@ -573,13 +573,13 @@
     /* ============================================================
        Rendering (three.js)
        ============================================================ */
-    const TARGET_SIZE  = 2.9;    // the model's largest dimension, in world units
+    const TARGET_SIZE  = 2.6;    // the model's on-screen footprint, in world units
     const RADIUS_W     = 0.62;   // dent radius, world units
     const MAX_DEPTH_W  = 0.34;   // deepest cave-in, world units
     const SPRING_K     = 52;     // stiffness — the "slow rise"
     const SPRING_D     = 6.4;    // damping — leaves a small, happy overshoot
 
-    let renderer = null, scene = null, camera = null, shadow = null;
+    let renderer = null, scene = null, camera = null, shadow = null, shadowBase = 1;
     let modelRoot = null;        // wrapper: idle sway + squash/stretch live here
     let records = [];            // one per unique geometry in the active model
     let activeIdx = 0;
@@ -764,17 +764,24 @@
       veilEl.classList.toggle('hidden', !show);
     }
 
+    /* We view every character head-on, so what decides how big it looks on
+       screen is its width and height — NOT its depth. Normalising by the
+       deepest axis (a quadruped's body length) would leave the lion and the
+       dog visibly smaller than the bird or the bunny. Fit the footprint
+       instead, and every friend arrives at the same size.
+       Returns the fitted world size so the shadow can be placed under it. */
     function normalize(root) {
       root.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(root);
       const size = box.getSize(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z) || 1;
-      root.scale.setScalar(TARGET_SIZE / maxDim);
+      const footprint = Math.max(size.x, size.y) || 1;
+      root.scale.setScalar(TARGET_SIZE / footprint);
       root.updateMatrixWorld(true);
       const box2 = new THREE.Box3().setFromObject(root);
       const center = box2.getCenter(new THREE.Vector3());
       root.position.sub(center);         // sit the model on the origin
       root.updateMatrixWorld(true);
+      return box2.getSize(new THREE.Vector3());
     }
 
     /* Freeze each unique geometry's rest shape once, so every vertex can
@@ -862,11 +869,16 @@
             });
           }
         });
-        normalize(inner);
+        const fitted = normalize(inner);
         const wrapper = new THREE.Group();
         wrapper.add(inner);
         const recs = buildRecords(inner);
         cache.set(ch.file, { wrapper: wrapper, records: recs });
+        /* park the contact shadow just under this character's feet */
+        if (shadow) {
+          shadow.position.y = -(fitted.y / 2) - 0.22;
+          shadowBase = Math.max(0.5, Math.min(1.35, fitted.x / 2.0));
+        }
         loading = false;
         setVeil(true, ch.emoji, ch.name + ' ready', 1);
         setTimeout(function () { setVeil(false); }, 260);
@@ -1026,7 +1038,7 @@
       } else { camShake.amt = 0; camShake.x = 0; camShake.y = 0; }
       camera.position.set(camShake.x, 0.15 + camShake.y, 6.2);
 
-      if (shadow) shadow.scale.setScalar(1 - 0.06 * dentPower);
+      if (shadow) shadow.scale.setScalar(shadowBase * (1 - 0.06 * dentPower));
 
       drawFx(dt);
       renderer.render(scene, camera);
