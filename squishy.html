@@ -1373,7 +1373,9 @@
 
     /* give the current friend a shove, for anyone who would rather click than drag */
     spinBtn.addEventListener('click', function () {
-      if (!modelRoot || reducedMotion) return;
+      if (!modelRoot) return;
+      /* with motion turned down, turn it in one clean step instead of a glide */
+      if (reducedMotion) { spin += Math.PI; playWhoosh(0.5); return; }
       spinVel = (Math.random() < 0.5 ? -1 : 1) * (9 + Math.random() * 5);
       playWhoosh(0.75);
       spawnBurst(stage.clientWidth / 2, stage.clientHeight * 0.42, 8, 0.7);
