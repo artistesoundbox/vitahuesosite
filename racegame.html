@@ -167,7 +167,8 @@
     entirely as text. The city, the road and the racers are real 3D — every frame is rendered tiny, then each
     texel is turned into a brightness, looked up in a character ramp and stamped out as a glyph, which is why a
     tower becomes a wall of <b>#</b> and the sky stays empty. Hold the throttle, brake for the chicane, and try not
-    to be the one who parks a starfighter in a wall.</p>
+    to be the one who parks a starfighter in a wall. A controller works too — left stick or d-pad to steer, RT or A for
+    throttle, LT to brake and reverse, Y for the ▤ view, X for the palette, Start to restart.</p>
 
     <div id="stage">
       <canvas id="screen"></canvas>
@@ -865,12 +866,20 @@
           r.latV = -side * 3;
           if (!r.wallTouch) {
             r.wallTouch = true;
-            if (r.v > 10) { r.v *= 0.5; if (r.isPlayer) crunch(); }
+            if (r.v > 10) {
+              const impact = r.v;                 // read before the penalty, or the
+              r.v *= 0.5;                         // shake is scaled by the wreckage
+              if (r.isPlayer) {
+                crunch();
+                addShake(clamp(impact / 42, 0.35, 1.3));
+                rumble(clamp(impact / 40, 0.25, 1), 240);
+              }
+            }
           }
         }
       }
       if (sideways < WALL_AT - 0.35) r.wallTouch = false;
-      if (r.isPlayer) setSkid(off);
+      if (r.isPlayer) { setSkid(off); offRoad = off; }
 
       r.v = clamp(r.v, -REVERSE_MAX, MAX_SPEED);
 
@@ -1054,8 +1063,87 @@
       if (touch.steer) steer = touch.steer;
       if (touch.throttle) throttle = 1;
       if (touch.brake) brake = 1;
+      /* a pad is analogue: the stick can ask for a fraction of full lock and
+         the trigger for a fraction of throttle, which a key never can */
+      if (pad.steer) steer = pad.steer;
+      if (pad.throttle > throttle) throttle = pad.throttle;
+      if (pad.brake > brake) brake = pad.brake;
       return { steer: clamp(steer, -1, 1), throttle: throttle, brake: brake };
     }
+
+    /* ============================================================
+       Xbox pad — polled every frame, as battle.html does. Analogue
+       throughout: the left stick is a fraction of lock, RT and LT are
+       proportional, and the face buttons are edge-triggered so holding
+       one never repeats its action.
+       ============================================================ */
+    const pad = { live: false, steer: 0, throttle: 0, brake: 0 };
+    const padWas = { a: false, x: false, y: false, lb: false, start: false };
+    const PAD_DEAD = 0.18;
+    let offRoad = false;          // the player is on the shoulder this frame
+
+    function firstPad() {
+      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (let i = 0; i < pads.length; i++) if (pads[i] && pads[i].connected) return pads[i];
+      return null;
+    }
+    /* rumble, where the browser exposes it — a pad that shakes with the
+       screen is the whole point of a pad */
+    function rumble(strong, ms) {
+      const gp = firstPad();
+      const act = gp && gp.vibrationActuator;
+      if (act && act.playEffect) {
+        try {
+          act.playEffect('dual-rumble', { duration: ms, strongMagnitude: strong, weakMagnitude: strong * 0.6 });
+        } catch (err) {}
+      }
+    }
+    function pollPad() {
+      const gp = firstPad();
+      if (!gp) {
+        if (pad.live) { pad.live = false; pad.steer = pad.throttle = pad.brake = 0; }
+        return;
+      }
+      if (!pad.live) { pad.live = true; showMsg('PAD CONNECTED', 1400); }
+      const val = function (i) { return gp.buttons[i] && gp.buttons[i].value ? gp.buttons[i].value : 0; };
+      const down = function (i) { return !!(gp.buttons[i] && gp.buttons[i].pressed); };
+      const ax = gp.axes.length ? (gp.axes[0] || 0) : 0;
+      /* stick right is +x, and the track's normal points to the driver's LEFT,
+         so right is a NEGATIVE steer request — the same sign the → key sends */
+      pad.steer = Math.abs(ax) > PAD_DEAD ? clamp(-ax, -1, 1) : 0;
+      if (down(14)) pad.steer = 1;                      // d-pad, for square-corner drivers
+      if (down(15)) pad.steer = -1;
+      const rt = Math.max(val(7), down(0) ? 1 : 0);     // A or right trigger
+      const lt = val(6);                                // left trigger
+      pad.throttle = rt > 0.06 ? rt : 0;
+      pad.brake = lt > 0.06 ? lt : 0;
+      const edge = function (name, i, fn) {             // press once, act once
+        const is = down(i);
+        if (is && !padWas[name]) fn();
+        padWas[name] = is;
+      };
+      edge('a', 0, function () { if (!actx) audioReady(); });
+      edge('x', 2, function () { toggleMode(); });
+      edge('y', 3, function () { toggleRaw(); showMsg(rawView ? '3D VIEW' : 'ASCII VIEW', 900); });
+      edge('lb', 4, function () { if (!actx) audioReady(); toggleSound(); });
+      edge('start', 9, function () { if (!actx) audioReady(); gridStart(); showMsg('RESTART', 800); });
+    }
+    window.addEventListener('gamepadconnected', function () {
+      if (!actx) audioReady();
+      showMsg('PAD CONNECTED', 1400);
+    });
+
+    /* ============================================================
+       shake — the camera takes the hits the hull takes. An impact
+       kicks it, a rough shoulder rattles it, throttle and speed set how
+       hard. The offsets land on the camera and a copy of the look
+       target, NEVER on camPos/camLook: those are smoothed state, so
+       feeding the shake back in would make it ring instead of settle.
+       ============================================================ */
+    const reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    let shake = 0, shakeT = 0;
+    const shakeLook = new THREE.Vector3();
+    function addShake(a) { if (!reducedMotion) shake = Math.min(1.4, shake + a); }
     window.addEventListener('keydown', function (e) {
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].indexOf(e.key) !== -1) e.preventDefault();
       if (!actx) audioReady();
@@ -1195,6 +1283,7 @@
     function frame() {
       const dt = Math.min(clock.getDelta(), 1 / 25);
       const t = clock.elapsedTime;
+      pollPad();
 
       /* --- state --- */
       if (raceState === 'countdown') {
@@ -1256,8 +1345,23 @@
       camLook.lerp(tmpLook, k);
       camera.position.copy(camPos);
       camera.position.y += Math.sin(t * 9) * 0.012 * clamp(me.v / MAX_SPEED, 0, 1);
-      camera.lookAt(camLook);
-      camera.fov = 48 + (me.v / MAX_SPEED) * 12;
+      /* shake: an impact rings down, a shoulder rattles for as long as you
+         are on it. Both are frame-rate independent — the ring by exp(-t),
+         the rattle from speed — so a slow machine shakes the same amount. */
+      shake *= Math.exp(-6.5 * dt);
+      shakeLook.copy(camLook);
+      const roughAmp = offRoad ? 0.07 + 0.11 * clamp(me.v / MAX_SPEED, 0, 1) : 0;
+      const amp = reducedMotion ? 0 : shake + roughAmp;
+      if (amp > 0.002) {
+        shakeT += dt;
+        camera.position.x += Math.sin(shakeT * 41.3) * amp * 0.30;
+        camera.position.y += Math.sin(shakeT * 57.7 + 1.3) * amp * 0.22;
+        camera.position.z += Math.sin(shakeT * 33.9 + 2.6) * amp * 0.30;
+        shakeLook.x += Math.sin(shakeT * 47.1 + 0.7) * amp * 0.70;
+        shakeLook.y += Math.sin(shakeT * 63.7 + 2.1) * amp * 0.50;
+      }
+      camera.lookAt(shakeLook);
+      camera.fov = 48 + (me.v / MAX_SPEED) * 12 + amp * 1.6;
       camera.updateProjectionMatrix();
 
       /* --- HUD --- */
@@ -1361,6 +1465,8 @@
             pos: standings().indexOf(mm) + 1, lap: mm.lap, laps: mm.laps.slice(),
             s: +mm.s.toFixed(2), lat: +mm.lat.toFixed(2), v: +mm.v.toFixed(2),
             raceTime: +raceTime.toFixed(2), bestLap: +bestLap.toFixed(2), fps: fps,
+            shake: +shake.toFixed(3), offRoad: offRoad,
+            pad: pad.live, padSteer: +pad.steer.toFixed(2), padThrottle: +pad.throttle.toFixed(2),
             trackLen: +trackLen.toFixed(1), cols: cols, rows: rows,
             cell: [+cellW.toFixed(2), +cellH.toFixed(2)],
             mode: asciiMat ? asciiMat.uniforms.uMode.value : null,
@@ -1398,7 +1504,10 @@
         },
         release: function () { const r = racers[playerIdx]; r.lap = RACE_LAPS - 1; r.lastLapAt = raceTime - 12; },
         snapCamera: snapCamera,
-        raw: function (v) { if (v !== undefined) rawView = !!v; return rawView; },
+        raw: function (v) { if (v !== undefined) { rawView = !!v; applyLightRig(); } return rawView; },
+        pad: function () { return { live: pad.live, steer: pad.steer, throttle: pad.throttle, brake: pad.brake }; },
+        shake: function (v) { if (v !== undefined) shake = v; return shake; },
+        rumble: rumble,
         cam: function () {
           return {
             pos: [+camera.position.x.toFixed(2), +camera.position.y.toFixed(2), +camera.position.z.toFixed(2)],
