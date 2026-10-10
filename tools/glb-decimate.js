@@ -30,13 +30,27 @@
  *      the positions, and the cell key includes the UV, so vertices either side
  *      of a texture seam never merge and the mapping stays sharp.
  *
- * The UV part of the cell key is calibrated, not guessed: the base-colour
- * texture spans roughly the model's canonical width, so a UV bucket of 1/res
- * is about the same size on the surface as the position cell, and a merge
- * moves a vertex by at most half a cell in both. Buckets finer than the
- * position cell would stop any merging at all (a 1-texel key is as good as no
- * decimation); coarser ones are what lets two unrelated islands weld and their
- * paint average into a smear, so the key is clamped to never be coarser.
+ * The cell key is position + UV + surface direction, and all three earn their
+ * place:
+ *   - UV, because two vertices either side of a texture seam must not weld,
+ *     or the paint averages across the seam and the livery smears. The bucket
+ *     is calibrated to the position cell rather than guessed: the base-colour
+ *     texture spans roughly the model's canonical width, so 1/UV_RES is about
+ *     the same distance on the surface as one grid cell.
+ *   - direction, because these are aircraft. A wing is a couple of hundredths
+ *     of a unit thick, and with position alone the top and bottom surfaces
+ *     land in the same cell, weld, and the wing collapses into a torn sheet
+ *     with the sky showing through it. Bucketing the vertex normal keeps two
+ *     opposing surfaces apart, which is what "the hull looks shredded" is.
+ *     Do not "fix" that by tightening the UV bucket instead: a stricter key
+ *     with the same triangle budget forces a coarser position grid, and the
+ *     geometry gets worse, not better.
+ *
+ * The report prints two health numbers per model, because a decimated mesh can
+ * hit its triangle target and still be wrong: the surface area it kept, and
+ * how much of its edge network is open (an edge used by one triangle). A solid
+ * hull keeps almost all of its area and very few open edges; a shredded one
+ * loses area and sprouts boundaries.
  *
  * Output format (little endian):
  *   u32 magic 'VRS2', u32 vehicleCount
@@ -58,9 +72,12 @@ const COMPONENT = { 5120: Int8Array, 5121: Uint8Array, 5122: Int16Array, 5123: U
 const COMP_BYTES = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
 const ITEMS = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT2: 4, MAT3: 9, MAT4: 16 };
 
-/* Finest UV bucket used in the cluster key. The effective bucket is
-   max(UV_RES, res) — see the note in the header for why it tracks the grid. */
-const UV_RES = 64;
+/* UV buckets across the atlas for the cluster key — see the header note. */
+const UV_RES = 48;
+/* Direction buckets per axis in the cluster key: coarse on purpose, so a
+   slightly curved surface still merges while the two sides of a thin wing do
+   not. 1.5 per unit means the normal components are split at about 0.67. */
+const NRM_BUCKETS = 1.5;
 
 /* ---------- glTF reading ---------- */
 
@@ -253,9 +270,7 @@ function cluster(positions, uvs, indices, res) {
   const size = [b.hi[0] - b.lo[0], b.hi[1] - b.lo[1], b.hi[2] - b.lo[2]];
   const longest = Math.max(size[0], size[1], size[2], 1e-6);
   const cell = longest / res;
-  /* the UV bucket has to be at least as fine as the position cell, or two
-     patches of the atlas that are 20 texels apart weld together */
-  const uvRes = Math.max(UV_RES, res);
+  const uvRes = UV_RES;
   const nx = Math.max(1, Math.ceil(size[0] / cell) + 1);
   const ny = Math.max(1, Math.ceil(size[1] / cell) + 1);
 
