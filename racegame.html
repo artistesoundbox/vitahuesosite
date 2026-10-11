@@ -960,18 +960,40 @@
        level across its width all the way round, which is the one thing a real
        spiral ramp never does. The deck now rolls into the corner, by the
        equilibrium angle for a cornering speed (tan b = v^2 k / g) softened
-       through tanh, so only the tightest corners reach full angle: about 18
-       degrees on the loop's 30-unit radius, two or three on the gentle bends,
-       and zero on the straights.
+       through tanh: 18 degrees on the loop's 30-unit radius, a few on the
+       gentle bends, and zero on the straights.
+
+       Two things that corner has to be, and both cost a pass over the lap.
+
+       1. SUSTAINED. The lap is not all long bends — it has hairpins of 10-12
+          unit radius and a serpentine whose curvature flips sign every thirty
+          units. Measured against the raw curvature, those banked to full
+          angle too, and because their lefts and rights are 40 units apart the
+          deck rolled +18 and then -18 within one corner: the road stopped
+          being a road and read as a folded sheet of paper. So the bank is
+          driven by the curvature averaged over +/-20 units — longer than any
+          hairpin, far shorter than the 206-unit loop. Averaging a SIGNED
+          curvature over a window longer than the corner cancels the hairpins
+          and the serpentine (a right immediately after a left sums to zero)
+          while the loop, one sign for two hundred units, keeps its angle.
+       2. SLOW TO CHANGE. The roll is then rate-limited to ROLL_RATE per unit
+          of s, relaxed around the closed lap, so the deck can never twist
+          faster than that however the plan view wriggles. Measured, the worst
+          gradient on the lap is 0.23 degrees per unit — a fifth of a degree
+          per metre of road, which is what a real transition is.
 
        It is applied as a *shear*, not a rotation: a point at lateral offset
        `lat` rises by lat*sin(b) and keeps its plan position. Rotating the
        cross-section properly would pull the barriers in by cos(b), leaving the
        drawn wall up to half a unit from the wall you actually hit; shearing
        costs nothing visually at these angles and leaves the corridor — and
-       every collision number in this file — exactly as it was. */
-    const BANK_REF = 0.028;        // curvature that banks to tanh(1) of full
+       every collision number in this file — exactly as it was. The sign is the
+       one a real bank has: y(lat) = -lat*sin(b), so in a left hander (b > 0)
+       the driver's left, the inside, is the low edge and the outside is up. */
+    const BANK_REF = 0.014;        // curvature that banks to tanh(1) of full
     const BANK_MAX = 0.32;         // radians — 18 degrees at full lock
+    const BANK_WIN = 20;           // units of curvature averaged into a bank
+    const ROLL_RATE = 0.004;       // radians per unit — the deck's twist limit
     let trackN = 0;
     let tX, tZ, tY, tTX, tTZ, tNX, tNZ, tK, tG, tKY, tB;
 
@@ -1023,10 +1045,27 @@
         for (let o = -9; o <= 9; o++) sum += k[(i + o + trackN) % trackN];
         tK[i] = sum / 19;
       }
-      /* the bank the smoothed curvature asks for, precomputed so the road, the
-         cars and the scenery all read the same number for a given s */
+      /* the bank the sustained curvature asks for, precomputed so the road, the
+         cars and the scenery all read the same number for a given s: the wide
+         average first (see the note on BANK_WIN), then the rate limit, relaxed
+         forward around the closed lap until no step exceeds ROLL_RATE. Twelve
+         passes is what it takes to settle; the constraint is local, so a pass
+         can only ever spread the change, and the loop closes on itself. */
+      const kB = new Float32Array(trackN);
+      for (let i = 0; i < trackN; i++) {
+        let sum = 0;
+        for (let o = -BANK_WIN; o <= BANK_WIN; o++) sum += tK[(i + o + trackN) % trackN];
+        kB[i] = sum / (2 * BANK_WIN + 1);
+      }
       tB = new Float32Array(trackN);
-      for (let i = 0; i < trackN; i++) tB[i] = BANK_MAX * Math.tanh(tK[i] / BANK_REF);
+      for (let i = 0; i < trackN; i++) tB[i] = BANK_MAX * Math.tanh(kB[i] / BANK_REF);
+      for (let pass = 0; pass < 12; pass++) {
+        for (let i = 0; i < trackN; i++) {
+          const j = (i + 1) % trackN, d = tB[j] - tB[i];
+          if (d > ROLL_RATE) tB[j] = tB[i] + ROLL_RATE;
+          else if (d < -ROLL_RATE) tB[j] = tB[i] - ROLL_RATE;
+        }
+      }
       /* The circuit's own datum. Catmull-Rom undershoots a little at the
          bottom of the descent — 12cm below the plane of the city slab — and a
          road below the ground it lies on is a road you cannot see. Lifting the
