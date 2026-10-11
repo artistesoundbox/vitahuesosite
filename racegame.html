@@ -105,6 +105,29 @@
       transition: opacity 0.3s ease;
     }
     #load.hidden { opacity: 0; pointer-events: none; }
+    /* Once the city is built this is not a loading screen any more, it is the
+       start screen: the mark, one button, and the grid standing still behind a
+       veil thin enough that you can see your racer waiting on it. The page used
+       to drop you straight into a countdown, which meant the first thing you did
+       was miss the start of a race you never pressed anything to begin. */
+    #load.ready {
+      flex-direction: column; gap: 16px; text-align: center;
+      background: rgba(3, 6, 12, 0.72); backdrop-filter: blur(2px);
+    }
+    #load .mark { display: none; width: min(300px, 64vw); height: auto;
+      filter: drop-shadow(0 0 22px rgba(80, 150, 255, 0.5)); }
+    #load .load-hint { display: none; max-width: 30em; font-size: 10.5px; line-height: 1.7;
+      letter-spacing: 0.14em; color: #7d90ae; }
+    #load.ready .mark, #load.ready .load-hint { display: block; }
+    #load.ready .load-line { display: none; }
+    #load .start { display: none; padding: 12px 26px; font-size: 13px; letter-spacing: 0.2em; }
+    #load.ready .start { display: inline-flex; }
+    @media (max-height: 560px) {
+      #load.ready { gap: 10px; }
+      #load .mark { width: min(210px, 46vw); }
+      #load .load-hint { font-size: 9.5px; line-height: 1.5; }
+      #load .start { padding: 9px 20px; }
+    }
 
     /* ---------- the 3-2-1 countdown ----------
        Before this the countdown was the same centred text element every other
@@ -415,7 +438,13 @@
         <button class="pad" id="pad-gas" type="button" aria-label="Throttle">GAS</button>
         <div class="pad" id="pad-look" role="group" aria-label="Look around"><i class="nub"></i></div>
       </div>
-      <div id="load">booting the city…</div>
+      <div id="load">
+        <img class="mark" src="anthonitus.png" alt="Anthonitus" />
+        <div class="load-line">booting the city…</div>
+        <button class="ca-btn start" id="start-btn" type="button">▶&nbsp; Start race</button>
+        <div class="load-hint">three laps of the city · ◀ ▶ or the left stick steers · GAS or RT goes
+        · tap the results board to race again</div>
+      </div>
     </div>
 
     <div class="console">
@@ -1023,25 +1052,27 @@
        creased sheet. Two things fix it, and both are properties of the corner,
        not of the frame:
 
-       1. A BANK HAS TO BE RAMPED IN AND OUT. The deck is rate-limited to
-          ROLL_RATE per unit of s (about a fifth of a degree per unit — what a
+       1. A BANK HAS TO BE RAMPED IN AND OUT. The deck may only change its roll
+          at ROLL_RATE per unit of s (a fifth of a degree per unit — what a
           real transition measures), so a corner of length L can carry at most
-          ROLL_RATE*L/BANK_BUILD before it has to come back down. That is the
-          cap, applied per corner before the profile is built. The loop's 208
-          units reach the full 18; the 45-unit corners carry 4-5 degrees.
-       2. THE SIGN IS THE LOCAL ONE. The cap is a magnitude; the sign comes
-          from the curvature under that metre of road, so the deck always
-          leans into the corner it is actually in. (Averaging the SIGNED
-          curvature over a wide window was tried first and leans the wrong way
-          through a serpentine, where the average is dominated by the corner
-          you have just left.)
+          ROLL_RATE*L/2 however hard it is curved. The loop's 208 units reach
+          the full 18 degrees; a 45-unit corner carries about 5.
+       2. THE PROFILE IS PER CORNER, NOT PER METRE. Each corner gets its own
+          trapezoid: level at the corner's first station, ramp up at ROLL_RATE,
+          hold at the angle its mean curvature has earned, ramp back to level at
+          its last station. That is what a banked corner looks like from the
+          driver's seat, and it makes both things this file cares about true BY
+          CONSTRUCTION rather than by filtering:
+            - the deck is EXACTLY level at every corner boundary, so its sign is
+              always the sign of the corner you are in. Its first version was a
+              filtered signal, which crosses zero a little late and so leans the
+              wrong way for a stretch at the end of a corner;
+            - no step ever exceeds ROLL_RATE, so the surface cannot fold however
+              short the corners are.
 
-       What is left after the cap is smoothed over +/-BANK_WIN units and run
-       through the rate limiter again, relaxed forward around the closed lap.
-       Measured: worst roll gradient 0.23 degrees/unit, zero on the straights,
-       18.0 at the loop, and the only place the sign opposes the local corner
-       is the few units where the roll crosses level between two of the 45-unit
-       corners, by at most 5 degrees.
+       Measured after this: worst roll gradient 0.23 degrees per unit, level on
+       the straights, 18.05 at the loop, and the sign of the roll agrees with
+       the sign of the corner at every station on the lap.
 
        It is applied as a *shear*, not a rotation: a point at lateral offset
        `lat` rises by lat*sin(b) and keeps its plan position. Rotating the
@@ -1054,8 +1085,6 @@
     const BANK_REF = 0.014;        // curvature that banks to tanh(1) of full
     const BANK_MAX = 0.32;         // radians — 18 degrees at full lock
     const BANK_MIN_K = 0.006;      // below this curvature, road counts as straight
-    const BANK_BUILD = 2.5;        // of the roll budget, the share a corner may use
-    const BANK_WIN = 3;            // units the capped profile is smoothed over
     const ROLL_RATE = 0.004;       // radians per unit — the deck's twist limit
     let trackN = 0;
     let tX, tZ, tY, tTX, tTZ, tNX, tNZ, tK, tG, tKY, tB;
@@ -1118,38 +1147,38 @@
       const bankSign = function (i) {
         return Math.abs(tK[i]) < BANK_MIN_K ? 0 : (tK[i] < 0 ? -1 : 1);
       };
-      const runLen = new Float32Array(trackN);
+      /* Second: the trapezoid. One pass, one corner at a time, so the profile
+         is built from the corners rather than filtered out of the curvature. */
+      tB = new Float32Array(trackN);
+      const fillBank = function (rs, n, sign, sum) {
+        const want = BANK_MAX * Math.tanh((sum / n) / BANK_REF);   // its mean curvature
+        const A = Math.min(want, ROLL_RATE * n / 2);              // what its length allows
+        const ramp = A / ROLL_RATE;                               // units of s
+        for (let t = 0; t < n; t++) {
+          /* distance to the nearer end of the corner: zero at both ends, which
+             is what puts the deck exactly level on every boundary */
+          const edge = Math.min(t, n - 1 - t);
+          tB[(rs + t) % trackN] = sign * A * Math.min(1, edge / ramp);
+        }
+      };
+      /* re-walk the runs, this time filling as each one closes */
       {
         let start = 0;
         for (let i = 0; i < trackN; i++) if (bankSign(i) === 0) { start = i; break; }
-        let rs = (start + 1) % trackN, cs = bankSign(rs), n = 1;
+        let rs = (start + 1) % trackN, cs = bankSign(rs), n = 1, sum = Math.abs(tK[rs]);
         for (let step = 2; step <= trackN; step++) {
           const i = (start + step) % trackN, s = bankSign(i);
-          if (s === cs) { n++; continue; }
-          if (cs !== 0) for (let k = 0; k < n; k++) runLen[(rs + k) % trackN] = n;
-          rs = i; cs = s; n = 1;
+          if (s === cs) { n++; sum += Math.abs(tK[i]); continue; }
+          if (cs !== 0) fillBank(rs, n, cs, sum);
+          rs = i; cs = s; n = 1; sum = Math.abs(tK[i]);
         }
-        if (cs !== 0) for (let k = 0; k < n; k++) runLen[(rs + k) % trackN] = n;
+        if (cs !== 0) fillBank(rs, n, cs, sum);
       }
-      /* Second: the angle. Local sign, magnitude capped by what this corner's
-         length can ramp in and out at ROLL_RATE. */
-      const kB = new Float32Array(trackN);
-      for (let i = 0; i < trackN; i++) {
-        const want = BANK_MAX * Math.tanh(Math.abs(tK[i]) / BANK_REF);
-        const cap = ROLL_RATE * runLen[i] / BANK_BUILD;
-        const a = Math.min(want, cap);
-        kB[i] = tK[i] < 0 ? -a : a;
-      }
-      /* Third: soften the corners of that profile, then enforce the rate limit
-         itself — relaxed forward around the closed lap until no step exceeds
-         ROLL_RATE. Twelve passes is what it takes to settle; the constraint is
-         local, so a pass can only spread a change, and the loop closes. */
-      tB = new Float32Array(trackN);
-      for (let i = 0; i < trackN; i++) {
-        let sum = 0;
-        for (let o = -BANK_WIN; o <= BANK_WIN; o++) sum += kB[(i + o + trackN) % trackN];
-        tB[i] = sum / (2 * BANK_WIN + 1);
-      }
+      /* Third: hold the rate limit as an invariant rather than a hope. The
+         trapezoid already satisfies it, so this changes nothing on a good day —
+         it is here because the deck folding is the one failure this geometry
+         cannot have, and a projection that is a no-op is cheaper than trusting
+         the arithmetic above at every corner on the lap. */
       for (let pass = 0; pass < 12; pass++) {
         for (let i = 0; i < trackN; i++) {
           const j = (i + 1) % trackN, d = tB[j] - tB[i];
@@ -2512,7 +2541,7 @@
 
       /* --- speed --- */
       let thr = clamp(inp.throttle, 0, 1);
-      if (raceState === 'countdown' || raceState === 'loading') thr = 0;
+      if (raceState !== 'racing' && raceState !== 'finished') thr = 0;   // grid, ready, countdown
       const braking = clamp(inp.brake, 0, 1);
       /* One boost timer, spent here, so a painted pad and a powerup mean the
          same thing to the maths below: a higher ceiling and a harder pull. */
@@ -2768,7 +2797,9 @@
       cdEl.classList.add('pop');
     }
 
-    function gridStart() {
+    /* `hold` lays the grid out and stops there, which is how the page loads: see
+       the end of the function and the start screen in #load. */
+    function gridStart(hold) {
       musicNext();               // each race gets the other track
       raceTime = 0; countdown = 3.0; raceState = 'countdown';
       countdownShown = 0; goHold = 0;
@@ -2794,6 +2825,11 @@
       });
       resetPickups();
       snapCamera();
+      /* HOLD: the same grid, standing still. The lamps stay dark and the
+         countdown does not run — 'ready' is the state the page now loads in, and
+         the first press of START (the button, Enter, the pad's Start, or a tap on
+         the overlay) is what turns it into 'countdown'. */
+      if (hold) { raceState = 'ready'; lightsEl.classList.remove('show'); }
     }
     function showMsg(html, ms) {
       msgEl.innerHTML = html;
@@ -3349,7 +3385,7 @@
       edge('a', 0, function () { if (!actx) audioReady(); });
       edge('back', 8, function () { togglePause(); });
       edge('lb', 4, function () { if (!actx) audioReady(); toggleSound(); });
-      edge('start', 9, function () { if (!actx) audioReady(); gridStart(); showMsg('RESTART', 800); });
+      edge('start', 9, function () { startRace(); showMsg('RESTART', 800); });
     }
     window.addEventListener('gamepadconnected', function () {
       if (!actx) audioReady();
@@ -3375,6 +3411,7 @@
       if (e.key === 'm' || e.key === 'M') toggleSound();
       if (e.key === 'p' || e.key === 'P') togglePause();
       if (e.key === 'c' || e.key === 'C') { autoPilot = !autoPilot; showMsg(autoPilot ? 'autopilot ON' : 'autopilot OFF', 900); }
+      if (raceState === 'ready' && (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar')) startRace();
     });
     window.addEventListener('keyup', function (e) { keys[e.key] = false; });
     window.addEventListener('blur', function () { releaseAllInputs(); });
@@ -3496,8 +3533,7 @@
     resultsEl.addEventListener('pointerup', function (e) {
       if (raceState !== 'finished') return;
       e.preventDefault();
-      if (!actx) audioReady();
-      gridStart();
+      startRace();
       showMsg('RESTART', 700);
     });
     /* Whether a device gets pads is a media query, and media queries change
@@ -3592,14 +3628,31 @@
        is what makes a neon city read as one — and the hulls get a little MORE
        self-illumination rather than less, because a racer has to stay the
        brightest object in its own shot. */
+    /* The numbers live in one table, because two callers ask the same question —
+       the solid view and the ASCII pass — and the debug switch has to be able to
+       put either back. Note what is deliberately NOT in the darker rig: the
+       exposure. The environment (towers, ground, the road, the lit sides of the
+       hulls) is lit by this rig; the LIGHTS in it — windows, neon, beacons, the
+       painted arrows, the tube, the hulls' own glow — are emissive, and an
+       emissive material does not care what the lights do. So dimming the rig
+       darkens the city without taking a single light out of it, whereas pulling
+       the exposure down would dim the signs as well, and the signs are the
+       subject. Measured with the debug frameStats(), old night rig against this
+       one: mean frame luminance drops by about a third, the pixels that are
+       near-white (the neon, the windows) barely move. */
+    const RIG = {
+      solid: { hemi: 0.30, key: 0.80, rim: 0.26, exposure: 1.06, hull: 0.34 },
+      ascii: { hemi: 0.30, key: 0.80, rim: 0.26, exposure: 1.00, hull: 0.55 }
+    };
     function applyLightRig() {
       const solid = rawView;
-      if (hemiLight) hemiLight.intensity = solid ? 0.58 : 0.3;
-      if (keyLight) keyLight.intensity = solid ? 1.55 : 0.8;
-      if (rimLight) rimLight.intensity = solid ? 0.5 : 0.26;
+      const rig = solid ? RIG.solid : RIG.ascii;
+      if (hemiLight) hemiLight.intensity = rig.hemi;
+      if (keyLight) keyLight.intensity = rig.key;
+      if (rimLight) rimLight.intensity = rig.rim;
       if (renderer) {
         renderer.toneMapping = solid ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
-        renderer.toneMappingExposure = solid ? 1.06 : 1;
+        renderer.toneMappingExposure = rig.exposure;
       }
       /* the 3D fog pulls in with the darker rig — depth now reads as darkness —
          but the ASCII pass keeps its old reach. There, glyph DENSITY is the
@@ -3607,7 +3660,7 @@
          deletes part of it, and half a screen of spaces is not a mood. */
       if (scene && scene.fog) { scene.fog.near = solid ? 80 : 30; scene.fog.far = solid ? 450 : 150; }
       racers.forEach(function (r) {
-        if (r.mesh) r.mesh.material.emissiveIntensity = solid ? 0.24 : 0.55;
+        if (r.mesh) r.mesh.material.emissiveIntensity = rig.hull;
       });
     }
 
@@ -3619,9 +3672,17 @@
     let rawView = true;
     function toggleRaw() { rawView = !rawView; applyLightRig(); return rawView; }
     soundBtn.addEventListener('click', function () { audioReady(); toggleSound(); });
-    pauseBtn.addEventListener('click', function () { audioReady(); togglePause(); });      restartBtn.addEventListener('click', function () { audioReady(); gridStart(); });
+    pauseBtn.addEventListener('click', function () { audioReady(); togglePause(); });      restartBtn.addEventListener('click', startRace);
       document.getElementById('dragsteer').addEventListener('click', function () { audioReady(); setDragSteer(!dsMode); });
-    function restart() { gridStart(); }
+    /* The one door from the start screen into a race. Every input that means
+       "go" comes through here — the button, Enter, the pad's Start, the R key,
+       picking a hull, a tap on the results board — so they cannot drift apart. */
+    function startRace() {
+      audioReady();
+      loadEl.classList.add('hidden');
+      gridStart();
+    }
+    function restart() { startRace(); }
     function setPlayer(i) {
       /* the daily fixes your hull, because everyone racing the same day has to
          be racing the same thing */
@@ -3631,8 +3692,17 @@
       Array.prototype.forEach.call(picksEl.children, function (c, j) {
         c.setAttribute('aria-pressed', j === i ? 'true' : 'false');
       });
-      gridStart();
+      startRace();
     }
+
+    /* The start button, and the two other ways to press it: Enter or Space from
+       the keyboard (neither drives anything), or a tap anywhere on the overlay
+       itself — which is what a thumb does to a start screen. */
+    document.getElementById('start-btn').addEventListener('click', function (e) {
+      e.stopPropagation();
+      startRace();
+    });
+    loadEl.addEventListener('click', function () { if (raceState === 'ready') startRace(); });
 
     /* ============================================================
        resize: the render target is one texel per character
@@ -3808,7 +3878,7 @@
           goHold = 0.85;
           blip(880, 0.32, 'square', 0.15);
         }
-      } else if (raceState !== 'loading') {
+      } else if (raceState === 'racing' || raceState === 'finished') {
         raceTime += dt;
         if (goHold > 0) { goHold -= dt; if (goHold <= 0) lightsEl.classList.remove('show'); }
       }
@@ -4014,7 +4084,10 @@
       buildVehicles(buf);
       buildMinimap();
       buildPickButtons();
-      gridStart();
+      /* the grid is laid out and then held: the countdown belongs to the player's
+         first press, not to the load. loadEl stays up as the start screen. */
+      gridStart(true);
+      loadEl.classList.add('ready');
 
       countEl.textContent = String(racers.length);
       bestEl.textContent = fmtTime(bestLap);
@@ -4032,7 +4105,6 @@
       if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(stageEl);
       resize();
 
-      loadEl.classList.add('hidden');
       renderer.setAnimationLoop(frame);
       document.title = 'City Grand Prix — ' + racers.length + ' racers ready';
       document.body.dataset.ready = '1';
@@ -4209,14 +4281,60 @@
            rig back; rig(true) is the night rig the game ships. Nothing else
            changes, which is the whole point: the same frame, one variable. */
         rig: function (night) {
-          const useNight = night !== false;
-          if (hemiLight) hemiLight.intensity = useNight ? 0.58 : 0.95;
-          if (keyLight) keyLight.intensity = useNight ? 1.55 : 2.5;
-          if (rimLight) rimLight.intensity = useNight ? 0.5 : 0.7;
-          if (renderer) renderer.toneMappingExposure = useNight ? 1.06 : 1.22;
+          const r = night === false ? { hemi: 0.95, key: 2.5, rim: 0.7, exposure: 1.22 } : RIG.solid;
+          if (hemiLight) hemiLight.intensity = r.hemi;
+          if (keyLight) keyLight.intensity = r.key;
+          if (rimLight) rimLight.intensity = r.rim;
+          if (renderer) renderer.toneMappingExposure = r.exposure;
           return { hemi: hemiLight && hemiLight.intensity, key: keyLight && keyLight.intensity,
             rim: rimLight && rimLight.intensity, exposure: renderer && renderer.toneMappingExposure };
         },
+        /* any rig at all, so an A/B on one scene needs no page reload */
+        rigAt: function (hemi, key, rim, exposure) {
+          if (hemiLight) hemiLight.intensity = hemi;
+          if (keyLight) keyLight.intensity = key;
+          if (rimLight) rimLight.intensity = rim;
+          if (renderer && exposure !== undefined) renderer.toneMappingExposure = exposure;
+          return { hemi: hemi, key: key, rim: rim, exposure: exposure };
+        },
+        /* What the frame actually looks like, rather than what the constants say:
+           one frame rendered on demand, read back, and reduced to mean luminance,
+           the median and 95th percentile, and how many pixels are near-white —
+           which is the neon, the windows and the hulls. "Darker city, same
+           lights" is then a before/after on one scene instead of a claim. */
+        frameStats: function () {
+          renderer.setAnimationLoop(null);
+          renderer.clear();
+          renderer.render(scene, camera);
+          const gl = renderer.getContext();
+          const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+          const px = new Uint8Array(w * h * 4);
+          gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+          const hist = new Uint32Array(256);
+          let sum = 0, n = 0, bright = 0;
+          for (let i = 0; i < px.length; i += 4) {
+            const l = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) | 0;
+            hist[l]++; sum += l; n++;
+            if (px[i] > 190 && px[i + 1] > 190 && px[i + 2] > 190) bright++;
+          }
+          let acc = 0, p50 = 0, p95 = 0;
+          for (let v = 0; v < 256; v++) {
+            acc += hist[v];
+            if (!p50 && acc >= n * 0.5) p50 = v;
+            if (!p95 && acc >= n * 0.95) p95 = v;
+          }
+          renderer.setAnimationLoop(frame);
+          return { w: w, h: h, mean: +(sum / n).toFixed(2), p50: p50, p95: p95,
+            brightPixels: bright, brightShare: +(bright / n).toFixed(4) };
+        },
+        /* the start screen, from the page's side */
+        start: function () {
+          const btn = document.getElementById('start-btn');
+          return { state: raceState, overlay: !loadEl.classList.contains('hidden'),
+            ready: loadEl.classList.contains('ready'), buttonShown: btn ? btn.offsetWidth > 0 : null,
+            lampShow: lightsEl.classList.contains('show'), mark: document.querySelector('#load .mark').offsetWidth };
+        },
+        go: function () { startRace(); return raceState; },
         /* how much of the lap is actually eligible for road furniture. The
            placement walks the spline looking for a straight, flat window, and
            when a lap gets longer and twistier the interesting question is not
