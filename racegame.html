@@ -89,6 +89,16 @@
     #map .car { color: #ffe066; }
     #speed { position: absolute; left: 14px; bottom: 11px; color: #9dffcf; }
     #speed .bar { color: #ffffff; }
+    /* The nitro tank, one line under the speed on the same bottom-left anchor.
+       A second line grows the box UPWARD from its bottom edge, which is the
+       property that keeps it clear of the screen edge on a phone — and it is
+       shorter than the speed line above it, so the readout's width (the thing
+       the look pad has to stay off) does not change at all. */
+    #speed .nitro { display: block; color: #ffc247; text-shadow: 0 0 10px rgba(255, 194, 71, 0.28); }
+    #speed .nitro .bar { color: #ffd88a; }
+    #speed .nitro.on { color: #fff3d0; text-shadow: 0 0 13px rgba(255, 194, 71, 0.75); }
+    #speed .nitro.dry { color: #6f5c36; text-shadow: none; }
+    #speed .nitro.dry .bar { color: #6f5c36; }
     #msg {
       position: absolute; left: 0; right: 0; top: 36%; text-align: center;
       font: inherit; font-size: clamp(22px, 4.4vw, 42px); font-weight: 700;
@@ -349,13 +359,16 @@
       /* one pad up from GAS, on the same edge: the speed readout takes that band
          on the LEFT, so the two cannot cover each other however narrow the
          phone is */
-      /* one pad up from GAS, and high enough to be clear of the speed readout
+      /* One pad up from GAS, and high enough to be clear of the speed readout
          that takes the band above the left pads: at 320 wide the readout reaches
          into this column, and measured at the first height it clipped the stick
-         by 14x16 */
+         by 14x16. The readout is two lines now — the nitro tank sits under the
+         speed — so the box grew 16px upward and the pad clears the extra (at
+         52 it measured an 8x6 overlap of the pad's corner and the speed line's
+         ascent). */
       #pad-look {
         right: calc(var(--pad-edge) + var(--safe-r));
-        bottom: calc(52px + var(--safe-b) + var(--pad) + var(--pad-gap));
+        bottom: calc(68px + var(--safe-b) + var(--pad) + var(--pad-gap));
       }
       /* The speed bar is pinned to the VIEWPORT, like the pads, and not to the
          stage. In landscape the stage is 330 tall in a 390-tall screen, so a
@@ -423,7 +436,8 @@
     every crest — a hill only throws you when its curvature beats gravity, and none of them do. Hold the throttle,
     brake for the chicane, and try not to be the one who parks a starfighter in a wall. A controller works too — left
     stick or d-pad to steer, RT or A for throttle, LT to brake and reverse, <b>right stick to look around</b>, <b>A</b>
-    (or the keyboard's Shift) for a nitro boost, hold <b>LB</b>/<b>RB</b> to spin the hull sideways, Y for sound, Start
+    (or the keyboard's Shift) for the nitro <b>tank</b> — hold it and the reserve burns, let go and it refills, and how
+    much is left is the orange meter under the speed — hold <b>LB</b>/<b>RB</b> to spin the hull sideways, Y for sound, Start
     to restart. Drag the canvas to look, too — or press <b>Steer: drag</b> and a thumb anywhere on the screen sets the
     lock, with a pull up or down for throttle and brake. On a touch screen the <b>look stick</b> above the throttle does
     what the right stick does, and the results board is also a button: <b>tap it to race again</b>. <b>P</b> pauses.</p>
@@ -454,8 +468,8 @@
         <img class="mark" src="anthonitus.png" alt="Anthonitus" />
         <div class="load-line">booting the city…</div>
         <button class="ca-btn start" id="start-btn" type="button">▶&nbsp; Start race</button>
-        <div class="load-hint">three laps of the city · ◀ ▶ or the left stick steers · GAS or RT goes · A boosts
-        · LB/RB spins · tap the results board to race again</div>
+        <div class="load-hint">three laps of the city · ◀ ▶ or the left stick steers · GAS or RT goes · A burns
+        the nitro tank · LB/RB spins · tap the results board to race again</div>
       </div>
     </div>
 
@@ -593,12 +607,19 @@
     const BOOST_ACCEL = 1.9;
     /* The nitro the A button fires. The painted arrows are the TRACK's boost —
        everyone gets those, and the same ones; this is the driver's own, and
-       the difference is the cooldown. One press is a shorter, weaker shove
-       than a pad and it will not fire again for NITRO_CD seconds, so it is an
-       overtake tool rather than a way to hold boost for a whole straight. */
-    const NITRO_CD = 3.0;         // seconds before A fires again
-    const NITRO_TIME = 1.2;       // how long each press lasts
-    const NITRO_GAIN = 9;         // units/s handed over on the press
+       the difference is that it is a TANK. It used to be a press with a fixed
+       three-second cooldown, which made the button a metronome: tap, wait,
+       tap. Now holding A burns the reserve — a full tank is NITRO_TIME of
+       shove and an empty one refills in NITRO_REFILL seconds while you drive
+       — so the overtake is a pulse whose length you choose, and a long burn
+       costs you the refill you will want at the next corner. */
+    const NITRO_TANK = 1;                  // the tank, 0..1 (and how much you start with)
+    const NITRO_TIME = 1.2;                // seconds of shove a full tank buys
+    const NITRO_DRAIN = NITRO_TANK / NITRO_TIME;   // per second, while burning
+    const NITRO_REFILL = 4.2;              // seconds to refill a dry tank
+    const NITRO_MIN = 0.12;                // you cannot START a burn below this
+    const NITRO_PUSH = 11;                 // units/s² of speed while the tank is open
+    const NITRO_TAIL = 0.12;               // how long the raised ceiling lingers past the key
     /* The sideways spin. Hold a bumper and the hull turns ACROSS its own line
        and holds the angle while the key is held; the speed pays for it in
        proportion to the slip, which is what stops a drift being free time. */
@@ -2558,7 +2579,8 @@
              ramp is just a place where the road is higher than zero */
           hgt: 0, vy: 0, air: false,
           /* what the racer is carrying */
-          boostT: 0, boostCd: 0, nitroCd: 0, drift: 0, shield: false, flashT: 0,
+          boostT: 0, boostCd: 0, drift: 0, shield: false, flashT: 0,
+          nitro: NITRO_TANK, nitroOn: false, nitroFired: false, nitroSpent: false,
           bumpCd: 0,
           input: { steer: 0, throttle: 0, brake: 0, boost: false, spin: 0 },
           group: group, mesh: mesh, blob: blob
@@ -2652,16 +2674,37 @@
       let thr = clamp(inp.throttle, 0, 1);
       if (raceState !== 'racing' && raceState !== 'finished') thr = 0;   // grid, ready, countdown
       const braking = clamp(inp.brake, 0, 1);
-      /* --- your own nitro: the A button, and the only boost with a cooldown
-             on the driver rather than on the track --- */
-      r.nitroCd = Math.max(0, (r.nitroCd || 0) - dt);
-      if (r.isPlayer && inp.boost && r.nitroCd <= 0 && raceState === 'racing' && r.v > 2) {
-        r.nitroCd = NITRO_CD;
-        r.boostT = Math.max(r.boostT, NITRO_TIME);
-        r.v = Math.min(MAX_SPEED * BOOST_TOP, r.v + NITRO_GAIN);
-        blip(760, 0.16, 'sawtooth', 0.1);
-        rumble(0.4, 160);
-        addShake(0.13);
+      /* --- your own nitro: the A button, and the only boost with a tank of
+             its own rather than on the track --- */
+      r.nitro = clamp(r.nitro === undefined ? NITRO_TANK : r.nitro, 0, NITRO_TANK);
+      const nitroWanted = r.isPlayer && inp.boost && raceState === 'racing' && r.v > 2;
+      /* A burn has to START with NITRO_MIN in the tank, or a sliver would
+         stutter out a shove a frame at a time; once lit it runs down to
+         nothing, and the tank refills whenever it is not open. Running dry
+         also needs the button UP before it can fire again: without that
+         latch, holding A would re-light the tank every time the refill
+         crawled back over NITRO_MIN and quietly turn a pulse whose length
+         you choose into a boost you simply hold down. */
+      if (!nitroWanted) r.nitroSpent = false;
+      const nitroOn = nitroWanted && !r.nitroSpent && (r.nitroOn || r.nitro >= NITRO_MIN);
+      r.nitroOn = nitroOn && r.nitro > 0;
+      if (r.nitroOn) {
+        r.nitro = Math.max(0, r.nitro - NITRO_DRAIN * dt);
+        if (r.nitro <= 0) r.nitroSpent = true;
+        /* the same raised ceiling a painted arrow buys, topped up every frame
+           so it expires NITRO_TAIL after you let go rather than the instant
+           you do */
+        r.boostT = Math.max(r.boostT, NITRO_TAIL);
+        r.v = Math.min(MAX_SPEED * BOOST_TOP, r.v + NITRO_PUSH * dt);
+        if (!r.nitroFired) {
+          r.nitroFired = true;
+          blip(760, 0.16, 'sawtooth', 0.1);
+          rumble(0.4, 160);
+          addShake(0.13);
+        }
+      } else {
+        r.nitroFired = false;
+        r.nitro = Math.min(NITRO_TANK, r.nitro + (NITRO_TANK / NITRO_REFILL) * dt);
       }
       /* One boost timer, spent here, so a painted pad and a powerup mean the
          same thing to the maths below: a higher ceiling and a harder pull. */
@@ -3007,7 +3050,8 @@
         r.latV = 0; r.v = 0; r.lap = 0; r.laps = []; r.finished = false;
         r.lastLapAt = 0; r.lastS = r.s; r.roll = 0; r.pitch = 0; r.aiLatTarget = r.lat;
         r.hgt = 0; r.vy = 0; r.air = false; r.stuckFor = 0;
-        r.boostT = 0; r.boostCd = 0; r.nitroCd = 0; r.drift = 0;
+        r.boostT = 0; r.boostCd = 0; r.drift = 0;
+        r.nitro = NITRO_TANK; r.nitroOn = false; r.nitroFired = false; r.nitroSpent = false;
         r.shield = false; r.flashT = 0;
         const h = trackAt(r.s);
         r.yaw = Math.atan2(-h.tx, -h.tz);
@@ -3470,7 +3514,10 @@
       /* what you are carrying, and for how much longer — a powerup you cannot
          see is a powerup you will not use */
       let chips = '';
-      if (me.boostT > 0) chips += '▲ BOOST ' + me.boostT.toFixed(1) + 's';
+      /* the nitro has its own meter under the speed readout, so this chip is
+         for the track's shove — a burning tank tops boostT up by NITRO_TAIL
+         every frame, which is why the threshold sits above that and not at 0 */
+      if (me.boostT > NITRO_TAIL + 0.05) chips += '▲ BOOST ' + me.boostT.toFixed(1) + 's';
       if (me.shield) chips += (chips ? '  ' : '') + '◈ SHIELD';
       if (chips !== lastChips) {
         powerEl.textContent = chips;
@@ -3508,8 +3555,8 @@
       if (pad.steer) steer = pad.steer;
       if (pad.throttle > throttle) throttle = pad.throttle;
       if (pad.brake > brake) brake = pad.brake;
-      /* held, not edge-triggered: the nitro spends itself on the cooldown in
-         driveRacer, and the spin is a held angle by definition */
+      /* held, not edge-triggered: the nitro burns the tank in driveRacer for
+         as long as it is down, and the spin is a held angle by definition */
       if (pad.boost) boost = true;
       if (pad.spin) spin = pad.spin;
       /* the thumb on the canvas, if that mode is on: it is the explicit choice,
@@ -3594,7 +3641,7 @@
       const lt = val(6);                                // left trigger
       pad.throttle = rt > 0.06 ? rt : 0;
       pad.brake = lt > 0.06 ? lt : 0;
-      pad.boost = down(0);                              // the nitro, on its own cooldown
+      pad.boost = down(0);                              // the nitro, for as long as it is held
       const edge = function (name, i, fn) {             // press once, act once
         const is = down(i);
         if (is && !padWas[name]) fn();
@@ -4241,8 +4288,16 @@
       drawHud();
       drawMinimap();
       const bars = clamp(Math.round((me.v / MAX_SPEED) * 20), 0, 20);
-      speedEl.innerHTML = 'SPEED <span class="bar">' + '█'.repeat(bars) + '░'.repeat(20 - bars) + '</span> ' +
-        String(Math.round(me.v * 3.1)).padStart(3, ' ') + ' km/h';
+      /* the nitro tank, on its own line under the speed: floor() and not
+         round(), so a tank with 4% left does not read as a whole cell */
+      const nBars = clamp(Math.floor(me.nitro * 10 + 1e-6), 0, 10);
+      const nCls = 'nitro' + (me.nitroOn ? ' on' : '') + (me.nitro < NITRO_MIN ? ' dry' : '');
+      speedEl.innerHTML =
+        'SPEED <span class="bar">' + '█'.repeat(bars) + '░'.repeat(20 - bars) + '</span> ' +
+          String(Math.round(me.v * 3.1)).padStart(3, ' ') + ' km/h' +
+        '<span class="' + nCls + '">N2O <span class="bar">' +
+          '█'.repeat(nBars) + '░'.repeat(10 - nBars) + '</span> ' +
+          String(Math.round(me.nitro * 100)).padStart(3, ' ') + '%</span>';
 
       /* --- and the two passes (or one, for the raw 3D view) --- */
       if (rawView) {
@@ -4358,7 +4413,8 @@
           bankDeg: +(trackAt(mm.s).b * 180 / Math.PI).toFixed(2),
             shake: +shake.toFixed(3), offRoad: offRoad,
             boostT: +mm.boostT.toFixed(2), boostCd: +mm.boostCd.toFixed(2), shield: mm.shield,
-            nitroCd: +mm.nitroCd.toFixed(2), drift: +(mm.drift || 0).toFixed(3),
+            nitro: +mm.nitro.toFixed(3), nitroOn: !!mm.nitroOn, nitroSpent: !!mm.nitroSpent,
+            drift: +(mm.drift || 0).toFixed(3),
             yaw: +mm.group.rotation.y.toFixed(3),
             hgt: +mm.hgt.toFixed(2), air: mm.air, look: [+lookYaw.toFixed(2), +lookPitch.toFixed(2)],
             pad: pad.live, padSteer: +pad.steer.toFixed(2), padThrottle: +pad.throttle.toFixed(2),
