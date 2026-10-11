@@ -793,8 +793,8 @@
        audio — two music files, everything else synthesised
 
        The engine hum used to be the soundtrack. It is now the fallback: the
-       race is scored by the two tracks in racegame/, alternating each race,
-       and the synthesised hum only comes back if neither file can be played
+       race is scored by the tracks in racegame/, one per race and wrapping, and
+       the synthesised hum only comes back if none of them can be played
        (an offline cache, a renamed file) — so the page is never silent and
        never lies about what it is playing. Skids, blips and the finish fanfare
        stay synthesised: they are cues, and cues have to land on the frame.
@@ -803,9 +803,14 @@
     let muted = false;
 
     /* ---- music ---- */
-    const MUSIC_TRACKS = ['racegame/galacticgame1.mp3', 'racegame/galacticgame 2.mp3'];
+    const MUSIC_TRACKS = ['racegame/galacticgame1.mp3', 'racegame/galacticgame 2.mp3',
+      'racegame/galacticgame3.mp3', 'racegame/galacticgame4.mp3'];
     const MUSIC_VOLUME = 0.42;
-    let musicEl = null, musicIdx = 0, musicOk = null, musicWanted = false;
+    /* -1: no track picked yet. The first race takes track 1 and each one after it
+       takes the next, wrapping — so the order the files are listed in is the
+       order they are heard, and the first race is not the second track. */
+    let musicEl = null, musicIdx = -1, musicOk = null, musicWanted = false;
+    function musicTrack() { return MUSIC_TRACKS[musicIdx < 0 ? 0 : musicIdx]; }
 
     function audioReady() {
       if (actx) return actx;
@@ -861,17 +866,17 @@
       const el = musicInit();
       if (!el) return null;
       if (muted) { el.pause(); return el; }
-      const want = MUSIC_TRACKS[musicIdx % MUSIC_TRACKS.length];
+      const want = musicTrack();
       if (!el.currentSrc || el.currentSrc.indexOf(want) === -1) { try { el.src = want; } catch (e) {} }
       el.volume = MUSIC_VOLUME;
       const p = el.play();
       if (p && p.catch) p.catch(function () { /* no gesture yet, or no file: try again next time */ });
       return el;
     }
-    /* a new race means the other track — two tracks and a restart key would
-       otherwise mean hearing the same one all evening */
+    /* a new race means the next track — four tracks and a restart key would
+       otherwise mean hearing one of them all evening */
     function musicNext() {
-      musicIdx++;
+      musicIdx = (musicIdx + 1) % MUSIC_TRACKS.length;
       if (musicEl) { try { musicEl.pause(); } catch (e) {} }
       return musicPlay();
     }
@@ -2800,7 +2805,10 @@
     /* `hold` lays the grid out and stops there, which is how the page loads: see
        the end of the function and the start screen in #load. */
     function gridStart(hold) {
-      musicNext();               // each race gets the other track
+      /* a HELD grid is not a race, so it must not consume a track: the countdown
+         the player never asked for used to take track 1, which meant the first
+         race they actually started played track 2 */
+      if (!hold) musicNext();    // each race gets the next track
       raceTime = 0; countdown = 3.0; raceState = 'countdown';
       countdownShown = 0; goHold = 0;
       setLamps(0, '');
@@ -3676,11 +3684,17 @@
       document.getElementById('dragsteer').addEventListener('click', function () { audioReady(); setDragSteer(!dsMode); });
     /* The one door from the start screen into a race. Every input that means
        "go" comes through here — the button, Enter, the pad's Start, the R key,
-       picking a hull, a tap on the results board — so they cannot drift apart. */
+       picking a hull, a tap on the results board — so they cannot drift apart.
+
+       gridStart comes FIRST and audioReady second, which looks upside down and
+       is not: gridStart is what picks this race's track off the playlist, and
+       the audio context created after it is what starts playing. The other way
+       round, the context opens on the previous track and the new one is switched
+       in a moment later — an audible hiccup on the first note of every race. */
     function startRace() {
+      gridStart();
       audioReady();
       loadEl.classList.add('hidden');
-      gridStart();
     }
     function restart() { startRace(); }
     function setPlayer(i) {
@@ -4546,10 +4560,15 @@
         /* what the soundtrack is actually doing, since "is it playing" is not a
            question you can answer by listening in a test */
         music: function () {
+          const file = function (u) { return u ? String(u).split('/').pop() : null; };
           return { tracks: MUSIC_TRACKS, idx: musicIdx, ok: musicOk, wanted: musicWanted,
             playing: !!(musicEl && !musicEl.paused), muted: muted,
             volume: musicEl ? musicEl.volume : null,
-            src: musicEl ? String(musicEl.currentSrc || musicEl.src || '') : null,
+            /* both: the attribute is what was ASKED for, currentSrc what the
+               element has actually selected — they disagree for a moment after a
+               switch, and the wrong one makes a working rotation look stuck */
+            src: musicEl ? file(musicEl.src) : null,
+            currentSrc: musicEl ? file(musicEl.currentSrc) : null,
             currentTime: musicEl ? +musicEl.currentTime.toFixed(2) : null,
             engineGain: engineGain ? +engineGain.gain.value.toFixed(5) : null,
             skidGain: skidGain ? +skidGain.gain.value.toFixed(5) : null };
