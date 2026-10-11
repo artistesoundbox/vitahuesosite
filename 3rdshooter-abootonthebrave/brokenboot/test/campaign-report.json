@@ -1,6 +1,6 @@
 {
   "seed": 20260411,
-  "startedAt": "2026-10-11T19:54:47.361Z",
+  "startedAt": "2026-10-11T19:55:17.355Z",
   "gameSeconds": 0,
   "steps": 0,
   "waves": [],
@@ -12,12 +12,12 @@
   "healthAtEnd": null,
   "damageTaken": 0,
   "instrumented": true,
-  "outcome": "aim-trigger-check-failed",
+  "outcome": "aim-trigger-checked",
   "errors": [],
   "lockCheck": {
     "cone": 0.22,
     "distance": 26,
-    "pass": false,
+    "pass": true,
     "baseHeadingRadians": 0,
     "anglesRadians": {
       "near": 0.055,
@@ -37,10 +37,10 @@
     "farVisible": true,
     "swungOnTarget": true,
     "afterRelease": "near",
-    "freshPress": "near"
+    "freshPress": "far"
   },
   "wavesReached": 1,
-  "wallClockSeconds": 0.4,
+  "wallClockSeconds": 0.3,
   "consoleErrors": [],
   "consoleWarnings": [
     "console.warn: THREE.FBXLoader: %s map is not supported in three.js, skipping texture. ShininessExponent",
