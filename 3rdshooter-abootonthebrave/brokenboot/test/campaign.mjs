@@ -1,0 +1,452 @@
+// Headless campaign harness for A Broken Boot On The Brave.
+//
+// Plays a scripted match through the game's own per-frame step in a real
+// browser, then reports wave times, boot-tier timing and any errors, so a
+// pacing change can be checked instead of played by hand.
+//
+//   node test/campaign.mjs                 full ten-wave run
+//   node test/campaign.mjs --waves=3       quick pacing check
+//   node test/campaign.mjs --headed        watch it play (debugging)
+//   node test/campaign.mjs --baseline      compare against test/campaign-baseline.json
+//   node test/campaign.mjs --record        write that baseline
+//
+// Needs a Chromium-based browser: $CHROME_PATH, or Chrome/Edge in the usual
+// places. No npm dependencies — it talks to the browser over the DevTools
+// protocol with Node's built-in WebSocket.
+import { spawn } from 'node:child_process';
+import { createServer } from 'node:net';
+import fs from 'node:fs';
+import http from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(here, '..');           // brokenboot/
+const repoRoot = path.resolve(projectRoot, '..');       // the served root
+const driverSource = fs.readFileSync(path.join(here, 'driver.js'), 'utf8');
+const baselinePath = path.join(here, 'campaign-baseline.json');
+const reportPath = path.join(here, 'campaign-report.json');
+
+// ------------------------------------------------------------------ arguments
+
+function parseArgs(argv) {
+  const opts = {
+    waves: 10,
+    waveLimitSeconds: 150,
+    maxSteps: 60000,
+    timeoutSeconds: 420,
+    seed: 20260411,
+    baseline: false,
+    record: false,
+    headed: false,
+    keepOpen: false,
+    quiet: false,
+    url: null,
+    port: null,
+    noServer: false,
+  };
+  for (const arg of argv) {
+    const [flag, value] = arg.split('=');
+    const num = Number(value);
+    switch (flag) {
+      case '--waves': opts.waves = num; break;
+      case '--wave-limit': opts.waveLimitSeconds = num; break;
+      case '--max-steps': opts.maxSteps = num; break;
+      case '--timeout': opts.timeoutSeconds = num; break;
+      case '--seed': opts.seed = num; break;
+      case '--baseline': opts.baseline = true; break;
+      case '--record': opts.record = true; break;
+      case '--headed': opts.headed = true; break;
+      case '--keep-open': opts.keepOpen = true; break;
+      case '--quiet': opts.quiet = true; break;
+      case '--url': opts.url = value; break;
+      case '--port': opts.port = num; break;
+      case '--no-server': opts.noServer = true; break;
+      case '--help': case '-h': printUsage(); process.exit(0); break;
+      default: console.error(`Unknown option: ${arg}`); printUsage(); process.exit(2);
+    }
+  }
+  return opts;
+}
+
+function printUsage() {
+  console.log(`Usage: node test/campaign.mjs [options]
+
+  --waves=N        stop after N waves (default 10, the full campaign)
+  --wave-limit=S   seconds without an elimination before a wave counts as stalled (default 150)
+  --max-steps=N    hard cap on simulated frames (default 60000)
+  --timeout=S      whole-run wall-clock budget (default 420)
+  --seed=N         RNG seed, for a repeatable campaign (default 20260411, 0 = real random)
+  --baseline       compare wave and tier timings against test/campaign-baseline.json
+  --record         write the timings from this run to that baseline
+  --url=URL        page to load (default: served from this repo)
+  --port=N         port for the bundled static server
+  --no-server      use a server that is already running
+  --headed         run the browser with a visible window
+  --keep-open      leave the browser open when the run finishes
+  --quiet          print the report only, not progress`);
+}
+
+const opts = parseArgs(process.argv.slice(2));
+const log = (...args) => { if (!opts.quiet) console.log(...args); };
+
+// ------------------------------------------------------------------ helpers
+
+function findBrowser() {
+  const candidates = [
+    process.env.CHROME_PATH,
+    process.env.BROKENBOOT_BROWSER,
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+  ].filter(Boolean);
+  return candidates.find((p) => { try { return fs.statSync(p).isFile(); } catch { return false; } }) || null;
+}
+
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const { port } = server.address();
+      server.close(() => resolve(port));
+    });
+  });
+}
+
+async function waitForHttp(url, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError = 'timed out';
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(url, { method: 'HEAD' });
+      if (res.ok) return true;
+      lastError = `HTTP ${res.status}`;
+    } catch (err) {
+      lastError = err.message;
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new Error(`server never answered ${url}: ${lastError}`);
+}
+
+/** Minimal DevTools-protocol client over the built-in WebSocket. */
+class Cdp {
+  constructor(ws) {
+    this.ws = ws;
+    this.nextId = 0;
+    this.pending = new Map();
+    this.listeners = new Map();
+    ws.addEventListener('message', (event) => {
+      let msg;
+      try { msg = JSON.parse(event.data); } catch { return; }
+      if (msg.id && this.pending.has(msg.id)) {
+        const { resolve, reject, timer } = this.pending.get(msg.id);
+        clearTimeout(timer);
+        this.pending.delete(msg.id);
+        if (msg.error) reject(new Error(`${msg.error.message}${msg.error.data ? ` (${msg.error.data})` : ''}`));
+        else resolve(msg.result);
+      } else if (msg.method) {
+        for (const fn of this.listeners.get(msg.method) || []) fn(msg.params);
+      }
+    });
+  }
+
+  on(method, fn) {
+    if (!this.listeners.has(method)) this.listeners.set(method, []);
+    this.listeners.get(method).push(fn);
+  }
+
+  send(method, params = {}, timeoutMs = 30000) {
+    const id = ++this.nextId;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`${method} timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+      this.pending.set(id, { resolve, reject, timer });
+      this.ws.send(JSON.stringify({ id, method, params }));
+    });
+  }
+}
+
+// ------------------------------------------------------------------ main
+
+let server = null;
+let browser = null;
+let profileDir = null;
+let exitCode = 0;
+
+async function main() {
+  const browserPath = findBrowser();
+  if (!browserPath) {
+    console.error('No Chromium-based browser found. Set CHROME_PATH to chrome/msedge/chromium.');
+    return 2;
+  }
+
+  // ---------------------------------------------------------------- static server
+  let url = opts.url;
+  if (!opts.noServer) {
+    const port = opts.port || await freePort();
+    server = spawn(process.execPath, [path.join(projectRoot, 'serve.mjs'), String(port)], {
+      cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    server.stderr.on('data', (d) => log(`[server] ${String(d).trim()}`));
+    const base = `http://127.0.0.1:${port}`;
+    url = url || `${base}/brokenboot/index.html`;
+    await waitForHttp(url, 15000);
+    log(`server ready on ${base}`);
+  }
+  if (!url) { console.error('--no-server needs --url'); return 2; }
+
+  // ---------------------------------------------------------------- browser
+  profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'brokenboot-campaign-'));
+  const args = [
+    opts.headed ? '--window-size=1280,720' : '--headless=new',
+    '--disable-gpu',
+    '--enable-unsafe-swiftshader',   // software WebGL, so the renderer can start
+    '--mute-audio',
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--disable-extensions',
+    '--disable-background-timer-throttling',
+    '--remote-debugging-port=0',
+    `--user-data-dir=${profileDir}`,
+    'about:blank',
+  ];
+  browser = spawn(browserPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+
+  const wsUrl = await new Promise((resolve, reject) => {
+    let buffer = '';
+    const timer = setTimeout(() => reject(new Error('browser never reported a debugging endpoint')), 30000);
+    browser.stderr.on('data', (chunk) => {
+      buffer += String(chunk);
+      if (/DevTools listening on/i.test(buffer)) {
+        // The port is only known once the browser prints its endpoint.
+        const port = buffer.match(/DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)\//)?.[1];
+        if (port) {
+          clearTimeout(timer);
+          resolve({ port: Number(port) });
+        }
+      }
+    });
+    browser.on('exit', (code) => { clearTimeout(timer); reject(new Error(`browser exited early (code ${code})`)); });
+  });
+
+  // Connect to the page target rather than the browser target: one session does
+  // everything this harness needs.
+  const list = await (await fetch(`http://127.0.0.1:${wsUrl.port}/json/list`)).json();
+  const page = list.find((t) => t.type === 'page');
+  if (!page) throw new Error('no page target in the browser');
+
+  const ws = new WebSocket(page.webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => {
+    ws.addEventListener('open', resolve, { once: true });
+    ws.addEventListener('error', () => reject(new Error('failed to open the DevTools socket')), { once: true });
+  });
+  const cdp = new Cdp(ws);
+
+  // ---------------------------------------------------------------- error capture
+  const consoleErrors = [];
+  const consoleWarnings = [];
+  cdp.on('Runtime.exceptionThrown', ({ exceptionDetails }) => {
+    consoleErrors.push(`exception: ${exceptionDetails.exception?.description || exceptionDetails.text}`);
+  });
+  cdp.on('Runtime.consoleAPICalled', ({ type, args }) => {
+    const text = (args || []).map((a) => a.value ?? a.description ?? '').join(' ');
+    if (type === 'error') consoleErrors.push(`console.error: ${text}`);
+    else if (type === 'warning') consoleWarnings.push(`console.warn: ${text}`);
+  });
+  cdp.on('Log.entryAdded', ({ entry }) => {
+    if (entry.level === 'error') consoleErrors.push(`log: ${entry.text}`);
+  });
+  const failedRequests = [];
+  const meaningful = new Set(['Script', 'Fetch', 'XHR', 'Document', 'Stylesheet']);
+  cdp.on('Network.loadingFailed', ({ errorText, type }) => {
+    if (meaningful.has(type)) failedRequests.push(`${type}: ${errorText}`);
+  });
+
+  await cdp.send('Runtime.enable');
+  await cdp.send('Log.enable');
+  await cdp.send('Page.enable');
+  await cdp.send('Network.enable');
+
+  // ---------------------------------------------------------------- boot the game
+  log(`loading ${url}`);
+  await cdp.send('Page.navigate', { url });
+
+  const bootDeadline = Date.now() + 180000;
+  let booted = false;
+  while (Date.now() < bootDeadline) {
+    const { result } = await cdp.send('Runtime.evaluate', {
+      expression: 'Boolean(window.__brokenBoot && document.getElementById("screen-start") && !document.getElementById("screen-start").classList.contains("hidden"))',
+      returnByValue: true,
+    });
+    if (result.value === true) { booted = true; break; }
+    const ready = await cdp.send('Runtime.evaluate', {
+      expression: 'document.getElementById("load-text") ? document.getElementById("load-text").textContent : ""',
+      returnByValue: true,
+    });
+    if (!opts.quiet) process.stdout.write(`\rwaiting for the forest… ${ready.result.value}`.padEnd(60));
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  if (!booted) {
+    console.error('\nThe game never reached the start screen.');
+    for (const e of consoleErrors.slice(0, 10)) console.error(`  ${e}`);
+    return 1;
+  }
+  log('\ngame loaded, playing the campaign');
+
+  // ---------------------------------------------------------------- play it
+  const expression = `(async () => { ${driverSource}\n; return await runCampaign(${JSON.stringify({
+    waves: opts.waves,
+    waveLimitSeconds: opts.waveLimitSeconds,
+    maxSteps: opts.maxSteps,
+    seed: opts.seed,
+  })}); })()`;
+
+  const startedAt = Date.now();
+  const { result, exceptionDetails } = await cdp.send('Runtime.evaluate', {
+    expression,
+    awaitPromise: true,
+    returnByValue: true,
+    timeout: opts.timeoutSeconds * 1000,
+  }, opts.timeoutSeconds * 1000 + 10000);
+
+  if (exceptionDetails) {
+    console.error(`\nThe campaign driver threw: ${exceptionDetails.exception?.description || exceptionDetails.text}`);
+    return 1;
+  }
+  const report = result.value;
+  if (!report || report.fatal) {
+    console.error(`\nCampaign could not run: ${report ? report.fatal : 'no report returned'}`);
+    return 1;
+  }
+  report.wallClockSeconds = +((Date.now() - startedAt) / 1000).toFixed(1);
+  report.consoleErrors = consoleErrors;
+  report.consoleWarnings = consoleWarnings;
+  report.failedRequests = failedRequests;
+
+  // ---------------------------------------------------------------- report
+  const passed = assess(report);
+  printReport(report, passed);
+
+  fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  log(`\nreport written to ${path.relative(process.cwd(), reportPath)}`);
+
+  if (opts.record) {
+    fs.writeFileSync(baselinePath, `${JSON.stringify({
+      recordedAt: new Date().toISOString(),
+      seed: opts.seed,
+      waves: report.waves.map((w) => ({ wave: w.wave, durationSeconds: w.durationSeconds })),
+      tiers: report.tiers.map((t) => ({ tier: t.tier, atSeconds: t.atSeconds })),
+    }, null, 2)}\n`);
+    log(`baseline written to ${path.relative(process.cwd(), baselinePath)}`);
+  }
+
+  return passed.ok ? 0 : 1;
+}
+
+/** Everything that makes a run a failure, rather than an interesting number. */
+function assess(report) {
+  const reasons = [];
+  const errors = [...(report.errors || []), ...(report.consoleErrors || [])];
+  if (errors.length) reasons.push(`${errors.length} error(s): ${errors[0]}`);
+  if (report.outcome === 'over') reasons.push('the player was killed');
+  if (report.stalledWave) reasons.push(`wave ${report.stalledWave.wave} stalled for ${report.stalledWave.stalledFor}s with ${report.stalledWave.hostiles} attacker(s) left`);
+
+  if (!(report.waves || []).length) reasons.push('no waves completed');
+  if (report.outcome === 'step-cap') reasons.push('the frame cap was reached before the campaign ended');
+
+  // A wave that closed with the harness still running means it never handed
+  // over, which after a clean run only happens at the wave cap.
+  for (const w of report.waves || []) {
+    if (w.closedByHarness) reasons.push(`wave ${w.wave} never finished (${w.durationSeconds}s with ${w.eliminations} elimination(s))`);
+  }
+
+  if (report.failedRequests?.length) reasons.push(`${report.failedRequests.length} failed request(s): ${report.failedRequests[0]}`);
+
+  // Optional pacing gate: only compare when a baseline has been recorded.
+  let baselineDelta = null;
+  if (opts.baseline && fs.existsSync(baselinePath)) {
+    const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+    baselineDelta = [];
+    for (const w of report.waves || []) {
+      const was = baseline.waves?.find((b) => b.wave === w.wave);
+      if (!was) continue;
+      const change = +(((w.durationSeconds - was.durationSeconds) / Math.max(1, was.durationSeconds)) * 100).toFixed(1);
+      baselineDelta.push({ wave: w.wave, wasSeconds: was.durationSeconds, nowSeconds: w.durationSeconds, changePercent: change });
+      if (Math.abs(change) > 40) reasons.push(`wave ${w.wave} pacing moved ${change}% (${was.durationSeconds}s → ${w.durationSeconds}s)`);
+    }
+  }
+
+  return { ok: reasons.length === 0, reasons, baselineDelta, errors };
+}
+
+function printReport(report, passed) {
+  const pad = (s, n) => String(s).padEnd(n);
+  console.log('');
+  console.log(`${pad('wave', 6)}${pad('starts', 9)}${pad('clears', 9)}${pad('duration', 10)}${pad('hostiles', 10)}${pad('kills', 6)}`);
+  for (const w of report.waves || []) {
+    const flag = w.closedByHarness ? ' (unfinished)' : '';
+    console.log(`${pad(w.wave, 6)}${pad(`${w.startSeconds}s`, 9)}${pad(`${w.clearSeconds}s`, 9)}${pad(`${w.durationSeconds}s${flag}`, 10)}${pad(w.hostilesAtStart, 10)}${pad(w.eliminations, 6)}`);
+  }
+  console.log('');
+  console.log('Boot tiers');
+  if (!(report.tiers || []).length) console.log('  (none reached)');
+  for (const t of report.tiers || []) console.log(`  ${pad(t.tier, 26)}${pad(`${t.atSeconds}s`, 10)}credit ${t.credit}`);
+
+  console.log('');
+  console.log(`Simulated ${report.gameSeconds}s over ${report.steps} frames (${report.wallClockSeconds}s wall clock).`);
+  console.log(`Eliminations ${report.eliminations} (boot ${report.bootEliminations}), loot ${report.lootCollected}, outcome ${report.outcome}, health ${report.healthAtEnd}.`);
+
+  if (passed.baselineDelta?.length) {
+    console.log('\nAgainst the baseline');
+    console.log(`  ${pad('wave', 6)}${pad('was', 10)}${pad('now', 10)}change`);
+    for (const d of passed.baselineDelta) {
+      console.log(`  ${pad(d.wave, 6)}${pad(`${d.wasSeconds}s`, 10)}${pad(`${d.nowSeconds}s`, 10)}${d.changePercent > 0 ? '+' : ''}${d.changePercent}%`);
+    }
+  }
+
+  if (report.consoleWarnings?.length) {
+    console.log(`\n${report.consoleWarnings.length} console warning(s), first: ${report.consoleWarnings[0]}`);
+  }
+  if (passed.ok) {
+    console.log('\nPASS — every wave resolved, no errors.');
+  } else {
+    console.log('\nFAIL');
+    for (const reason of passed.reasons) console.log(`  - ${reason}`);
+  }
+}
+
+// ------------------------------------------------------------------ lifecycle
+
+function cleanup() {
+  try { if (browser && !opts.keepOpen) browser.kill(); } catch { /* already gone */ }
+  try { if (server) server.kill(); } catch { /* already gone */ }
+  if (profileDir && !opts.keepOpen) {
+    try { fs.rmSync(profileDir, { recursive: true, force: true }); } catch { /* windows may hold it */ }
+  }
+}
+
+const timeout = setTimeout(() => {
+  console.error(`\nTimed out after ${opts.timeoutSeconds}s.`);
+  cleanup();
+  process.exit(1);
+}, opts.timeoutSeconds * 1000);
+
+main()
+  .then((code) => { exitCode = code ?? 0; })
+  .catch((err) => { console.error(`\nHarness error: ${err.message}`); exitCode = 2; })
+  .finally(() => {
+    clearTimeout(timeout);
+    cleanup();
+    process.exit(exitCode);
+  });
