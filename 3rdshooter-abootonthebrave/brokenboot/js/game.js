@@ -213,6 +213,7 @@ export class Game {
 
     for (const action of manager.takeActions()) {
       if (action === 'kick') this.player.melee();
+      else if (action === 'jump') this.player.jump();
       else if (action === 'reload') this.player.beginReload();
       else if (action === 'mute') this.toggleMute();
       else if (action === 'pause' && document.pointerLockElement) document.exitPointerLock();

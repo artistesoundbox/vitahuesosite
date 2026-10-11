@@ -13,6 +13,10 @@ export const SETTINGS = {
   accel: 42,
   friction: 14,
 
+  // Jumping
+  gravity: -20,
+  jumpSpeed: 6.3,
+
   // Combat
   maxHealth: 100,
   magSize: 30,
@@ -74,6 +78,7 @@ export const PLAYER_SOURCE = {
     walk: '3rdpersonshootwalking.fbx',
     aim: '3rdpersonshootstanding.fbx',
     crouch: '3rdpersonshootcrouch.fbx',
+    jump: '3rdpersonjump.fbx',
     kick: '3rdpersonkick.fbx',
     kickHigh: '3rdpersonkickhigh.fbx',
     stomp: '3rdpersonstomp.fbx',

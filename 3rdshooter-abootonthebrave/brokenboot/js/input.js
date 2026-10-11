@@ -91,7 +91,8 @@ export class InputManager {
       if (e.repeat) { this.keys[e.code] = true; return; }
       this.keys[e.code] = true;
       if (e.code === 'KeyR') this._push('reload');
-      if (e.code === 'KeyF' || e.code === 'Space') this._push('kick');
+      if (e.code === 'KeyF') this._push('kick');
+      if (e.code === 'Space') this._push('jump');
       if (e.code === 'KeyM') this._push('mute');
       if (e.code === 'Escape') this._push('pause');
     });
@@ -213,6 +214,7 @@ export class InputManager {
     edge(0, 'kick');    // A
     edge(1, 'reload');  // B
     edge(2, 'mute');    // X
+    edge(3, 'jump');    // Y
     edge(9, 'pause');   // Menu
   }
 
@@ -326,6 +328,7 @@ export class InputManager {
 
     hold('touch-fire', () => { this.firingState.touch = true; }, () => { this.firingState.touch = false; });
     hold('touch-kick', () => this._push('kick'));
+    hold('touch-jump', () => this._push('jump'));
     hold('touch-reload', () => this._push('reload'));
   }
 

@@ -13,6 +13,8 @@ export class Player {
     this.anim = new AnimController(this.model, template.clips);
 
     this.velocity = new THREE.Vector3();
+    this.velocityY = 0;
+    this.grounded = true;
     this.health = SETTINGS.maxHealth;
     this.maxHealth = SETTINGS.maxHealth;
     this.ammo = SETTINGS.magSize;
@@ -99,6 +101,17 @@ export class Player {
     this.object.position.z = clamp(this.object.position.z, -limit, limit);
     world.resolveCircle(this.object.position, 0.55);
 
+    // Vertical motion. The ground plane sits at y = 0.
+    this.velocityY += SETTINGS.gravity * dt;
+    this.object.position.y += this.velocityY * dt;
+    if (this.object.position.y <= 0) {
+      this.object.position.y = 0;
+      if (this.velocityY < 0) this.velocityY = 0;
+      this.grounded = true;
+    } else {
+      this.grounded = false;
+    }
+
     const horizontal = Math.hypot(this.velocity.x, this.velocity.z);
     if (horizontal > 0.4) {
       this.yaw = dampAngle(this.yaw, Math.atan2(this.velocity.x, this.velocity.z), 12, dt);
@@ -109,7 +122,9 @@ export class Player {
 
     const sinceShot = this.time - this.lastShotAt;
     if (!this.anim.busy) {
-      if (this.moving) {
+      if (!this.grounded && this.anim.has('jump')) {
+        this.anim.play('jump', { timeScale: 1 });
+      } else if (this.moving) {
         this.anim.play('walk', { timeScale: this.sprinting ? 1.45 : 1.0 });
       } else if (this.reloading > 0 || sinceShot < 4) {
         this.anim.play('aim');
@@ -142,6 +157,13 @@ export class Player {
 
   canMelee() {
     return this.alive && this.kickCooldown <= 0 && !this.pendingKick && !this.anim.busy;
+  }
+
+  jump() {
+    if (!this.alive || !this.grounded || this.anim.busy) return false;
+    this.velocityY = SETTINGS.jumpSpeed;
+    this.grounded = false;
+    return true;
   }
 
   melee() {
