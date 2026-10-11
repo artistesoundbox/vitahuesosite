@@ -77,7 +77,10 @@ export class Player {
     }
 
     const forward = new THREE.Vector3(Math.sin(cameraYaw), 0, Math.cos(cameraYaw));
-    const right = new THREE.Vector3(forward.z, 0, -forward.x);
+    // Camera right is cross(forward, up). With the camera looking along +Z this
+    // is (-forward.z, 0, forward.x); the opposite sign made every input source
+    // strafe the wrong way.
+    const right = new THREE.Vector3(-forward.z, 0, forward.x);
     const wish = new THREE.Vector3();
     wish.addScaledVector(forward, input.forward);
     wish.addScaledVector(right, input.strafe);
