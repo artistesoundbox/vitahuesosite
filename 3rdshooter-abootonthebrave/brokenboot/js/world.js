@@ -49,6 +49,9 @@ export class World {
     this.rand = makeRandom(PRNG_SEED);
     this._ray = new THREE.Ray();
     this._tmp = new THREE.Vector3();
+    // Separate scratch vector: hasLineOfSight() rewrites _tmp, so a probe point
+    // must never share it or the sight test silently compares a point to itself.
+    this._probe = new THREE.Vector3();
   }
 
   /** Nearest blocker along a ray, or null. Used for bullets and line of sight. */
@@ -138,6 +141,53 @@ export class World {
         }
       }
     }
+  }
+
+  /**
+   * A spot near `from` that breaks line of sight to `threat`, so attackers can
+   * bound from cover to cover instead of walking in the open. Candidates are the
+   * static obstacles (trees, the car, the crates); each is scored toward
+   * `preferred` metres from the threat and then by how close it is to `from`.
+   * Returns null when nothing within `maxDistance` blocks the sight line.
+   */
+  findCover(from, threat, { maxDistance = 18, preferred = 15, minRange = 10 } = {}) {
+    const candidates = [];
+    const consider = (cx, cz, r) => {
+      const dx = cx - threat.x;
+      const dz = cz - threat.z;
+      const d = Math.hypot(dx, dz) || 1;
+      // Stand on the far side of the obstacle, out of the threat's sight line.
+      const px = cx + (dx / d) * (r + 1.2);
+      const pz = cz + (dz / d) * (r + 1.2);
+      if (Math.hypot(px - from.x, pz - from.z) > maxDistance) return;
+      // Never bundle up in the player's lap: cover only counts at a distance.
+      const toThreat = Math.hypot(px - threat.x, pz - threat.z);
+      if (toThreat < minRange) return;
+      candidates.push([px, pz]);
+    };
+    for (const c of this.cylinders) consider(c.x, c.z, c.r);
+    for (const box of this.boxes) {
+      const cx = (box.min.x + box.max.x) / 2;
+      const cz = (box.min.z + box.max.z) / 2;
+      const r = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) / 2;
+      consider(cx, cz, r);
+    }
+
+    let best = null;
+    let bestScore = Infinity;
+    for (const [px, pz] of candidates) {
+      // Probe at chest height so a crate counts as cover, not just a tree.
+      this._probe.set(px, 1.25, pz);
+      if (this.hasLineOfSight(this._probe, threat)) continue;
+      const toThreat = Math.hypot(px - threat.x, pz - threat.z);
+      const tramp = Math.hypot(px - from.x, pz - from.z);
+      const score = Math.abs(toThreat - preferred) + tramp * 0.4;
+      if (score < bestScore) {
+        bestScore = score;
+        best = new THREE.Vector3(px, 0, pz);
+      }
+    }
+    return best;
   }
 
   /** A spawn point on open ground at a given radius band from a centre. */

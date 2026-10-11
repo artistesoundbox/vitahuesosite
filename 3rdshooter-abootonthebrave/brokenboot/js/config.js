@@ -23,19 +23,29 @@ export const SETTINGS = {
   reserveStart: 150,
   reloadTime: 1.7,
   fireInterval: 0.105,
-  // Gunfire wounds attackers but never finishes them; the boot does that.
+  // Gunfire wounds attackers. Enough sustained fire will eventually bring one
+  // down, but it is deliberately slow work: hits floor the health and then feed
+  // a bleed-out timer. The boot is instant, so it stays the tool of choice and
+  // is what earns the boot tiers.
   bulletDamage: 24,
   bulletMinHealth: 6,
+  // Seconds an attacker survives bleeding at the floor before collapsing.
+  bleedoutTime: 15,
+  // Each extra hit while they are bleeding takes this many seconds off.
+  bleedoutHitPush: 0.8,
+  // Elites are tougher and take proportionally longer to bleed out.
+  bleedoutEliteScale: 1.6,
+  // A bullet downing only credits this fraction of a boot rout toward tiers.
+  bulletKillWeight: 0.25,
   headshotMultiplier: 2.2,
   bulletRange: 140,
   spread: 0.012,
   recoil: 0.9,
 
-  // Boot
+  // Boot. Reach and cooldown are global; damage and knockback come from the
+  // equipped tier in BOOT_TIERS so upgrades are felt directly.
   kickRange: 3.3,
   kickArc: Math.PI * 0.6,
-  kickDamage: 55,
-  kickKnockback: 13,
   kickCooldown: 0.9,
 
   // Enemy
@@ -45,6 +55,23 @@ export const SETTINGS = {
   enemyMaxRange: 46,
   enemyFireBase: 1.35,
   enemyDamage: 9,
+
+  // Attackers fight from cover. Only one presses the attack at a time; the rest
+  // crouch behind trees, the car and the crates, bounding forward cover to
+  // cover, so the fight opens out instead of turning into a close-range brawl.
+  coverSearchRadius: 20,
+  coverPreferredRange: 15,
+  // Cover is only cover at a distance; they never crowd into the player's lap.
+  coverMinRange: 11,
+  coverHoldMin: 4.5,
+  coverHoldMax: 9,
+  // While hiding they only snap off a shot if the player gets this close.
+  coverFireRange: 8,
+  // How long one attacker keeps coming before it falls back and another takes over.
+  assaultDurationMin: 6,
+  assaultDurationMax: 11,
+  assaultGap: 2.4,
+  firstAssaultDelay: 3.5,
 
   // A routed attacker runs for the trees and is gone for good.
   routedSpeed: 6.4,
@@ -63,11 +90,14 @@ export const SETTINGS = {
   clearingRadius: 19,
   treeCount: 165,
 
-  // Spawn ring for attackers, measured from the player.
-  spawnMinRadius: 24,
-  spawnMaxRadius: 46,
+  // Spawn ring for attackers, measured from the player. They open the fight
+  // from a distance and walk in from cover.
+  spawnMinRadius: 32,
+  spawnMaxRadius: 48,
 
-  maxAliveEnemies: 12,
+  maxAliveEnemies: 8,
+  spawnInterval: 1.4,
+  waveIntermission: 7,
   totalWaves: 10,
 };
 
@@ -124,16 +154,31 @@ export const SKY = {
   zenith: 0x5480bd,
 };
 
-// Boot progression. `model` is lazily loaded the first time a tier is reached.
+// Boot progression. `kills` is boot-progress credit: a boot rout is worth one
+// point, a bullet downing a quarter, so shooting levels the boots far slower.
+// `model` is lazily loaded the first time a tier is reached, and `socket` names
+// the fit used to strap it onto the right foot (see BOOT_SOCKETS).
 export const BOOT_TIERS = [
-  { name: 'Standard Boot',     kills: 0,   meleeDamage: 55,  knockback: 13,  speedBonus: 0,    model: null,                color: '#c8b18d' },
-  { name: 'Reinforced Boot',   kills: 12,  meleeDamage: 66,  knockback: 14,  speedBonus: 0,    model: null,                color: '#9fd08a' },
-  { name: 'Silver Boot',       kills: 30,  meleeDamage: 82,  knockback: 16,  speedBonus: 0.05, model: 'silverboot.glb',    color: '#cfd6de' },
-  { name: 'Gold Boot',         kills: 60,  meleeDamage: 105, knockback: 19,  speedBonus: 0.1,  model: 'goldboot.glb',      color: '#f2c94c' },
-  { name: 'Spiked Gold Boot',  kills: 100, meleeDamage: 128, knockback: 26,  speedBonus: 0.1,  model: 'goldboot.glb',      color: '#e0912f' },
-  { name: 'Tactical Doom Boot',kills: 150, meleeDamage: 150, knockback: 30,  speedBonus: 0.12, model: 'brokenboot.glb',    color: '#c0642b' },
-  { name: 'Legendary Broken Boot', kills: 220, meleeDamage: 190, knockback: 38, speedBonus: 0.16, model: 'brokenboot.glb', color: '#a33b6b' },
+  { name: 'Standard Boot',     kills: 0,   meleeDamage: 55,  knockback: 13,  speedBonus: 0,    model: null,                color: '#c8b18d', socket: 'default' },
+  { name: 'Reinforced Boot',   kills: 12,  meleeDamage: 66,  knockback: 14,  speedBonus: 0,    model: null,                color: '#9fd08a', socket: 'default' },
+  { name: 'Silver Boot',       kills: 30,  meleeDamage: 82,  knockback: 16,  speedBonus: 0.05, model: 'silverboot.glb',    color: '#cfd6de', socket: 'silver' },
+  { name: 'Gold Boot',         kills: 60,  meleeDamage: 105, knockback: 19,  speedBonus: 0.1,  model: 'goldboot.glb',      color: '#f2c94c', socket: 'gold' },
+  { name: 'Spiked Gold Boot',  kills: 100, meleeDamage: 128, knockback: 26,  speedBonus: 0.1,  model: 'goldboot.glb',      color: '#e0912f', socket: 'gold' },
+  { name: 'Tactical Doom Boot',kills: 150, meleeDamage: 150, knockback: 30,  speedBonus: 0.12, model: 'brokenboot.glb',    color: '#c0642b', socket: 'broken' },
+  { name: 'Legendary Broken Boot', kills: 220, meleeDamage: 190, knockback: 38, speedBonus: 0.16, model: 'brokenboot.glb', color: '#a33b6b', socket: 'broken' },
+  { name: 'Mythical Diamond Boot', kills: 300, meleeDamage: 220, knockback: 44, speedBonus: 0.18, model: 'diamondboot.glb', color: '#7fe6e0', socket: 'broken' },
 ];
+
+// The socket helper centres a boot model on the right-foot bone, so each model
+// needs its own fit. `size` is its longest axis in world units; `lift` raises it
+// (also world units) until the sole sits on the ground under a standing foot.
+// The broken boot is deliberately the big, heavy one.
+export const BOOT_SOCKETS = {
+  default: { size: 0.36, lift: 0.05 },
+  silver:  { size: 0.34, lift: 0.05 },
+  gold:    { size: 0.35, lift: 0.05 },
+  broken:  { size: 0.38, lift: 0.065 },
+};
 
 export const ACHIEVEMENTS = [
   { id: 'first_blood',  label: 'Boot Camp Graduate',        desc: 'Get your first elimination.' },

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SETTINGS, BOOT_TIERS, ASSET_BASE, WEAPON } from './config.js';
+import { SETTINGS, BOOT_TIERS, BOOT_SOCKETS, ASSET_BASE, WEAPON } from './config.js';
 import { AnimController, findBone, attachToBone, gltfLoader } from './assets.js';
 import { dampAngle, clamp } from './mathx.js';
 
@@ -25,6 +25,9 @@ export class Player {
     this.bootIndex = 0;
     this.kills = 0;
     this.meleeKills = 0;
+    // Boot-tier progress. A boot rout pays a full point, a bullet downing a
+    // fraction, so the boot is what actually levels the boots.
+    this.tierCredit = 0;
     this.yaw = 0;
     this.time = 0;
     this.lastShotAt = -99;
@@ -198,16 +201,17 @@ export class Player {
     this.reserve += amount;
   }
 
-  registerKill(melee = false) {
+  registerKill(melee = false, weight = 1) {
     this.kills += 1;
     if (melee) this.meleeKills += 1;
+    this.tierCredit += weight;
     return this.refreshBootTier();
   }
 
   refreshBootTier() {
     let next = 0;
     for (let i = 0; i < BOOT_TIERS.length; i++) {
-      if (this.kills >= BOOT_TIERS[i].kills) next = i;
+      if (this.tierCredit >= BOOT_TIERS[i].kills) next = i;
     }
     if (next !== this.bootIndex) {
       this.bootIndex = next;
@@ -231,11 +235,12 @@ export class Player {
       if (!bone) { console.warn('[player] no right-foot bone for boot socket'); return; }
       if (this.bootModel && this.bootModel.parent) this.bootModel.parent.remove(this.bootModel);
       const boot = gltf.scene;
+      const socket = BOOT_SOCKETS[tier.socket] || BOOT_SOCKETS.default;
       attachToBone(
         bone,
         boot,
-        0.36,
-        new THREE.Vector3(0, -0.02, 0.05),
+        socket.size,
+        new THREE.Vector3(0, socket.lift, 0.03),
         new THREE.Euler(-Math.PI / 2, 0, 0),
       );
       this.bootModel = boot;

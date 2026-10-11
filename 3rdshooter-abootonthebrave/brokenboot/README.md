@@ -61,30 +61,56 @@ pointers, and the layout adapts to portrait and short-landscape phones.
 
 This is the heart of the design, and it is deliberately unusual:
 
-- **Gunfire only wounds.** Bullets can never finish an attacker off — health
-  floors out at `bulletMinHealth` (6). Wounded attackers slow down and shoot less
-  accurately. You can hold a whole wave at bay with the rifle, but you will never
-  clear it.
-- **The boot is the only way to remove an attacker.** A kick sends them screaming
-  into the trees; they run and despawn, and they count as an elimination. The kick
-  still applies knockback and a strike effect to everyone else caught in the arc.
+- **Gunfire wounds first.** An attacker's health floors out at `bulletMinHealth`
+  (6); no single burst drops them, and wounded attackers slow down and shoot less
+  accurately.
+- **Keep firing and they eventually bleed out.** Once an attacker is driven to
+  the floor it starts a bleed-out timer (`bleedoutTime`, 15 s). Every extra hit
+  takes `bleedoutHitPush` (0.8 s) off it, so putting one down with the rifle takes
+  roughly a full magazine of tracking fire — and even then they stay on their feet
+  for a couple of seconds. It is the slow, expensive way, and it kills them for
+  good, so a patient player can win a war of attrition.
+- **The boot is the fast way, and the way that earns boots.** A kick sends them
+  screaming into the trees on contact. They run and despawn, and it counts as an
+  elimination. One kick instead of twenty-odd rounds.
+- **Tier credit is weighted accordingly.** A boot rout pays **1.0**; a gunfire
+  downing pays `bulletKillWeight` (**0.25**). `player.tierCredit` — not the
+  elimination count — is what unlocks tiers, so the boot is what actually levels
+  the boots.
 - **Boot tiers decide how much of a crowd breaks.** Tier 0–1 routes the single
   closest attacker, then 2, 3 and 4 at higher tiers, so upgrades translate
-  directly into crowd control.
+  directly into crowd control. Attackers in the arc beyond that limit take the
+  boot's full `meleeDamage` (55 → 220 by tier), which floors them and leaves them
+  bleeding out or ready to be routed by the next kick.
 - **They keep coming.** Routed attackers being gone for good is fine because the
   next wave spawns more — the forest never runs out of brave soldiers.
 
-Tiers unlock on total eliminations: Standard → Reinforced → Silver → Gold →
-Spiked Gold → Tactical Doom → Legendary Broken, each raising melee knockback,
-the number routed per kick and movement speed. Reaching a tier lazily loads its
-model and sockets it onto the officer's right foot bone.
+Tiers unlock on tier credit: Standard → Reinforced → Silver → Gold → Spiked Gold →
+Tactical Doom → Legendary Broken → Mythical Diamond, each raising melee damage,
+knockback, the number routed per kick and movement speed. Reaching a tier lazily
+loads its model and sockets it onto the officer's **right foot** bone.
+
+Each boot model carries its own fit in `BOOT_SOCKETS` — `size` for the model's
+longest axis and `lift` to raise it until the sole rests on the ground. The
+socket helper centres a model on the foot bone, so a lift is always needed; the
+broken boot is deliberately the big one (0.38 against 0.34–0.36 for the rest).
 
 ## What else is implemented
 
 - **Over-the-shoulder camera** that fires along the reticle axis, with cover-aware
   pull-in, recoil that recenters, and screen shake.
-- **Attackers** cloned from one skinned template: separation, obstacle avoidance,
-  line-of-sight checks before firing, strafing at range, and a share that charge in.
+- **Attackers fight from cover, one at a time.** They spawn 32–48 m out and bound
+  forward cover to cover — a spot on the far side of a tree, the car or a crate
+  that breaks line of sight — crouching there behind the `crouch` clip. Exactly
+  **one** attacker holds the assault token at any moment: it presses in, holds a
+  firing line and shoots properly, while everyone else stays down and only snaps
+  off a hurried close-range shot if the player walks right up to them. When the
+  holder is routed, downed or its turn runs out it falls back and another steps
+  out after `assaultGap`, preferring someone other than the last holder so the
+  crowd takes turns.
+- **Cover is fixed, not a chase.** Once the player is inside `coverPreferredRange`
+  an attacker stops looking for new positions and holds where it is, so it can be
+  closed down and kicked rather than leading the player around the forest.
 - **Waves.** Ten waves, staggered spawns, a cap on how many are alive at once,
   elite variants from wave 5, and an intermission with a tagline between waves.
 - **Forest.** Instanced pines, a clearing, crates, barriers, rocks and parked cars
@@ -176,6 +202,9 @@ download, which is the single biggest remaining improvement.
 
 - No crouch, no aim-down-sights, and weapon pickups are limited to the AK.
 - Achievements are a subset of the design document.
-- Boot placement on the foot bone is tuned by eye; a different rig may need new
-  offset/rotation values in `player.js`.
+- Boot fits in `BOOT_SOCKETS` are hand-tuned for this rig's `mixamorigRightFoot`
+  bone; a different skeleton would need new `size`/`lift` values.
+- The bleed-out floor means a patient player can clear a wave from cover without
+  ever closing to melee. It is slow and ammo-hungry by design, but it is a
+  legitimate strat.
 - Wave composition is flat: no scripted set-pieces or boss encounters yet.

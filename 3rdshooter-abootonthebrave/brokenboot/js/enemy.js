@@ -24,14 +24,21 @@ export class Enemy {
     // Most attackers hold a firing line; a third press in close. The aggressive
     // ones give the boot something to do and stop an ammo-dry player stalling out.
     this.aggressive = Math.random() < 0.38;
-    this.preferredRange = this.aggressive ? 2.2 : 9 + Math.random() * 5;
+    this.preferredRange = this.aggressive ? 3.4 : 9 + Math.random() * 5;
+    // Cover work: where this attacker is heading to hide, and when to re-pick.
+    this.coverPoint = null;
+    this.coverTimer = 0;
 
     this.dead = false;
     this.deathTimer = 0;
     this.removeMe = false;
-    // Attackers are never shot dead: gunfire only wounds them. Only the boot
-    // takes one out of the fight, and it does so by routing them.
+    // Gunfire only ever wounds to start with. Attacker health floors out at
+    // `bulletMinHealth`; the boot sends them running outright, and it is the
+    // boot that earns tiers. Keep shooting a floored attacker and the bleed-out
+    // timer kills them slowly.
     this.wounded = false;
+    this.bleeding = false;
+    this.bleedTimer = 0;
     this.routed = false;
     this.routedTimer = 0;
     this.fireTimer = 0.7 + Math.random() * 1.4;
@@ -54,13 +61,35 @@ export class Enemy {
   }
 
   /**
-   * Gunfire wounds but can never finish an attacker off. Health floors out, and
-   * a badly hurt attacker slows down and shoots less accurately.
+   * Gunfire wounds, and the wound can finish them — but slowly. Health floors
+   * at `bulletMinHealth` and extra hits then feed a bleed-out timer instead of
+   * killing outright, so a bullet downing always takes sustained fire. The boot
+   * remains the fast, one-hit way out.
+   * Returns true when this hit is the one that puts them down.
    */
   takeDamage(amount) {
-    if (this.dead || this.routed) return;
+    if (this.dead || this.routed) return false;
     this.health = Math.max(SETTINGS.bulletMinHealth, this.health - amount);
     if (this.health <= this.maxHealth * 0.65) this.wounded = true;
+    if (this.health <= SETTINGS.bulletMinHealth) {
+      if (!this.bleeding) {
+        this.bleeding = true;
+        this.bleedTimer = SETTINGS.bleedoutTime * (this.elite ? SETTINGS.bleedoutEliteScale : 1);
+      } else {
+        this.bleedTimer -= SETTINGS.bleedoutHitPush;
+      }
+      if (this.bleedTimer <= 0) return this.down();
+    }
+    return false;
+  }
+
+  /** Bullets finally take them down: a slow collapse, not a booting. */
+  down() {
+    if (this.dead) return false;
+    this.dead = true;
+    this.deathTimer = 0;
+    this.bleeding = false;
+    return true;
   }
 
   /** The boot: send them screaming into the trees. This is the only removal. */
@@ -107,27 +136,55 @@ export class Enemy {
       return;
     }
 
+    // Bleeding out is slow: it ticks down on its own and finishes them long
+    // after the shooting stops, so gunfire grinds attackers down rather than
+    // dropping them on the spot.
+    if (this.bleeding) {
+      this.bleedTimer -= dt;
+      if (this.bleedTimer <= 0 && this.down()) {
+        if (ctx.onDown) ctx.onDown(this);
+        return;
+      }
+    }
+
     const toPlayer = this._toPlayer.subVectors(player.position, this.object.position);
     toPlayer.y = 0;
     const dist = toPlayer.length();
     const dir = dist > 1e-4 ? toPlayer.clone().divideScalar(dist) : new THREE.Vector3(0, 0, 1);
 
     const move = this._move.set(0, 0, 0);
-    if (dist > SETTINGS.enemyEngageRange) {
-      move.copy(dir);
-      this.moving = true;
-    } else {
-      this.strafeTimer -= dt;
-      if (this.strafeTimer <= 0) {
-        this.strafeDir *= -1;
-        this.strafeTimer = 1.4 + Math.random() * 2.2;
+    const assaulting = ctx.assault === this;
+    let crouch = false;
+    let gaitScale = 1;
+    let mayFire = false;
+
+    if (assaulting) {
+      // This attacker's turn: press in and hold a firing line.
+      this.coverPoint = null;
+      this.coverTimer = 0;
+      mayFire = true;
+      if (dist > SETTINGS.enemyEngageRange) {
+        move.copy(dir);
+        this.moving = true;
+      } else {
+        this.strafeTimer -= dt;
+        if (this.strafeTimer <= 0) {
+          this.strafeDir *= -1;
+          this.strafeTimer = 1.4 + Math.random() * 2.2;
+        }
+        const closing = dist - this.preferredRange;
+        if (closing > 1.2) move.addScaledVector(dir, 1);
+        else if (closing < -1.2) move.addScaledVector(dir, -1);
+        this._side.set(dir.z, 0, -dir.x).multiplyScalar(this.strafeDir * 0.85);
+        move.add(this._side);
+        this.moving = true;
       }
-      const closing = dist - this.preferredRange;
-      if (closing > 1.2) move.addScaledVector(dir, 1);
-      else if (closing < -1.2) move.addScaledVector(dir, -1);
-      this._side.set(dir.z, 0, -dir.x).multiplyScalar(this.strafeDir * 0.85);
-      move.add(this._side);
-      this.moving = true;
+    } else {
+      // Everyone else fights from cover, crouched and hard to hit.
+      const hold = this.updateCover(dt, ctx, { dist, dir, move });
+      crouch = hold.crouch;
+      gaitScale = hold.gaitScale;
+      mayFire = hold.mayFire;
     }
 
     for (const other of enemies) {
@@ -143,7 +200,7 @@ export class Enemy {
     }
 
     if (move.lengthSq() > 1e-6) move.normalize();
-    const gait = SETTINGS.enemyWalkSpeed * (this.wounded ? 0.72 : 1);
+    const gait = SETTINGS.enemyWalkSpeed * gaitScale * (this.wounded ? 0.72 : 1);
     this.object.position.addScaledVector(move, gait * dt);
     this.object.position.x += this.knock.x * dt;
     this.object.position.z += this.knock.z * dt;
@@ -154,18 +211,22 @@ export class Enemy {
     this.object.rotation.y = this.yaw;
 
     this.fireTimer -= dt;
-    if (this.fireTimer <= 0 && dist < SETTINGS.enemyMaxRange) {
+    if (mayFire && this.fireTimer <= 0 && dist < SETTINGS.enemyMaxRange) {
       const from = this.headPosition;
       const to = player.headPosition;
       if (this.world.hasLineOfSight(from, to)) {
-        this.fireTimer = (this.fireInterval * (this.wounded ? 1.55 : 1)) + Math.random() * 0.8;
-        onFire(this, dist, this.wounded);
+        // Cover shooters fire far less often, and far less accurately.
+        const slower = assaulting ? 1 : 2.6;
+        this.fireTimer = (this.fireInterval * (this.wounded ? 1.55 : 1) * slower) + Math.random() * 0.8;
+        onFire(this, dist, this.wounded, !assaulting);
       } else {
         this.fireTimer = 0.35;
       }
     }
 
-    if (this.anim.has('walk') && this.moving) {
+    if (crouch && this.anim.has('crouch')) {
+      this.anim.play('crouch');
+    } else if (this.anim.has('walk') && this.moving) {
       this.anim.play('walk', { timeScale: dist > SETTINGS.enemyEngageRange ? 1.0 : 0.72 });
     } else if (this.anim.has('aim')) {
       this.anim.play('aim');
@@ -173,6 +234,64 @@ export class Enemy {
       this.anim.play('idle');
     }
     this.anim.update(dt);
+  }
+
+  /**
+   * Hold position behind cover while another attacker makes the assault. The
+   * attacker bounds to a spot on the far side of a tree, the car or a crate,
+   * ducks down there, and only risks a close-range shot if the player closes in.
+   */
+  updateCover(dt, ctx, { dist, dir, move }) {
+    const { player } = ctx;
+    const world = this.world;
+    this.coverTimer -= dt;
+
+    // Only look for a new spot while still working forward. Once the player is
+    // inside fighting range the attacker holds where it is and cowers, so the
+    // boot can actually reach it instead of chasing it from tree to tree.
+    const wantsNewSpot = !this.coverPoint
+      || (this.coverTimer <= 0 && dist > SETTINGS.coverPreferredRange);
+    if (wantsNewSpot) {
+      this.coverPoint = world.findCover(this.object.position, player.position, {
+        maxDistance: SETTINGS.coverSearchRadius,
+        preferred: SETTINGS.coverPreferredRange,
+        minRange: SETTINGS.coverMinRange,
+      });
+      this.coverTimer = SETTINGS.coverHoldMin
+        + Math.random() * (SETTINGS.coverHoldMax - SETTINGS.coverHoldMin);
+    }
+    const reach = this.coverPoint
+      ? this.object.position.distanceTo(this.coverPoint)
+      : Infinity;
+
+    let crouch = true;
+    let gaitScale = 0.82;
+    if (this.coverPoint && reach > 1.2) {
+      move.subVectors(this.coverPoint, this.object.position);
+      move.y = 0;
+      if (move.lengthSq() > 1e-6) move.normalize();
+      this.moving = true;
+      crouch = false;
+    } else if (this.coverPoint) {
+      // Settled behind cover: stay down and hold.
+      this.moving = false;
+      gaitScale = 0.5;
+    } else if (dist > SETTINGS.coverPreferredRange) {
+      // No cover within reach: keep coming, carefully, rather than stand about.
+      move.copy(dir);
+      this.moving = true;
+      gaitScale = 0.6;
+    } else {
+      // No cover and already at fighting range: hold, down and ready.
+      this.moving = false;
+      gaitScale = 0.5;
+    }
+
+    const mayFire = this.coverPoint !== null
+      && !this.moving
+      && dist < SETTINGS.coverFireRange
+      && world.hasLineOfSight(this.headPosition, player.headPosition);
+    return { crouch, gaitScale, mayFire };
   }
 }
 
@@ -184,7 +303,13 @@ export class EnemyManager {
     this.enemies = [];
     this.queue = [];
     this.spawnTimer = 0;
-    this.spawnInterval = 0.75;
+    this.spawnInterval = SETTINGS.spawnInterval;
+    // The single attacker currently pressing the attack. Everyone else holds
+    // cover, so the fight stays a series of duels instead of a scrum.
+    this.assault = null;
+    this.lastAssault = null;
+    this.assaultTime = 0;
+    this.assaultCooldown = SETTINGS.firstAssaultDelay;
   }
 
   /** Attackers still in the fight. Routed ones are already out of it. */
@@ -230,15 +355,65 @@ export class EnemyManager {
       }
     }
 
+    if (ctx.player) this.updateAssault(dt, ctx.player);
+
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const enemy = this.enemies[i];
-      enemy.update(dt, { ...ctx, enemies: this.enemies });
+      enemy.update(dt, { ...ctx, enemies: this.enemies, assault: this.assault });
       if (enemy.removeMe) {
         this.scene.remove(enemy.object);
         enemy.anim.mixer.stopAllAction();
         this.enemies.splice(i, 1);
       }
     }
+  }
+
+  /**
+   * Hand the assault to one attacker at a time. When that attacker is routed,
+   * downed or its turn simply runs out, it falls back to cover and the next one
+   * steps out after a short breather.
+   */
+  updateAssault(dt, player) {
+    const holder = this.assault;
+    if (holder) {
+      const gone = holder.dead || holder.routed || holder.removeMe;
+      if (gone) {
+        this.assault = null;
+        this.assaultCooldown = SETTINGS.assaultGap;
+      } else {
+        this.assaultTime -= dt;
+        if (this.assaultTime > 0) return;
+        this.assault = null;
+        this.assaultCooldown = SETTINGS.assaultGap;
+      }
+    }
+
+    this.assaultCooldown = Math.max(0, this.assaultCooldown - dt);
+    if (this.assaultCooldown > 0) return;
+    const next = this.pickAssault(player);
+    if (!next) return;
+    this.assault = next;
+    this.lastAssault = next;
+    this.assaultTime = SETTINGS.assaultDurationMin
+      + Math.random() * (SETTINGS.assaultDurationMax - SETTINGS.assaultDurationMin);
+  }
+
+  /**
+   * The closest fit attacker, preferring anyone other than the last one to step
+   * out so the crowd takes turns instead of one attacker monopolising the fight.
+   */
+  pickAssault(player) {
+    let best = null;
+    let bestD = Infinity;
+    let alt = null;
+    let altD = Infinity;
+    for (const e of this.enemies) {
+      if (e.dead || e.routed || e.removeMe || e.bleeding) continue;
+      const d = e.position.distanceTo(player.position);
+      if (d < bestD) { bestD = d; best = e; }
+      if (e !== this.lastAssault && d < altD) { altD = d; alt = e; }
+    }
+    return alt || best;
   }
 
   /** Nearest living enemy to a point, used for melee and effects. */
@@ -260,5 +435,9 @@ export class EnemyManager {
     }
     this.enemies.length = 0;
     this.queue.length = 0;
+    this.assault = null;
+    this.lastAssault = null;
+    this.assaultTime = 0;
+    this.assaultCooldown = SETTINGS.firstAssaultDelay;
   }
 }
