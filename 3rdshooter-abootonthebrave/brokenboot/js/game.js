@@ -599,7 +599,7 @@ export class Game {
     this.lockGrace = Math.max(0, this.lockGrace - dt);
 
     const held = this.input.targeting;
-    const pressed = held && !this.targetingHeld;
+    const pressed = false; // TEMP-FALSIFY
     this.targetingHeld = held;
 
     if (!held) {
