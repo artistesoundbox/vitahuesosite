@@ -1,6 +1,6 @@
 {
   "seed": 20260411,
-  "startedAt": "2026-10-11T19:55:17.355Z",
+  "startedAt": "2026-10-11T19:55:32.298Z",
   "gameSeconds": 0,
   "steps": 0,
   "waves": [],
@@ -12,12 +12,12 @@
   "healthAtEnd": null,
   "damageTaken": 0,
   "instrumented": true,
-  "outcome": "aim-trigger-checked",
+  "outcome": "aim-trigger-check-failed",
   "errors": [],
   "lockCheck": {
     "cone": 0.22,
     "distance": 26,
-    "pass": true,
+    "pass": false,
     "baseHeadingRadians": 0,
     "anglesRadians": {
       "near": 0.055,
@@ -37,7 +37,7 @@
     "farVisible": true,
     "swungOnTarget": true,
     "afterRelease": "near",
-    "freshPress": "far"
+    "freshPress": "near"
   },
   "wavesReached": 1,
   "wallClockSeconds": 0.3,
