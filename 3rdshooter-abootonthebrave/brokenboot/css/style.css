@@ -161,6 +161,13 @@ html, body {
   background: radial-gradient(ellipse at center, rgba(160, 20, 20, 0) 40%, rgba(150, 10, 10, 0.72) 100%);
 }
 
+/* The world shoving the frame back: warm edges, so a heavy boot does not read
+   as taking a hit. Opacity is set per frame, scaled by the mass that landed. */
+.impact-edge {
+  position: absolute; inset: 0; opacity: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(255, 236, 190, 0) 52%, rgba(255, 226, 160, 0.55) 100%);
+}
+
 .panel {
   position: absolute;
   background: var(--panel);

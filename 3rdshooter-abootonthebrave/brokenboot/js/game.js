@@ -79,6 +79,11 @@ export class Game {
     this.cameraPitch = -0.16;
     this.recoilPitch = 0;
     this.shake = 0;
+    // What a kick does to the camera: a shove back along the aim, a roll of the
+    // frame, and a hit-stop that the frame clock pays back out of this.
+    this.kickback = 0;
+    this.kickRoll = 0;
+    this.hitStop = 0;
 
     this.state = 'loading'; // loading | ready | playing | over
     this.wave = 0;
@@ -333,7 +338,7 @@ export class Game {
     }
 
     this.recoilPitch += SETTINGS.recoil * 0.02;
-    this.shake = Math.max(this.shake, 0.3);
+    this.addShake(0.3);
   }
 
   /**
@@ -406,6 +411,62 @@ export class Game {
     return type;
   }
 
+  // ------------------------------------------------------------ impact feel
+
+  /** Rattle the camera. `amount` is an impulse, not a duration. */
+  addShake(amount) {
+    this.shake = Math.min(SETTINGS.shakeMax, Math.max(this.shake, amount));
+  }
+
+  /**
+   * How much mass the boot just met, and where the heaviest of it was: an
+   * attacker counts as `bodyMass`, a kicked crate, barrier, rock or car as its
+   * own mass, and the heaviest thing in the arc sets the figure. A mass of zero
+   * means the swing met nothing at all.
+   */
+  kickHitMass(hitBodies, props) {
+    let mass = hitBodies ? SETTINGS.bodyMass : 0;
+    let at = null;
+    for (const prop of props) {
+      if (prop.mass > mass) { mass = prop.mass; at = prop.mesh.position; }
+    }
+    return { mass, at };
+  }
+
+  /**
+   * The boot connecting, as the camera feels it. Everything here scales with the
+   * mass that was hit: the frame rattles, is shoved back along the aim and rolled
+   * away from the impact, the world hitch-slides for a moment, and the screen
+   * edges light up. A car is heavy, a body is not, and `side` is which shoulder
+   * the mass was on, so the frame rolls away from it rather than always the same
+   * way — the officer kicks with the right leg, but a boot into a car parked on
+   * the left should not read the same as one parked on the right.
+   */
+  kickImpact(mass, side = 1) {
+    if (!(mass > 0)) return;
+    const s = SETTINGS;
+    this.addShake(Math.min(s.kickShakeMax, mass * s.kickShakePerMass));
+    this.kickback = Math.min(s.kickbackMax, this.kickback + mass * s.kickbackPerMass);
+    this.kickRoll = clamp(
+      this.kickRoll + mass * s.kickRollPerMass * side, -s.kickRollMax, s.kickRollMax,
+    );
+    this.hitStop = Math.max(this.hitStop, Math.min(s.kickStopMax, mass * s.kickStopPerMass));
+    this.hud.flashImpact(Math.min(1, mass / s.kickFlashMass));
+  }
+
+  /**
+   * The world time this frame is worth. A hit-stop is charged by the boot
+   * connecting and paid back here: the frame clock keeps running at full speed
+   * while the world creeps, so a connect reads as weight rather than as a dropped
+   * frame. `step()` stays a pure function of the dt it is handed, which is what
+   * keeps the harness's own timings honest.
+   */
+  frameTime(realDt) {
+    if (this.hitStop <= 0) return realDt;
+    this.hitStop = Math.max(0, this.hitStop - realDt);
+    return realDt * SETTINGS.kickStopScale;
+  }
+
   /**
    * The kick the officer is throwing, and what it reaches. Each type has its own
    * reach, arc and power (see KICKS): the sweep stays low and wide, the high kick
@@ -468,7 +529,6 @@ export class Game {
     if (launched.length) {
       this.sceneryKicked += launched.length;
       this.carsKicked += launched.filter((p) => p.kind === 'car').length;
-      this.shake = Math.max(this.shake, 0.5);
     }
 
     // The three kicks are contextual, so each one is introduced the first time
@@ -483,13 +543,27 @@ export class Game {
       if (hint) this.hud.toast(kick.name.toUpperCase(), hint);
     }
 
+    // The impact itself, as the camera feels it. What the boot met decides how
+    // heavy it was: a body rattles the frame, a car shoves and rolls it. A swing
+    // through empty air gets only the swing — which is exactly what makes the
+    // difference between a connect and a miss readable in the first place.
+    const contact = this.kickHitMass(inArc.length > 0, launched);
+    if (contact.mass > 0) {
+      const right = new THREE.Vector3(Math.cos(this.player.yaw), 0, -Math.sin(this.player.yaw));
+      const at = contact.at || inArc[0].enemy.position;
+      const lateral = (at.x - origin.x) * right.x + (at.z - origin.z) * right.z;
+      const feel = contact.mass * (charged ? SETTINGS.chargedKnockbackScale : 1);
+      this.kickImpact(feel, Math.sign(lateral) || 1);
+    } else {
+      this.addShake(SETTINGS.kickWhiffShake);
+    }
+
     if (charged) {
       this.audio.chargedKick();
       this.effects.shockwave(this.player.position.clone(), this.player.bootIndex, boot.color);
-      this.shake = Math.max(this.shake, 1.4);
+      this.addShake(SETTINGS.chargedShake);
     } else {
       this.audio.kick();
-      this.shake = Math.max(this.shake, routed > 0 ? 0.9 : 0.3);
     }
     if (routed > 0) {
       this.hud.showBanner(
@@ -520,7 +594,7 @@ export class Game {
     const force = SETTINGS.propHitKnockback * Math.min(2, speed / SETTINGS.propHitSpeed);
     enemy.knock.addScaledVector(dir, force);
     this.effects.burst(enemy.position.clone().setY(0.95), 12, 0xd8c79a);
-    this.shake = Math.max(this.shake, 0.7);
+    this.addShake(SETTINGS.propHitShakePerMass * prop.mass);
     prop.vel.multiplyScalar(0.72);
     // It was the boot that did it, so a rout here still levels the boot.
     if (this.routEnemy(enemy, dir, force)) return;
@@ -560,7 +634,7 @@ export class Game {
     if (hit) {
       const died = this.player.takeDamage(SETTINGS.enemyDamage * (enemy.elite ? 1.5 : 1));
       this.hud.flashDamage();
-      this.shake = Math.max(this.shake, 0.5);
+      this.addShake(0.5);
       if (died) this.gameOver();
     }
   }
@@ -807,9 +881,14 @@ export class Game {
       this.player.position.z,
     ).addScaledVector(right, SETTINGS.camShoulder);
 
+    // The boot's kickback rides on top of the camera's arm length, and whatever
+    // is behind still has the last word: a kick that would push the eye into a
+    // tree is absorbed by the tree rather than clipping the view through it.
     const back = direction.clone().negate();
-    const hit = this.world.raycast(anchor, back, SETTINGS.camDistance);
-    const distance = hit ? Math.max(1.2, hit.t - 0.45) : SETTINGS.camDistance;
+    const reach = SETTINGS.camDistance + this.kickback;
+    const hit = this.world.raycast(anchor, back, reach);
+    const distance = hit ? Math.max(1.2, hit.t - 0.45) : reach;
+    this.kickback = damp(this.kickback, 0, SETTINGS.kickbackDamp, dt);
 
     const desired = anchor.clone().addScaledVector(back, distance);
     desired.y = Math.max(0.8, desired.y);
@@ -824,6 +903,13 @@ export class Game {
       this.camera.position.y + direction.y,
       this.camera.position.z + direction.z,
     );
+    // The roll goes on after the look, so it tilts the frame without touching the
+    // aim: the crosshair still sits on the view axis, which means the reticle
+    // covers exactly where the rounds go however hard the boot lands.
+    this.kickRoll = damp(this.kickRoll, 0, SETTINGS.kickRollDamp, dt);
+    if (Math.abs(this.kickRoll) > 1e-4) {
+      this.camera.rotateZ((this.kickRoll * Math.PI) / 180);
+    }
   }
 
   step(dt) {
@@ -964,7 +1050,7 @@ export class Game {
 
       if (this.state === 'playing') {
         if (this.canSimulate()) {
-          this.step(dt);
+          this.step(this.frameTime(dt));
           this.hud.setPaused(false);
         } else {
           // Still poll input so a controller or the touch pad can take over.

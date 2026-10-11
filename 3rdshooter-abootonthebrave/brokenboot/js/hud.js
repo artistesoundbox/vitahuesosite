@@ -1,5 +1,8 @@
 // HUD and overlay wiring. Pure DOM, no rendering concerns.
 
+// How long the screen-edge flash from a boot landing takes to fade, in seconds.
+const IMPACT_FLASH = 0.24;
+
 export class Hud {
   constructor() {
     this.health = document.getElementById('health-fill');
@@ -27,7 +30,10 @@ export class Hud {
     this._powerupSig = '';
     this._crossSig = '';
     this.damage = document.getElementById('damage-vignette');
+    this.impactEdge = document.getElementById('impact-edge');
     this.hitmark = document.getElementById('hitmarker');
+    this._impactTimer = 0;
+    this._impactStrength = 0;
     this.start = document.getElementById('screen-start');
     this.over = document.getElementById('screen-over');
     this.overTitle = document.getElementById('over-title');
@@ -138,6 +144,11 @@ export class Hud {
       this._damageTimer -= dt;
       this.damage.style.opacity = String(Math.max(0, this._damageTimer * 1.6));
     }
+    if (this._impactTimer > 0) {
+      this._impactTimer -= dt;
+      const fade = Math.max(0, this._impactTimer / IMPACT_FLASH);
+      this.impactEdge.style.opacity = String(fade * (0.18 + this._impactStrength * 0.82));
+    }
     if (this._hitTimer > 0) {
       this._hitTimer -= dt;
       this.hitmark.style.opacity = String(Math.max(0, this._hitTimer * 4));
@@ -163,6 +174,16 @@ export class Hud {
   }
 
   flashDamage() { this._damageTimer = 0.65; }
+
+  /**
+   * The screen edges lighting up as the boot connects, as hard as it landed: a
+   * body is a flicker, a car is a flare. `strength` is that mass, normalised.
+   */
+  flashImpact(strength = 1) {
+    if (!this.impactEdge) return;
+    this._impactStrength = Math.max(0, Math.min(1, strength));
+    this._impactTimer = IMPACT_FLASH;
+  }
   flashHit(kill = false) {
     this._hitTimer = 0.35;
     this.hitmark.style.color = kill ? '#ff4b3a' : '#ffffff';

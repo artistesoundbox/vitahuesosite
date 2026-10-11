@@ -61,6 +61,30 @@ export const SETTINGS = {
   propHitDamage: 38,
   propHitKnockback: 16,
 
+  // What the boot feels like when it connects. Every figure below scales off one
+  // mass: an attacker body counts as `bodyMass`, a kicked crate, barrier, rock or
+  // car as its own mass (1, 1.5, 2.6, 4.5), and the heaviest thing the boot met
+  // decides. So a crate barely rattles the frame, a rock is a shove and a car is a
+  // car. A kick into empty air meets no mass at all and gets none of it, which is
+  // what makes a connect read as a connect.
+  bodyMass: 2.0,
+  kickShakePerMass: 0.45,       // camera rattle per unit of mass
+  kickShakeMax: 2.0,
+  kickWhiffShake: 0.3,          // the swing alone, when it meets nothing
+  chargedShake: 1.4,            // a charged kick floors it whatever it met
+  kickbackPerMass: 0.16,        // metres the eye is shoved back along the aim
+  kickbackMax: 0.9,
+  kickbackDamp: 7.5,            // per second: a snap, not a drift
+  kickRollPerMass: 1.6,         // degrees of frame roll, away from the impact
+  kickRollMax: 8,
+  kickRollDamp: 8,
+  kickStopPerMass: 0.03,        // seconds the world hitch-slides for
+  kickStopMax: 0.14,
+  kickStopScale: 0.12,          // world time runs at this fraction during one
+  kickFlashMass: 4.5,           // the mass that fills the screen-edge flash
+  propHitShakePerMass: 0.16,    // a car rolling through a line, per unit mass
+  shakeMax: 2.4,
+
   // Boot charge. Routs and charge crates fill it; a full meter turns the next
   // kick into a charged one that sends the whole arc running at once.
   chargeMax: 100,
