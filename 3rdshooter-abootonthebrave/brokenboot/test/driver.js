@@ -364,9 +364,11 @@ async function runCampaign(options) {
     const p = G.player;
     const before = {
       crouching: p.crouching, grounded: p.grounded, bootIndex: p.bootIndex,
-      cooldown: p.kickCooldown, pendingKick: p.pendingKick,
+      cooldown: p.kickCooldown, pendingKick: p.pendingKick, charge: p.charge,
       position: p.object.position.clone(), yaw: p.yaw,
       cameraYaw: G.cameraYaw,
+      shake: G.shake, kickback: G.kickback, kickRoll: G.kickRoll, hitStop: G.hitStop,
+      cameraPitch: G.cameraPitch,
     };
 
     try {
@@ -438,6 +440,145 @@ async function runCampaign(options) {
       out.scenery.settled = prop.rest;
       out.scenery.boxFollowed = +prop.box.getCenter(new THREE.Vector3()).distanceTo(boxFrom).toFixed(2);
 
+      // 4. And what all of it feels like. One mass figure drives the shake, the
+      //    camera kickback, the frame roll, the hit-stop and the screen-edge
+      //    flash, so this reads back what the rig actually uses: a body is light,
+      //    a car is not, and a swing through empty air gets none of it.
+      const car = prop;
+      out.feel = {};
+      const clearFeel = () => {
+        G.shake = 0; G.kickback = 0; G.kickRoll = 0; G.hitStop = 0; p.charge = 0;
+      };
+      const readFeel = () => ({
+        shake: +G.shake.toFixed(3),
+        kickback: +G.kickback.toFixed(3),
+        roll: +G.kickRoll.toFixed(2),
+        hitStop: +G.hitStop.toFixed(3),
+      });
+      // A stand-in body for the body cases: it has to report `rout`/`takeDamage`
+      // false, because measuring the feel must not quietly eliminate somebody
+      // before the match starts.
+      const standIn = (x, z) => ({
+        dead: false,
+        routed: false,
+        position: new THREE.Vector3(x, 0, z),
+        knock: new THREE.Vector3(),
+        rout: () => false,
+        takeDamage: () => false,
+      });
+      const bootAt = (yaw, x = 0, z = 0) => {
+        p.crouching = false;
+        p.grounded = true;
+        p.object.position.set(x, 0, z);
+        p.yaw = yaw;
+        G.cameraYaw = yaw;
+        p.kickCooldown = 0;
+        p.pendingKick = null;
+        G.resolveMelee('kick');
+      };
+      const parkCar = (x, z) => {
+        car.rest = true;
+        car.vel.set(0, 0, 0);
+        car.spin.set(0, 0, 0);
+        car.mesh.position.set(x, car.baseY, z);
+      };
+
+      // A swing through empty air, in a corner of the map with nothing in reach.
+      G.enemyManager.enemies = [];
+      clearFeel();
+      bootAt(0, 30, 30);
+      out.feel.whiff = readFeel();
+
+      // The boot into a body, 1.2 m dead ahead.
+      clearFeel();
+      G.enemyManager.enemies = [standIn(30, 31.2)];
+      bootAt(0, 30, 30);
+      out.feel.body = readFeel();
+
+      // The boot into a car, which is the heaviest thing on the field.
+      clearFeel();
+      G.enemyManager.enemies = [];
+      parkCar(30, 32.2);
+      bootAt(0, 30, 30);
+      out.feel.car = readFeel();
+      out.feel.carRoll = +G.kickRoll.toFixed(2);
+
+      // The camera really answers to it: the eye is shoved back along the aim and
+      // the frame rolls. An open sightline is found first, because a shove that
+      // would put the eye inside a tree is absorbed by the tree instead — so the
+      // measurement has to be made where the boot can actually push.
+      const upAt = () => new THREE.Vector3(0, 1, 0).applyQuaternion(G.camera.quaternion);
+      let yaw = null;
+      for (let i = 0; i < 8 && yaw === null; i++) {
+        const candidate = (i * Math.PI) / 4;
+        const right = new THREE.Vector3(Math.cos(candidate), 0, -Math.sin(candidate));
+        const anchor = new THREE.Vector3(0, SETTINGS.camHeight, 0)
+          .addScaledVector(right, SETTINGS.camShoulder);
+        const back = new THREE.Vector3(-Math.sin(candidate), 0, -Math.cos(candidate));
+        if (!G.world.raycast(anchor, back, 6)) yaw = candidate;
+      }
+      out.feel.openSightline = yaw !== null;
+      if (yaw === null) yaw = 0;
+      const fwd = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+      const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+
+      clearFeel();
+      bootAt(yaw);
+      for (let i = 0; i < 45; i++) G.updateCamera(1 / 60);   // let the rig settle
+      const restDistance = G.camera.getWorldPosition(new THREE.Vector3())
+        .distanceTo(p.object.position);
+      const restUp = upAt();
+
+      // A car lands dead ahead: the eye is shoved back and the frame rolls away.
+      clearFeel();
+      parkCar(fwd.x * 2.2, fwd.z * 2.2);
+      bootAt(yaw);
+      G.shake = 0;                    // the rattle is random; measure the shove
+      G.updateCamera(1 / 60);
+      const pushed = G.camera.getWorldPosition(new THREE.Vector3())
+        .distanceTo(p.object.position);
+      out.feel.cameraPushBack = +(pushed - restDistance).toFixed(3);
+      out.feel.frameRollDegrees = +((restUp.angleTo(upAt()) * 180) / Math.PI).toFixed(2);
+
+      // The roll leans away from the impact, so a car off to the left must not
+      // tilt the frame the same way as one dead ahead.
+      clearFeel();
+      const off = fwd.clone().multiplyScalar(2).addScaledVector(right, -0.9);
+      parkCar(off.x, off.z);
+      bootAt(yaw);
+      out.feel.carLeftRoll = +G.kickRoll.toFixed(2);
+      out.feel.rollFollowsSide = out.feel.carLeftRoll < 0 && out.feel.carRoll > 0;
+
+      // The hit-stop is paid back by the frame clock, and it dilates the world
+      // without touching `step` — which is what keeps this harness's own timings
+      // honest, since the campaign drives step() directly and never sees a freeze.
+      clearFeel();
+      G.kickImpact(SETTINGS.bodyMass, 1);
+      out.feel.hitStopFromBody = +G.hitStop.toFixed(3);
+      const frame = 1 / 60;
+      const frozen = G.frameTime(frame);
+      out.feel.worldTimeDuringStop = +frozen.toFixed(5);
+      out.feel.stopScale = +(frozen / frame).toFixed(3);
+      let stopFrames = 0;
+      while (G.hitStop > 0 && stopFrames < 120) { G.frameTime(frame); stopFrames += 1; }
+      out.feel.stopFrames = stopFrames;
+      out.feel.worldTimeAfterStop = +G.frameTime(frame).toFixed(5);
+
+      // And the screen edges light up with it — the HUD's own frame, read back off
+      // the DOM rather than off the timer behind it.
+      clearFeel();
+      G.kickImpact(SETTINGS.kickFlashMass, 1);
+      G.hud.update(G.hudState(), frame);
+      const edge = document.getElementById('impact-edge');
+      out.feel.edgeFlashOpacity = +((edge && parseFloat(edge.style.opacity)) || 0).toFixed(3);
+      if (edge) { G.hud.flashImpact(0); G.hud.update(G.hudState(), 1); }
+
+      const f = out.feel;
+      out.feelScaledByMass = f.car.shake > f.body.shake
+        && f.car.kickback > f.body.kickback
+        && f.car.hitStop > f.body.hitStop
+        && Math.abs(f.car.roll) > Math.abs(f.body.roll);
+
       out.pass = out.selection.crouched === 'sweep'
         && out.selection.airborne === 'high'
         && out.selection.standingStandardBoot === 'kick'
@@ -448,7 +589,20 @@ async function runCampaign(options) {
         && out.scenery.tumbled
         && out.scenery.settled
         && out.scenery.settleSeconds < 12
-        && out.scenery.boxFollowed > 0.5;
+        && out.scenery.boxFollowed > 0.5
+        && f.whiff.shake > 0
+        && f.whiff.kickback === 0 && f.whiff.roll === 0 && f.whiff.hitStop === 0
+        && f.body.shake > 0 && f.body.kickback > 0 && f.body.hitStop > 0 && f.body.roll !== 0
+        && out.feelScaledByMass
+        && f.carRoll > 0 && f.rollFollowsSide
+        && f.openSightline
+        && f.cameraPushBack > 0.02
+        && f.frameRollDegrees > 1
+        && f.hitStopFromBody > 0
+        && f.stopScale === SETTINGS.kickStopScale
+        && f.stopFrames >= 2 && f.stopFrames <= 12
+        && Math.abs(f.worldTimeAfterStop - frame) < 1e-5
+        && f.edgeFlashOpacity > 0.5;
       return out;
     } finally {
       G.step = savedStep;
@@ -458,9 +612,15 @@ async function runCampaign(options) {
       p.bootIndex = before.bootIndex;
       p.kickCooldown = before.cooldown;
       p.pendingKick = before.pendingKick;
+      p.charge = before.charge;
       p.object.position.copy(before.position);
       p.yaw = before.yaw;
       G.cameraYaw = before.cameraYaw;
+      G.cameraPitch = before.cameraPitch;
+      G.shake = before.shake;
+      G.kickback = before.kickback;
+      G.kickRoll = before.kickRoll;
+      G.hitStop = before.hitStop;
     }
   }
 
