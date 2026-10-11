@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SETTINGS } from './config.js';
+import { SETTINGS, waveRamp } from './config.js';
 import { AnimController } from './assets.js';
 import { dampAngle } from './mathx.js';
 
@@ -153,7 +153,7 @@ export class Enemy {
     const dir = dist > 1e-4 ? toPlayer.clone().divideScalar(dist) : new THREE.Vector3(0, 0, 1);
 
     const move = this._move.set(0, 0, 0);
-    const assaulting = ctx.assault === this;
+    const assaulting = Boolean(ctx.assaults && ctx.assaults.includes(this));
     let crouch = false;
     let gaitScale = 1;
     let mayFire = false;
@@ -179,6 +179,13 @@ export class Enemy {
         move.add(this._side);
         this.moving = true;
       }
+    } else if (ctx.push) {
+      // The line has broken cover: close the distance at a jog, still letting
+      // the assault holder do the shooting.
+      this.coverPoint = null;
+      move.copy(dir);
+      this.moving = true;
+      gaitScale = 1.05;
     } else {
       // Everyone else fights from cover, crouched and hard to hit.
       const hold = this.updateCover(dt, ctx, { dist, dir, move });
@@ -200,7 +207,8 @@ export class Enemy {
     }
 
     if (move.lengthSq() > 1e-6) move.normalize();
-    const gait = SETTINGS.enemyWalkSpeed * gaitScale * (this.wounded ? 0.72 : 1);
+    // The whole line moves a little quicker as the game escalates.
+    const gait = SETTINGS.enemyWalkSpeed * gaitScale * (this.wounded ? 0.72 : 1) * (ctx.speedScale || 1);
     this.object.position.addScaledVector(move, gait * dt);
     this.object.position.x += this.knock.x * dt;
     this.object.position.z += this.knock.z * dt;
@@ -249,13 +257,14 @@ export class Enemy {
     // Only look for a new spot while still working forward. Once the player is
     // inside fighting range the attacker holds where it is and cowers, so the
     // boot can actually reach it instead of chasing it from tree to tree.
+    const ramp = ctx.ramp || { coverPreferredRange: SETTINGS.coverSearchRadius * 0.7, coverMinRange: 9 };
     const wantsNewSpot = !this.coverPoint
-      || (this.coverTimer <= 0 && dist > SETTINGS.coverPreferredRange);
+      || (this.coverTimer <= 0 && dist > ramp.coverPreferredRange);
     if (wantsNewSpot) {
       this.coverPoint = world.findCover(this.object.position, player.position, {
         maxDistance: SETTINGS.coverSearchRadius,
-        preferred: SETTINGS.coverPreferredRange,
-        minRange: SETTINGS.coverMinRange,
+        preferred: ramp.coverPreferredRange,
+        minRange: ramp.coverMinRange,
       });
       this.coverTimer = SETTINGS.coverHoldMin
         + Math.random() * (SETTINGS.coverHoldMax - SETTINGS.coverHoldMin);
@@ -276,7 +285,7 @@ export class Enemy {
       // Settled behind cover: stay down and hold.
       this.moving = false;
       gaitScale = 0.5;
-    } else if (dist > SETTINGS.coverPreferredRange) {
+    } else if (dist > ramp.coverPreferredRange) {
       // No cover within reach: keep coming, carefully, rather than stand about.
       move.copy(dir);
       this.moving = true;
@@ -303,13 +312,19 @@ export class EnemyManager {
     this.enemies = [];
     this.queue = [];
     this.spawnTimer = 0;
-    this.spawnInterval = SETTINGS.spawnInterval;
-    // The single attacker currently pressing the attack. Everyone else holds
-    // cover, so the fight stays a series of duels instead of a scrum.
-    this.assault = null;
+    // Escalation for the current wave; every pacing value below reads from it.
+    this.ramp = waveRamp(1);
+    this.spawnInterval = this.ramp.spawnInterval;
+    // The attackers currently pressing the attack (one early on, a pair later).
+    // Everyone else holds cover, so the fight stays a series of duels rather
+    // than a scrum.
+    this.assaults = [];
     this.lastAssault = null;
     this.assaultTime = 0;
     this.assaultCooldown = SETTINGS.firstAssaultDelay;
+    // Cover-breaking state: see updateFlush().
+    this.flushing = false;
+    this.sinceElimination = 0;
   }
 
   /** Attackers still in the fight. Routed ones are already out of it. */
@@ -330,7 +345,20 @@ export class EnemyManager {
 
   /** Queue a wave. Enemies trickle in so the fight stays readable. */
   queueWave(waveNumber, center) {
-    const count = Math.min(26, 4 + waveNumber * 2);
+    // Sized for a cover fight, where every attacker has to be closed down and
+    // kicked rather than mown down from a distance.
+    const count = Math.min(18, Math.round(4 + waveNumber * 1.4));
+    // Escalate: later waves hide less, press longer, come on faster and send a
+    // second attacker out at the same time.
+    this.ramp = waveRamp(waveNumber);
+    this.spawnInterval = this.ramp.spawnInterval;
+    this.assaults = [];
+    this.flushing = false;
+    this.flushAnnounced = false;
+    this.lastStandAnnounced = false;
+    // A fresh wave starts with the clock at zero: they hold cover while the
+    // player is making progress, then charge if the fight stalls.
+    this.sinceElimination = 0;
     const elites = waveNumber >= 5 ? Math.floor(waveNumber / 4) : 0;
     for (let i = 0; i < count; i++) {
       const elite = i < elites;
@@ -355,11 +383,21 @@ export class EnemyManager {
       }
     }
 
-    if (ctx.player) this.updateAssault(dt, ctx.player);
+    if (ctx.player) {
+      this.updateAssault(dt, ctx.player);
+      this.updateFlush(dt, ctx.player, ctx.onFlush);
+    }
 
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const enemy = this.enemies[i];
-      enemy.update(dt, { ...ctx, enemies: this.enemies, assault: this.assault });
+      enemy.update(dt, {
+        ...ctx,
+        enemies: this.enemies,
+        assaults: this.assaults,
+        push: this.flushing,
+        ramp: this.ramp,
+        speedScale: this.ramp.speedScale,
+      });
       if (enemy.removeMe) {
         this.scene.remove(enemy.object);
         enemy.anim.mixer.stopAllAction();
@@ -369,51 +407,83 @@ export class EnemyManager {
   }
 
   /**
-   * Hand the assault to one attacker at a time. When that attacker is routed,
-   * downed or its turn simply runs out, it falls back to cover and the next one
-   * steps out after a short breather.
+   * Hand the assault to `ramp.assaultSlots` attackers at a time — one early in
+   * the game, a pair from `RAMP.secondAssaultWave` on. When they are routed,
+   * downed or their turn runs out they fall back to cover and the next take
+   * over after a breather that shortens as the game goes on.
    */
   updateAssault(dt, player) {
-    const holder = this.assault;
-    if (holder) {
-      const gone = holder.dead || holder.routed || holder.removeMe;
-      if (gone) {
-        this.assault = null;
-        this.assaultCooldown = SETTINGS.assaultGap;
-      } else {
-        this.assaultTime -= dt;
-        if (this.assaultTime > 0) return;
-        this.assault = null;
-        this.assaultCooldown = SETTINGS.assaultGap;
-      }
+    const had = this.assaults.length;
+    this.assaults = this.assaults.filter((e) => !e.dead && !e.routed && !e.removeMe);
+    // Losing one mid-press (usually to the boot) costs a short beat, not a full
+    // turn: the pressure should not evaporate when the player lands a kick.
+    if (had > 0 && this.assaults.length === 0) {
+      this.assaultCooldown = this.ramp.assaultGap * 0.6;
+    }
+
+    if (this.assaults.length) {
+      this.assaultTime -= dt;
+      if (this.assaultTime > 0) return;
+      this.lastAssault = this.assaults[this.assaults.length - 1];
+      this.assaults = [];
+      this.assaultCooldown = this.ramp.assaultGap;
+      return;
     }
 
     this.assaultCooldown = Math.max(0, this.assaultCooldown - dt);
     if (this.assaultCooldown > 0) return;
-    const next = this.pickAssault(player);
-    if (!next) return;
-    this.assault = next;
-    this.lastAssault = next;
-    this.assaultTime = SETTINGS.assaultDurationMin
-      + Math.random() * (SETTINGS.assaultDurationMax - SETTINGS.assaultDurationMin);
+    const next = this.pickAssault(player, this.ramp.assaultSlots);
+    if (!next.length) return;
+    this.assaults = next;
+    this.assaultTime = this.ramp.assaultDurationMin
+      + Math.random() * (this.ramp.assaultDurationMax - this.ramp.assaultDurationMin);
   }
 
   /**
-   * The closest fit attacker, preferring anyone other than the last one to step
-   * out so the crowd takes turns instead of one attacker monopolising the fight.
+   * Decide whether the hidden line should break cover. Hiding is only worth
+   * anything while the fight is moving: if nothing has been eliminated for
+   * `flushAfter` seconds, or only a couple of attackers are left, they all come
+   * at once.
    */
-  pickAssault(player) {
-    let best = null;
-    let bestD = Infinity;
-    let alt = null;
-    let altD = Infinity;
-    for (const e of this.enemies) {
-      if (e.dead || e.routed || e.removeMe || e.bleeding) continue;
-      const d = e.position.distanceTo(player.position);
-      if (d < bestD) { bestD = d; best = e; }
-      if (e !== this.lastAssault && d < altD) { altD = d; alt = e; }
+  updateFlush(dt, player, onFlush) {
+    this.sinceElimination += dt;
+    const lastStand = this.aliveCount > 0 && this.aliveCount <= SETTINGS.flushLastStandCount;
+    const wasFlushing = this.flushing;
+    // They hold cover while the player is making progress; the moment the fight
+    // stalls they all come at once. Any kill buys a fresh window of hiding.
+    this.flushing = this.aliveCount > 0
+      && (lastStand || this.sinceElimination >= this.ramp.flushAfter);
+    if (this.flushing && !wasFlushing) {
+      // Announce the first charge of a wave and the last stand, once each.
+      // Repeating the banner every time they break cover again is just noise.
+      const firstCharge = !this.flushAnnounced;
+      const firstLastStand = lastStand && !this.lastStandAnnounced;
+      if (firstCharge) this.flushAnnounced = true;
+      if (firstLastStand) this.lastStandAnnounced = true;
+      if (onFlush) onFlush(lastStand, firstCharge || firstLastStand);
     }
-    return alt || best;
+  }
+
+  /** Called after every elimination so the attackers get a window of cover again. */
+  notifyEliminated() {
+    this.sinceElimination = 0;
+  }
+
+  /**
+   * The closest attackers, preferring anyone other than the last one to step
+   * out so the crowd takes turns instead of the same attacker monopolising the
+   * fight. Returns up to `slots` of them.
+   */
+  pickAssault(player, slots = 1) {
+    const dist = (e) => e.position.distanceTo(player.position);
+    const pool = this.enemies.filter((e) => !e.dead && !e.routed && !e.removeMe && !e.bleeding);
+    pool.sort((a, b) => dist(a) - dist(b));
+    const chosen = pool.filter((e) => e !== this.lastAssault).slice(0, slots);
+    for (const e of pool) {
+      if (chosen.length >= slots) break;
+      if (!chosen.includes(e)) chosen.push(e);
+    }
+    return chosen;
   }
 
   /** Nearest living enemy to a point, used for melee and effects. */
@@ -435,9 +505,11 @@ export class EnemyManager {
     }
     this.enemies.length = 0;
     this.queue.length = 0;
-    this.assault = null;
+    this.assaults = [];
     this.lastAssault = null;
     this.assaultTime = 0;
     this.assaultCooldown = SETTINGS.firstAssaultDelay;
+    this.flushing = false;
+    this.sinceElimination = 0;
   }
 }

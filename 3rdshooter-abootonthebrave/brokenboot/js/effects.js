@@ -13,6 +13,7 @@ export class Effects {
     this.particles = [];
     this.pickups = [];
     this.time = 0;
+    this._pull = new THREE.Vector3();
 
     const tracerGeo = new THREE.CylinderGeometry(0.018, 0.018, 1, 5, 1, true);
     tracerGeo.translate(0, 0.5, 0);
@@ -154,6 +155,13 @@ export class Effects {
         this.scene.remove(p.mesh);
         this.pickups.splice(i, 1);
         continue;
+      }
+      // Loot drifts to the player from close by, so a dressing earned in a
+      // firefight is not lost in the grass while they fight the next attacker.
+      if (dist < 6 && player.alive) {
+        const pull = (1 - dist / 6) * 3.4 * dt;
+        this._pull.set(player.position.x, 0.4, player.position.z);
+        p.mesh.position.lerp(this._pull, Math.min(1, pull));
       }
       if (p.life <= 0) {
         this.scene.remove(p.mesh);

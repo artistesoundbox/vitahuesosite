@@ -150,6 +150,8 @@ export class GameAudio {
   wounded() { this.blip(420, 0.14, 'square', 0.1, 300); }
   // A bullet downing: a slow slump, no boot scream.
   downed() { this.blip(150, 0.5, 'sawtooth', 0.13, 62); this.noise(0.3, 520, 0.16); }
+  // The hidden line breaking cover and coming on.
+  flush() { this.blip(240, 0.35, 'sawtooth', 0.12, 460); this.blip(180, 0.5, 'triangle', 0.09, 300); }
   hurt() { this.noise(0.2, 700, 0.3); this.blip(90, 0.25, 'sine', 0.2, 50); }
   reload() { this.blip(520, 0.06, 'square', 0.12); setTimeout(() => this.blip(320, 0.08, 'square', 0.12), 220); }
   pickup() { this.blip(660, 0.08, 'sine', 0.2); setTimeout(() => this.blip(990, 0.12, 'sine', 0.18), 80); }

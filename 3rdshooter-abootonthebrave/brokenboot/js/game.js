@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  SETTINGS, PLAYER_SOURCE, ENEMY_SOURCE, ASSET_BASE, ACHIEVEMENTS, BOOT_TIERS,
+  SETTINGS, PLAYER_SOURCE, ENEMY_SOURCE, ASSET_BASE, ACHIEVEMENTS, BOOT_TIERS, waveRamp,
 } from './config.js';
 import { buildCharacter } from './assets.js';
 import { createWorld } from './world.js';
@@ -243,7 +243,8 @@ export class Game {
       if (this.intermission <= 0) {
         const next = this.wave + 1;
         if (next > SETTINGS.totalWaves) { this.victory(); return; }
-        this.intermission = SETTINGS.waveIntermission;
+        // The breather between waves shortens as the game escalates.
+        this.intermission = waveRamp(next).intermission;
         this.hud.showBanner('WAVE CLEARED', `Wave ${next} incoming — ${TAGLINES[next % TAGLINES.length]}`, 3.4);
       } else {
         this.intermission -= dt;
@@ -336,6 +337,7 @@ export class Game {
     this.audio.downed();
     this.effects.burst(enemy.position.clone().setY(0.9), 6, 0xc2402c);
     this.enemiesKilledTotal += 1;
+    this.enemyManager.notifyEliminated();
     this.player.registerKill(false, SETTINGS.bulletKillWeight);
     if (Math.random() < 0.2) this.effects.spawnPickup(enemy.position.clone().setY(0.4), 'ammo');
     this.hud.showBanner('BLEEDING OUT', 'GUNFIRE ELIMINATION', 0.9);
@@ -346,12 +348,17 @@ export class Game {
   routEnemy(enemy, direction, force) {
     if (!enemy.rout(direction, force)) return false;
     this.audio.scream();
+    // An elimination buys the rest of the line another window in cover.
+    this.enemyManager.notifyEliminated();
     // registerKill raises the boot tier, which fires onTierChange -> onTierUp.
     this.player.registerKill(true);
+    // Roughly a third of eliminations drop ammo and a fifth drop a dressing.
+    // Healing has to keep up with a wave's incoming fire, or the run ends in
+    // wave three no matter how well it is played.
     const dry = this.player.ammo === 0 && this.player.reserve < 30;
     const roll = Math.random();
-    if (dry || roll < 0.34) this.effects.spawnPickup(enemy.position.clone().setY(0.4), 'ammo');
-    else if (roll < 0.46) this.effects.spawnPickup(enemy.position.clone().setY(0.4), 'health');
+    if (dry || roll < 0.32) this.effects.spawnPickup(enemy.position.clone().setY(0.4), 'ammo');
+    else if (roll < 0.52) this.effects.spawnPickup(enemy.position.clone().setY(0.4), 'health');
     this.checkAchievements();
     return true;
   }
@@ -402,6 +409,20 @@ export class Game {
       this.hud.showBanner('THE BOOT', 'JUST A SHOVE', 0.8);
     }
     this.checkAchievements();
+  }
+
+  /**
+   * The hidden line has broken cover and is closing in: either the fight had
+   * gone quiet for too long, or this is the last of the wave.
+   */
+  onFlush(lastStand, announce = true) {
+    this.audio.flush();
+    if (!announce) return;
+    this.hud.showBanner(
+      lastStand ? 'LAST STAND' : 'THEY\u2019RE MOVING',
+      lastStand ? 'THE LAST OF THEM ARE COMING' : 'NO MORE HIDING',
+      1.8,
+    );
   }
 
   enemyFire(enemy, dist, wounded = false, suppressed = false) {
@@ -494,7 +515,7 @@ export class Game {
     this.hud.showGameOver('ONE-MAN ARMY', `
       <p>Every attacker that entered the forest has learned the lesson.</p>
       <div class="stats">
-        <span>Waves cleared</span><b>${this.wave - 1}</b>
+        <span>Waves cleared</span><b>${Math.min(this.wave, SETTINGS.totalWaves)}</b>
         <span>Eliminations</span><b>${this.player.kills}</b>
         <span>Boot eliminations</span><b>${this.player.meleeKills}</b>
         <span>Boot tier</span><b>${this.player.boot.name}</b>
@@ -557,6 +578,7 @@ export class Game {
       player: this.player,
       onFire: (enemy, dist, wounded, suppressed) => this.enemyFire(enemy, dist, wounded, suppressed),
       onDown: (enemy) => this.onEnemyDown(enemy),
+      onFlush: (lastStand, announce) => this.onFlush(lastStand, announce),
     });
     this.effects.update(dt, this.player, (type) => this.onPickup(type));
 

@@ -82,6 +82,12 @@ This is the heart of the design, and it is deliberately unusual:
   directly into crowd control. Attackers in the arc beyond that limit take the
   boot's full `meleeDamage` (55 → 220 by tier), which floors them and leaves them
   bleeding out or ready to be routed by the next kick.
+- **Hiding is temporary.** Attackers hold cover only while the player is making
+  progress. If nothing is eliminated for `flushAfter` (6 s) the whole line breaks
+  cover and charges at once — and the last `flushLastStandCount` (3) attackers of
+  a wave never hide again. Any elimination buys them a fresh window of hiding.
+  This is what stops a wave ending in a slow walk around the forest rounding up
+  stragglers, which was the single biggest drag on the pace.
 - **They keep coming.** Routed attackers being gone for good is fine because the
   next wave spawns more — the forest never runs out of brave soldiers.
 
@@ -89,6 +95,12 @@ Tiers unlock on tier credit: Standard → Reinforced → Silver → Gold → Spi
 Tactical Doom → Legendary Broken → Mythical Diamond, each raising melee damage,
 knockback, the number routed per kick and movement speed. Reaching a tier lazily
 loads its model and sockets it onto the officer's **right foot** bone.
+
+Thresholds are set against the whole campaign, which totals 117 attackers, so a
+single run is worth at most 117 credit. A good run reaches **Legendary Broken
+Boot** (102) near the end; **Mythical Diamond** (116) needs a near-perfect,
+boot-only clear. Measured in a full simulated clear: Reinforced 49 s, Silver
+132 s, Gold 190 s, Spiked Gold 261 s, Tactical Doom 323 s, Legendary 385 s.
 
 Each boot model carries its own fit in `BOOT_SOCKETS` — `size` for the model's
 longest axis and `lift` to raise it until the sole rests on the ground. The
@@ -111,8 +123,14 @@ broken boot is deliberately the big one (0.38 against 0.34–0.36 for the rest).
 - **Cover is fixed, not a chase.** Once the player is inside `coverPreferredRange`
   an attacker stops looking for new positions and holds where it is, so it can be
   closed down and kicked rather than leading the player around the forest.
-- **Waves.** Ten waves, staggered spawns, a cap on how many are alive at once,
-  elite variants from wave 5, and an intermission with a tagline between waves.
+- **Cover breaking is announced once per wave** (`THEY'RE MOVING`, or `LAST
+  STAND` when it is the tail of a wave) so the HUD does not chatter every time
+  they charge again.
+- **Waves.** Ten waves sized `round(4 + wave * 1.4)` and capped at 18, staggered
+  spawns, a cap of 9 alive at once, elite variants from wave 5, and an
+  intermission with a tagline between waves. Measured clear times in a full
+  simulated run: 21 s for wave 1 rising to ~50 s for the late waves, about seven
+  minutes for the whole campaign.
 - **Forest.** Instanced pines, a clearing, crates, barriers, rocks and parked cars
   used as cover — all with real collision.
 - **A scanned environment.** `landscape_forest__mountains.glb` is a closed,
@@ -121,8 +139,10 @@ broken boot is deliberately the big one (0.38 against 0.34–0.36 for the rest).
   gradient sky cap. Only its terrain band stays visible on the horizon.
 - **Dynamic music.** The two supplied tracks are crossfaded as beds: one for the
   lulls, one for when there are attackers alive.
-- **Loot.** Ammo and field-dressing drops; an elimination while low on rounds
-  always drops ammo so the player can never hard-stall.
+- **Loot.** Roughly a third of eliminations drop ammo, a fifth drop a field
+  dressing, and an elimination while low on rounds always drops ammo so the
+  player can never hard-stall. Drops drift toward the player from within 6 m so a
+  dressing earned in a firefight is not lost in the grass.
 - **HUD.** Health, ammo, wave, hostiles, eliminations, boot kills, tier progress,
   damage vignette, hit markers, banners, achievement toasts and an end screen.
 
