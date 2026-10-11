@@ -9,6 +9,7 @@
     "test:honest": "node test/campaign.mjs --honest",
     "test:aim": "node test/campaign.mjs --check-lock",
     "test:kick": "node test/campaign.mjs --check-kick",
+    "test:dry": "node test/campaign.mjs --check-dry",
     "test:probes": "node test/campaign.mjs --check-lock --check-kick"
   },
   "keywords": [],

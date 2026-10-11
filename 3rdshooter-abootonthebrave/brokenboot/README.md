@@ -23,7 +23,8 @@ to happen:
 npm test                # full campaign, officer kept on their feet for pacing
 npm run test:honest     # same, but the officer can die, and the report says where
 npm run test:aim        # assert the aim-trigger rule (press retargets, hold keeps)
-npm run test:kick       # assert the three kicks and the scenery they move
+npm run test:kick       # assert the three kicks, the scenery and the impact feel
+npm run test:dry        # play a whole wave with no ammunition left, booting only
 npm run test:probes     # both of those mechanic checks, one page load
 ```
 
@@ -39,8 +40,9 @@ report is always left in `test/campaign-report.json`.
 What it treats as a failure: a wave that cannot finish (a stall watchdog on
 eliminations, which snapshots whoever is left, whether they can see the player
 and whether the pilot is even firing), an error or a failed request from the
-page, a frame cap reached mid-campaign, and pacing that has moved more than 40%
-against a recorded baseline. A death is a datapoint, not a failure, unless
+page, a frame cap reached mid-campaign, pacing that has moved more than 40%
+against a recorded baseline, and — when one is asked for — any mechanic probe
+whose own assertion does not hold. A death is a datapoint, not a failure, unless
 `--require-finish` is passed — and since victory and death are the same terminal
 state on screen, the end-screen title is what decides which one it was.
 
@@ -49,6 +51,26 @@ wave, the longest spell with no elimination. That is what turned up a 206 s wave
 whose neighbours all took under 45 s — a pilot parked in a blocked pocket with no
 line to anyone, which made the instrument wrong rather than the game. The same
 single number is what would flag a real one.
+
+Two pilot rules came out of exactly that class of finding, and both are
+corrections to the pilot rather than to the game. An officer with no rounds
+anywhere has no rifle left, so a dry pilot closes and uses the boot instead of
+holding a firing line it cannot shoot from — dry, at range, with the trigger
+down, it could not end a wave at all, and the report said so (`playerAmmo: [0,
+0]` beside a full-health attacker). And the retreat rule only applies while an
+attacker is actually on it: a hurt pilot backing away from someone eighty metres
+off with no line of sight to anyone just walks the map and never finishes the
+wave. Neither changes the game, only the scripted player — which is the point,
+since the pilot is standing in for someone who wants to win.
+
+`npm run test:dry` is the regression check for the first of them. It plays a
+whole wave for real — same patched step, same pilot, same wave one — with the
+officer's rounds taken away *every frame*, so nothing it kills can resupply it
+and the entire wave has to be won with the boot. It fails if the wave never ends,
+if the officer never closed to boot range, or if anything other than the boot did
+the removing. Against the deadlocking pilot it reports a 60 s limit reached with
+all five attackers still standing at full health; with the fix it clears the wave
+in about 20 s, five eliminations, all of them booted.
 
 `--honest` is the interesting mode for balance work, since it reports where a
 scripted pilot died rather than protecting them. `--waves=N`, `--seed=N`
@@ -206,9 +228,48 @@ attackers alike, because both use the same box. A prop still travelling at
 boot that did it, that rout still pays full boot credit toward the next tier.
 
 `npm run test:kick` asserts the lot: that the three kicks differ in reach, arc and
-power, that crouching and being airborne select the sweep and the high kick, and
-that kicked scenery really moves, tumbles, settles and drags its collision box
-with it.
+power, that crouching and being airborne select the sweep and the high kick, that
+kicked scenery really moves, tumbles, settles and drags its collision box with it,
+and that the boot *feels* as heavy as the mass it met.
+
+## What the boot feels like when it lands
+
+Above everything else this needed weight, so the whole impact reads off a single
+figure: the mass the boot met. An attacker body counts as `bodyMass` (2.0), a
+crate as 1, a barrier 1.5, a rock 2.6 and a car **4.5**, and the heaviest thing in
+the arc sets it. Measured through the harness:
+
+| What it met | Mass | Camera shake | Eye kicked back | Frame roll | Hit-stop |
+| --- | --- | --- | --- | --- | --- |
+| empty air | — | 0.3 | — | — | — |
+| a body | 2.0 | 0.9 | 0.32 m | 3.2° | 0.06 s |
+| a car | 4.5 | 2.0 | 0.72 m | 7.2° | 0.135 s |
+
+- **Shake** rattles the frame, as before, but scaled: a kick that meets nothing at
+  all gets only the swing (`kickWhiffShake` 0.3) and a car is 2.0. That gap is the
+  point — a connect has to feel different from a miss, or neither reads.
+- **Kickback** shoves the eye back along the aim (`kickbackPerMass` 0.16 m per
+  unit, capped at 0.9), decaying in about a third of a second rather than
+  drifting. It rides on top of the camera's arm length and whatever is behind
+  still has the last word: a kick that would push the view into a tree is absorbed
+  by the tree instead of clipping through it.
+- **Frame roll** leans away from the impact (`kickRollPerMass` 1.6° per unit, ±8°
+  max, also capped by the wheelbase): a car on the officer's left rolls the frame
+  the other way from one dead ahead. It goes on *after* the look, so the crosshair
+  stays on the view axis and the reticle still covers exactly where the rounds go.
+- **Hit-stop** is the weight. Contact charges `kickStopPerMass` (0.03 s per unit,
+  0.14 s max) and the frame clock pays it back at `kickStopScale` ×0.12 world time.
+  It is deliberately *not* inside `step()`: the loop dilates the dt it hands to
+  step, so the world creeps for a moment while `step()` stays a pure function of
+  its argument and the harness's timings stay honest. The campaign drives step
+  directly and never sees a freeze.
+- **The screen edges** light up warm (never the red damage vignette, so a heavy
+  boot does not read as taking a hit), fading from `flashImpact`, and `kickFlashMass`
+  says what mass fills it — a car does.
+
+A charged kick multiplies the whole thing by `chargedKnockbackScale` (1.6×), so a
+full meter into a car is the heaviest thing in the game: capped shake, capped
+push-back, capped hit-stop and a full screen-edge flare.
 
 ## Aim tune, the boot charge and the new pickups
 
@@ -273,7 +334,8 @@ start pressing sooner as well as harder.
 ## What else is implemented
 
 - **Over-the-shoulder camera** that fires along the reticle axis, with cover-aware
-  pull-in, recoil that recenters, and screen shake.
+  pull-in, recoil that recenters, and screen shake — plus the mass-scaled
+  kickback, frame roll and hit-stop that make the boot land (above).
 - **Attackers fight from cover, one at a time.** They spawn 26–38 m out and bound
   forward cover to cover — a spot on the far side of a tree, the car or a crate
   that breaks line of sight — crouching there behind the `crouch` clip. Exactly

@@ -23,6 +23,8 @@ async function runCampaign(options) {
     checkLock: false,
     // Assert the three kicks and the scenery they move instead.
     checkKick: false,
+    // Play a whole wave with the officer's ammunition taken away.
+    checkDry: false,
   }, options || {});
   const instrumented = opts.instrument === 'alive';
   // The ceiling has to move with the pool: a field dressing heals via
@@ -136,13 +138,24 @@ async function runCampaign(options) {
     // openings, and for the attackers the rifle has already floored.
     // Under instrumentation health is topped up every frame, so there is never
     // a reason to retreat and the pacing stays comparable between runs.
-    const hurt = !instrumented && G.player.health < 40;
+    // Retreating is for breaking contact, not for running away from someone who
+    // has none to break: a hurt officer keeps backing off while an attacker is on
+    // it, but an officer backing away from a target eighty metres off with no line
+    // of sight to anyone just walks the map and never ends the wave.
+    const hurt = !instrumented && G.player.health < 40 && nearestDist < 20;
+    // An officer with no rounds anywhere has no rifle left, and the boot is the
+    // only weapon that does not need ammunition. So a dry pilot closes instead of
+    // holding a firing line it cannot shoot from — without this it stands at
+    // range with the trigger down and the wave can never end, which is a
+    // limitation of the pilot, not of the fight.
+    const dry = G.player.ammo <= 0 && G.player.reserve <= 0;
     const holdRange = hurt ? 15 : 9;
     let forward = 0, strafe = 0, sprint = false;
     if (goal) {
       const d = G.player.position.distanceTo(goal);
-      if (d > holdRange + 2) forward = d > 20 ? 1 : 0.7;
-      if (d < holdRange - 3.5 || hurt) forward = -1;
+      if (dry) forward = 1;
+      else if (d > holdRange + 2) forward = d > 20 ? 1 : 0.7;
+      if (!dry && (d < holdRange - 3.5 || hurt)) forward = -1;
       strafe = Math.floor(frame / 70) % 2 === 0 ? 0.55 : -0.55;   // keep orbiting
       sprint = d > 18 || hurt;
     } else if (G.effects.pickups.length) {
@@ -180,12 +193,14 @@ async function runCampaign(options) {
     const closest = visible || nearest;
     if (closest) {
       const cd = G.player.position.distanceTo(closest.position);
-      const worthBooting = G.player.bootChargeReady || closest.bleeding || closest.wounded;
+      const worthBooting = dry || G.player.bootChargeReady || closest.bleeding || closest.wounded;
       // Kick from the reach of the kick that is actually available, not the old
       // global figure — a stomp is shorter than a high kick.
       const kickReach = (KICKS[G.player.kickType()] || KICKS.kick).range;
       if (cd <= kickReach && G.player.canMelee()) G.player.melee();
-      if (worthBooting && !hurt && pivotSeconds <= 0) forward = 1;   // close the gap and boot it
+      // A dry officer closes whatever its health is doing: backing off to heal
+      // is not on the table when the boot is the only thing that can hurt them.
+      if (worthBooting && (dry || !hurt) && pivotSeconds <= 0) forward = 1;
     }
     setMove(forward, strafe, sprint);
     if (G.player.ammo <= 0 && G.player.reloading <= 0) G.player.beginReload();
@@ -481,6 +496,9 @@ async function runCampaign(options) {
         car.vel.set(0, 0, 0);
         car.spin.set(0, 0, 0);
         car.mesh.position.set(x, car.baseY, z);
+        // Keep the collision box with it: a parked car whose box is still at the
+        // old pitch would block bullets and sight lines from thin air.
+        car.box.setFromObject(car.mesh).expandByScalar(-0.05);
       };
 
       // A swing through empty air, in a corner of the map with nothing in reach.
@@ -574,7 +592,9 @@ async function runCampaign(options) {
       if (edge) { G.hud.flashImpact(0); G.hud.update(G.hudState(), 1); }
 
       const f = out.feel;
-      out.feelScaledByMass = f.car.shake > f.body.shake
+      f.bodyMass = SETTINGS.bodyMass;
+      f.whiffShake = SETTINGS.kickWhiffShake;
+      f.feelScaledByMass = f.car.shake > f.body.shake
         && f.car.kickback > f.body.kickback
         && f.car.hitStop > f.body.hitStop
         && Math.abs(f.car.roll) > Math.abs(f.body.roll);
@@ -593,7 +613,7 @@ async function runCampaign(options) {
         && f.whiff.shake > 0
         && f.whiff.kickback === 0 && f.whiff.roll === 0 && f.whiff.hitStop === 0
         && f.body.shake > 0 && f.body.kickback > 0 && f.body.hitStop > 0 && f.body.roll !== 0
-        && out.feelScaledByMass
+        && f.feelScaledByMass
         && f.carRoll > 0 && f.rollFollowsSide
         && f.openSightline
         && f.cameraPushBack > 0.02
@@ -622,6 +642,80 @@ async function runCampaign(options) {
       G.kickRoll = before.kickRoll;
       G.hitStop = before.hitStop;
     }
+  }
+
+  // ---------------------------------------------------- the dry officer's wave
+  /**
+   * A dry officer must still be able to finish a wave. With no ammunition
+   * anywhere the rifle is decoration and the boot is the whole arsenal, so the
+   * pilot has to close and use it. The failure this guards is the one the pilot
+   * produced itself: holding a firing line at an unwounded attacker, at range,
+   * with nothing to fire, until the stall watchdog gave up and the wave could not
+   * end at all. The report said so at the time — `playerAmmo: [0, 0]` beside an
+   * attacker at full health, distance not closing.
+   *
+   * Played for real: the same patched step, the same pilot and the same wave one
+   * that `npm test` plays, with the officer's rounds taken away every single
+   * frame so nothing it kills can resupply it and the whole wave has to be won
+   * with the boot. The officer is kept on their feet, as the campaign does for
+   * pacing, because the claim being checked is that the wave can end — not that a
+   * dry officer survives being shot at while it happens.
+   */
+  function probeDryWave() {
+    const p = G.player;
+    const out = { limitSeconds: 60, pass: false };
+    const startKills = p.kills;
+    const startBoots = p.meleeKills;
+    const saved = {
+      maxHealth: p.maxHealth, health: p.health, ammo: p.ammo, reserve: p.reserve,
+    };
+    const limitFrames = Math.round(out.limitSeconds / FRAME);
+    let frames = 0;
+    let closedIn = null;
+
+    try {
+      p.maxHealth = INSTRUMENT_MAX_HEALTH;
+      p.health = INSTRUMENT_MAX_HEALTH;
+      p.alive = true;
+
+      while (G.state === 'playing' && frames < limitFrames) {
+        // Nothing to shoot with and nothing to pick up: this wave is the boot's.
+        p.ammo = 0;
+        p.reserve = 0;
+        G.step(FRAME);
+        frames += 1;
+        const live = G.enemyManager.enemies.find((e) => e && !e.dead && !e.routed);
+        // Closing to boot range is the move that never happened while the
+        // deadlock was in: the old pilot held a firing line at nine metres and
+        // waited there for ammunition that was never coming.
+        if (live && closedIn === null && p.position.distanceTo(live.position) <= 8) {
+          closedIn = +(frames * FRAME).toFixed(1);
+        }
+        if (G.enemyManager.aliveCount === 0 && G.enemyManager.pendingCount === 0) break;
+      }
+    } finally {
+      for (const key of Object.keys(saved)) p[key] = saved[key];
+    }
+
+    out.seconds = +(frames * FRAME).toFixed(1);
+    out.cleared = G.enemyManager.aliveCount === 0 && G.enemyManager.pendingCount === 0;
+    out.eliminations = p.kills - startKills;
+    out.bootEliminations = p.meleeKills - startBoots;
+    out.closedToBootRangeSeconds = closedIn;
+    out.leftover = G.enemyManager.enemies
+      .filter((e) => e && !e.dead && !e.routed)
+      .map((e) => ({
+        distance: +p.position.distanceTo(e.position).toFixed(1),
+        health: +e.health.toFixed(0),
+        inAssault: G.enemyManager.assaults.includes(e),
+      }));
+    // Every attacker the officer removed, it removed with the boot: with no
+    // rounds in the magazine and none in the reserve there was nothing else.
+    out.pass = out.cleared
+      && out.eliminations > 0
+      && out.bootEliminations === out.eliminations
+      && closedIn !== null;
+    return out;
   }
 
   // ------------------------------------------------------------------ bookkeeping
@@ -756,6 +850,12 @@ async function runCampaign(options) {
         bearingToAttacker: only ? +Math.atan2(only.position.x - G.camera.position.x, only.position.z - G.camera.position.z).toFixed(3) : null,
         targetingHeld: G.inputManager.targeting,
         triggerHeld: pad.buttons[7].pressed,
+        // A pilot with the trigger down on a live target and no ammunition is
+        // the one way this can be silent: say so in the sample rather than
+        // leaving "the last attacker will not die" open to interpretation.
+        ammo: G.player.ammo,
+        reserve: G.player.reserve,
+        reloading: G.player.reloading > 0,
         triggerFramesSinceLastSample: triggerFrames - lastTriggerSample,
         playerHealth: +G.player.health.toFixed(0),
         playerPosition: [+G.player.position.x.toFixed(1), +G.player.position.z.toFixed(1)],
@@ -788,6 +888,7 @@ async function runCampaign(options) {
         stalledFor: +stallSeconds.toFixed(1),
         hostiles: G.enemyManager.aliveCount + G.enemyManager.queue.length,
         flushing: G.enemyManager.flushing,
+        playerAmmo: [G.player.ammo, G.player.reserve],
         playerPosition: [+G.player.position.x.toFixed(1), +G.player.position.z.toFixed(1)],
         leftovers,
         samples: stallSamples,
@@ -800,11 +901,14 @@ async function runCampaign(options) {
   if (startButton) startButton.click();
   if (G.state !== 'playing') G.start();
   if (G.state !== 'playing') return { fatal: `game did not start (state ${G.state})` };
-  if (opts.checkLock || opts.checkKick) {
+  if (opts.checkLock || opts.checkKick || opts.checkDry) {
     if (opts.checkLock) report.lockCheck = probeLockRetarget();
     if (opts.checkKick) report.kickCheck = probeKicks();
+    // Last, because unlike the others it plays a real wave and moves the officer.
+    if (opts.checkDry) report.dryCheck = probeDryWave();
     const pass = (!report.lockCheck || report.lockCheck.pass)
-      && (!report.kickCheck || report.kickCheck.pass);
+      && (!report.kickCheck || report.kickCheck.pass)
+      && (!report.dryCheck || report.dryCheck.pass);
     report.gameSeconds = +report.gameSeconds.toFixed(2);
     report.wavesReached = G.wave;
     report.outcome = pass ? 'probes-passed' : 'probe-failed';

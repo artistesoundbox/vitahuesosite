@@ -62,6 +62,7 @@ function parseArgs(argv) {
       case '--honest': opts.honest = true; break;
       case '--check-lock': opts.checkLock = true; break;
       case '--check-kick': opts.checkKick = true; break;
+      case '--check-dry': opts.checkDry = true; break;
       case '--require-finish': opts.requireFinish = true; break;
       case '--headed': opts.headed = true; break;
       case '--keep-open': opts.keepOpen = true; break;
@@ -91,6 +92,8 @@ function printUsage() {
 target) instead of playing the campaign
   --check-kick     assert the three kicks and the scenery they move (also instead of
 the campaign; pass both to run both probes)
+  --check-dry      play a whole wave with the officer's ammunition taken away, and
+assert the boot alone can still end it
   --require-finish fail the run if the campaign did not reach the last wave
   --url=URL        page to load (default: served from this repo)
   --port=N         port for the bundled static server
@@ -336,6 +339,7 @@ async function main() {
     instrument: opts.honest ? 'none' : 'alive',
     checkLock: opts.checkLock || false,
     checkKick: opts.checkKick || false,
+    checkDry: opts.checkDry || false,
   })}); })()`;
 
   const startedAt = Date.now();
@@ -386,9 +390,23 @@ function assess(report) {
   const findings = [];
 
   // The probes are single assertions about one mechanic, not a campaign.
-  if (report.lockCheck || report.kickCheck) {
+  if (report.lockCheck || report.kickCheck || report.dryCheck) {
     const l = report.lockCheck;
     const k = report.kickCheck;
+    const d = report.dryCheck;
+    if (d && !d.pass) {
+      const bits = [];
+      if (!d.cleared) {
+        bits.push(`the wave never ended (${d.seconds}s of a ${d.limitSeconds}s limit, `
+          + `${d.leftover.length} attacker(s) left: ${JSON.stringify(d.leftover)})`);
+      }
+      if (d.closedToBootRangeSeconds === null) bits.push('the dry officer never closed to boot range');
+      if (d.eliminations === 0) bits.push('the dry officer eliminated nobody');
+      if (d.bootEliminations !== d.eliminations) {
+        bits.push(`only ${d.bootEliminations} of ${d.eliminations} elimination(s) were the boot, with no rounds`);
+      }
+      reasons.push(`the dry officer: ${bits.join('; ') || 'the probe did not pass'}`);
+    }
     if (l && !l.pass) {
       reasons.push(`the aim trigger picked ${l.firstPress} on the first press (wanted near), `
         + `kept ${l.heldDuringSwing} while held (wanted near), then picked ${l.freshPress} on a fresh press (wanted far)`);
@@ -404,6 +422,21 @@ function assess(report) {
       if (!k.scenery.tumbled) bits.push(`the kicked ${k.scenery.kind} never tumbled`);
       if (!k.scenery.settled) bits.push(`the kicked ${k.scenery.kind} never came to rest (${k.scenery.settleSeconds}s)`);
       if (!(k.scenery.boxFollowed > 0.5)) bits.push('the moved scenery left its collision box behind');
+      const f = k.feel || {};
+      if (f.whiff && !(f.whiff.shake > 0)) bits.push('a kick into empty air did not even move the frame');
+      if (f.whiff && (f.whiff.kickback !== 0 || f.whiff.hitStop !== 0 || f.whiff.roll !== 0)) {
+        bits.push('a kick into empty air was felt as a connect');
+      }
+      if (f.body && !(f.body.shake > 0 && f.body.kickback > 0 && f.body.hitStop > 0 && f.body.roll !== 0)) {
+        bits.push('a boot into a body was not felt');
+      }
+      if (f.feelScaledByMass === false) bits.push('the impact feel did not scale with the mass that was hit');
+      if (f.rollFollowsSide === false) bits.push('the frame roll did not lean away from the impact');
+      if (f.openSightline === false) bits.push('no open sightline could be found to measure the kickback through');
+      if (f.cameraPushBack !== undefined && !(f.cameraPushBack > 0.02)) bits.push(`the camera was not shoved back (${f.cameraPushBack}m)`);
+      if (f.frameRollDegrees !== undefined && !(f.frameRollDegrees > 1)) bits.push(`the frame did not roll (${f.frameRollDegrees}°)`);
+      if (f.stopFrames !== undefined && !(f.stopFrames >= 2 && f.stopFrames <= 12)) bits.push(`the hit-stop froze time for ${f.stopFrames} frame(s)`);
+      if (f.edgeFlashOpacity !== undefined && !(f.edgeFlashOpacity > 0.5)) bits.push('the screen edge never lit up on a heavy connect');
       reasons.push(`kicks and scenery: ${bits.join('; ') || 'the probe did not pass'}`);
     }
     if (report.failedRequests?.length) reasons.push(`${report.failedRequests.length} failed request(s): ${report.failedRequests[0]}`);
@@ -472,9 +505,10 @@ function printReport(report, passed) {
   console.log('');
 
   // The mechanic probes: one assertion each, no campaign.
-  if (report.lockCheck || report.kickCheck) {
+  if (report.lockCheck || report.kickCheck || report.dryCheck) {
     const c = report.lockCheck;
     const k = report.kickCheck;
+    const d = report.dryCheck;
     if (c) {
       console.log('Aim trigger (left trigger / right mouse / Q)');
       console.log(`  lock cone ${c.cone} rad, probe attackers: near ${c.anglesRadians?.near} rad off the crosshair, far ${c.anglesRadians?.far}`);
@@ -501,10 +535,32 @@ function printReport(report, passed) {
       console.log('');
       console.log(`  kicked ${s.kind} (mass ${s.mass}): ${s.speedAfterKick} m/s off the boot, ${s.movedMeters} m travelled, ` +
         `${s.tumbled ? 'tumbled' : 'did not tumble'}, ${s.settled ? `settled after ${s.settleSeconds}s` : 'never settled'}, collision box moved ${s.boxFollowed} m with it.`);
+      const f = k.feel;
+      if (f) {
+        console.log('');
+        console.log(`  ${pad('what it met', 16)}${pad('mass', 7)}${pad('shake', 8)}${pad('kickback', 10)}${pad('roll', 8)}${pad('hit-stop', 10)}`);
+        const row = (label, v, mass) => console.log(`  ${pad(label, 16)}${pad(mass, 7)}${pad(v.shake, 8)}${pad(`${v.kickback}m`, 10)}${pad(`${v.roll}\u00b0`, 8)}${pad(v.hitStop > 0 ? `${v.hitStop}s` : 'none', 10)}`);
+        row('empty air', f.whiff, '\u2014');
+        row('a body', f.body, f.bodyMass);
+        row('a car', f.car, s.mass);
+        console.log(`  the camera was shoved back ${f.cameraPushBack} m and the frame rolled ${f.frameRollDegrees}\u00b0 (${f.rollFollowsSide ? 'away from the impact, both sides' : 'WRONG'})`);
+        console.log(`  hit-stop: a body froze ${f.stopFrames} frame(s) at \u00d7${f.stopScale} world time, then the clock ran clean again; screen edge lit to ${f.edgeFlashOpacity}`);
+      }
       if (k.detail) console.log(`  ${k.detail}`);
     }
+    if (d) {
+      if (c || k) console.log('');
+      console.log('A wave with no ammunition');
+      console.log(`  ${pad('rounds', 26)}none in the magazine, none in the reserve, every frame`);
+      console.log(`  ${pad('closed to boot range', 26)}${d.closedToBootRangeSeconds === null ? 'never' : `${d.closedToBootRangeSeconds}s`}`);
+      console.log(`  ${pad('eliminations', 26)}${d.eliminations} (${d.bootEliminations} by boot)`);
+      console.log(`  ${pad('wave ended', 26)}${d.cleared ? `after ${d.seconds}s` : 'NEVER'}`);
+      if (!d.cleared && d.leftover.length) {
+        console.log(`  left standing: ${JSON.stringify(d.leftover)}`);
+      }
+    }
     if (passed.ok) {
-      console.log(`\nPASS — ${[c && 'a press retargets to the attacker nearest the crosshair and a held trigger keeps its target', k && 'the three kicks differ and the scenery they launch settles where it lands'].filter(Boolean).join('; ')}.`);
+      console.log(`\nPASS — ${[c && 'a press retargets to the attacker nearest the crosshair and a held trigger keeps its target', k && 'the three kicks differ, the scenery they launch settles where it lands, and the impact feels as heavy as the mass it hit', d && 'a wave can be won with no ammunition left, by closing and booting'].filter(Boolean).join('; ')}.`);
     } else {
       console.log('\nFAIL');
       for (const reason of passed.reasons) console.log(`  - ${reason}`);
