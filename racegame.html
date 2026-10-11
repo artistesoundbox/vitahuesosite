@@ -129,7 +129,7 @@
     #start-lights .lamps i.lit { background: #ff3b30; border-color: #ff9b93; box-shadow: 0 0 20px rgba(255, 60, 50, 0.85); }
     #start-lights .lamps i.go { background: #29ff8e; border-color: #c4ffe2; box-shadow: 0 0 26px rgba(40, 255, 150, 0.95); }
     #start-lights .cd {
-      font-size: clamp(54px, 11vw, 124px); font-weight: 700; line-height: 1;
+      font-size: clamp(54px, min(11vw, 17vh), 124px); font-weight: 700; line-height: 1;
       color: #fff; text-shadow: 0 0 42px rgba(90, 255, 190, 0.9), 0 6px 20px rgba(0, 0, 0, 0.9);
     }
     #start-lights .cd.go { color: #6dffb4; text-shadow: 0 0 50px rgba(60, 255, 170, 0.95), 0 6px 20px rgba(0, 0, 0, 0.9); }
@@ -150,7 +150,9 @@
       backdrop-filter: blur(6px);
       opacity: 0; transition: opacity 0.3s ease;
     }
-    #results.show { opacity: 1; }
+    /* the board is a button, not just a panel: on a phone there is no R key and
+       the board is the one thing a thumb is already pointing at after the flag */
+    #results.show { opacity: 1; pointer-events: auto; cursor: pointer; }
     #results h4 {
       margin: 0 0 10px; font-size: 13px; font-weight: 600;
       letter-spacing: 0.16em; color: #9dffcf; white-space: nowrap;
@@ -188,6 +190,18 @@
     #pad-right { left: 96px; }
     #pad-brake { right: 96px; font-size: 14px; }
     #pad-gas { right: 14px; font-size: 14px; }
+    /* The look pad is the one control here that is a stick rather than a switch:
+       a thumb anywhere on it sets a direction and how far it is pushed, and the
+       camera springs back when the thumb lifts — the same thing the right stick
+       and the canvas drag do. It lives above GAS, so the two thumbs that drive
+       keep the bottom corners: steer on the left, throttle on the right, and
+       look with the right thumb one pad up. */
+    #pad-look { bottom: 96px; right: 14px; }
+    #pad-look .nub {
+      width: 30%; height: 30%; border-radius: 50%;
+      background: rgba(157, 255, 207, 0.85);
+      box-shadow: 0 0 12px rgba(90, 255, 190, 0.55);
+    }
 
     /* ---------- console under the screen ---------- */
     .console {
@@ -302,6 +316,13 @@
       #pad-right { left: calc(var(--pad-edge) + var(--pad) + var(--pad-gap) + var(--safe-l)); }
       #pad-brake { right: calc(var(--pad-edge) + var(--pad) + var(--pad-gap) + var(--safe-r)); font-size: calc(var(--pad) * 0.2); }
       #pad-gas { right: calc(var(--pad-edge) + var(--safe-r)); font-size: calc(var(--pad) * 0.2); }
+      /* one pad up from GAS, on the same edge: the speed readout takes that band
+         on the LEFT, so the two cannot cover each other however narrow the
+         phone is */
+      #pad-look {
+        right: calc(var(--pad-edge) + var(--safe-r));
+        bottom: calc(16px + var(--safe-b) + var(--pad) + var(--pad-gap));
+      }
       /* The speed bar is pinned to the VIEWPORT, like the pads, and not to the
          stage. In landscape the stage is 330 tall in a 390-tall screen, so a
          bar anchored to the stage's bottom lands inside the band the pads
@@ -315,6 +336,34 @@
       }
       .wrap { padding-left: var(--safe-l); padding-right: var(--safe-r); }
     }
+
+    /* ---------- short screens: the stage is 330 tall in a 360-tall phone ------
+       Sized off the width alone, the countdown numeral and a six-row results
+       board both come out at their portrait size in a viewport two thirds the
+       height. Measured in a 740x360 landscape window: the board hung 23 units
+       below the fold with its bottom row on top of the speed readout, and the
+       numeral sat in the band the pads occupy. Both now take their size from the
+       shorter axis as well, the board sheds its padding and row height before it
+       clips (and scrolls rather than hiding a row), and the speed readout steps
+       aside once the race is over — a speedometer is not what you are reading on
+       the results screen, and it is pinned to the same corner the board lands
+       in. */
+    @media (max-height: 560px) {
+      #start-lights { gap: 8px; }
+      #start-lights .lamps { gap: 8px; }
+      #start-lights .lamps i { width: 15px; height: 15px; }
+      #start-lights .cd { font-size: clamp(34px, min(10vw, 14vh), 96px); }
+      #results {
+        padding: 9px 12px 8px; font-size: 11px;
+        max-height: calc(100% - 12px); overflow: auto;
+      }
+      #results h4 { font-size: 11px; margin-bottom: 6px; }
+      #results h4 small { font-size: 9px; margin-top: 3px; }
+      #results td { padding: 1.5px 0; }
+      #results tr.hd td { font-size: 8.5px; padding-bottom: 3px; }
+      #results .hint { font-size: 9px; margin-top: 6px; }
+    }
+    #stage.over #speed { display: none; }
   </style>
 </head>
 <body>
@@ -341,7 +390,8 @@
     brake for the chicane, and try not to be the one who parks a starfighter in a wall. A controller works too — left
     stick or d-pad to steer, RT or A for throttle, LT to brake and reverse, <b>right stick to look around</b>, Start
     to restart. Drag the canvas to look, too — or press <b>Steer: drag</b> and a thumb anywhere on the screen sets the
-    lock, with a pull up or down for throttle and brake — and <b>P</b> pauses.</p>
+    lock, with a pull up or down for throttle and brake. On a touch screen the <b>look stick</b> above the throttle does
+    what the right stick does, and the results board is also a button: <b>tap it to race again</b>. <b>P</b> pauses.</p>
 
     <div id="stage">
       <canvas id="screen"></canvas>
@@ -363,6 +413,7 @@
         <button class="pad" id="pad-right" type="button" aria-label="Steer right">▶</button>
         <button class="pad" id="pad-brake" type="button" aria-label="Brake">BRK</button>
         <button class="pad" id="pad-gas" type="button" aria-label="Throttle">GAS</button>
+        <div class="pad" id="pad-look" role="group" aria-label="Look around"><i class="nub"></i></div>
       </div>
       <div id="load">booting the city…</div>
     </div>
@@ -2726,6 +2777,7 @@
       cdEl.classList.remove('pop', 'go');
       lightsEl.classList.add('show');
       resultsEl.classList.remove('show');
+      stageEl.classList.remove('over');     // the speed readout comes back
       lastResults = '';
       let slot = 1;
       racers.forEach(function (r, i) { r.gridSlot = (i === playerIdx) ? 0 : slot++; });
@@ -2758,7 +2810,7 @@
       const me = racers[playerIdx];
       const pos = list.indexOf(me) + 1;
       let h = '<h4>FINISHED — P' + pos + '/' + racers.length +
-        '<small>your best lap ' + fmtTime(bestLapOf(me)) + ' · R to race again</small></h4>' +
+        '<small>your best lap ' + fmtTime(bestLapOf(me)) + ' · tap the board or press R to race again</small></h4>' +
         '<table><tr class="hd"><td class="pos">#</td><td class="nm">RACER</td>' +
         '<td class="tm">TOTAL</td><td class="best">BEST LAP</td></tr>';
       list.forEach(function (r, i) {
@@ -3141,6 +3193,9 @@
       raceState = 'finished';
       fanfare();
       resultsEl.classList.add('show');
+      /* the board lands in the corner the speed readout is pinned to on a
+         phone, and the readout is not what you are looking at now */
+      stageEl.classList.add('over');
       lastResults = '';        // the next frame builds the board the moment it is up
       /* the run is banked the instant the flag falls, so a reload — or walking
          away and coming back tomorrow — cannot lose it */
@@ -3384,6 +3439,67 @@
     bindPad(document.getElementById('pad-right'), function () { touch.steer = -1; }, function () { if (touch.steer < 0) touch.steer = 0; });
     bindPad(document.getElementById('pad-gas'), function () { touch.throttle = 1; }, function () { touch.throttle = 0; });
     bindPad(document.getElementById('pad-brake'), function () { touch.brake = 1; }, function () { touch.brake = 0; });
+
+    /* The look pad, one pad up from the throttle: a stick rather than a switch.
+       It claims one pointer and keeps it — the thumb may slide off the circle
+       and go on steering the view, which is what a stick does — and it writes
+       to the same look axis the right stick and the canvas drag write to. There
+       is one place look is assembled (updateLook) and this is one of its three
+       inputs, so nothing downstream can tell which of them moved it. The nub
+       follows the thumb, and both spring back on release: it is a look, not a
+       turret, exactly like the other two. */
+    const lookPadEl = document.getElementById('pad-look');
+    const lookPadNub = lookPadEl.querySelector('.nub');
+    const LOOK_PAD_R = 26;                 // px of travel for a full deflection
+    let lookPadX = 0, lookPadY = 0, lookPadId = null, lookPadHome = null;
+    function lookPadReset() {
+      lookPadId = null; lookPadHome = null; lookPadX = 0; lookPadY = 0;
+      lookPadEl.classList.remove('held');
+      lookPadNub.style.transform = 'translate(0px, 0px)';
+    }
+    function lookPadMove(e) {
+      const dx = e.clientX - lookPadHome.x, dy = e.clientY - lookPadHome.y;
+      const l = Math.hypot(dx, dy) || 1;
+      const s = Math.min(1, l / LOOK_PAD_R);
+      lookPadX = (dx / l) * s;               // right is positive, like the stick
+      lookPadY = (dy / l) * s;               // and down, like the stick
+      lookPadNub.style.transform = 'translate(' + (dx / l * s * LOOK_PAD_R).toFixed(1) +
+        'px, ' + (dy / l * s * LOOK_PAD_R).toFixed(1) + 'px)';
+    }
+    lookPadEl.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      if (!actx) audioReady();
+      if (lookPadId !== null) return;                       // already answering a thumb
+      if (lookPadEl.setPointerCapture) { try { lookPadEl.setPointerCapture(e.pointerId); } catch (err) {} }
+      const b = lookPadEl.getBoundingClientRect();
+      lookPadHome = { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+      lookPadId = e.pointerId;
+      lookPadEl.classList.add('held');
+      lookPadMove(e);
+    });
+    lookPadEl.addEventListener('pointermove', function (e) {
+      if (e.pointerId === lookPadId && lookPadHome) lookPadMove(e);
+    });
+    function lookPadRelease(e) { if (e.pointerId === lookPadId) lookPadReset(); }
+    lookPadEl.addEventListener('pointerup', lookPadRelease);
+    lookPadEl.addEventListener('pointercancel', lookPadRelease);
+    lookPadEl.addEventListener('lostpointercapture', lookPadRelease);
+    window.addEventListener('pointerup', lookPadRelease);
+    window.addEventListener('pointercancel', lookPadRelease);
+    padReleasers.push(lookPadReset);
+
+    /* Tap the board to go again. #hud is pointer-events:none and the board is a
+       SIBLING of the canvas rather than a child of it, so this only fires on the
+       board itself — a tap anywhere else on the stage is still the game's. It
+       also refuses to fire unless the race is actually finished, so a stray tap
+       mid-race cannot restart anything. */
+    resultsEl.addEventListener('pointerup', function (e) {
+      if (raceState !== 'finished') return;
+      e.preventDefault();
+      if (!actx) audioReady();
+      gridStart();
+      showMsg('RESTART', 700);
+    });
     /* Whether a device gets pads is a media query, and media queries change
        under you: a phone turned to landscape, a desktop window dragged narrow,
        a tablet docked or undocked. Deciding this once at boot left the style
@@ -3639,8 +3755,8 @@
     }
 
     function updateLook(dt) {
-      const lx = clamp(pad.lookX + lookDragX, -1, 1);
-      const ly = clamp(pad.lookY + lookDragY, -1, 1);
+      const lx = clamp(pad.lookX + lookDragX + lookPadX, -1, 1);
+      const ly = clamp(pad.lookY + lookDragY + lookPadY, -1, 1);
       if (lx || ly) {
         /* Positive lookYaw swings the view to the driver's RIGHT, so stick
            right (and a drag to the right) increases it. This is the one sign
@@ -4323,6 +4439,24 @@
         /* makes the music fail the way a 404 or an offline cache would, so the
            "the hum comes back" claim can be tested rather than asserted */
         musicFail: function () { if (musicEl) musicEl.dispatchEvent(new Event('error')); return musicOk; },
+        /* the on-screen look stick: where it is, what it is asking for, and
+           where the nub is sitting — so "it looks around" is a measurement */
+        lookPad: function () {
+          const b = lookPadEl.getBoundingClientRect();
+          return { x: +lookPadX.toFixed(3), y: +lookPadY.toFixed(3),
+            held: lookPadEl.classList.contains('held'), pointer: lookPadId,
+            nub: lookPadNub.style.transform, c: lookPadNub.getBoundingClientRect().width,
+            rect: [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)],
+            shown: getComputedStyle(lookPadEl).display !== 'none' && b.width > 0 };
+        },
+        /* tapping the board to restart, without a real thumb */
+        tapRestart: function () {
+          const b = resultsEl.getBoundingClientRect();
+          resultsEl.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true,
+            clientX: Math.round(b.left + b.width / 2), clientY: Math.round(b.top + b.height / 2) }));
+          return { state: raceState, shown: resultsEl.classList.contains('show'),
+            over: stageEl.classList.contains('over'), speedShown: getComputedStyle(speedEl).display !== 'none' };
+        },
         dragSteer: function (v) { if (v !== undefined) setDragSteer(v);
           return { on: dsMode, steer: +dsSteer.toFixed(2), gas: +dsGas.toFixed(2), brake: +dsBrake.toFixed(2),
             pointer: dsPointer, range: DS_RANGE, axis: DS_AXIS, label: document.getElementById('dragsteer').textContent,
