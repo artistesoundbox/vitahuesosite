@@ -322,9 +322,11 @@ export class EnemyManager {
     this.lastAssault = null;
     this.assaultTime = 0;
     this.assaultCooldown = SETTINGS.firstAssaultDelay;
-    // Cover-breaking state: see updateFlush().
+    // Cover-breaking state: see updateFlush(). `flushTune` is a live debug
+    // multiplier on the lull so the charge timing can be tuned in play.
     this.flushing = false;
     this.sinceElimination = 0;
+    this.flushTune = 1;
   }
 
   /** Attackers still in the fight. Routed ones are already out of it. */
@@ -452,7 +454,7 @@ export class EnemyManager {
     // They hold cover while the player is making progress; the moment the fight
     // stalls they all come at once. Any kill buys a fresh window of hiding.
     this.flushing = this.aliveCount > 0
-      && (lastStand || this.sinceElimination >= this.ramp.flushAfter);
+      && (lastStand || this.sinceElimination >= this.ramp.flushAfter * (this.flushTune || 1));
     if (this.flushing && !wasFlushing) {
       // Announce the first charge of a wave and the last stand, once each.
       // Repeating the banner every time they break cover again is just noise.

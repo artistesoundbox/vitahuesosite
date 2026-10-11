@@ -154,7 +154,21 @@ export class GameAudio {
   flush() { this.blip(240, 0.35, 'sawtooth', 0.12, 460); this.blip(180, 0.5, 'triangle', 0.09, 300); }
   hurt() { this.noise(0.2, 700, 0.3); this.blip(90, 0.25, 'sine', 0.2, 50); }
   reload() { this.blip(520, 0.06, 'square', 0.12); setTimeout(() => this.blip(320, 0.08, 'square', 0.12), 220); }
-  pickup() { this.blip(660, 0.08, 'sine', 0.2); setTimeout(() => this.blip(990, 0.12, 'sine', 0.18), 80); }
+  pickup(type = 'ammo') {
+    const base = { ammo: 660, health: 540, reload: 740, charge: 460, rapid: 820, armor: 600 }[type] || 660;
+    this.blip(base, 0.08, 'sine', 0.2);
+    setTimeout(() => this.blip(base * 1.5, 0.12, 'sine', 0.18), 80);
+  }
+
+  // Rifle-style target tune: a short click as the aim takes hold.
+  lock() { this.blip(880, 0.05, 'square', 0.09, 1180); }
+  // The meter topping out, and the kick that spends it.
+  chargeReady() { [520, 660, 880].forEach((f, i) => setTimeout(() => this.blip(f, 0.16, 'triangle', 0.16), i * 85)); }
+  chargedKick() {
+    this.noise(0.42, 700, 0.4);
+    this.blip(88, 0.5, 'sawtooth', 0.32, 30);
+    setTimeout(() => this.blip(150, 0.3, 'square', 0.2, 58), 60);
+  }
   tierUp() { [440, 587, 740, 880].forEach((f, i) => setTimeout(() => this.blip(f, 0.18, 'triangle', 0.22), i * 110)); }
   waveStart() { [330, 392, 494].forEach((f, i) => setTimeout(() => this.blip(f, 0.3, 'sawtooth', 0.15), i * 140)); }
   gameOver() { [392, 330, 262, 196].forEach((f, i) => setTimeout(() => this.blip(f, 0.5, 'triangle', 0.22), i * 200)); }

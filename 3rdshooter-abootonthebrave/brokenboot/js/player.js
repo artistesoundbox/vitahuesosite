@@ -34,6 +34,12 @@ export class Player {
     this.moving = false;
     this.sprinting = false;
     this.alive = true;
+    this.crouching = false;
+    // Boot charge: filled by routs and charge pickups. A full meter turns the
+    // next kick into a charged one that sends the whole arc running.
+    this.charge = 0;
+    // Timed powerups, in seconds remaining.
+    this.powerups = { rapid: 0, armor: 0, speed: 0 };
     this.pendingKick = null;
     this.onKickHit = null;
     this.onReload = null;
@@ -46,7 +52,16 @@ export class Player {
 
   get position() { return this.object.position; }
   get boot() { return BOOT_TIERS[this.bootIndex]; }
-  get speedMultiplier() { return 1 + this.boot.speedBonus; }
+  get bootChargeReady() { return this.charge >= SETTINGS.chargeMax; }
+  get speedMultiplier() {
+    const powerup = this.powerups.speed > 0 ? SETTINGS.speedPowerupBonus : 0;
+    const crouch = this.crouching ? SETTINGS.crouchSpeedScale : 1;
+    return (1 + this.boot.speedBonus + powerup) * crouch;
+  }
+  get spreadMultiplier() {
+    // Crouching steadies the rifle; so does a tuned target lock.
+    return (this.crouching ? SETTINGS.crouchSpreadScale : 1);
+  }
   get headPosition() {
     // Allocate: callers offset the result, so a shared temp would be unsafe.
     return new THREE.Vector3(this.object.position.x, this.object.position.y + 1.5, this.object.position.z);
@@ -56,6 +71,9 @@ export class Player {
     this.time += dt;
     this.fireTimer = Math.max(0, this.fireTimer - dt);
     this.kickCooldown = Math.max(0, this.kickCooldown - dt);
+    for (const key of Object.keys(this.powerups)) {
+      if (this.powerups[key] > 0) this.powerups[key] = Math.max(0, this.powerups[key] - dt);
+    }
 
     if (this.pendingKick) {
       this.pendingKick.t -= dt;
@@ -130,6 +148,8 @@ export class Player {
     if (!this.anim.busy) {
       if (!this.grounded && this.anim.has('jump')) {
         this.anim.play('jump', { timeScale: 1 });
+      } else if (this.crouching && this.anim.has('crouch')) {
+        this.anim.play('crouch', { timeScale: this.moving ? 1.15 : 1 });
       } else if (this.moving) {
         this.anim.play('walk', { timeScale: this.sprinting ? 1.45 : 1.0 });
       } else if (this.reloading > 0 || sinceShot < 4) {
@@ -148,7 +168,7 @@ export class Player {
   fire() {
     if (!this.canFire()) return false;
     this.ammo -= 1;
-    this.fireTimer = SETTINGS.fireInterval;
+    this.fireTimer = SETTINGS.fireInterval * (this.powerups.rapid > 0 ? SETTINGS.rapidFireScale : 1);
     this.lastShotAt = this.time;
     if (this.ammo <= 0 && this.reserve > 0) this.beginReload();
     return true;
@@ -167,9 +187,34 @@ export class Player {
 
   jump() {
     if (!this.alive || !this.grounded || this.anim.busy) return false;
+    this.crouching = false;
     this.velocityY = SETTINGS.jumpSpeed;
     this.grounded = false;
     return true;
+  }
+
+  /** Crouch is a toggle: easier on a controller thumb and on a phone. */
+  toggleCrouch() {
+    if (!this.alive) return false;
+    this.crouching = !this.crouching;
+    if (this.crouching) this.sprinting = false;
+    return this.crouching;
+  }
+
+  addCharge(amount) {
+    if (this.bootChargeReady) return false;
+    this.charge = Math.min(SETTINGS.chargeMax, this.charge + amount);
+    return this.bootChargeReady;
+  }
+
+  consumeCharge() {
+    this.charge = 0;
+  }
+
+  grantPowerup(type, seconds) {
+    if (!(type in this.powerups)) return;
+    // Stacking refreshes rather than adding indefinitely.
+    this.powerups[type] = Math.max(this.powerups[type], 0) + seconds;
   }
 
   melee() {
@@ -187,7 +232,7 @@ export class Player {
 
   takeDamage(amount) {
     if (!this.alive) return false;
-    this.health -= amount;
+    this.health -= amount * (this.powerups.armor > 0 ? SETTINGS.armorDamageScale : 1);
     if (this.health <= 0) {
       this.health = 0;
       this.alive = false;
@@ -202,6 +247,13 @@ export class Player {
 
   addAmmo(amount) {
     this.reserve += amount;
+  }
+
+  /** Reload crate: a full magazine now, plus a little reserve. */
+  instantReload(extraReserve = 0) {
+    this.reloading = 0;
+    this.ammo = SETTINGS.magSize;
+    this.reserve += extraReserve;
   }
 
   registerKill(melee = false, weight = 1) {

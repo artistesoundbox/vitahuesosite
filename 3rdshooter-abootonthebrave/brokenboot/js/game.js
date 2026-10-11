@@ -10,7 +10,7 @@ import { Effects } from './effects.js';
 import { Hud } from './hud.js';
 import { GameAudio } from './audio.js';
 import { InputManager } from './input.js';
-import { clamp, damp } from './mathx.js';
+import { clamp, damp, dampAngle } from './mathx.js';
 
 // Approximate download weight (MB) of each asset group, for an honest loading bar.
 const LOAD_WEIGHTS = {
@@ -63,7 +63,13 @@ export class Game {
     document.getElementById('canvas-wrap').appendChild(this.renderer.domElement);
 
     this.timer = new THREE.Timer();
-    this.input = { forward: 0, strafe: 0, sprint: false, firing: false };
+    this.input = { forward: 0, strafe: 0, sprint: false, firing: false, targeting: false };
+    // Current soft target lock, and the short grace period that keeps it alive
+    // for a moment after the trigger is released.
+    this.lock = null;
+    this.lockGrace = 0;
+    // Live multiplier on the cover-break lull, for tuning it in play.
+    this.flushTune = 1;
     this.inputManager = new InputManager({
       canvas: this.renderer.domElement,
       isLocked: () => document.pointerLockElement !== null,
@@ -210,11 +216,16 @@ export class Game {
     this.input.strafe = manager.move.strafe;
     this.input.sprint = manager.move.sprint;
     this.input.firing = manager.firing;
+    this.input.targeting = manager.targeting;
 
     for (const action of manager.takeActions()) {
       if (action === 'kick') this.player.melee();
       else if (action === 'jump') this.player.jump();
       else if (action === 'reload') this.player.beginReload();
+      else if (action === 'crouch') this.player.toggleCrouch();
+      else if (action === 'flush-shorter') this.tuneFlush(-1);
+      else if (action === 'flush-longer') this.tuneFlush(1);
+      else if (action === 'flush-reset') this.tuneFlush(0, true);
       else if (action === 'mute') this.toggleMute();
       else if (action === 'pause' && document.pointerLockElement) document.exitPointerLock();
     }
@@ -290,9 +301,14 @@ export class Game {
     this.audio.shoot();
     const origin = this.camera.getWorldPosition(this._tmpA).clone();
     const direction = this.camera.getWorldDirection(new THREE.Vector3());
-    direction.x += (Math.random() - 0.5) * SETTINGS.spread;
-    direction.y += (Math.random() - 0.5) * SETTINGS.spread;
-    direction.z += (Math.random() - 0.5) * SETTINGS.spread;
+    // Crouching steadies the rifle and so does a tuned lock, so the cone of
+    // fire matches what the crosshair is showing.
+    const spread = SETTINGS.spread
+      * this.player.spreadMultiplier
+      * (this.lock ? SETTINGS.lockSpreadScale : 1);
+    direction.x += (Math.random() - 0.5) * spread;
+    direction.y += (Math.random() - 0.5) * spread;
+    direction.z += (Math.random() - 0.5) * spread;
     direction.normalize();
 
     const forward = new THREE.Vector3(Math.sin(this.cameraYaw), 0, Math.cos(this.cameraYaw));
@@ -339,7 +355,9 @@ export class Game {
     this.enemiesKilledTotal += 1;
     this.enemyManager.notifyEliminated();
     this.player.registerKill(false, SETTINGS.bulletKillWeight);
-    if (Math.random() < 0.2) this.effects.spawnPickup(enemy.position.clone().setY(0.4), 'ammo');
+    this.player.addCharge(SETTINGS.chargePerGunfireDown);
+    // A downing drops less than a booting: the boot is the way to earn loot.
+    this.dropLoot(enemy.position, 0.5);
     this.hud.showBanner('BLEEDING OUT', 'GUNFIRE ELIMINATION', 0.9);
     this.checkAchievements();
   }
@@ -352,15 +370,34 @@ export class Game {
     this.enemyManager.notifyEliminated();
     // registerKill raises the boot tier, which fires onTierChange -> onTierUp.
     this.player.registerKill(true);
-    // Roughly a third of eliminations drop ammo and a fifth drop a dressing.
-    // Healing has to keep up with a wave's incoming fire, or the run ends in
-    // wave three no matter how well it is played.
-    const dry = this.player.ammo === 0 && this.player.reserve < 30;
-    const roll = Math.random();
-    if (dry || roll < 0.32) this.effects.spawnPickup(enemy.position.clone().setY(0.4), 'ammo');
-    else if (roll < 0.52) this.effects.spawnPickup(enemy.position.clone().setY(0.4), 'health');
+    // Every rout charges the boot a little, so the meter fills by playing the
+    // way the design intends rather than by waiting.
+    this.player.addCharge(SETTINGS.chargePerRout);
+    this.dropLoot(enemy.position, 1);
     this.checkAchievements();
     return true;
+  }
+
+  /**
+   * Roll the elimination drop table. Ammo is checked first so a dry player can
+   * never hard-stall, and healing keeps up with a wave's incoming fire.
+   * `scale` lets a slower kill (a gunfire downing) drop less often.
+   */
+  dropLoot(position, scale = 1) {
+    const dry = this.player.ammo === 0 && this.player.reserve < 30;
+    const roll = Math.random() / Math.max(0.001, scale);
+    const s = SETTINGS;
+    let type = null;
+    if (dry) type = 'ammo';
+    else if (roll < s.dropAmmo) type = 'ammo';
+    else if (roll < s.dropAmmo + s.dropHealth) type = 'health';
+    else if (roll < s.dropAmmo + s.dropHealth + s.dropReload) type = 'reload';
+    else if (roll < s.dropAmmo + s.dropHealth + s.dropReload + s.dropCharge) type = 'charge';
+    else if (roll < s.dropAmmo + s.dropHealth + s.dropReload + s.dropCharge + s.dropRapid) type = 'rapid';
+    else if (roll < s.dropAmmo + s.dropHealth + s.dropReload + s.dropCharge + s.dropRapid + s.dropArmor) type = 'armor';
+    if (!type) return null;
+    this.effects.spawnPickup(position.clone().setY(0.4), type);
+    return type;
   }
 
   resolveMelee() {
@@ -381,13 +418,20 @@ export class Game {
     inArc.sort((a, b) => a.dist - b.dist);
 
     // Better boots send more of the crowd running; the rest just get shoved.
-    const routeLimit = 1 + Math.floor(this.player.bootIndex / 2);
+    // A fully charged meter spends itself on a charged kick that takes the
+    // whole arc at once, scaled by the tier that is currently strapped on.
+    const charged = this.player.bootChargeReady;
+    const tierScale = 1 + this.player.bootIndex * 0.08;
+    const routeLimit = 1 + Math.floor(this.player.bootIndex / 2)
+      + (charged ? SETTINGS.chargedExtraRouts : 0);
+    const knockback = boot.knockback * (charged ? SETTINGS.chargedKnockbackScale * tierScale : 1);
+    if (charged) this.player.consumeCharge();
     let routed = 0;
     for (let i = 0; i < inArc.length; i++) {
       const { enemy } = inArc[i];
-      enemy.knock.addScaledVector(forward, boot.knockback);
-      this.effects.burst(enemy.position.clone().setY(0.95), 8, 0xffd08a);
-      if (i < routeLimit && this.routEnemy(enemy, forward, boot.knockback)) {
+      enemy.knock.addScaledVector(forward, knockback);
+      this.effects.burst(enemy.position.clone().setY(0.95), charged ? 14 : 8, 0xffd08a);
+      if (i < routeLimit && this.routEnemy(enemy, forward, knockback)) {
         routed += 1;
         continue;
       }
@@ -397,13 +441,19 @@ export class Game {
       if (enemy.takeDamage(boot.meleeDamage)) this.onEnemyDown(enemy);
     }
 
-    this.audio.kick();
-    this.shake = Math.max(this.shake, routed > 0 ? 0.9 : 0.3);
+    if (charged) {
+      this.audio.chargedKick();
+      this.effects.shockwave(this.player.position.clone(), this.player.bootIndex, boot.color);
+      this.shake = Math.max(this.shake, 1.4);
+    } else {
+      this.audio.kick();
+      this.shake = Math.max(this.shake, routed > 0 ? 0.9 : 0.3);
+    }
     if (routed > 0) {
       this.hud.showBanner(
-        'THE BOOT',
+        charged ? `${boot.name.toUpperCase()}` : 'THE BOOT',
         routed > 1 ? `${routed} ATTACKERS SENT RUNNING` : 'SENT RUNNING',
-        1.2,
+        charged ? 2 : 1.2,
       );
     } else if (inArc.length > 0) {
       this.hud.showBanner('THE BOOT', 'JUST A SHOVE', 0.8);
@@ -427,9 +477,11 @@ export class Game {
 
   enemyFire(enemy, dist, wounded = false, suppressed = false) {
     const from = enemy.headPosition;
-    // A shooter leaning out of cover is rushed and far less accurate.
+    // A shooter leaning out of cover is rushed and far less accurate, and a
+    // crouched player is a smaller target.
     const base = (wounded ? 0.4 : 0.6) - (suppressed ? 0.2 : 0);
-    const hitChance = clamp(base - dist * 0.011, 0.04, 0.5);
+    const profile = this.player.crouching ? SETTINGS.crouchHitScale : 1;
+    const hitChance = clamp(base - dist * 0.011, 0.04, 0.5) * profile;
     const hit = Math.random() < hitChance;
     const target = this.player.headPosition.clone();
     if (!hit) {
@@ -448,14 +500,131 @@ export class Game {
   }
 
   onPickup(type) {
-    if (type === 'ammo') {
-      this.player.addAmmo(45);
-      this.hud.toast('Ammo Crate', '+45 reserve rounds');
-    } else {
-      this.player.heal(30);
-      this.hud.toast('Field Dressing', '+30 health');
+    const s = SETTINGS;
+    switch (type) {
+      case 'ammo':
+        this.player.addAmmo(s.dropAmmoIfDry);
+        this.hud.toast('Ammo Crate', `+${s.dropAmmoIfDry} reserve rounds`);
+        break;
+      case 'health':
+        this.player.heal(s.dropHealthAmount);
+        this.hud.toast('Field Dressing', `+${s.dropHealthAmount} health`);
+        break;
+      case 'reload':
+        this.player.instantReload(s.dropReloadReserve);
+        this.hud.toast('Fast Mag', 'Magazine topped up');
+        break;
+      case 'charge':
+        if (this.player.addCharge(s.dropChargeAmount)) this.onBootCharged();
+        this.hud.toast('Boot Charge', `+${s.dropChargeAmount} charge`);
+        break;
+      case 'rapid':
+        this.player.grantPowerup('rapid', s.rapidDuration);
+        this.hud.toast('Rapid Fire', `${s.rapidDuration}s of double rate`);
+        break;
+      case 'armor':
+        this.player.grantPowerup('armor', s.armorDuration);
+        this.hud.toast('Plated Vest', `${s.armorDuration}s of reduced damage`);
+        break;
+      default:
+        break;
     }
-    this.audio.pickup();
+    this.audio.pickup(type);
+  }
+
+  onBootCharged() {
+    this.audio.chargeReady();
+    this.hud.showBanner('BOOT CHARGED', 'KICK TO UNLEASH', 1.8);
+  }
+
+  /** Crouch is a toggle; the clip and the lower profile come with it. */
+  toggleCrouch() {
+    const crouched = this.player.toggleCrouch();
+    this.hud.toast(crouched ? 'Crouched' : 'Standing',
+      crouched ? 'Steadier shots, smaller target' : 'Back on your feet');
+  }
+
+  /**
+   * The attacker nearest the crosshair that is actually in view. The lock tunes
+   * onto what the player is already aiming at, rather than pulling the view to
+   * whatever happens to be closest.
+   */
+  findLockTarget() {
+    const origin = this.camera.getWorldPosition(new THREE.Vector3());
+    const forward = this.camera.getWorldDirection(new THREE.Vector3());
+    let best = null;
+    let bestAngle = SETTINGS.lockAngle;
+    for (const enemy of this.enemyManager.enemies) {
+      if (enemy.dead || enemy.routed) continue;
+      const chest = this._tmpB.set(
+        enemy.position.x, enemy.position.y + 1.05, enemy.position.z,
+      );
+      const to = chest.clone().sub(origin);
+      const dist = to.length();
+      if (dist > SETTINGS.lockMaxRange || dist < 0.8) continue;
+      to.divideScalar(dist);
+      const angle = Math.acos(clamp(to.dot(forward), -1, 1));
+      if (angle >= bestAngle) continue;
+      if (!this.world.hasLineOfSight(origin, chest)) continue;
+      bestAngle = angle;
+      best = { enemy, angle, dist };
+    }
+    return best;
+  }
+
+  /** Angle from the crosshair axis to an attacker, or null if it is gone. */
+  lockAngleTo(enemy) {
+    if (!enemy || enemy.dead || enemy.routed) return null;
+    const origin = this.camera.getWorldPosition(new THREE.Vector3());
+    const forward = this.camera.getWorldDirection(new THREE.Vector3());
+    const to = new THREE.Vector3(
+      enemy.position.x, enemy.position.y + 1.05, enemy.position.z,
+    ).sub(origin);
+    const dist = to.length();
+    if (dist < 1e-3) return 0;
+    to.divideScalar(dist);
+    return Math.acos(clamp(to.dot(forward), -1, 1));
+  }
+
+  /**
+   * Left trigger / right mouse / Q: hold the aim on the attacker closest to the
+   * crosshair and glide the view onto them. It steadies the shot while held and
+   * keeps the target for a short grace period after release.
+   */
+  updateTargetLock(dt) {
+    this.lockGrace = Math.max(0, this.lockGrace - dt);
+
+    if (!this.input.targeting) {
+      if (this.lockGrace <= 0) this.lock = null;
+      return;
+    }
+
+    // Keep an existing lock so the aim does not flick between two attackers as
+    // the view swings, but drop it if they die or leave the cone.
+    if (this.lock) {
+      const angle = this.lockAngleTo(this.lock.enemy);
+      if (angle === null || angle > SETTINGS.lockAngle * 2.4) this.lock = null;
+    }
+    if (!this.lock) {
+      this.lock = this.findLockTarget();
+      if (this.lock) this.audio.lock();
+    }
+    this.lockGrace = SETTINGS.lockGrace;
+    if (!this.lock) return;
+
+    const enemy = this.lock.enemy;
+    const eye = this.camera.getWorldPosition(new THREE.Vector3());
+    const dx = enemy.position.x - eye.x;
+    const dy = enemy.position.y + 1.05 - eye.y;
+    const dz = enemy.position.z - eye.z;
+    const flat = Math.hypot(dx, dz) || 1e-3;
+    this.cameraYaw = dampAngle(this.cameraYaw, Math.atan2(dx, dz), SETTINGS.lockRate, dt);
+    this.cameraPitch = damp(
+      this.cameraPitch,
+      clamp(Math.atan2(dy, flat), SETTINGS.camPitchMin, SETTINGS.camPitchMax),
+      SETTINGS.lockRate,
+      dt,
+    );
   }
 
   onTierUp(boot) {
@@ -548,7 +717,8 @@ export class Game {
 
     const anchor = new THREE.Vector3(
       this.player.position.x,
-      this.player.position.y + SETTINGS.camHeight,
+      this.player.position.y + SETTINGS.camHeight
+        - (this.player.crouching ? SETTINGS.crouchCamDrop : 0),
       this.player.position.z,
     ).addScaledVector(right, SETTINGS.camShoulder);
 
@@ -582,6 +752,10 @@ export class Game {
     });
     this.effects.update(dt, this.player, (type) => this.onPickup(type));
 
+    // Tune the aim onto a locked target before the camera and the shot, so a
+    // held trigger actually puts rounds on the attacker under the reticle.
+    this.updateTargetLock(dt);
+
     // Camera first so shots use this frame's aim rather than last frame's.
     this.updateCamera(dt);
     if (this.input.firing) this.tryShoot();
@@ -614,8 +788,56 @@ export class Game {
       bootProgress: this.bootProgress(),
       killsToNext: this.killsToNext(),
       nextBoot: this.nextBootName(),
+      charge: this.player.charge / SETTINGS.chargeMax,
+      chargeReady: this.player.bootChargeReady,
+      crouching: this.player.crouching,
+      locked: this.lock ? this.lock.dist : null,
+      powerups: this.player.powerups,
+      spread: this.crosshairSpread(),
+      onTarget: this.isAttackerUnderReticle(),
     }, dt);
     this.checkAchievements();
+  }
+
+  /** How open the reticle should be: honest about the rifle's real accuracy. */
+  crosshairSpread() {
+    let spread = 0;
+    if (this.player.fireTimer > 0) spread += 0.6;
+    if (this.player.sprinting) spread += 0.5;
+    if (this.player.crouching) spread -= 0.3;
+    if (this.lock) spread -= 0.35;
+    return clamp(spread, 0, 1);
+  }
+
+  /** True when an attacker is under the reticle, for the crosshair's dot. */
+  isAttackerUnderReticle() {
+    const origin = this.camera.getWorldPosition(new THREE.Vector3());
+    const forward = this.camera.getWorldDirection(new THREE.Vector3());
+    for (const enemy of this.enemyManager.enemies) {
+      if (enemy.dead || enemy.routed) continue;
+      const to = new THREE.Vector3(
+        enemy.position.x, enemy.position.y + 1.05, enemy.position.z,
+      ).sub(origin);
+      const dist = to.length();
+      if (dist < 0.8 || dist > SETTINGS.lockMaxRange) continue;
+      to.divideScalar(dist);
+      if (Math.acos(clamp(to.dot(forward), -1, 1)) < SETTINGS.lockAngle * 0.85) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Debug tuner for the cover-break lull. `[` and `]` scale the quiet period
+   * for this session so the charge timing can be judged against a live fight,
+   * and `\` restores the configured curve.
+   */
+  tuneFlush(direction, reset = false) {
+    this.flushTune = reset
+      ? 1
+      : clamp(this.flushTune + direction * 0.1, 0.2, 3);
+    this.enemyManager.flushTune = this.flushTune;
+    const actual = waveRamp(Math.max(1, this.wave)).flushAfter * this.flushTune;
+    this.hud.toast('Cover-break delay', `${actual.toFixed(1)}s (\u00d7${this.flushTune.toFixed(1)})`);
   }
 
   /** Progress toward the next boot tier, as a 0..1 fraction (1 when maxed). */

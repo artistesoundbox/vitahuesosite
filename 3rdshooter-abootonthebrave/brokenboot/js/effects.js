@@ -2,6 +2,16 @@ import * as THREE from 'three';
 
 const TRACER_LIFE = 0.09;
 const FLASH_LIFE = 0.06;
+
+// Pickup palette: body colour, emissive glow and halo, per loot type.
+const PICKUP_LOOK = {
+  ammo:   { body: 0x2f4f3a, glow: 0x1b3a26, halo: 0x8ef0b0 },
+  health: { body: 0x7a2b2b, glow: 0x4a1414, halo: 0xff8a7a },
+  reload: { body: 0x3c4a6b, glow: 0x1e2b4a, halo: 0x8fb6ff },
+  charge: { body: 0x6b5417, glow: 0x4a3a0c, halo: 0xffd24a },
+  rapid:  { body: 0x5a3a6b, glow: 0x341b4a, halo: 0xd99bff },
+  armor:  { body: 0x2f5a6b, glow: 0x14363a, halo: 0x8fe6ef },
+};
 const PARTICLE_LIFE = 0.5;
 const MAX_TRACERS = 24;
 const MAX_PARTICLES = 90;
@@ -12,6 +22,7 @@ export class Effects {
     this.tracers = [];
     this.particles = [];
     this.pickups = [];
+    this.waves = [];
     this.time = 0;
     this._pull = new THREE.Vector3();
 
@@ -92,21 +103,23 @@ export class Effects {
   }
 
   spawnPickup(position, type) {
-    const isAmmo = type === 'ammo';
+    // Each pickup type reads at a glance: body colour, and a glowing halo that
+    // makes it findable in the grass.
+    const look = PICKUP_LOOK[type] || PICKUP_LOOK.ammo;
     const geo = new THREE.BoxGeometry(0.5, 0.34, 0.34);
     const mat = new THREE.MeshStandardMaterial({
-      color: isAmmo ? 0x2f4f3a : 0x7a2b2b,
-      emissive: isAmmo ? 0x1b3a26 : 0x4a1414,
+      color: look.body,
+      emissive: look.glow,
+      emissiveIntensity: 0.85,
       roughness: 0.6,
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.copy(position);
     mesh.position.y = 0.4;
     mesh.castShadow = true;
-    // A small marker so loot is visible in the grass.
     const halo = new THREE.Mesh(
       new THREE.TorusGeometry(0.36, 0.03, 6, 16),
-      new THREE.MeshBasicMaterial({ color: isAmmo ? 0x8ef0b0 : 0xff8a7a, transparent: true, opacity: 0.85 }),
+      new THREE.MeshBasicMaterial({ color: look.halo, transparent: true, opacity: 0.85 }),
     );
     halo.rotation.x = Math.PI / 2;
     halo.position.y = 0.02;
@@ -115,8 +128,40 @@ export class Effects {
     this.pickups.push({ mesh, type, life: 26 });
   }
 
+  /**
+   * Expanding ground ring for a charged kick. It grows and brightens with the
+   * boot tier, so a Diamond kick is visibly not a Standard one.
+   */
+  shockwave(position, tierIndex = 0, color = 0xffd08a) {
+    const tint = new THREE.Color(color).getHex();
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(1, 0.07, 6, 40),
+      new THREE.MeshBasicMaterial({ color: tint, transparent: true, opacity: 0.9 }),
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.set(position.x, 0.12, position.z);
+    ring.scale.setScalar(0.4);
+    this.scene.add(ring);
+    this.waves.push({ mesh: ring, life: 0, max: 0.55 + tierIndex * 0.06, reach: 2.6 + tierIndex * 0.75 });
+  }
+
   update(dt, player, onPickup) {
     this.time += dt;
+
+    for (let i = this.waves.length - 1; i >= 0; i--) {
+      const w = this.waves[i];
+      w.life += dt;
+      const t = w.life / w.max;
+      if (t >= 1) {
+        this.scene.remove(w.mesh);
+        w.mesh.geometry.dispose();
+        w.mesh.material.dispose();
+        this.waves.splice(i, 1);
+        continue;
+      }
+      w.mesh.scale.setScalar(0.4 + t * w.reach);
+      w.mesh.material.opacity = 0.9 * (1 - t);
+    }
 
     for (const t of this.tracers) {
       if (t.life <= 0) continue;

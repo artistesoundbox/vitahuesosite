@@ -53,6 +53,82 @@ html, body {
   margin: -1px 0 0 -1px; background: var(--amber);
 }
 
+/* The reticle reports what the rifle is actually doing: bars open with the
+   cone of fire, the dot goes hot over a target, and a lock draws brackets. */
+.crosshair { --gap: 0px; }
+.crosshair .ch-t { transform: translateY(calc(-1 * var(--gap))); }
+.crosshair .ch-b { transform: translateY(var(--gap)); }
+.crosshair .ch-l { transform: translateX(calc(-1 * var(--gap))); }
+.crosshair .ch-r { transform: translateX(var(--gap)); }
+.crosshair.spread .ch { background: rgba(255, 214, 138, 0.95); }
+.crosshair.on-target .ch-dot {
+  width: 4px; height: 4px; margin: -2px 0 0 -2px;
+  box-shadow: 0 0 6px rgba(242, 201, 76, 0.9);
+}
+.crosshair.locked .ch { background: var(--amber); box-shadow: 0 0 6px rgba(242, 201, 76, 0.8); }
+.crosshair.locked::before,
+.crosshair.locked::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  border: 1px solid rgba(242, 201, 76, 0.85);
+  border-radius: 3px;
+}
+.crosshair.locked::after {
+  inset: -12px;
+  border-style: dashed;
+  border-color: rgba(242, 201, 76, 0.4);
+}
+
+
+.lock-info {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, 26px);
+  font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--amber); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  opacity: 0; transition: opacity 0.15s;
+}
+.lock-info.show { opacity: 1; }
+
+.stance {
+  position: absolute; left: 22px; bottom: 128px;
+  font-size: 11px; letter-spacing: 0.18em; font-weight: 700;
+  color: #8fe6ef; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  opacity: 0; transition: opacity 0.18s;
+}
+.stance.show { opacity: 1; }
+
+.powerups {
+  position: absolute; left: 50%; bottom: 108px;
+  transform: translateX(-50%);
+  display: flex; gap: 8px; pointer-events: none;
+}
+.chip {
+  font-size: 11px; letter-spacing: 0.14em; font-weight: 700;
+  padding: 3px 8px; border-radius: 3px;
+  background: rgba(10, 14, 11, 0.72);
+  border: 1px solid var(--edge);
+  color: var(--amber); text-transform: uppercase;
+}
+.chip.rapid { color: #d99bff; border-color: rgba(217, 155, 255, 0.5); }
+.chip.armor { color: #8fe6ef; border-color: rgba(143, 230, 239, 0.5); }
+.chip.speed { color: #8ef0b0; border-color: rgba(142, 240, 176, 0.5); }
+
+.charge-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-top: 7px; margin-bottom: 3px;
+  font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: rgba(232, 230, 221, 0.6);
+}
+.charge-state { color: rgba(242, 201, 76, 0.85); font-weight: 700; }
+.charge-row.ready .charge-state { color: #fff0b8; }
+.bar-fill.charge { background: linear-gradient(90deg, #6b5417, #f2c94c); width: 0; }
+.charge-row.ready .charge-state { animation: chargePulse 0.9s ease-in-out infinite; }
+@keyframes chargePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
 .hitmarker {
   position: absolute; left: 50%; top: 50%;
   width: 22px; height: 22px; margin: -11px 0 0 -11px;

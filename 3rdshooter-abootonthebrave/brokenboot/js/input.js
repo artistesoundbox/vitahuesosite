@@ -23,6 +23,8 @@ export class InputManager {
     this.move = { forward: 0, strafe: 0, sprint: false };
     // Firing is a union of sources; a connected pad must not stomp a touch hold.
     this.firingState = { mouse: false, pad: false, touch: false };
+    // Target lock is a union too: any source holding it keeps the aim tuned.
+    this.targetingState = { mouse: false, pad: false, touch: false, key: false };
     this.look = { dx: 0, dy: 0 };
     this.actions = [];
 
@@ -62,10 +64,18 @@ export class InputManager {
     return f.mouse || f.pad || f.touch;
   }
 
+  /** Held by any source: tunes the aim onto the attacker nearest the reticle. */
+  get targeting() {
+    const t = this.targetingState;
+    return t.mouse || t.pad || t.touch || t.key;
+  }
+
   releaseFiring() {
     this.firingState.mouse = false;
     this.firingState.pad = false;
     this.firingState.touch = false;
+    this.targetingState.mouse = false;
+    this.targetingState.pad = false;
   }
 
   _push(action) {
@@ -91,6 +101,11 @@ export class InputManager {
       if (e.repeat) { this.keys[e.code] = true; return; }
       this.keys[e.code] = true;
       if (e.code === 'KeyR') this._push('reload');
+      if (e.code === 'KeyC') this._push('crouch');
+      // Live cover-break tuning, for judging the charge timing mid-fight.
+      if (e.code === 'BracketLeft') this._push('flush-shorter');
+      if (e.code === 'BracketRight') this._push('flush-longer');
+      if (e.code === 'Backslash') this._push('flush-reset');
       if (e.code === 'KeyF') this._push('kick');
       if (e.code === 'Space') this._push('jump');
       if (e.code === 'KeyM') this._push('mute');
@@ -111,9 +126,15 @@ export class InputManager {
     });
     window.addEventListener('mousedown', (e) => {
       if (e.button === 0 && this.isLocked()) this.firingState.mouse = true;
+      if (e.button === 2) this.targetingState.mouse = true;
     });
     window.addEventListener('mouseup', (e) => {
       if (e.button === 0) this.firingState.mouse = false;
+      if (e.button === 2) this.targetingState.mouse = false;
+    });
+    // Right-drag is the aim tune, so the browser menu must not open over it.
+    window.addEventListener('contextmenu', (e) => {
+      if (this.isLocked()) e.preventDefault();
     });
 
     window.addEventListener('gamepadconnected', (e) => {
@@ -153,6 +174,7 @@ export class InputManager {
     this.move.forward = forward;
     this.move.strafe = strafe;
     this.move.sprint = Boolean(k['ShiftLeft'] || k['ShiftRight']);
+    this.targetingState.key = Boolean(k['KeyQ']);
   }
 
   _updateGamepad(dt) {
@@ -194,7 +216,9 @@ export class InputManager {
     const dz = (v) => (Math.abs(v) < STICK_DEADZONE ? 0 : (v - Math.sign(v) * STICK_DEADZONE) / (1 - STICK_DEADZONE));
     this.move.strafe = dz(lx);
     this.move.forward = -dz(ly); // stick up is negative on the Y axis
-    this.move.sprint = lMag > SPRINT_STICK || pressed(10) || lt > 0.5;
+    // LT is the aim tune now, so sprint lives on a stick click / left-stick edge.
+    this.move.sprint = lMag > SPRINT_STICK || pressed(10);
+    this.targetingState.pad = lt > TRIGGER_THRESHOLD || pressed(6);
 
     // Look
     if (rMag > STICK_DEADZONE) {
@@ -215,6 +239,7 @@ export class InputManager {
     edge(1, 'reload');  // B
     edge(2, 'mute');    // X
     edge(3, 'jump');    // Y
+    edge(11, 'crouch'); // Right stick click
     edge(9, 'pause');   // Menu
   }
 
@@ -330,6 +355,8 @@ export class InputManager {
     hold('touch-kick', () => this._push('kick'));
     hold('touch-jump', () => this._push('jump'));
     hold('touch-reload', () => this._push('reload'));
+    hold('touch-crouch', () => this._push('crouch'));
+    hold('touch-target', () => { this.targetingState.touch = true; }, () => { this.targetingState.touch = false; });
   }
 
   _moveStick(clientX, clientY, setKnob) {

@@ -17,6 +17,14 @@ export class Hud {
     this.bannerSub = document.getElementById('banner-sub');
     this.toasts = document.getElementById('toasts');
     this.crosshair = document.getElementById('crosshair');
+    this.chargeBar = document.getElementById('charge-bar-fill');
+    this.chargeState = document.getElementById('charge-state');
+    this.chargeRow = this.chargeState ? this.chargeState.parentElement : null;
+    this.powerups = document.getElementById('powerups');
+    this.stance = document.getElementById('stance');
+    this.lockInfo = document.getElementById('lock-info');
+    this._powerupSig = '';
+    this._crossSig = '';
     this.damage = document.getElementById('damage-vignette');
     this.hitmark = document.getElementById('hitmarker');
     this.start = document.getElementById('screen-start');
@@ -69,6 +77,47 @@ export class Hud {
     this.bootProgress.textContent = state.nextBoot
       ? `${state.killsToNext} more for ${state.nextBoot}`
       : 'Maximum tier reached';
+
+    // Boot charge meter, and the stance badge.
+    if (this.chargeBar) {
+      this.chargeBar.style.width = `${Math.round((state.charge || 0) * 100)}%`;
+    }
+    if (this.chargeState) {
+      const ready = Boolean(state.chargeReady);
+      if (this.chargeRow) this.chargeRow.classList.toggle('ready', ready);
+      const text = ready ? 'ready — kick' : 'charging';
+      if (this.chargeState.textContent !== text) this.chargeState.textContent = text;
+    }
+    if (this.stance) this.stance.classList.toggle('show', Boolean(state.crouching));
+
+    // Timed powerups, rebuilt only when the set or the whole seconds change.
+    if (this.powerups) {
+      const p = state.powerups || {};
+      const active = Object.keys(p).filter((k) => p[k] > 0);
+      const sig = active.map((k) => `${k}${Math.ceil(p[k])}`).join(',');
+      if (sig !== this._powerupSig) {
+        this._powerupSig = sig;
+        this.powerups.innerHTML = active
+          .map((k) => `<span class="chip ${k}">${k} ${Math.ceil(p[k])}s</span>`)
+          .join('');
+      }
+    }
+
+    // Reticle states and the lock readout.
+    const crossCls = [
+      state.locked ? 'locked' : '',
+      state.spread > 0.35 ? 'spread' : '',
+      state.onTarget ? 'on-target' : '',
+    ].filter(Boolean).join(' ');
+    if (crossCls !== this._crossSig) {
+      this._crossSig = crossCls;
+      this.crosshair.className = `crosshair ${crossCls}`.trim();
+    }
+    if (this.lockInfo) {
+      const show = state.locked !== null && state.locked !== undefined;
+      this.lockInfo.classList.toggle('show', show);
+      if (show) this.lockInfo.textContent = `locked · ${Math.round(state.locked)}m`;
+    }
 
     if (this._bannerTimer > 0) {
       this._bannerTimer -= dt;

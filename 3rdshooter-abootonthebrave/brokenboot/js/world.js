@@ -52,6 +52,9 @@ export class World {
     // Separate scratch vector: hasLineOfSight() rewrites _tmp, so a probe point
     // must never share it or the sight test silently compares a point to itself.
     this._probe = new THREE.Vector3();
+    // raycast() writes its box hit into _tmp, so the sight test must aim along
+    // its own vector or the tree pass would read a hit point as a direction.
+    this._sightDir = new THREE.Vector3();
   }
 
   /** Nearest blocker along a ray, or null. Used for bullets and line of sight. */
@@ -93,7 +96,7 @@ export class World {
   }
 
   hasLineOfSight(from, to) {
-    const dir = this._tmp.copy(to).sub(from);
+    const dir = this._sightDir.copy(to).sub(from);
     const dist = dir.length();
     if (dist < 1e-3) return true;
     dir.divideScalar(dist);

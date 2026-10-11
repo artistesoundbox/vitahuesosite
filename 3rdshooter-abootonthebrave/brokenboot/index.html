@@ -55,7 +55,16 @@
     </div>
     <div class="bar thin"><div id="boot-bar-fill" class="bar-fill boot"></div></div>
     <div id="boot-progress" class="boot-progress">0 more for Reinforced Boot</div>
+    <div class="charge-row">
+      <span class="charge-label">Boot charge</span>
+      <span id="charge-state" class="charge-state">charging</span>
+    </div>
+    <div class="bar thin charge"><div id="charge-bar-fill" class="bar-fill charge"></div></div>
   </div>
+
+  <div id="powerups" class="powerups"></div>
+  <div id="stance" class="stance">CROUCHED</div>
+  <div id="lock-info" class="lock-info"></div>
 
   <div id="banner" class="banner"></div>
   <div id="banner-sub" class="banner-sub"></div>
@@ -68,8 +77,10 @@
   <div id="touch-look" class="touch-look"></div>
   <div id="touch-stick" class="touch-stick"><div id="touch-knob" class="touch-knob"></div></div>
   <div class="touch-buttons">
-    <button id="touch-jump" class="touch-btn small" type="button">JUMP</button>
+    <button id="touch-target" class="touch-btn small" type="button">TARGET</button>
+    <button id="touch-crouch" class="touch-btn small" type="button">CROUCH</button>
     <button id="touch-reload" class="touch-btn small" type="button">RELOAD</button>
+    <button id="touch-jump" class="touch-btn small" type="button">JUMP</button>
     <button id="touch-kick" class="touch-btn medium" type="button">🥾 BOOT</button>
     <button id="touch-fire" class="touch-btn fire" type="button">FIRE</button>
   </div>

@@ -48,6 +48,49 @@ export const SETTINGS = {
   kickArc: Math.PI * 0.6,
   kickCooldown: 0.8,
 
+  // Boot charge. Routs and charge crates fill it; a full meter turns the next
+  // kick into a charged one that sends the whole arc running at once.
+  chargeMax: 100,
+  chargePerRout: 9,
+  chargePerGunfireDown: 3,
+  chargePickup: 40,
+  chargedExtraRouts: 4,
+  chargedKnockbackScale: 1.6,
+
+  // Crouch. Steadies the rifle and shrinks the target, at the cost of speed.
+  crouchSpeedScale: 0.55,
+  crouchSpreadScale: 0.45,
+  crouchHitScale: 0.72,
+  crouchCamDrop: 0.45,
+
+  // Target lock (left trigger / right mouse / Q): tunes the aim onto the
+  // attacker closest to the crosshair and steadies the shot while held.
+  lockAngle: 0.22,
+  lockRate: 7,
+  lockSpreadScale: 0.45,
+  lockMaxRange: 70,
+  lockGrace: 0.35,
+
+  // Timed powerups.
+  rapidFireScale: 0.55,
+  rapidDuration: 12,
+  armorDuration: 12,
+  speedDuration: 12,
+  armorDamageScale: 0.55,
+  speedPowerupBonus: 0.25,
+
+  // Elimination drop table. Ammo comes first so a dry player can never stall.
+  dropAmmo: 0.26,
+  dropHealth: 0.16,
+  dropReload: 0.1,
+  dropCharge: 0.14,
+  dropRapid: 0.08,
+  dropArmor: 0.08,
+  dropAmmoIfDry: 45,
+  dropHealthAmount: 30,
+  dropReloadReserve: 30,
+  dropChargeAmount: 40,
+
   // Enemy
   enemyHealth: 100,
   enemyWalkSpeed: 3.4,
