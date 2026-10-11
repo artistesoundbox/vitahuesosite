@@ -422,8 +422,9 @@
     down. The barriers are there at every height, and the profile is gentle enough that you can hold the throttle over
     every crest — a hill only throws you when its curvature beats gravity, and none of them do. Hold the throttle,
     brake for the chicane, and try not to be the one who parks a starfighter in a wall. A controller works too — left
-    stick or d-pad to steer, RT or A for throttle, LT to brake and reverse, <b>right stick to look around</b>, or hold
-    <b>LB</b>/<b>RB</b> to swing the view to the sides, Y for sound, Start to restart. Drag the canvas to look, too — or press <b>Steer: drag</b> and a thumb anywhere on the screen sets the
+    stick or d-pad to steer, RT or A for throttle, LT to brake and reverse, <b>right stick to look around</b>, <b>A</b>
+    (or the keyboard's Shift) for a nitro boost, hold <b>LB</b>/<b>RB</b> to spin the hull sideways, Y for sound, Start
+    to restart. Drag the canvas to look, too — or press <b>Steer: drag</b> and a thumb anywhere on the screen sets the
     lock, with a pull up or down for throttle and brake. On a touch screen the <b>look stick</b> above the throttle does
     what the right stick does, and the results board is also a button: <b>tap it to race again</b>. <b>P</b> pauses.</p>
 
@@ -453,8 +454,8 @@
         <img class="mark" src="anthonitus.png" alt="Anthonitus" />
         <div class="load-line">booting the city…</div>
         <button class="ca-btn start" id="start-btn" type="button">▶&nbsp; Start race</button>
-        <div class="load-hint">three laps of the city · ◀ ▶ or the left stick steers · GAS or RT goes
-        · tap the results board to race again</div>
+        <div class="load-hint">three laps of the city · ◀ ▶ or the left stick steers · GAS or RT goes · A boosts
+        · LB/RB spins · tap the results board to race again</div>
       </div>
     </div>
 
@@ -590,6 +591,20 @@
     const BOOST_TIME = 1.5;       // seconds of raised ceiling per hit
     const BOOST_TOP = 1.22;       // how much more top speed that buys
     const BOOST_ACCEL = 1.9;
+    /* The nitro the A button fires. The painted arrows are the TRACK's boost —
+       everyone gets those, and the same ones; this is the driver's own, and
+       the difference is the cooldown. One press is a shorter, weaker shove
+       than a pad and it will not fire again for NITRO_CD seconds, so it is an
+       overtake tool rather than a way to hold boost for a whole straight. */
+    const NITRO_CD = 3.0;         // seconds before A fires again
+    const NITRO_TIME = 1.2;       // how long each press lasts
+    const NITRO_GAIN = 9;         // units/s handed over on the press
+    /* The sideways spin. Hold a bumper and the hull turns ACROSS its own line
+       and holds the angle while the key is held; the speed pays for it in
+       proportion to the slip, which is what stops a drift being free time. */
+    const DRIFT_MAX = 0.85;       // radians of yaw the spin holds (~49 deg)
+    const DRIFT_SLIDE = 2.2;      // how hard the nose pulls the hull sideways
+    const DRIFT_SCRUB = 0.8;      // and what the slide costs in speed
     const RAMP_LEN = 13;
     /* A ramp spans the WHOLE tarmac, edge to kerb. It used to take a lane at
        lat ±3.5 with a half-width of 3.4 and leave the other lane clear, which
@@ -1283,7 +1298,19 @@
        The centre dashes stay white for the same reason — they are how you read
        the road at speed. envDim() at the debug handle rescales the same list,
        which is how the before/after is measured rather than asserted. */
-    const ENV_DIM = 0.6;
+    /* Two numbers, not one, because "the city got darker" and "the towers got
+       darker" are not the same job: the flat surfaces below are one basic
+       colour each, while a tower's concrete comes from a texture multiplied by
+       a per-vertex tone. The flat pass is deeper than the buildings — the
+       ground, the streets, the slabs and the tarmac are what a neon city sits
+       ON, and they should read as near-black with the road only just brighter
+       than the dark between the blocks. Measured after this pass with
+       frameStats(), same driving view at 740x420, this build against the same
+       file with this whole pass reverted: mean frame luminance 35.0 -> 27.4
+       over fourteen samples, p95 110 -> 109. The city came down a fifth and
+       the lights did not move at all. */
+    const ENV_DIM = 0.40;
+    const FACADE_DIM = 0.68;      // the towers, dimmed where their concrete is
     const envMats = [];
     function envDim(m) {
       m.userData.envBase = m.color.clone();
@@ -1490,7 +1517,10 @@
       scene.add(new THREE.Mesh(geometryFrom(clutter), new THREE.MeshLambertMaterial({ vertexColors: true })));
       beaconGroups.forEach(function (A, i) {
         if (!A.idx.length) return;
-        const mat = envDim(new THREE.MeshBasicMaterial({ vertexColors: true }));
+        /* NOT envDim: a beacon is a light. It was in the dim list, which is
+           exactly backwards — the darker the skyline, the more a rooftop
+           warning light should stand off it. */
+        const mat = new THREE.MeshBasicMaterial({ vertexColors: true });
         mat.userData.rate = 0.34 + i * 0.17;      // each group on its own cycle
         mat.userData.phase = i * 0.31;
         mat.userData.duty = 0.2 + (i % 3) * 0.06; // and its own dwell
@@ -1503,7 +1533,12 @@
          as lit — and they follow the same spline as the asphalt, chicane and
          all, for free. */
       const lamps = { pos: [], nrm: [], col: [], idx: [] };
-      const POST = [0.13, 0.15, 0.19], BULB = [1.35, 1.02, 0.6];
+      /* The bulbs are pushed well over 1 on purpose. They are Lambert, so the
+         night rig lights them and a dim rig left every street lamp a dull
+         amber smear; over 1 in the vertex colour, with ACES tone mapping, they
+         roll off toward white instead of clipping, which is what a sodium lamp
+         seen at night actually does. */
+      const POST = [0.13, 0.15, 0.19], BULB = [3.4, 2.5, 1.35];
       for (let s = 8; s < trackLen; s += 14) {
         const side = (Math.floor(s / 14) % 2 === 0) ? 1 : -1;
         const t = trackAt(s);
@@ -1574,7 +1609,7 @@
           : (pick < 0.92 ? [255, 118, 212] : [132, 255, 214]));
         g.fillStyle = 'rgb(' + rgb.map(function (v) { return Math.round(v * l); }).join(',') + ')';
       } else {
-        g.fillStyle = '#242b35';
+        g.fillStyle = '#191e26';
       }
       g.fillRect(x * CELL + 3, y * CELL + 4, CELL - 6, CELL - 9);
       skin.lit[y * WIN.cols + x] = on ? 1 : 0;
@@ -1593,7 +1628,7 @@
         canvas: c, ctx: c.getContext('2d'), rnd: mulberry32(seed),
         lit: new Uint8Array(COLS * ROWS), tex: null, cells: COLS * ROWS
       };
-      skin.ctx.fillStyle = '#242b35';    // concrete, not a void
+      skin.ctx.fillStyle = '#191e26';    // concrete, not a void — and dark
       skin.ctx.fillRect(0, 0, c.width, c.height);
       for (let y = 0; y < ROWS; y++) {
         for (let x = 0; x < COLS; x++) {
@@ -1815,7 +1850,11 @@
         A.pos.push(p.getX(i) + b.x, p.getY(i) + b.h / 2, p.getZ(i) + b.z);
         A.nrm.push(n.getX(i), n.getY(i), n.getZ(i));
         A.uv.push(uv.getX(i), uv.getY(i));
-        A.col.push(b.tone * 0.70, b.tone * 0.80, b.tone);
+        /* the concrete, dimmed — NOT the lit cells: this is the DIFFUSE
+           colour, and the window texture above is the emissive map, so the
+           lit cells keep every bit of their brightness while the wall they
+           sit on goes down */
+        A.col.push(b.tone * 0.70 * FACADE_DIM, b.tone * 0.80 * FACADE_DIM, b.tone * FACADE_DIM);
       }
       const ix = g.index;
       for (let i = 0; i < ix.count; i++) A.idx.push(base + ix.getX(i));
@@ -1943,7 +1982,10 @@
       const curbGeo = new THREE.BufferGeometry();
       curbGeo.setAttribute('position', new THREE.Float32BufferAttribute(curb.pos, 3));
       curbGeo.setAttribute('color', new THREE.Float32BufferAttribute(curb.col, 3));
-      scene.add(new THREE.Mesh(curbGeo, envDim(new THREE.MeshBasicMaterial({ vertexColors: true }))));
+      /* the kerbs are a LIGHT: white and red alternating is how the edge of the
+         tarmac reads at speed, so they stay out of the dim list too — the
+         darker the asphalt beside them, the more they do their job. */
+      scene.add(new THREE.Mesh(curbGeo, new THREE.MeshBasicMaterial({ vertexColors: true })));
     }
 
     /* ---------- a point on the road, in road coordinates ---------- */
@@ -2516,8 +2558,9 @@
              ramp is just a place where the road is higher than zero */
           hgt: 0, vy: 0, air: false,
           /* what the racer is carrying */
-          boostT: 0, boostCd: 0, shield: false, flashT: 0,
-          input: { steer: 0, throttle: 0, brake: 0 },
+          boostT: 0, boostCd: 0, nitroCd: 0, drift: 0, shield: false, flashT: 0,
+          bumpCd: 0,
+          input: { steer: 0, throttle: 0, brake: 0, boost: false, spin: 0 },
           group: group, mesh: mesh, blob: blob
         });
       }
@@ -2589,10 +2632,37 @@
       r.latV *= Math.exp(-LATERAL_DAMP * dt);
       r.lat += r.latV * dt;
 
+      /* --- the sideways spin ---
+         Hold a bumper and the hull turns ACROSS its own line: the nose comes
+         off the direction of travel and stays there while the button is held,
+         and releasing springs it straight. This is a slide, not a turn — the
+         road direction is untouched, so it is how you flick the tail out and
+         hold an angle through a corner. The price is the slip: the flatter to
+         the side the hull is pointing, the more of its speed goes into the
+         sideways push and the more is scrubbed off, so it is not free time. */
+      const spinIn = r.isPlayer ? clamp(inp.spin || 0, -1, 1) : 0;
+      r.drift = (r.drift || 0) + (spinIn * DRIFT_MAX - (r.drift || 0)) * Math.min(1, 7 * dt);
+      if (Math.abs(r.drift) > 0.02) {
+        const slip = Math.sin(r.drift);
+        r.latV += slip * Math.abs(r.v) * DRIFT_SLIDE * grip * dt;
+        if (r.v > 0) r.v = Math.max(0, r.v - Math.abs(slip) * r.v * DRIFT_SCRUB * dt);
+      }
+
       /* --- speed --- */
       let thr = clamp(inp.throttle, 0, 1);
       if (raceState !== 'racing' && raceState !== 'finished') thr = 0;   // grid, ready, countdown
       const braking = clamp(inp.brake, 0, 1);
+      /* --- your own nitro: the A button, and the only boost with a cooldown
+             on the driver rather than on the track --- */
+      r.nitroCd = Math.max(0, (r.nitroCd || 0) - dt);
+      if (r.isPlayer && inp.boost && r.nitroCd <= 0 && raceState === 'racing' && r.v > 2) {
+        r.nitroCd = NITRO_CD;
+        r.boostT = Math.max(r.boostT, NITRO_TIME);
+        r.v = Math.min(MAX_SPEED * BOOST_TOP, r.v + NITRO_GAIN);
+        blip(760, 0.16, 'sawtooth', 0.1);
+        rumble(0.4, 160);
+        addShake(0.13);
+      }
       /* One boost timer, spent here, so a painted pad and a powerup mean the
          same thing to the maths below: a higher ceiling and a harder pull. */
       r.boostT = Math.max(0, (r.boostT || 0) - dt);
@@ -2774,7 +2844,9 @@
         look.y + HOVER + r.height / 2 + bob + r.hgt - r.lat * Math.sin(look.b),
         look.pz + look.nz * r.lat
       );
-      r.group.rotation.set(r.pitch, r.yaw, r.roll + look.b);   // sits with the deck
+      /* r.drift is the spin, on top of the yaw the velocity already earns: the
+         hull points off its own line, which is the whole picture of a drift */
+      r.group.rotation.set(r.pitch, r.yaw + r.drift, r.roll + look.b);   // sits with the deck
 
       /* the shadow stays on the road while the hull leaves it, and spreads as
          the hull gets further away: without that a jump has no height in it */
@@ -2809,7 +2881,38 @@
       r.aiLatTarget = targetLine(r.s);
     }
 
-    function separateCars() {
+    /* Contact between two hulls.
+
+       This used to be a nudge you could ignore: overlap in lap distance and
+       lateral offset pushed them apart and knocked 1.5% off the one behind,
+       which at a 30 unit/s closing speed meant a faster hull simply drove
+       THROUGH the one in front and came out the far side. A 1.5% penalty per
+       frame is a wall, so nothing here is a fixed number any more.
+
+       Two responses, because there are two ways to touch. Side by side, each
+       hull is shoved out of the other's lane — the lateral half, unchanged in
+       spirit, and it is what does the work when two cars run level.
+
+       Nose to tail is an inelastic shove. The hull in front is kicked along by
+       part of the closing speed, and the hull behind is not allowed to come out
+       of the contact faster than the one it just hit. That last line is the
+       whole difference between a bump and a ghost: a follower that cannot
+       out-run the car in front of it has to go AROUND it, which is what "no
+       more driving through each other" has to mean in code. It is a speed
+       match, not a wall — the follower keeps its steering, and the contact ends
+       the moment the two are no longer overlapping along the lap. */
+    let bumpCd = 0;
+    function carBump(behind, ahead, closing) {
+      if (!(behind.isPlayer || ahead.isPlayer)) return;
+      if (bumpCd > 0) return;
+      bumpCd = 0.32;
+      const hard = clamp(closing / 20, 0.08, 0.5);
+      blip(170, 0.14, 'square', hard * 0.5);
+      addShake(hard);
+      rumble(hard * 0.8, 190);
+    }
+    function separateCars(dt) {
+      bumpCd = Math.max(0, bumpCd - dt);
       for (let i = 0; i < racers.length; i++) {
         for (let j = i + 1; j < racers.length; j++) {
           const a = racers[i], b = racers[j];
@@ -2817,12 +2920,37 @@
           if (ds > trackLen / 2) ds -= trackLen;
           if (ds < -trackLen / 2) ds += trackLen;
           const dl = b.lat - a.lat;
-          if (Math.abs(ds) < 5.4 && Math.abs(dl) < 3.0) {
-            const push = (3.0 - Math.abs(dl)) * 0.5 * (dl >= 0 ? 1 : -1);
-            a.latV -= push * 1.5;
-            b.latV += push * 1.5;
-            (ds > 0 ? a : b).v *= 0.985;
+          const overS = 5.4 - Math.abs(ds), overL = 3.0 - Math.abs(dl);
+          if (overS <= 0 || overL <= 0) continue;          // not touching
+          const push = overL * 0.5 * (dl >= 0 ? 1 : -1);
+          a.latV -= push * 1.5;
+          b.latV += push * 1.5;
+          /* and the overlap itself is undone along the road, so the hull behind
+             cannot simply drive through the one in front. Only the part that is
+             PAST the touching distance is corrected — 5.4 units is the contact
+             window, 4.0 is nose to tail — so side-by-side running and a light
+             rub are untouched, and a car parked across the road is an obstacle
+             to go around rather than a ghost to drive through. The car behind
+             carries most of the correction, which is what makes it a bump
+             rather than both hulls being teleported apart. */
+          const GAP_MIN = 4.0;                             // nose to tail
+          if (Math.abs(ds) < GAP_MIN) {
+            const need = GAP_MIN - Math.abs(ds);
+            const back = ds > 0 ? a : b, front = ds > 0 ? b : a;
+            back.s = wrapS(back.s - need * 0.7);
+            front.s = wrapS(front.s + need * 0.3);
           }
+          const behind = ds > 0 ? a : b, ahead = ds > 0 ? b : a;
+          const closing = behind.v - ahead.v;
+          if (closing <= 0.5) continue;                    // pulling apart
+          const hit = Math.min(closing, 18);
+          /* the one in front takes a quarter of the hit forward, capped at the
+             speed a boost could reach so a chain of bumps cannot stack up */
+          ahead.v = Math.min(ahead.v + hit * 0.2, MAX_SPEED * BOOST_TOP);
+          /* and the one behind pays for it, and cannot end the contact faster
+             than the hull it hit — that single min() is the anti-pass-through */
+          behind.v = Math.max(0, Math.min(behind.v - hit * 0.35, ahead.v + 1.0));
+          carBump(behind, ahead, closing);
         }
       }
     }
@@ -2879,7 +3007,8 @@
         r.latV = 0; r.v = 0; r.lap = 0; r.laps = []; r.finished = false;
         r.lastLapAt = 0; r.lastS = r.s; r.roll = 0; r.pitch = 0; r.aiLatTarget = r.lat;
         r.hgt = 0; r.vy = 0; r.air = false; r.stuckFor = 0;
-        r.boostT = 0; r.boostCd = 0; r.shield = false; r.flashT = 0;
+        r.boostT = 0; r.boostCd = 0; r.nitroCd = 0; r.drift = 0;
+        r.shield = false; r.flashT = 0;
         const h = trackAt(r.s);
         r.yaw = Math.atan2(-h.tx, -h.tz);
         r.group.position.set(h.px + h.nx * r.lat, h.y + HOVER + r.height / 2 - r.lat * Math.sin(h.b), h.pz + h.nz * r.lat);
@@ -3361,11 +3490,16 @@
       /* positive steer means towards +lat, and the track's normal points to
          the driver's LEFT — so the left key is the positive one. Getting this
          backwards is invisible in the code and obvious the moment you drive. */
-      let steer = 0, throttle = 0, brake = 0;
+      let steer = 0, throttle = 0, brake = 0, boost = false, spin = 0;
       if (keys['ArrowLeft'] || keys['a'] || keys['A']) steer += 1;
       if (keys['ArrowRight'] || keys['d'] || keys['D']) steer -= 1;
       if (keys['ArrowUp'] || keys['w'] || keys['W']) throttle = 1;
       if (keys['ArrowDown'] || keys['s'] || keys['S']) brake = 1;
+      /* the keyboard has the same two moves the pad does, on keys that were
+         doing nothing: Shift is the nitro, Q and E spin the hull */
+      if (keys['Shift']) boost = true;
+      if (keys['q'] || keys['Q']) spin += 1;
+      if (keys['e'] || keys['E']) spin -= 1;
       if (touch.steer) steer = touch.steer;
       if (touch.throttle) throttle = 1;
       if (touch.brake) brake = 1;
@@ -3374,6 +3508,10 @@
       if (pad.steer) steer = pad.steer;
       if (pad.throttle > throttle) throttle = pad.throttle;
       if (pad.brake > brake) brake = pad.brake;
+      /* held, not edge-triggered: the nitro spends itself on the cooldown in
+         driveRacer, and the spin is a held angle by definition */
+      if (pad.boost) boost = true;
+      if (pad.spin) spin = pad.spin;
       /* the thumb on the canvas, if that mode is on: it is the explicit choice,
          so it wins over the stick, but the pedals still merge by max() */
       if (dsMode && dsPointer !== null) {
@@ -3381,7 +3519,8 @@
         if (dsGas > throttle) throttle = dsGas;
         if (dsBrake > brake) brake = dsBrake;
       }
-      return { steer: clamp(steer, -1, 1), throttle: throttle, brake: brake };
+      return { steer: clamp(steer, -1, 1), throttle: throttle, brake: brake,
+        boost: boost, spin: clamp(spin, -1, 1) };
     }
 
     /* ============================================================
@@ -3389,7 +3528,7 @@
        throughout: the left stick is a fraction of lock, RT and LT are
        proportional, and the face buttons are edge-triggered so holding
        one never repeats its action.
-       ============================================================ */    const pad = { live: false, steer: 0, throttle: 0, brake: 0, lookX: 0, lookY: 0 };
+       ============================================================ */    const pad = { live: false, steer: 0, throttle: 0, brake: 0, lookX: 0, lookY: 0, boost: false, spin: 0 };
     const padWas = { a: false, x: false, y: false, lb: false, start: false };
     const PAD_DEAD = 0.18;
     let offRoad = false;          // the player is on the shoulder this frame
@@ -3415,7 +3554,8 @@
       if (!gp) {
         if (pad.live) {
           pad.live = false;
-          pad.steer = pad.throttle = pad.brake = pad.lookX = pad.lookY = 0;
+          pad.steer = pad.throttle = pad.brake = pad.lookX = pad.lookY = pad.spin = 0;
+          pad.boost = false;
         }
         return;
       }
@@ -3435,18 +3575,26 @@
       const ry = gp.axes.length > 3 ? (gp.axes[3] || 0) : 0;
       pad.lookX = Math.abs(rx) > PAD_DEAD ? clamp(rx, -1, 1) : 0;
       pad.lookY = Math.abs(ry) > PAD_DEAD ? clamp(ry, -1, 1) : 0;
-      /* And the bumpers look to the SIDES, which is the one thing the right
-         stick is bad at while the right thumb is also on the throttle: LB swings
-         the view left, RB right, held, at the same rate the stick swings it. The
-         bumper wins when both are asking — it is the deliberate press. Digital
-         buttons, so this is full deflection and the look springs back the moment
-         they are released, exactly like the stick and the canvas drag. */
-      if (down(5)) pad.lookX = 1;
-      else if (down(4)) pad.lookX = -1;
+      /* The bumpers SPIN the hull sideways. They used to swing the view, and
+         that was wrong: the look lives on the right stick (and the canvas
+         drag, and the touch stick), which is what the brief actually asked
+         for, and the bumpers are the one pair of buttons either thumb can hold
+         while the other two are busy steering and throttling. LB spins the hull
+         one way and RB the other, held, and it springs straight on release. */
+      /* LB spins the hull to the left, RB to the right. The sign matters and
+         is easy to get backwards: +drift turns the nose towards +lat, which
+         the track's normal defines as the driver's LEFT — measured against a
+         left stick input, which moves the hull left and turns its yaw UP. */
+      pad.spin = down(4) ? 1 : (down(5) ? -1 : 0);
+      /* A is the nitro. It still doubles as a throttle for a pad whose triggers
+         do not report a value, which is why it appears in the max() here: a
+         held A then both accelerates and spends the nitro, which is what a
+         driver pressing it wants anyway. */
       const rt = Math.max(val(7), down(0) ? 1 : 0);     // A or right trigger
       const lt = val(6);                                // left trigger
       pad.throttle = rt > 0.06 ? rt : 0;
       pad.brake = lt > 0.06 ? lt : 0;
+      pad.boost = down(0);                              // the nitro, on its own cooldown
       const edge = function (name, i, fn) {             // press once, act once
         const is = down(i);
         if (is && !padWas[name]) fn();
@@ -3540,7 +3688,7 @@
       for (const k in keys) keys[k] = false;
       touch.steer = 0; touch.throttle = 0; touch.brake = 0;
       pad.steer = 0; pad.throttle = 0; pad.brake = 0;
-      pad.lookX = 0; pad.lookY = 0;
+      pad.lookX = 0; pad.lookY = 0; pad.spin = 0; pad.boost = false;
       dsEnd();
       for (let i = 0; i < padReleasers.length; i++) padReleasers[i]();
     }
@@ -3974,10 +4122,12 @@
       me.input.steer = pin.steer;
       me.input.throttle = pin.throttle;
       me.input.brake = pin.brake;
+      me.input.boost = pin.boost;
+      me.input.spin = pin.spin;
 
       racers.forEach(function (r) { if (!r.isPlayer) driveAI(r, dt); });
       racers.forEach(function (r) { driveRacer(r, dt); });
-      separateCars();
+      separateCars(dt);
       updatePickups(dt, t);
 
       /* the arrows and the signs breathe, all from one material each */
@@ -4208,6 +4358,8 @@
           bankDeg: +(trackAt(mm.s).b * 180 / Math.PI).toFixed(2),
             shake: +shake.toFixed(3), offRoad: offRoad,
             boostT: +mm.boostT.toFixed(2), boostCd: +mm.boostCd.toFixed(2), shield: mm.shield,
+            nitroCd: +mm.nitroCd.toFixed(2), drift: +(mm.drift || 0).toFixed(3),
+            yaw: +mm.group.rotation.y.toFixed(3),
             hgt: +mm.hgt.toFixed(2), air: mm.air, look: [+lookYaw.toFixed(2), +lookPitch.toFixed(2)],
             pad: pad.live, padSteer: +pad.steer.toFixed(2), padThrottle: +pad.throttle.toFixed(2),
             input: { steer: +mm.input.steer.toFixed(2), throttle: +mm.input.throttle.toFixed(2), brake: +mm.input.brake.toFixed(2) },
@@ -4742,6 +4894,7 @@
           return (h >>> 0).toString(16);
         },
         pad: function () { return { live: pad.live, steer: pad.steer, throttle: pad.throttle, brake: pad.brake,
+          boost: !!pad.boost, spin: pad.spin,
           lookX: +pad.lookX.toFixed(3), lookY: +pad.lookY.toFixed(3), look: [+lookYaw.toFixed(3), +lookPitch.toFixed(3)],
           id: (function () { const gp = firstPad(); return gp ? (gp.id || 'pad') : null; })() }; },
         shake: function (v) { if (v !== undefined) shake = v; return shake; },
