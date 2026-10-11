@@ -39,6 +39,8 @@ function parseArgs(argv) {
     seed: 20260411,
     baseline: false,
     record: false,
+    honest: false,
+    requireFinish: false,
     headed: false,
     keepOpen: false,
     quiet: false,
@@ -57,6 +59,9 @@ function parseArgs(argv) {
       case '--seed': opts.seed = num; break;
       case '--baseline': opts.baseline = true; break;
       case '--record': opts.record = true; break;
+      case '--honest': opts.honest = true; break;
+      case '--check-lock': opts.checkLock = true; break;
+      case '--require-finish': opts.requireFinish = true; break;
       case '--headed': opts.headed = true; break;
       case '--keep-open': opts.keepOpen = true; break;
       case '--quiet': opts.quiet = true; break;
@@ -80,6 +85,10 @@ function printUsage() {
   --seed=N         RNG seed, for a repeatable campaign (default 20260411, 0 = real random)
   --baseline       compare wave and tier timings against test/campaign-baseline.json
   --record         write the timings from this run to that baseline
+  --honest         play the match for real: the officer can die, and the report says where
+  --check-lock     assert the aim trigger rule (fresh press retargets, held keeps its
+target) instead of playing the campaign
+  --require-finish fail the run if the campaign did not reach the last wave
   --url=URL        page to load (default: served from this repo)
   --port=N         port for the bundled static server
   --no-server      use a server that is already running
@@ -256,16 +265,27 @@ async function main() {
   // ---------------------------------------------------------------- error capture
   const consoleErrors = [];
   const consoleWarnings = [];
+  const seenErrors = new Set();
+  const addError = (text) => {
+    if (seenErrors.has(text)) return;
+    seenErrors.add(text);
+    consoleErrors.push(text);
+  };
   cdp.on('Runtime.exceptionThrown', ({ exceptionDetails }) => {
-    consoleErrors.push(`exception: ${exceptionDetails.exception?.description || exceptionDetails.text}`);
+    addError(`exception: ${exceptionDetails.exception?.description || exceptionDetails.text}`);
   });
   cdp.on('Runtime.consoleAPICalled', ({ type, args }) => {
     const text = (args || []).map((a) => a.value ?? a.description ?? '').join(' ');
-    if (type === 'error') consoleErrors.push(`console.error: ${text}`);
+    if (type === 'error') addError(`console.error: ${text}`);
     else if (type === 'warning') consoleWarnings.push(`console.warn: ${text}`);
   });
   cdp.on('Log.entryAdded', ({ entry }) => {
-    if (entry.level === 'error') consoleErrors.push(`log: ${entry.text}`);
+    if (entry.level === 'error') addError(`log: ${entry.text}${entry.url ? ` <${entry.url}>` : ''}`);
+  });
+  // A missing asset shows up as a console 404 with no URL attached, so track the
+  // responses too — otherwise the failure report cannot say what is missing.
+  cdp.on('Network.responseReceived', ({ response }) => {
+    if (response.status >= 400) addError(`HTTP ${response.status} for ${response.url}`);
   });
   const failedRequests = [];
   const meaningful = new Set(['Script', 'Fetch', 'XHR', 'Document', 'Stylesheet']);
@@ -310,6 +330,8 @@ async function main() {
     waveLimitSeconds: opts.waveLimitSeconds,
     maxSteps: opts.maxSteps,
     seed: opts.seed,
+    instrument: opts.honest ? 'none' : 'alive',
+    checkLock: opts.checkLock || false,
   })}); })()`;
 
   const startedAt = Date.now();
@@ -357,18 +379,55 @@ async function main() {
 /** Everything that makes a run a failure, rather than an interesting number. */
 function assess(report) {
   const reasons = [];
+  const findings = [];
+
+  // The aim-trigger probe is a single assertion, not a campaign.
+  if (report.lockCheck) {
+    const c = report.lockCheck;
+    if (!c.pass) {
+      reasons.push(`the aim trigger picked ${c.firstPress} on the first press (wanted ${'near'}), `
+        + `kept ${c.heldDuringSwing} while held (wanted near), then picked ${c.freshPress} on a fresh press (wanted far)`);
+    }
+    if (report.failedRequests?.length) reasons.push(`${report.failedRequests.length} failed request(s): ${report.failedRequests[0]}`);
+    return { ok: reasons.length === 0, reasons, findings, good: [], baselineDelta: null, errors: [] };
+  }
   const errors = [...(report.errors || []), ...(report.consoleErrors || [])];
   if (errors.length) reasons.push(`${errors.length} error(s): ${errors[0]}`);
-  if (report.outcome === 'over') reasons.push('the player was killed');
   if (report.stalledWave) reasons.push(`wave ${report.stalledWave.wave} stalled for ${report.stalledWave.stalledFor}s with ${report.stalledWave.hostiles} attacker(s) left`);
 
   if (!(report.waves || []).length) reasons.push('no waves completed');
   if (report.outcome === 'step-cap') reasons.push('the frame cap was reached before the campaign ended');
 
-  // A wave that closed with the harness still running means it never handed
-  // over, which after a clean run only happens at the wave cap.
+  // Dying is a difficulty datapoint rather than a defect, unless the run was
+  // asked to finish the campaign. Either way the unreached waves are noted.
+  const killed = report.outcome === 'death';
+  const victory = report.outcome === 'victory';
+  if (victory) {
+    findings.push(`the campaign was cleared in ${report.gameSeconds}s with ${report.eliminations} elimination(s)`);
+  } else if (killed) {
+    const line = `the officer was killed in wave ${report.wavesReached} after ${report.gameSeconds}s, with ${report.eliminations} elimination(s)`;
+    if (opts.requireFinish) reasons.push(line); else findings.push(line);
+  } else if (report.outcome === 'over') {
+    reasons.push('the run ended without the game reporting a victory or a death');
+  }
+
+  // A wave row that closed with the harness still running never handed over.
+  // A death or a victory explains the last one, so it is context there.
   for (const w of report.waves || []) {
-    if (w.closedByHarness) reasons.push(`wave ${w.wave} never finished (${w.durationSeconds}s with ${w.eliminations} elimination(s))`);
+    if (!w.closedByHarness) continue;
+    const line = `wave ${w.wave} never finished (${w.durationSeconds}s, ${w.eliminations} elimination(s))`;
+    if (killed || victory) findings.push(line); else reasons.push(line);
+  }
+  if (!killed && !victory && report.wavesReached <= opts.waves && !report.stalledWave) {
+    findings.push(`stopped in wave ${report.wavesReached} (${report.outcome})`);
+  }
+
+  // A wave that sags — one attacker unreachable, or the line hiding too long —
+  // shows up as a long quiet stretch rather than a hard stall.
+  for (const w of report.waves || []) {
+    if (!w.closedByHarness && w.longestGapSeconds > 60) {
+      findings.push(`wave ${w.wave} went ${w.longestGapSeconds}s with no elimination (it took ${w.durationSeconds}s overall)`);
+    }
   }
 
   if (report.failedRequests?.length) reasons.push(`${report.failedRequests.length} failed request(s): ${report.failedRequests[0]}`);
@@ -387,16 +446,47 @@ function assess(report) {
     }
   }
 
-  return { ok: reasons.length === 0, reasons, baselineDelta, errors };
+  return { ok: reasons.length === 0, reasons, findings, baselineDelta, errors };
 }
 
 function printReport(report, passed) {
   const pad = (s, n) => String(s).padEnd(n);
   console.log('');
-  console.log(`${pad('wave', 6)}${pad('starts', 9)}${pad('clears', 9)}${pad('duration', 10)}${pad('hostiles', 10)}${pad('kills', 6)}`);
+
+  if (report.lockCheck) {
+    const c = report.lockCheck;
+    console.log('Aim trigger (left trigger / right mouse / Q)');
+    console.log(`  lock cone ${c.cone} rad, probe attackers: near ${c.anglesRadians?.near} rad off the crosshair, far ${c.anglesRadians?.far}`);
+    console.log(`  ${pad('fresh press', 16)}${pad(c.firstPress, 8)}${c.firstPress === 'near' ? 'the attacker nearest the crosshair' : 'WRONG'}`);
+    console.log(`  ${pad('held, aim swung', 16)}${pad(c.heldDuringSwing, 8)}${c.heldDuringSwing === 'near' ? 'keeps its target, no flicking' : 'WRONG'}`);
+    console.log(`  ${pad('fresh press again', 16)}${pad(c.freshPress, 8)}${c.freshPress === 'far' ? 'retargets to the new nearest' : 'WRONG'}`);
+    if (c.detail) console.log(`  ${c.detail}`);
+    if (passed.ok) {
+      console.log('\nPASS — a press retargets to the attacker nearest the crosshair, and a held trigger keeps its target.');
+    } else {
+      console.log('\nFAIL');
+      for (const reason of passed.reasons) console.log(`  - ${reason}`);
+    }
+    return;
+  }
+  if (report.instrumented) {
+    console.log('(instrumented: the officer is kept on their feet so every wave can be paced)');
+  }
+  console.log(`${pad('wave', 6)}${pad('starts', 9)}${pad('clears', 9)}${pad('duration', 10)}${pad('hostiles', 10)}${pad('kills', 7)}${pad('damage', 9)}${pad('dmg/s', 7)}${pad('quietest', 9)}`);
   for (const w of report.waves || []) {
-    const flag = w.closedByHarness ? ' (unfinished)' : '';
-    console.log(`${pad(w.wave, 6)}${pad(`${w.startSeconds}s`, 9)}${pad(`${w.clearSeconds}s`, 9)}${pad(`${w.durationSeconds}s${flag}`, 10)}${pad(w.hostilesAtStart, 10)}${pad(w.eliminations, 6)}`);
+    const flag = w.endedByVictory ? ' (cleared)' : (w.closedByHarness ? ' (unfinished)' : '');
+    console.log(`${pad(w.wave, 6)}${pad(`${w.startSeconds}s`, 9)}${pad(`${w.clearSeconds}s`, 9)}${pad(`${w.durationSeconds}s${flag}`, 10)}${pad(w.hostilesAtStart, 10)}${pad(w.eliminations, 7)}${pad(`${w.damageTaken}`, 9)}${pad(`${w.damagePerSecond}`, 7)}${pad(`${w.longestGapSeconds}s`, 9)}`);
+  }
+  console.log('(quietest = the longest stretch of that wave with no elimination)');
+
+  // The ramp, read straight off the table: late waves should press harder.
+  const rows = (report.waves || []).filter((w) => !w.closedByHarness);
+  if (rows.length >= 2) {
+    const first = rows[0], last = rows[rows.length - 1];
+    const ratio = (a, b) => (b === 0 ? 'n/a' : `${(a / b).toFixed(2)}×`);
+    console.log('');
+    console.log(`Ramp: wave ${last.wave} pushes ${ratio(last.damagePerSecond, first.damagePerSecond)} the damage per second of wave ${first.wave} ` +
+      `(${last.damagePerSecond} vs ${first.damagePerSecond}), and takes ${ratio(last.durationSeconds, first.durationSeconds)} as long to clear.`);
   }
   console.log('');
   console.log('Boot tiers');
@@ -405,7 +495,7 @@ function printReport(report, passed) {
 
   console.log('');
   console.log(`Simulated ${report.gameSeconds}s over ${report.steps} frames (${report.wallClockSeconds}s wall clock).`);
-  console.log(`Eliminations ${report.eliminations} (boot ${report.bootEliminations}), loot ${report.lootCollected}, outcome ${report.outcome}, health ${report.healthAtEnd}.`);
+  console.log(`Eliminations ${report.eliminations} (boot ${report.bootEliminations}), loot ${report.lootCollected}, outcome ${report.outcome}${report.endTitle ? ` ("${report.endTitle}")` : ''}${report.instrumented ? '' : `, health ${report.healthAtEnd}`}.`);
 
   if (passed.baselineDelta?.length) {
     console.log('\nAgainst the baseline');
@@ -423,6 +513,10 @@ function printReport(report, passed) {
   } else {
     console.log('\nFAIL');
     for (const reason of passed.reasons) console.log(`  - ${reason}`);
+  }
+  if (passed.findings?.length) {
+    console.log('\nWorth knowing');
+    for (const finding of passed.findings) console.log(`  - ${finding}`);
   }
 }
 

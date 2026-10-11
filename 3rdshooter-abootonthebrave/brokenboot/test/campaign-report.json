@@ -1,0 +1,51 @@
+{
+  "seed": 20260411,
+  "startedAt": "2026-10-11T19:54:47.361Z",
+  "gameSeconds": 0,
+  "steps": 0,
+  "waves": [],
+  "tiers": [],
+  "banners": [],
+  "eliminations": 0,
+  "bootEliminations": 0,
+  "lootCollected": 0,
+  "healthAtEnd": null,
+  "damageTaken": 0,
+  "instrumented": true,
+  "outcome": "aim-trigger-check-failed",
+  "errors": [],
+  "lockCheck": {
+    "cone": 0.22,
+    "distance": 26,
+    "pass": false,
+    "baseHeadingRadians": 0,
+    "anglesRadians": {
+      "near": 0.055,
+      "far": 0.132
+    },
+    "firstPress": "near",
+    "anglesAtPress": {
+      "near": 0.169,
+      "far": 0.207
+    },
+    "swingRadians": 0.11,
+    "heldDuringSwing": "near",
+    "anglesAfterSwing": {
+      "near": 0.216,
+      "far": 0.165
+    },
+    "farVisible": true,
+    "swungOnTarget": true,
+    "afterRelease": "near",
+    "freshPress": "near"
+  },
+  "wavesReached": 1,
+  "wallClockSeconds": 0.4,
+  "consoleErrors": [],
+  "consoleWarnings": [
+    "console.warn: THREE.FBXLoader: %s map is not supported in three.js, skipping texture. ShininessExponent",
+    "console.warn: THREE.FBXLoader: %s map is not supported in three.js, skipping texture. ShininessExponent",
+    "console.warn: THREE.FBXLoader: Vertex has more than 4 skinning weights assigned to vertex. Deleting additional weights."
+  ],
+  "failedRequests": []
+}
