@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>A Broken Boot On The Brave</title>
+<meta name="description" content="A third-person action shooter set in a dense forest. One SWAT officer, endless attackers, and one increasingly broken boot." />
+<link rel="stylesheet" href="./css/style.css" />
+<link rel="stylesheet" href="./css/touch.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/three.module.js",
+    "three/addons/": "./vendor/addons/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="canvas-wrap"></div>
+
+<!-- In-game HUD -->
+<div id="hud" class="hud">
+  <div id="crosshair" class="crosshair">
+    <span class="ch ch-t"></span><span class="ch ch-b"></span>
+    <span class="ch ch-l"></span><span class="ch ch-r"></span>
+    <span class="ch-dot"></span>
+  </div>
+  <div id="hitmarker" class="hitmarker"></div>
+  <div id="damage-vignette" class="vignette"></div>
+
+  <div class="panel panel-left">
+    <div class="label">Condition</div>
+    <div class="bar"><div id="health-fill" class="bar-fill"></div></div>
+    <div class="bar-value">HP <b id="health-text">100</b></div>
+    <div class="ammo-row">
+      <span id="ammo-text" class="ammo">30</span>
+      <span class="slash">/</span>
+      <span id="reserve-text" class="reserve">150</span>
+    </div>
+    <div class="label dim">AK-47</div>
+  </div>
+
+  <div class="panel panel-right">
+    <div class="stat"><span>Wave</span><b id="wave-text">0</b></div>
+    <div class="stat"><span>Hostiles</span><b id="enemies-text">0</b></div>
+    <div class="stat"><span>Eliminations</span><b id="kills-text">0</b></div>
+    <div class="stat"><span>Boot kills</span><b id="melee-text">0</b></div>
+  </div>
+
+  <div class="panel panel-bottom">
+    <div class="boot-row">
+      <span class="boot-icon">🥾</span>
+      <span id="boot-name" class="boot-name">Standard Boot</span>
+    </div>
+    <div class="bar thin"><div id="boot-bar-fill" class="bar-fill boot"></div></div>
+    <div id="boot-progress" class="boot-progress">0 more for Reinforced Boot</div>
+  </div>
+
+  <div id="banner" class="banner"></div>
+  <div id="banner-sub" class="banner-sub"></div>
+  <div id="toasts" class="toasts"></div>
+  <div id="pause-hint" class="pause-hint"></div>
+</div>
+
+<!-- Touch controls. Shown only once a touch is seen (or on coarse pointers). -->
+<div id="touch-ui" class="touch-ui">
+  <div id="touch-look" class="touch-look"></div>
+  <div id="touch-stick" class="touch-stick"><div id="touch-knob" class="touch-knob"></div></div>
+  <div class="touch-buttons">
+    <button id="touch-reload" class="touch-btn small" type="button">RELOAD</button>
+    <button id="touch-kick" class="touch-btn medium" type="button">🥾 BOOT</button>
+    <button id="touch-fire" class="touch-btn fire" type="button">FIRE</button>
+  </div>
+</div>
+
+<!-- Loading -->
+<div id="screen-loading" class="screen">
+  <div class="screen-inner">
+    <h1 class="title">A Broken Boot<span>On The Brave</span></h1>
+    <div class="bar loading"><div id="load-bar-fill" class="bar-fill"></div></div>
+    <p id="load-text" class="load-text">Loading 0%</p>
+    <p class="fine">Preparing the forest, the officer and the boot…</p>
+  </div>
+</div>
+
+<!-- Start -->
+<div id="screen-start" class="screen hidden">
+  <div class="screen-inner wide">
+    <img class="poster" src="../abrokenbootonthebraveposter.jpg" alt="A Broken Boot On The Brave poster" />
+    <div class="start-copy">
+      <h1 class="title">A Broken Boot<span>On The Brave</span></h1>
+      <p class="tagline">“I'm not trapped here with you… you're trapped here with me.”</p>
+      <ul class="controls">
+        <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move · <kbd>Shift</kbd> Sprint</li>
+        <li><kbd>Mouse</kbd> Aim · <kbd>Left click</kbd> Fire (hold)</li>
+        <li><kbd>R</kbd> Reload · <kbd>F</kbd> Boot kick · <kbd>Esc</kbd> Release cursor</li>
+        <li class="pad">🎮 <b>Controller</b> — left stick move, right stick aim, <kbd>RT</kbd> fire, <kbd>A</kbd> boot, <kbd>B</kbd> reload, <kbd>LT</kbd> sprint</li>
+        <li class="touch-only">📱 <b>Touch</b> — left pad to move, drag the right side to aim, then use the buttons</li>
+        <li class="dim"><kbd>M</kbd> Mute · gamepad and touch controls are detected automatically</li>
+      </ul>
+      <button id="start-button" class="start-button">Deploy into the forest</button>
+      <p class="fine">Survive all 10 waves. The boot upgrades as the attrition adds up.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Game over / victory -->
+<div id="screen-over" class="screen hidden">
+  <div class="screen-inner">
+    <h1 id="over-title" class="title">YOU ARE DOWN</h1>
+    <div id="over-body" class="over-body"></div>
+  </div>
+</div>
+
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>

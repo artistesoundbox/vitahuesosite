@@ -1,0 +1,173 @@
+import * as THREE from 'three';
+
+const TRACER_LIFE = 0.09;
+const FLASH_LIFE = 0.06;
+const PARTICLE_LIFE = 0.5;
+const MAX_TRACERS = 24;
+const MAX_PARTICLES = 90;
+
+export class Effects {
+  constructor(scene) {
+    this.scene = scene;
+    this.tracers = [];
+    this.particles = [];
+    this.pickups = [];
+    this.time = 0;
+
+    const tracerGeo = new THREE.CylinderGeometry(0.018, 0.018, 1, 5, 1, true);
+    tracerGeo.translate(0, 0.5, 0);
+    const tracerMat = new THREE.MeshBasicMaterial({
+      color: 0xffe6a8, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    for (let i = 0; i < MAX_TRACERS; i++) {
+      const mesh = new THREE.Mesh(tracerGeo, tracerMat.clone());
+      mesh.visible = false;
+      mesh.frustumCulled = false;
+      scene.add(mesh);
+      this.tracers.push({ mesh, life: 0 });
+    }
+
+    const particleGeo = new THREE.SphereGeometry(0.05, 4, 4);
+    const particleMat = new THREE.MeshBasicMaterial({ color: 0xffca7a, transparent: true, depthWrite: false });
+    for (let i = 0; i < MAX_PARTICLES; i++) {
+      const mesh = new THREE.Mesh(particleGeo, particleMat.clone());
+      mesh.visible = false;
+      scene.add(mesh);
+      this.particles.push({ mesh, life: 0, vel: new THREE.Vector3() });
+    }
+
+    this.flash = new THREE.PointLight(0xffd08a, 0, 9, 2);
+    this.flash.visible = false;
+    scene.add(this.flash);
+    this.flashLife = 0;
+
+    this.muzzleGeo = new THREE.SphereGeometry(0.13, 6, 6);
+    this.muzzleMat = new THREE.MeshBasicMaterial({ color: 0xffd08a, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false });
+    this.muzzleMesh = new THREE.Mesh(this.muzzleGeo, this.muzzleMat);
+    this.muzzleMesh.visible = false;
+    scene.add(this.muzzleMesh);
+  }
+
+  tracer(from, to, color = 0xffe6a8) {
+    const slot = this.tracers.find((t) => t.life <= 0) || this.tracers[0];
+    const dir = new THREE.Vector3().subVectors(to, from);
+    const len = dir.length();
+    if (len < 0.001) return;
+    slot.mesh.position.copy(from);
+    slot.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+    slot.mesh.scale.set(1, len, 1);
+    slot.mesh.material.color.setHex(color);
+    slot.mesh.material.opacity = 0.9;
+    slot.mesh.visible = true;
+    slot.life = TRACER_LIFE;
+  }
+
+  muzzle(position) {
+    this.flash.position.copy(position);
+    this.flash.intensity = 26;
+    this.flash.visible = true;
+    this.flashLife = FLASH_LIFE;
+    this.muzzleMesh.position.copy(position);
+    this.muzzleMesh.visible = true;
+    this.muzzleMesh.scale.setScalar(0.8 + Math.random() * 0.6);
+  }
+
+  burst(point, count = 7, color = 0xffca7a) {
+    let spawned = 0;
+    for (const p of this.particles) {
+      if (p.life > 0) continue;
+      p.mesh.position.copy(point);
+      p.mesh.material.color.setHex(color);
+      p.mesh.material.opacity = 1;
+      p.mesh.visible = true;
+      p.vel.set(
+        (Math.random() - 0.5) * 5,
+        Math.random() * 3.4 + 0.6,
+        (Math.random() - 0.5) * 5,
+      );
+      p.life = PARTICLE_LIFE * (0.6 + Math.random() * 0.7);
+      if (++spawned >= count) break;
+    }
+  }
+
+  spawnPickup(position, type) {
+    const isAmmo = type === 'ammo';
+    const geo = new THREE.BoxGeometry(0.5, 0.34, 0.34);
+    const mat = new THREE.MeshStandardMaterial({
+      color: isAmmo ? 0x2f4f3a : 0x7a2b2b,
+      emissive: isAmmo ? 0x1b3a26 : 0x4a1414,
+      roughness: 0.6,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(position);
+    mesh.position.y = 0.4;
+    mesh.castShadow = true;
+    // A small marker so loot is visible in the grass.
+    const halo = new THREE.Mesh(
+      new THREE.TorusGeometry(0.36, 0.03, 6, 16),
+      new THREE.MeshBasicMaterial({ color: isAmmo ? 0x8ef0b0 : 0xff8a7a, transparent: true, opacity: 0.85 }),
+    );
+    halo.rotation.x = Math.PI / 2;
+    halo.position.y = 0.02;
+    mesh.add(halo);
+    this.scene.add(mesh);
+    this.pickups.push({ mesh, type, life: 26 });
+  }
+
+  update(dt, player, onPickup) {
+    this.time += dt;
+
+    for (const t of this.tracers) {
+      if (t.life <= 0) continue;
+      t.life -= dt;
+      t.mesh.material.opacity = Math.max(0, (t.life / TRACER_LIFE) * 0.9);
+      if (t.life <= 0) t.mesh.visible = false;
+    }
+
+    for (const p of this.particles) {
+      if (p.life <= 0) continue;
+      p.life -= dt;
+      p.vel.y -= 12 * dt;
+      p.mesh.position.addScaledVector(p.vel, dt);
+      p.mesh.material.opacity = Math.max(0, p.life / PARTICLE_LIFE);
+      if (p.life <= 0) p.mesh.visible = false;
+    }
+
+    if (this.flashLife > 0) {
+      this.flashLife -= dt;
+      this.flash.intensity = Math.max(0, this.flash.intensity * 0.6);
+      this.muzzleMesh.material.opacity = Math.max(0, this.flashLife / FLASH_LIFE);
+      if (this.flashLife <= 0) {
+        this.flash.visible = false;
+        this.muzzleMesh.visible = false;
+      }
+    }
+
+    for (let i = this.pickups.length - 1; i >= 0; i--) {
+      const p = this.pickups[i];
+      p.life -= dt;
+      p.mesh.rotation.y += dt * 1.6;
+      p.mesh.position.y = 0.4 + Math.sin(this.time * 2.4 + i) * 0.08;
+      const dist = p.mesh.position.distanceTo(player.position);
+      if (dist < 1.4 && player.alive) {
+        if (onPickup) onPickup(p.type);
+        this.scene.remove(p.mesh);
+        this.pickups.splice(i, 1);
+        continue;
+      }
+      if (p.life <= 0) {
+        this.scene.remove(p.mesh);
+        this.pickups.splice(i, 1);
+      }
+    }
+  }
+
+  reset() {
+    for (const t of this.tracers) { t.life = 0; t.mesh.visible = false; }
+    for (const p of this.particles) { p.life = 0; p.mesh.visible = false; }
+    for (const p of this.pickups) this.scene.remove(p.mesh);
+    this.pickups.length = 0;
+    this.flash.visible = false;
+    this.muzzleMesh.visible = false;
+  }
+}

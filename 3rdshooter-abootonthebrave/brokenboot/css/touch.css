@@ -1,0 +1,184 @@
+/* Touch controls and the compact phone HUD.
+   Loaded after style.css so it can override the desktop layout. */
+
+/* ------------------------------------------------------------ touch pad */
+
+.touch-ui {
+  position: fixed;
+  inset: 0;
+  z-index: 7;
+  display: none;
+  pointer-events: none;
+  touch-action: none;
+}
+body.touch-mode .touch-ui { display: block; }
+
+/* The right side is the aiming surface; buttons sit above it. */
+.touch-look {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 58%;
+  height: 100%;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch-stick {
+  position: absolute;
+  left: 26px;
+  bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02) 72%);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  background: rgba(242, 201, 76, 0.5);
+  transition: transform 0.04s linear;
+}
+
+.touch-buttons {
+  position: absolute;
+  right: 22px;
+  bottom: calc(112px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 14px;
+  pointer-events: none;
+}
+
+.touch-btn {
+  pointer-events: auto;
+  touch-action: none;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.34);
+  background: rgba(10, 14, 11, 0.55);
+  color: #fff;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(4px);
+  transition: background 0.08s, transform 0.08s;
+}
+.touch-btn.pressed {
+  background: rgba(242, 201, 76, 0.55);
+  transform: scale(0.95);
+}
+.touch-btn.fire {
+  width: 104px;
+  height: 104px;
+  font-size: 15px;
+  border-color: rgba(242, 201, 76, 0.7);
+}
+.touch-btn.medium { width: 78px; height: 78px; font-size: 11px; }
+.touch-btn.small { width: 62px; height: 62px; font-size: 10px; }
+
+/* Controller hint only matters when there is no touch pad. */
+.touch-only { display: none; }
+body.touch-mode .touch-only { display: list-item; }
+body.touch-mode .pad { display: none; }
+
+#canvas-wrap canvas { touch-action: none; }
+
+/* --------------------------------------------------------- phone HUD */
+
+@media (pointer: coarse), (max-width: 720px) {
+  .panel {
+    padding: 8px 10px;
+    min-width: 0;
+    background: rgba(8, 11, 9, 0.55);
+  }
+  .panel-left {
+    left: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  .panel-right {
+    right: 10px;
+    top: calc(10px + env(safe-area-inset-top, 0px));
+  }
+  .panel-bottom {
+    left: 50%;
+    bottom: calc(278px + env(safe-area-inset-bottom, 0px));
+    padding: 6px 12px;
+  }
+
+  .label.dim { display: none; }
+  .bar-value { font-size: 10px; margin-top: 4px; }
+  .bar-value b { font-size: 12px; }
+  .label { font-size: 9px; letter-spacing: 0.16em; margin-bottom: 4px; }
+  .bar { height: 9px; }
+  .bar.thin { height: 6px; margin-top: 5px; }
+  .ammo { font-size: 24px; }
+  .slash { font-size: 14px; }
+  .reserve { font-size: 14px; }
+  .stat { font-size: 10px; gap: 10px; padding: 2px 0; }
+  .stat b { font-size: 12px; }
+  .boot-icon { font-size: 15px; }
+  .boot-name { font-size: 11px; letter-spacing: 0.08em; }
+  .boot-progress { font-size: 9px; margin-top: 4px; }
+
+  .banner { top: 24%; font-size: 26px; letter-spacing: 0.18em; }
+  .banner-sub { top: calc(24% + 40px); font-size: 11px; }
+  .pause-hint { top: 62%; font-size: 11px; }
+
+  /* Keep toasts clear of the touch buttons. */
+  .toasts {
+    right: 10px;
+    left: 10px;
+    bottom: auto;
+    top: calc(84px + env(safe-area-inset-top, 0px));
+    align-items: flex-start;
+  }
+  .toast { max-width: 100%; padding: 7px 11px; }
+  .toast-title { font-size: 11px; }
+  .toast-desc { font-size: 10px; }
+
+  .screen {
+    align-items: flex-start;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px 0;
+  }
+  .screen-inner { padding: 16px; max-width: 100%; }
+  .screen-inner.wide { flex-direction: column; gap: 18px; text-align: center; }
+  .poster { width: 168px; }
+  .title { font-size: 26px; }
+  .title span { font-size: 14px; letter-spacing: 0.24em; }
+  .tagline { font-size: 12px; }
+  .controls { font-size: 11px; }
+  .controls li { padding: 2px 0; }
+  .start-button { width: 100%; padding: 15px 20px; font-size: 13px; }
+  .over-body .stats { max-width: 100%; }
+}
+
+/* Very short landscape phones: shrink the pad so it stays usable. */
+@media (pointer: coarse) and (max-height: 460px) {
+  .touch-stick {
+    width: 104px;
+    height: 104px;
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+  .touch-knob { width: 46px; height: 46px; margin: -23px 0 0 -23px; }
+  .touch-buttons { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); gap: 10px; }
+  .touch-btn.fire { width: 84px; height: 84px; }
+  .touch-btn.medium { width: 64px; height: 64px; }
+  .touch-btn.small { width: 52px; height: 52px; }
+  .panel-bottom { bottom: auto; top: calc(10px + env(safe-area-inset-top, 0px)); }
+  .panel-right { display: none; }
+}

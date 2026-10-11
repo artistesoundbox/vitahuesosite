@@ -1,3 +1,4 @@
 # Auto detect text files and perform LF normalization
 * text=auto
 game/index.pck filter=lfs diff=lfs merge=lfs -text
+3rdshooter-abootonthebrave/3rdpersonidle.fbx filter=lfs diff=lfs merge=lfs -text
