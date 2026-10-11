@@ -46,6 +46,11 @@ export class World {
     this.scene = scene;
     this.cylinders = []; // { x, z, r, top }
     this.boxes = [];     // THREE.Box3
+    // Scenery that can be kicked about. Each prop keeps the very Box3 that
+    // already blocks bullets, sight lines and movement, and that box is moved
+    // with the mesh — so a car shoved out of the way opens the firing line it
+    // was blocking, for the player and the attackers alike.
+    this.props = [];
     this.rand = makeRandom(PRNG_SEED);
     this._ray = new THREE.Ray();
     this._tmp = new THREE.Vector3();
@@ -220,6 +225,217 @@ export class World {
   addBox(box) {
     this.boxes.push(box);
   }
+
+  /**
+   * Register a piece of scenery as something the boot can move. `mass` decides
+   * how much of a kick it takes: a crate flies, a car shoves. `kind` is only for
+   * reporting.
+   */
+  addProp(mesh, box, { mass = 1, radius = 1, kind = 'scenery' } = {}) {
+    const prop = {
+      mesh, box, mass, radius, kind,
+      baseY: mesh.position.y,          // the height it sits at on the ground
+      vel: new THREE.Vector3(),
+      spin: new THREE.Vector3(),
+      hitTimer: 0,
+      rest: true,
+    };
+    this.props.push(prop);
+    return prop;
+  }
+
+  /**
+   * Everything with a mass inside the kick's reach and arc takes an impulse: the
+   * along-kick part is `propPower / mass` and the upward part `propLift / mass`,
+   * so the same stomp skitters crates and only shifts a car. Returns what moved,
+   * for the banner and the achievements.
+   */
+  kickProps(origin, forward, kick, powerScale = 1) {
+    const hit = [];
+    for (const p of this.props) {
+      const to = this._tmp.set(
+        p.mesh.position.x - origin.x, 0, p.mesh.position.z - origin.z,
+      );
+      const dist = to.length();
+      if (dist > kick.range + p.radius) continue;
+      if (dist > 1e-3) to.divideScalar(dist);
+      if (Math.acos(Math.max(-1, Math.min(1, to.dot(forward)))) > kick.arc) continue;
+
+      const power = (kick.propPower * powerScale) / p.mass;
+      p.vel.x += forward.x * power;
+      p.vel.z += forward.z * power;
+      p.vel.y += (kick.propLift * powerScale) / p.mass;
+      // Tumble about the axis across the kick, plus a bit of roll either way.
+      p.spin.x += -forward.z * power * 0.35;
+      p.spin.z += forward.x * power * 0.35;
+      p.spin.y += (this.rand() - 0.5) * power * 0.3;
+      p.rest = false;
+      hit.push(p);
+    }
+    return hit;
+  }
+
+  /**
+   * Integrate the scenery. Only the movers are simulated, and each settles where
+   * it comes to rest rather than snapping back, so a kicked car stays where it
+   * ended up and keeps working as cover there.
+   *
+   * `bodies` are the things a fast-moving prop can knock down (the attackers),
+   * and `onHit(prop, body, speed)` reports a real impact.
+   */
+  updateProps(dt, { bodies = [], onHit = null } = {}) {
+    const sleep = SETTINGS.propSleepSpeed;
+
+    for (const p of this.props) {
+      if (p.rest) continue;
+      if (p.hitTimer > 0) p.hitTimer -= dt;
+
+      p.vel.y += SETTINGS.gravity * dt;
+      p.vel.multiplyScalar(Math.max(0, 1 - SETTINGS.propDrag * dt));
+
+      const pos = p.mesh.position;
+      pos.addScaledVector(p.vel, dt);
+
+      // Ground: the prop comes back to the height it started at, which is where
+      // the ground is — the whole clearing is flat.
+      if (pos.y < p.baseY) {
+        pos.y = p.baseY;
+        if (p.vel.y < 0) {
+          p.vel.y = -p.vel.y * SETTINGS.propRestitution;
+          if (p.vel.y < 0.6) p.vel.y = 0;
+        }
+        // Friction on the ground, and the tumble slows with it.
+        p.vel.x *= Math.max(0, 1 - 2.6 * dt);
+        p.vel.z *= Math.max(0, 1 - 2.6 * dt);
+      }
+
+      this._bounceProp(p);
+
+      p.spin.multiplyScalar(Math.max(0, 1 - SETTINGS.propSpinDrag * dt));
+      p.mesh.rotation.x += p.spin.x * dt;
+      p.mesh.rotation.y += p.spin.y * dt;
+      p.mesh.rotation.z += p.spin.z * dt;
+
+      // Update the box that blocks bullets, sight lines and movement in place,
+      // so every system that already consults it follows the prop.
+      p.box.setFromObject(p.mesh).expandByScalar(-0.05);
+
+      const speed = p.vel.length();
+      if (speed > SETTINGS.propHitSpeed && p.hitTimer <= 0) {
+        for (const body of bodies) {
+          if (!body || body.dead || body.routed) continue;
+          const dx = body.position.x - pos.x;
+          const dz = body.position.z - pos.z;
+          const reach = p.radius + 0.8;
+          if (dx * dx + dz * dz > reach * reach) continue;
+          p.hitTimer = 0.3;
+          if (onHit) onHit(p, body, speed);
+          break;
+        }
+      }
+
+      if (speed < sleep && p.vel.y === 0 && pos.y <= p.baseY + 1e-3) {
+        p.vel.set(0, 0, 0);
+        p.spin.set(0, 0, 0);
+        pos.y = p.baseY;
+        p.box.setFromObject(p.mesh).expandByScalar(-0.05);
+        p.rest = true;
+      }
+    }
+
+    this._propsAgainstEachOther(dt);
+  }
+
+  /** Push a prop out of the static world it has run into, and bounce it back. */
+  _bounceProp(p) {
+    const pos = p.mesh.position;
+    const r = p.radius;
+
+    const bounce = (nx, nz, push) => {
+      pos.x += nx * push;
+      pos.z += nz * push;
+      const along = p.vel.x * nx + p.vel.z * nz;
+      if (along < 0) {
+        p.vel.x -= (1 + SETTINGS.propRestitution) * along * nx;
+        p.vel.z -= (1 + SETTINGS.propRestitution) * along * nz;
+      }
+    };
+
+    for (const c of this.cylinders) {
+      const dx = pos.x - c.x;
+      const dz = pos.z - c.z;
+      const min = c.r + r;
+      const d2 = dx * dx + dz * dz;
+      if (d2 >= min * min || d2 < 1e-6) continue;
+      const d = Math.sqrt(d2);
+      bounce(dx / d, dz / d, min - d);
+    }
+
+    for (const box of this.boxes) {
+      if (box === p.box) continue;
+      const cx = THREE.MathUtils.clamp(pos.x, box.min.x, box.max.x);
+      const cz = THREE.MathUtils.clamp(pos.z, box.min.z, box.max.z);
+      const dx = pos.x - cx;
+      const dz = pos.z - cz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 >= r * r) continue;
+      // Only the props that overlap vertically shove each other about.
+      if (p.baseY > box.max.y + r || p.baseY + r * 2 < box.min.y) continue;
+      if (d2 > 1e-6) {
+        const d = Math.sqrt(d2);
+        bounce(dx / d, dz / d, r - d);
+      } else {
+        bounce(1, 0, r);
+      }
+    }
+  }
+
+  /**
+   * Prop against prop: a crate hurled into a car should shove the car. Only the
+   * movers are tested, so a settled clearing costs nothing, and the impulse is
+   * split by mass so the heavy end wins.
+   */
+  _propsAgainstEachOther(dt) {
+    const props = this.props;
+    for (let i = 0; i < props.length; i++) {
+      const a = props[i];
+      if (a.rest) continue;
+      for (let j = 0; j < props.length; j++) {
+        if (i === j) continue;
+        const b = props[j];
+        if (Math.abs(a.baseY - b.baseY) > a.radius + b.radius) continue;
+        const dx = a.mesh.position.x - b.mesh.position.x;
+        const dz = a.mesh.position.z - b.mesh.position.z;
+        const min = a.radius + b.radius;
+        const d2 = dx * dx + dz * dz;
+        if (d2 >= min * min || d2 < 1e-6) continue;
+
+        const d = Math.sqrt(d2);
+        const nx = dx / d;
+        const nz = dz / d;
+        const overlap = min - d;
+        const total = a.mass + b.mass;
+        // Separate them, then trade the closing speed along the normal.
+        a.mesh.position.x += nx * overlap * (b.mass / total);
+        a.mesh.position.z += nz * overlap * (b.mass / total);
+        b.mesh.position.x -= nx * overlap * (a.mass / total);
+        b.mesh.position.z -= nz * overlap * (a.mass / total);
+
+        const closing = (a.vel.x - b.vel.x) * nx + (a.vel.z - b.vel.z) * nz;
+        if (closing < 0) {
+          const push = -closing * (1 + SETTINGS.propRestitution * 0.6);
+          a.vel.x += nx * push * (b.mass / total);
+          a.vel.z += nz * push * (b.mass / total);
+          b.vel.x -= nx * push * (a.mass / total);
+          b.vel.z -= nz * push * (a.mass / total);
+        }
+        if (b.rest) {
+          b.rest = false;
+          b.box.setFromObject(b.mesh).expandByScalar(-0.05);
+        }
+      }
+    }
+  }
 }
 
 function buildTrees(world, scene) {
@@ -298,7 +514,9 @@ function buildCover(world, scene) {
     return new THREE.Vector3(Math.cos(angle) * r, 0, Math.sin(angle) * r);
   };
 
-  const place = (geo, mat, y, scaleBox) => {
+  // Crates, barriers and rocks are light enough for the boot: their mass is what
+  // a kick is divided by, so a crate flies and a rock barely hops.
+  const place = (geo, mat, y, prop) => {
     const p = spawnRing(6, SETTINGS.clearingRadius + 10);
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(p.x, y, p.z);
@@ -307,13 +525,15 @@ function buildCover(world, scene) {
     mesh.receiveShadow = true;
     scene.add(mesh);
     mesh.updateMatrixWorld(true);
-    world.addBox(new THREE.Box3().setFromObject(mesh).expandByScalar(-0.05));
+    const box = new THREE.Box3().setFromObject(mesh).expandByScalar(-0.05);
+    world.addBox(box);
+    world.addProp(mesh, box, prop);
     return mesh;
   };
 
-  for (let i = 0; i < 10; i++) place(crateGeo, crateMat, 0.6, null);
-  for (let i = 0; i < 8; i++) place(barrierGeo, barrierMat, 0.55, null);
-  for (let i = 0; i < 7; i++) place(rockGeo, rockMat, 0.55, null);
+  for (let i = 0; i < 10; i++) place(crateGeo, crateMat, 0.6, { mass: 1, radius: 1.05, kind: 'crate' });
+  for (let i = 0; i < 8; i++) place(barrierGeo, barrierMat, 0.55, { mass: 1.5, radius: 1.4, kind: 'barrier' });
+  for (let i = 0; i < 7; i++) place(rockGeo, rockMat, 0.55, { mass: 2.6, radius: 1.1, kind: 'rock' });
 }
 
 async function buildVehicles(world, scene) {
@@ -340,7 +560,11 @@ async function buildVehicles(world, scene) {
       car.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       scene.add(car);
       car.updateMatrixWorld(true);
-      world.addBox(new THREE.Box3().setFromObject(car));
+      const box = new THREE.Box3().setFromObject(car);
+      world.addBox(box);
+      // The heaviest thing on the field, and the best thing to kick: it shifts
+      // and tumbles rather than flying, taking whatever it was covering with it.
+      world.addProp(car, box, { mass: 4.5, radius: 2.3, kind: 'car' });
     }
     return true;
   } catch (err) {

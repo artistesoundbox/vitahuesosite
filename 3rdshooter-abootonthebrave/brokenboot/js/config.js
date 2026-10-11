@@ -42,11 +42,24 @@ export const SETTINGS = {
   spread: 0.012,
   recoil: 0.9,
 
-  // Boot. Reach and cooldown are global; damage and knockback come from the
-  // equipped tier in BOOT_TIERS so upgrades are felt directly.
+  // Boot. Reach, arc and cooldown come from the kick being thrown (see KICKS);
+  // damage and knockback come from the equipped tier in BOOT_TIERS so upgrades
+  // are felt whatever kick it is.
   kickRange: 3.6,
   kickArc: Math.PI * 0.6,
   kickCooldown: 0.8,
+
+  // Scenery. Crates, barriers, rocks and the cars are simple bodies: an impulse
+  // sends them off, drag and a bounce settle them, and they sleep once they are
+  // slow enough that re-fitting their collision box every frame is a waste. A
+  // prop has to still be travelling at propHitSpeed to put an attacker down.
+  propDrag: 0.55,
+  propSpinDrag: 1.2,
+  propRestitution: 0.24,
+  propSleepSpeed: 0.4,
+  propHitSpeed: 4.5,
+  propHitDamage: 38,
+  propHitKnockback: 16,
 
   // Boot charge. Routs and charge crates fill it; a full meter turns the next
   // kick into a charged one that sends the whole arc running at once.
@@ -274,6 +287,51 @@ export const BOOT_TIERS = [
 // needs its own fit. `size` is its longest axis in world units; `lift` raises it
 // (also world units) until the sole sits on the ground under a standing foot.
 // The broken boot is deliberately the big, heavy one.
+// The kicks the officer knows, and how a kick is chosen:
+//
+//   standing  the equipped boot's signature — a kick, a high kick once the boot
+//             reaches Silver, a stomp from Spiked Gold up
+//   crouched  a low sweep: almost no reach, but it covers the whole front and
+//             takes the legs out from under a line
+//   airborne  a flying high kick: furthest reach, hardest landing, and the one
+//             that sends cars and crates furthest
+//
+// So all three are always available — crouch for the sweep, jump and kick from
+// the air for the high kick — and upgrading the boot changes the standing one.
+// `damageScale` and `knockbackScale` apply to the equipped tier's figures, so a
+// better boot is felt in every kick. `propPower` and `propLift` are the impulse
+// put into scenery, divided by the prop's mass: a crate flies, a car shifts.
+export const KICKS = {
+  kick: {
+    name: 'Kick', clip: 'kick',
+    range: 3.6, arc: Math.PI * 0.6,
+    damageScale: 1, knockbackScale: 1, routeBonus: 0,
+    propPower: 10, propLift: 3.5,
+    cooldownScale: 1,
+  },
+  sweep: {
+    name: 'Low Sweep', clip: 'kick',
+    range: 2.7, arc: Math.PI * 0.8,
+    damageScale: 0.7, knockbackScale: 0.7, routeBonus: 1,
+    propPower: 7, propLift: 1.2,          // skitters crates along the ground
+    cooldownScale: 0.75,
+  },
+  high: {
+    name: 'High Kick', clip: 'kickHigh',
+    range: 4.3, arc: Math.PI * 0.42,      // a spear, not a net
+    damageScale: 1.15, knockbackScale: 1.3, routeBonus: 0,
+    propPower: 13, propLift: 8,
+    cooldownScale: 1.05,
+  },
+  stomp: {
+    name: 'Stomp', clip: 'stomp',
+    range: 3.3, arc: Math.PI,             // all round, on the spot
+    damageScale: 1.4, knockbackScale: 1.1, routeBonus: 1,
+    propPower: 16, propLift: 10,
+    cooldownScale: 1.3,
+  },
+};
+
 export const BOOT_SOCKETS = {
   default: { size: 0.36, lift: 0.05 },
   silver:  { size: 0.34, lift: 0.05 },
@@ -291,4 +349,5 @@ export const ACHIEVEMENTS = [
   { id: 'legendary',    label: 'The Legend Of The Boot',    desc: 'Unlock the Legendary Broken Boot.' },
   { id: 'surrounded',   label: 'Surrounded',                desc: 'Become surrounded by six or more attackers.' },
   { id: 'one_man_army', label: 'One-Man Army',              desc: 'Complete every wave.' },
+  { id: 'car_kicker',   label: 'Boot Versus Bodywork',      desc: 'Kick a car off its mark.' },
 ];

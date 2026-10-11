@@ -22,6 +22,7 @@ export class Hud {
     this.chargeRow = this.chargeState ? this.chargeState.parentElement : null;
     this.powerups = document.getElementById('powerups');
     this.stance = document.getElementById('stance');
+    this.kickReadout = document.getElementById('kick-readout');
     this.lockInfo = document.getElementById('lock-info');
     this._powerupSig = '';
     this._crossSig = '';
@@ -89,6 +90,13 @@ export class Hud {
       if (this.chargeState.textContent !== text) this.chargeState.textContent = text;
     }
     if (this.stance) this.stance.classList.toggle('show', Boolean(state.crouching));
+
+    // Which kick is available from where the officer is standing, so the three
+    // of them are legible without a move list.
+    if (this.kickReadout && state.kick) {
+      const text = `kick · ${state.kick.name}`;
+      if (this.kickReadout.textContent !== text) this.kickReadout.textContent = text;
+    }
 
     // Timed powerups, rebuilt only when the set or the whole seconds change.
     if (this.powerups) {

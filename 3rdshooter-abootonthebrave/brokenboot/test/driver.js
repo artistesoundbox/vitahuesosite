@@ -21,6 +21,8 @@ async function runCampaign(options) {
     instrument: 'alive',
     // Assert the aim-trigger rule instead of playing the campaign.
     checkLock: false,
+    // Assert the three kicks and the scenery they move instead.
+    checkKick: false,
   }, options || {});
   const instrumented = opts.instrument === 'alive';
   // The ceiling has to move with the pool: a field dressing heals via
@@ -47,7 +49,7 @@ async function runCampaign(options) {
   }
 
   const THREE = await import('three');
-  const { SETTINGS } = await import('./js/config.js');
+  const { SETTINGS, KICKS } = await import('./js/config.js');
   const SENS = SETTINGS.mouseSensitivity;
   const errors = [];
   window.addEventListener('error', (e) => errors.push(`window.onerror: ${e.message}`));
@@ -179,7 +181,10 @@ async function runCampaign(options) {
     if (closest) {
       const cd = G.player.position.distanceTo(closest.position);
       const worthBooting = G.player.bootChargeReady || closest.bleeding || closest.wounded;
-      if (cd <= SETTINGS.kickRange && G.player.canMelee()) G.player.melee();
+      // Kick from the reach of the kick that is actually available, not the old
+      // global figure — a stomp is shorter than a high kick.
+      const kickReach = (KICKS[G.player.kickType()] || KICKS.kick).range;
+      if (cd <= kickReach && G.player.canMelee()) G.player.melee();
       if (worthBooting && !hurt && pivotSeconds <= 0) forward = 1;   // close the gap and boot it
     }
     setMove(forward, strafe, sprint);
@@ -341,6 +346,121 @@ async function runCampaign(options) {
       G.lock = null;
       G.targetingHeld = false;
       setMove(0, 0, false);
+    }
+  }
+
+  // --------------------------------------------------------- kicks and scenery
+  /**
+   * The other half of the boot: three kicks that are genuinely different — a
+   * sweep that stays low and wide, a high kick that reaches furthest, a stomp
+   * that lands on everything around — and scenery that goes flying when it is
+   * kicked, then tumbles and settles somewhere new (still blocking bullets and
+   * sight lines from where it ends up).
+   */
+  function probeKicks() {
+    const out = { selection: {}, profiles: {}, scenery: {} };
+    const savedStep = G.step;
+    const savedEnemies = G.enemyManager.enemies;
+    const p = G.player;
+    const before = {
+      crouching: p.crouching, grounded: p.grounded, bootIndex: p.bootIndex,
+      cooldown: p.kickCooldown, pendingKick: p.pendingKick,
+      position: p.object.position.clone(), yaw: p.yaw,
+      cameraYaw: G.cameraYaw,
+    };
+
+    try {
+      p.kickCooldown = 0;
+      p.pendingKick = null;
+
+      // 1. All three kicks are reachable: crouch for the sweep, be off the
+      //    ground for the high kick, and the boot tier decides the standing one.
+      p.grounded = true; p.crouching = true;
+      out.selection.crouched = p.kickType();
+      p.crouching = false; p.grounded = false;
+      out.selection.airborne = p.kickType();
+      p.grounded = true; p.bootIndex = 0;
+      out.selection.standingStandardBoot = p.kickType();
+      p.bootIndex = 2;
+      out.selection.standingSilverBoot = p.kickType();
+      p.bootIndex = 5;
+      out.selection.standingTopBoot = p.kickType();
+
+      // 2. And they really are different boots, not the same one relabelled.
+      for (const [key, k] of Object.entries(KICKS)) {
+        out.profiles[key] = {
+          name: k.name,
+          range: k.range,
+          arcDegrees: Math.round((k.arc * 180) / Math.PI),
+          damageScale: k.damageScale,
+          propPower: k.propPower,
+        };
+      }
+      out.profilesDiffer = KICKS.high.range > KICKS.kick.range
+        && KICKS.kick.range > KICKS.sweep.range
+        && KICKS.sweep.arc > KICKS.kick.arc
+        && KICKS.kick.arc > KICKS.high.arc
+        && KICKS.stomp.arc >= Math.PI - 1e-9
+        && KICKS.high.damageScale > KICKS.kick.damageScale
+        && KICKS.sweep.damageScale < KICKS.kick.damageScale;
+
+      // 3. Kick the scenery. The heaviest prop goes first — if a car moves, a
+      //    crate certainly does.
+      G.enemyManager.enemies = [];
+      G.step = originalStep;              // frames without the pilot, so nothing else kicks
+      const prop = G.world.props.find((q) => q.kind === 'car') || G.world.props[0];
+      out.scenery.kind = prop.kind;
+      out.scenery.mass = prop.mass;
+      const from = prop.mesh.position.clone();
+      const startSpin = prop.mesh.rotation.clone();
+      const boxFrom = prop.box.getCenter(new THREE.Vector3());
+
+      p.object.position.set(from.x - 2.2, 0, from.z - 2.2);
+      p.yaw = Math.atan2(from.x - p.object.position.x, from.z - p.object.position.z);
+      G.cameraYaw = p.yaw;
+      p.kickCooldown = 0;
+      p.pendingKick = null;
+      G.resolveMelee('stomp');
+      out.scenery.speedAfterKick = +prop.vel.length().toFixed(2);
+
+      let peak = 0;
+      let frames = 0;
+      while (frames < 900 && !prop.rest) {
+        G.step(1 / 60);
+        peak = Math.max(peak, prop.vel.length());
+        frames += 1;
+      }
+      out.scenery.peakSpeed = +peak.toFixed(2);
+      out.scenery.movedMeters = +prop.mesh.position.distanceTo(from).toFixed(2);
+      out.scenery.tumbled =
+        Math.abs(prop.mesh.rotation.x - startSpin.x) + Math.abs(prop.mesh.rotation.z - startSpin.z) > 0.2;
+      out.scenery.settleSeconds = +(frames / 60).toFixed(1);
+      out.scenery.settled = prop.rest;
+      out.scenery.boxFollowed = +prop.box.getCenter(new THREE.Vector3()).distanceTo(boxFrom).toFixed(2);
+
+      out.pass = out.selection.crouched === 'sweep'
+        && out.selection.airborne === 'high'
+        && out.selection.standingStandardBoot === 'kick'
+        && out.selection.standingTopBoot === 'stomp'
+        && out.profilesDiffer
+        && out.scenery.speedAfterKick > 1
+        && out.scenery.movedMeters > 1
+        && out.scenery.tumbled
+        && out.scenery.settled
+        && out.scenery.settleSeconds < 12
+        && out.scenery.boxFollowed > 0.5;
+      return out;
+    } finally {
+      G.step = savedStep;
+      G.enemyManager.enemies = savedEnemies;
+      p.crouching = before.crouching;
+      p.grounded = before.grounded;
+      p.bootIndex = before.bootIndex;
+      p.kickCooldown = before.cooldown;
+      p.pendingKick = before.pendingKick;
+      p.object.position.copy(before.position);
+      p.yaw = before.yaw;
+      G.cameraYaw = before.cameraYaw;
     }
   }
 
@@ -520,12 +640,14 @@ async function runCampaign(options) {
   if (startButton) startButton.click();
   if (G.state !== 'playing') G.start();
   if (G.state !== 'playing') return { fatal: `game did not start (state ${G.state})` };
-  if (opts.checkLock) {
-    const lockCheck = probeLockRetarget();
-    report.lockCheck = lockCheck;
+  if (opts.checkLock || opts.checkKick) {
+    if (opts.checkLock) report.lockCheck = probeLockRetarget();
+    if (opts.checkKick) report.kickCheck = probeKicks();
+    const pass = (!report.lockCheck || report.lockCheck.pass)
+      && (!report.kickCheck || report.kickCheck.pass);
     report.gameSeconds = +report.gameSeconds.toFixed(2);
     report.wavesReached = G.wave;
-    report.outcome = lockCheck.pass ? 'aim-trigger-checked' : 'aim-trigger-check-failed';
+    report.outcome = pass ? 'probes-passed' : 'probe-failed';
     return report;
   }
 

@@ -61,6 +61,7 @@ function parseArgs(argv) {
       case '--record': opts.record = true; break;
       case '--honest': opts.honest = true; break;
       case '--check-lock': opts.checkLock = true; break;
+      case '--check-kick': opts.checkKick = true; break;
       case '--require-finish': opts.requireFinish = true; break;
       case '--headed': opts.headed = true; break;
       case '--keep-open': opts.keepOpen = true; break;
@@ -88,6 +89,8 @@ function printUsage() {
   --honest         play the match for real: the officer can die, and the report says where
   --check-lock     assert the aim trigger rule (fresh press retargets, held keeps its
 target) instead of playing the campaign
+  --check-kick     assert the three kicks and the scenery they move (also instead of
+the campaign; pass both to run both probes)
   --require-finish fail the run if the campaign did not reach the last wave
   --url=URL        page to load (default: served from this repo)
   --port=N         port for the bundled static server
@@ -332,6 +335,7 @@ async function main() {
     seed: opts.seed,
     instrument: opts.honest ? 'none' : 'alive',
     checkLock: opts.checkLock || false,
+    checkKick: opts.checkKick || false,
   })}); })()`;
 
   const startedAt = Date.now();
@@ -381,12 +385,26 @@ function assess(report) {
   const reasons = [];
   const findings = [];
 
-  // The aim-trigger probe is a single assertion, not a campaign.
-  if (report.lockCheck) {
-    const c = report.lockCheck;
-    if (!c.pass) {
-      reasons.push(`the aim trigger picked ${c.firstPress} on the first press (wanted ${'near'}), `
-        + `kept ${c.heldDuringSwing} while held (wanted near), then picked ${c.freshPress} on a fresh press (wanted far)`);
+  // The probes are single assertions about one mechanic, not a campaign.
+  if (report.lockCheck || report.kickCheck) {
+    const l = report.lockCheck;
+    const k = report.kickCheck;
+    if (l && !l.pass) {
+      reasons.push(`the aim trigger picked ${l.firstPress} on the first press (wanted near), `
+        + `kept ${l.heldDuringSwing} while held (wanted near), then picked ${l.freshPress} on a fresh press (wanted far)`);
+    }
+    if (k && !k.pass) {
+      const bits = [];
+      if (k.selection.crouched !== 'sweep') bits.push(`crouching gives ${k.selection.crouched} instead of the sweep`);
+      if (k.selection.airborne !== 'high') bits.push(`being in the air gives ${k.selection.airborne} instead of the high kick`);
+      if (k.selection.standingStandardBoot !== 'kick') bits.push(`the standard boot stands with ${k.selection.standingStandardBoot}`);
+      if (k.selection.standingTopBoot !== 'stomp') bits.push(`the top boot stands with ${k.selection.standingTopBoot}`);
+      if (!k.profilesDiffer) bits.push('the three kicks do not differ in reach, arc and power');
+      if (!(k.scenery.movedMeters > 1)) bits.push(`the kicked ${k.scenery.kind} moved only ${k.scenery.movedMeters}m`);
+      if (!k.scenery.tumbled) bits.push(`the kicked ${k.scenery.kind} never tumbled`);
+      if (!k.scenery.settled) bits.push(`the kicked ${k.scenery.kind} never came to rest (${k.scenery.settleSeconds}s)`);
+      if (!(k.scenery.boxFollowed > 0.5)) bits.push('the moved scenery left its collision box behind');
+      reasons.push(`kicks and scenery: ${bits.join('; ') || 'the probe did not pass'}`);
     }
     if (report.failedRequests?.length) reasons.push(`${report.failedRequests.length} failed request(s): ${report.failedRequests[0]}`);
     return { ok: reasons.length === 0, reasons, findings, good: [], baselineDelta: null, errors: [] };
@@ -453,16 +471,40 @@ function printReport(report, passed) {
   const pad = (s, n) => String(s).padEnd(n);
   console.log('');
 
-  if (report.lockCheck) {
+  // The mechanic probes: one assertion each, no campaign.
+  if (report.lockCheck || report.kickCheck) {
     const c = report.lockCheck;
-    console.log('Aim trigger (left trigger / right mouse / Q)');
-    console.log(`  lock cone ${c.cone} rad, probe attackers: near ${c.anglesRadians?.near} rad off the crosshair, far ${c.anglesRadians?.far}`);
-    console.log(`  ${pad('fresh press', 16)}${pad(c.firstPress, 8)}${c.firstPress === 'near' ? 'the attacker nearest the crosshair' : 'WRONG'}`);
-    console.log(`  ${pad('held, aim swung', 16)}${pad(c.heldDuringSwing, 8)}${c.heldDuringSwing === 'near' ? 'keeps its target, no flicking' : 'WRONG'}`);
-    console.log(`  ${pad('fresh press again', 16)}${pad(c.freshPress, 8)}${c.freshPress === 'far' ? 'retargets to the new nearest' : 'WRONG'}`);
-    if (c.detail) console.log(`  ${c.detail}`);
+    const k = report.kickCheck;
+    if (c) {
+      console.log('Aim trigger (left trigger / right mouse / Q)');
+      console.log(`  lock cone ${c.cone} rad, probe attackers: near ${c.anglesRadians?.near} rad off the crosshair, far ${c.anglesRadians?.far}`);
+      console.log(`  ${pad('fresh press', 18)}${pad(c.firstPress, 8)}${c.firstPress === 'near' ? 'the attacker nearest the crosshair' : 'WRONG'}`);
+      console.log(`  ${pad('held, aim swung', 18)}${pad(c.heldDuringSwing, 8)}${c.heldDuringSwing === 'near' ? 'keeps its target, no flicking' : 'WRONG'}`);
+      console.log(`  ${pad('fresh press again', 18)}${pad(c.freshPress, 8)}${c.freshPress === 'far' ? 'retargets to the new nearest' : 'WRONG'}`);
+      if (c.detail) console.log(`  ${c.detail}`);
+    }
+    if (k) {
+      if (c) console.log('');
+      console.log('Kicks and scenery');
+      console.log(`  ${pad('crouched', 22)}${pad(k.selection.crouched, 12)}${k.selection.crouched === 'sweep' ? 'low and wide, takes the legs' : 'WRONG'}`);
+      console.log(`  ${pad('off the ground', 22)}${pad(k.selection.airborne, 12)}${k.selection.airborne === 'high' ? 'longest reach, hardest landing' : 'WRONG'}`);
+      console.log(`  ${pad('standing, standard', 22)}${pad(k.selection.standingStandardBoot, 12)}`);
+      console.log(`  ${pad('standing, silver', 22)}${pad(k.selection.standingSilverBoot, 12)}`);
+      console.log(`  ${pad('standing, spiked +', 22)}${pad(k.selection.standingTopBoot, 12)}${k.selection.standingTopBoot === 'stomp' ? 'everything around, at once' : 'WRONG'}`);
+      console.log('');
+      console.log(`  ${pad('kick', 10)}${pad('reach', 8)}${pad('arc', 8)}${pad('damage', 8)}${pad('prop power', 10)}`);
+      for (const [key, prof] of Object.entries(k.profiles)) {
+        const arc = prof.arcDegrees >= 180 ? 'all round' : `${prof.arcDegrees}°`;
+        console.log(`  ${pad(key, 10)}${pad(`${prof.range}m`, 8)}${pad(arc, 10)}${pad(`×${prof.damageScale}`, 8)}${pad(prof.propPower, 10)}`);
+      }
+      const s = k.scenery;
+      console.log('');
+      console.log(`  kicked ${s.kind} (mass ${s.mass}): ${s.speedAfterKick} m/s off the boot, ${s.movedMeters} m travelled, ` +
+        `${s.tumbled ? 'tumbled' : 'did not tumble'}, ${s.settled ? `settled after ${s.settleSeconds}s` : 'never settled'}, collision box moved ${s.boxFollowed} m with it.`);
+      if (k.detail) console.log(`  ${k.detail}`);
+    }
     if (passed.ok) {
-      console.log('\nPASS — a press retargets to the attacker nearest the crosshair, and a held trigger keeps its target.');
+      console.log(`\nPASS — ${[c && 'a press retargets to the attacker nearest the crosshair and a held trigger keeps its target', k && 'the three kicks differ and the scenery they launch settles where it lands'].filter(Boolean).join('; ')}.`);
     } else {
       console.log('\nFAIL');
       for (const reason of passed.reasons) console.log(`  - ${reason}`);

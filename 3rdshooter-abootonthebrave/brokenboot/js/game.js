@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  SETTINGS, PLAYER_SOURCE, ENEMY_SOURCE, ASSET_BASE, ACHIEVEMENTS, BOOT_TIERS, waveRamp,
+  SETTINGS, PLAYER_SOURCE, ENEMY_SOURCE, ASSET_BASE, ACHIEVEMENTS, BOOT_TIERS, KICKS, waveRamp,
 } from './config.js';
 import { buildCharacter } from './assets.js';
 import { createWorld } from './world.js';
@@ -84,6 +84,11 @@ export class Game {
     this.wave = 0;
     this.intermission = 0;
     this.achievements = new Set();
+    // Scenery the boot has moved, and the kicks whose one-off hint has been
+    // shown — the three kicks are contextual, so they need teaching once.
+    this.sceneryKicked = 0;
+    this.carsKicked = 0;
+    this.kicksTaught = new Set();
 
     this._tmpA = new THREE.Vector3();
     this._tmpB = new THREE.Vector3();
@@ -132,7 +137,7 @@ export class Game {
 
     this.player = new Player(this.playerTemplate);
     this.scene.add(this.player.object);
-    this.player.onKickHit = () => this.resolveMelee();
+    this.player.onKickHit = (type) => this.resolveMelee(type);
     this.player.onReload = () => this.audio.reload();
     this.player.onTierChange = (boot) => this.onTierUp(boot);
 
@@ -401,8 +406,16 @@ export class Game {
     return type;
   }
 
-  resolveMelee() {
+  /**
+   * The kick the officer is throwing, and what it reaches. Each type has its own
+   * reach, arc and power (see KICKS): the sweep stays low and wide, the high kick
+   * reaches furthest and lands hardest, the stomp hits everything around and
+   * throws the most scenery. The equipped tier still supplies the damage and
+   * knockback they scale, so upgrades are felt whichever kick it is.
+   */
+  resolveMelee(type = this.player.lastKick) {
     const boot = this.player.boot;
+    const kick = KICKS[type] || KICKS.kick;
     const origin = this.player.position;
     const forward = new THREE.Vector3(Math.sin(this.player.yaw), 0, Math.cos(this.player.yaw));
 
@@ -411,9 +424,9 @@ export class Game {
       if (enemy.dead || enemy.routed) continue;
       const to = new THREE.Vector3(enemy.position.x - origin.x, 0, enemy.position.z - origin.z);
       const dist = to.length();
-      if (dist > SETTINGS.kickRange + 0.7) continue;
+      if (dist > kick.range + 0.7) continue;
       if (dist > 1e-3) to.divideScalar(dist);
-      if (Math.acos(clamp(to.dot(forward), -1, 1)) > SETTINGS.kickArc) continue;
+      if (Math.acos(clamp(to.dot(forward), -1, 1)) > kick.arc) continue;
       inArc.push({ enemy, dist });
     }
     inArc.sort((a, b) => a.dist - b.dist);
@@ -423,9 +436,11 @@ export class Game {
     // whole arc at once, scaled by the tier that is currently strapped on.
     const charged = this.player.bootChargeReady;
     const tierScale = 1 + this.player.bootIndex * 0.08;
-    const routeLimit = 1 + Math.floor(this.player.bootIndex / 2)
+    const routeLimit = 1 + Math.floor(this.player.bootIndex / 2) + kick.routeBonus
       + (charged ? SETTINGS.chargedExtraRouts : 0);
-    const knockback = boot.knockback * (charged ? SETTINGS.chargedKnockbackScale * tierScale : 1);
+    const knockback = boot.knockback * kick.knockbackScale
+      * (charged ? SETTINGS.chargedKnockbackScale * tierScale : 1);
+    const damage = boot.meleeDamage * kick.damageScale;
     if (charged) this.player.consumeCharge();
     let routed = 0;
     for (let i = 0; i < inArc.length; i++) {
@@ -439,7 +454,33 @@ export class Game {
       // The boot only sends a limited number running; the rest take the hit.
       // Better boots hurt far harder, so a wounded attacker left standing is
       // usually finished by the next kick.
-      if (enemy.takeDamage(boot.meleeDamage)) this.onEnemyDown(enemy);
+      if (enemy.takeDamage(damage)) this.onEnemyDown(enemy);
+    }
+
+    // The same boot, into the scenery. A crate is worth a kick; a car is worth a
+    // kick plus a shove, and it takes whatever it was covering with it.
+    const launched = this.world.kickProps(
+      origin, forward, kick, charged ? SETTINGS.chargedKnockbackScale : 1,
+    );
+    for (const prop of launched) {
+      this.effects.burst(prop.mesh.position.clone().setY(0.55), 10, 0xd8c79a);
+    }
+    if (launched.length) {
+      this.sceneryKicked += launched.length;
+      this.carsKicked += launched.filter((p) => p.kind === 'car').length;
+      this.shake = Math.max(this.shake, 0.5);
+    }
+
+    // The three kicks are contextual, so each one is introduced the first time
+    // it is thrown rather than explained up front.
+    if (!this.kicksTaught.has(type)) {
+      this.kicksTaught.add(type);
+      const hint = {
+        sweep: 'Crouch and kick: low, wide, and it takes the legs out',
+        high: 'Kick from the air: the longest reach and the hardest landing',
+        stomp: 'The boot is heavy enough to stomp: everything around, at once',
+      }[type];
+      if (hint) this.hud.toast(kick.name.toUpperCase(), hint);
     }
 
     if (charged) {
@@ -456,10 +497,34 @@ export class Game {
         routed > 1 ? `${routed} ATTACKERS SENT RUNNING` : 'SENT RUNNING',
         charged ? 2 : 1.2,
       );
+    } else if (launched.length > 0) {
+      this.hud.showBanner(
+        'THE BOOT',
+        launched.some((p) => p.kind === 'car') ? 'CAR, MEET BOOT' : 'SCENERY LAUNCHED',
+        1,
+      );
     } else if (inArc.length > 0) {
       this.hud.showBanner('THE BOOT', 'JUST A SHOVE', 0.8);
     }
     this.checkAchievements();
+  }
+
+  /**
+   * A kicked crate or car has caught an attacker. They go down under it — and it
+   * keeps most of its speed, so a car rolling through a line keeps collecting.
+   */
+  onPropImpact(prop, enemy, speed) {
+    const dir = new THREE.Vector3(prop.vel.x, 0, prop.vel.z);
+    if (dir.lengthSq() < 1e-4) return;
+    dir.normalize();
+    const force = SETTINGS.propHitKnockback * Math.min(2, speed / SETTINGS.propHitSpeed);
+    enemy.knock.addScaledVector(dir, force);
+    this.effects.burst(enemy.position.clone().setY(0.95), 12, 0xd8c79a);
+    this.shake = Math.max(this.shake, 0.7);
+    prop.vel.multiplyScalar(0.72);
+    // It was the boot that did it, so a rout here still levels the boot.
+    if (this.routEnemy(enemy, dir, force)) return;
+    if (enemy.takeDamage(SETTINGS.propHitDamage)) this.onEnemyDown(enemy);
   }
 
   /**
@@ -670,6 +735,7 @@ export class Game {
     if (this.player.bootIndex >= 2) unlock('silver');
     if (this.player.bootIndex >= 3) unlock('gold');
     if (this.player.bootIndex >= 6) unlock('legendary');
+    if (this.carsKicked >= 1) unlock('car_kicker');
     if (this.enemyManager && this.enemyManager.aliveCount >= 6) unlock('surrounded');
   }
 
@@ -771,6 +837,15 @@ export class Game {
     });
     this.effects.update(dt, this.player, (type) => this.onPickup(type));
 
+    // Kicked scenery keeps moving after the kick: it tumbles, settles, and
+    // shoves aside whatever it runs into on the way. It runs on the same box
+    // that already blocks bullets and sight lines, so a car that has been booted
+    // out of the way genuinely stops being cover.
+    this.world.updateProps(dt, {
+      bodies: this.enemyManager.enemies,
+      onHit: (prop, enemy, speed) => this.onPropImpact(prop, enemy, speed),
+    });
+
     // Tune the aim onto a locked target before the camera and the shot, so a
     // held trigger actually puts rounds on the attacker under the reticle.
     this.updateTargetLock(dt);
@@ -810,6 +885,7 @@ export class Game {
       charge: this.player.charge / SETTINGS.chargeMax,
       chargeReady: this.player.bootChargeReady,
       crouching: this.player.crouching,
+      kick: KICKS[this.player.kickType()],
       locked: this.lock ? this.lock.dist : null,
       powerups: this.player.powerups,
       spread: this.crosshairSpread(),
@@ -928,6 +1004,8 @@ export class Game {
       bootProgress: this.player ? this.bootProgress() : 0,
       killsToNext: this.player ? this.killsToNext() : 0,
       nextBoot: this.player ? (this.nextBootName() || '') : '',
+      crouching: this.player ? this.player.crouching : false,
+      kick: KICKS[this.player ? this.player.kickType() : 'kick'],
     };
   }
 }

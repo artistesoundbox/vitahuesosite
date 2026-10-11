@@ -13,6 +13,50 @@ cd brokenboot
 node serve.mjs          # http://127.0.0.1:8177/brokenboot/index.html
 ```
 
+## Testing it
+
+`npm test` plays the whole campaign in a real headless Chrome and reports what
+happened — wave by wave, then the boot tiers and the escalations that were meant
+to happen:
+
+```bash
+npm test                # full campaign, officer kept on their feet for pacing
+npm run test:honest     # same, but the officer can die, and the report says where
+npm run test:aim        # assert the aim-trigger rule (press retargets, hold keeps)
+npm run test:kick       # assert the three kicks and the scenery they move
+npm run test:probes     # both of those mechanic checks, one page load
+```
+
+There is no test framework and no new dependency: the runner is a small CDP
+client (`node:http` + Node's built-in `WebSocket`) that launches Chrome, serves
+the repo, and evaluates [`test/driver.js`](test/driver.js) in the page. The driver
+drives the *real* `InputManager` — a stub pad for the trigger and aim tune, the
+keyboard map for movement — and then calls the game's own per-frame `step()`, so a
+passing run means the game really is playable through the interfaces a player
+uses. It exits non-zero and names the wave when something is wrong, and the last
+report is always left in `test/campaign-report.json`.
+
+What it treats as a failure: a wave that cannot finish (a stall watchdog on
+eliminations, which snapshots whoever is left, whether they can see the player
+and whether the pilot is even firing), an error or a failed request from the
+page, a frame cap reached mid-campaign, and pacing that has moved more than 40%
+against a recorded baseline. A death is a datapoint, not a failure, unless
+`--require-finish` is passed — and since victory and death are the same terminal
+state on screen, the end-screen title is what decides which one it was.
+
+It also reports something a stall does not catch: the **quietest stretch** of each
+wave, the longest spell with no elimination. That is what turned up a 206 s wave 9
+whose neighbours all took under 45 s — a pilot parked in a blocked pocket with no
+line to anyone, which made the instrument wrong rather than the game. The same
+single number is what would flag a real one.
+
+`--honest` is the interesting mode for balance work, since it reports where a
+scripted pilot died rather than protecting them. `--waves=N`, `--seed=N`
+(default 20260411, for comparable runs measured with the fixed-timestep step),
+`--wave-limit=S` and `--headed` are all worth knowing about; `--help` lists the
+rest, including `--baseline` / `--record` for noticing when a tuning change moves
+the pacing.
+
 `serve.mjs` serves the **repository root** (not just this folder) so the page can
 load the models with `../`. It sets the correct MIME types for `.fbx`, `.glb`,
 `.mp3` and the rest, and sends `Content-Length` so the loading bar is honest.
@@ -118,18 +162,70 @@ broken boot is deliberately the big one (0.38 against 0.34–0.36 for the rest).
 All three kick clips are right-legged, which is why the boot is socketed there:
 measured through each clip, the right toe travels 1.7 m (`kick`), 2.0 m
 (`kickHigh`) and 1.5 m (`stomp`) while the left foot stays planted within 0.26 m.
-The tier picks the clip too — tiers 0–1 use `kick`, 2–4 `kickHigh`, and 5–7
-`stomp` — so an upgrade is visible in the animation as well as the damage.
+
+## The three kicks
+
+They are not one kick with three animations. Each has its own reach, arc, damage
+and power against scenery, all in `KICKS` in `config.js`:
+
+| Kick | Thrown from | Reach | Arc | Damage | Extra routs | Prop power |
+| --- | --- | --- | --- | --- | --- | --- |
+| Kick | standing, boot tier 0–1 | 3.6 m | 108° | ×1.00 | — | 10 |
+| Low Sweep | crouched | 2.7 m | 144° | ×0.70 | +1 | 7 |
+| High Kick | in the air, or standing at tier 2–4 | 4.3 m | 76° | ×1.15 | — | 13 |
+| Stomp | standing at tier 5+ | 3.3 m | all round | ×1.40 | +1 | 16 |
+
+The arc is the half-angle either side of the kick, so the sweep covers nearly the
+whole front at almost no reach and the stomp's π takes everything around the
+officer on the spot. Because the kick is chosen by *where the officer is* rather
+than by a separate button, all three are always available — crouch for the sweep,
+jump and kick in the air for the flying high kick — and the equipped tier decides
+what the standing kick becomes. The tier's damage and knockback are still scaled
+by the kick, so an upgrade is felt in every one, and it remains visible in the
+animation. The HUD names whatever is available from where the officer is standing
+(`kick · Low Sweep`) and shows it change as they crouch and land, and the first
+time each kick is thrown it explains itself in a toast, since there is no move
+list to read.
+
+## Kicking the scenery
+
+The boot does not stop at people. Crates, barriers, rocks and the **cars** are
+kicked with the same reach and arc as the attackers. The impulse is the kick's
+`propPower`, and `propLift` upward, divided by the prop's `mass` — 1 for a crate,
+1.5 a barrier, 2.6 a rock and **4.5 for a car** — so a crate flies and a car
+shifts, tumbles and keeps rolling. `propDrag`, `propSpinDrag`,
+`propRestitution` and ground friction settle it, and it goes to sleep once it is
+slow enough that simulating it would be wasted work.
+
+What makes it more than a particle effect is that a prop's collision box is the
+very box the rest of the world already consults: it blocks bullets, line of sight
+and movement. A car booted out of the way genuinely stops being cover, and one
+left lying in a new spot becomes cover there instead — for the player and the
+attackers alike, because both use the same box. A prop still travelling at
+`propHitSpeed` (4.5 m/s) that catches an attacker floors them, and since it was the
+boot that did it, that rout still pays full boot credit toward the next tier.
+
+`npm run test:kick` asserts the lot: that the three kicks differ in reach, arc and
+power, that crouching and being airborne select the sweep and the high kick, and
+that kicked scenery really moves, tumbles, settles and drags its collision box
+with it.
 
 ## Aim tune, the boot charge and the new pickups
 
-- **Aim tune** (`LT` / right mouse / `Q` / the TARGET button). While held it picks
-  the attacker nearest the **reticle** — by angle, not distance, and only with a
+- **Aim tune** (`LT` / right mouse / `Q` / the TARGET button). It picks the
+  attacker nearest the **reticle** — by angle, not distance, and only with a
   clear sight line — then glides the view onto them and holds the lock through a
   short grace period after release. It tightens the cone of fire
   (`lockSpreadScale`, 0.45), steadies the reticle and shows a `locked · Nm`
   readout. It is deliberately a tune rather than a snap: it helps the shot you
   were already taking instead of yanking the camera onto whoever is closest.
+- **Every fresh press retargets.** The lock is re-acquired from scratch on each
+  *press*, not each frame it is held, so the way to switch attackers is to put
+  the reticle on the next one and pull the trigger again — even if the previous
+  lock is still alive in its grace period. A trigger held down keeps the attacker
+  it caught rather than flicking between two of them as the view swings, and the
+  `locked · Nm` readout pulses whenever a press moves the lock. Asserted by the
+  harness (`npm run test:aim`).
 - **Boot charge.** Routed attackers and gunfire downings feed a meter
   (`chargePerRout` 9, `chargePerGunfireDown` 3, up to `chargeMax` 100) and charge
   crates top it up. A full meter spends itself on a charged kick that takes the

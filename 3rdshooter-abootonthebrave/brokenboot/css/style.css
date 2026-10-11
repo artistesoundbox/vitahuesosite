@@ -98,6 +98,15 @@ html, body {
 }
 .lock-info.retarget { animation: lock-retarget 0.32s ease-out; }
 
+/* The kick the officer would throw from here: the sweep when crouched, the
+   flying high kick in the air, the boot's signature standing up. */
+.kick-readout {
+  position: absolute; left: 22px; bottom: 148px;
+  font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--amber); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  opacity: 0.75;
+}
+
 .stance {
   position: absolute; left: 22px; bottom: 128px;
   font-size: 11px; letter-spacing: 0.18em; font-weight: 700;

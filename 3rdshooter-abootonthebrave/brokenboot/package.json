@@ -4,7 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "serve": "node serve.mjs",
+    "test": "node test/campaign.mjs",
+    "test:honest": "node test/campaign.mjs --honest",
+    "test:aim": "node test/campaign.mjs --check-lock",
+    "test:kick": "node test/campaign.mjs --check-kick",
+    "test:probes": "node test/campaign.mjs --check-lock --check-kick"
   },
   "keywords": [],
   "type": "commonjs",

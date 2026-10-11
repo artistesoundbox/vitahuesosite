@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SETTINGS, BOOT_TIERS, BOOT_SOCKETS, ASSET_BASE, WEAPON } from './config.js';
+import { SETTINGS, BOOT_TIERS, BOOT_SOCKETS, ASSET_BASE, WEAPON, KICKS } from './config.js';
 import { AnimController, findBone, attachToBone, gltfLoader } from './assets.js';
 import { dampAngle, clamp } from './mathx.js';
 
@@ -41,7 +41,10 @@ export class Player {
     // Timed powerups, in seconds remaining.
     this.powerups = { rapid: 0, armor: 0, speed: 0 };
     this.pendingKick = null;
+    // The kick that is being thrown, carried to the frame it connects on.
+    this.lastKick = 'kick';
     this.onKickHit = null;
+    this.onKickStart = null;
     this.onReload = null;
     this.onTierChange = null;
     this.bootModel = null;
@@ -217,16 +220,32 @@ export class Player {
     this.powerups[type] = Math.max(this.powerups[type], 0) + seconds;
   }
 
+  /**
+   * Which kick is available from where the officer is, right now. Standing gives
+   * the equipped boot's signature kick, crouching gives the low sweep and being
+   * off the ground gives the flying high kick, so all three are always reachable
+   * and the boot tier decides which one the standing kick becomes.
+   */
+  kickType() {
+    if (this.crouching) return 'sweep';
+    if (!this.grounded) return 'high';
+    if (this.bootIndex >= 5) return 'stomp';
+    return this.bootIndex >= 2 ? 'high' : 'kick';
+  }
+
   melee() {
     if (!this.canMelee()) return false;
-    const key = this.anim.has('kickHigh') && this.bootIndex >= 2
-      ? (this.bootIndex >= 5 ? 'stomp' : 'kickHigh')
-      : 'kick';
-    const use = this.anim.has(key) ? key : 'kick';
-    if (!this.anim.has(use)) return false;
-    this.kickCooldown = SETTINGS.kickCooldown;
-    this.pendingKick = { t: 0.34 };
-    this.anim.once(use, { timeScale: 1.2 }, () => { /* locomotion resumes next frame */ });
+    const type = this.kickType();
+    const kick = KICKS[type] || KICKS.kick;
+    // A clip the rig does not carry falls back to the plain kick rather than
+    // costing the player their attack.
+    const clip = this.anim.has(kick.clip) ? kick.clip : 'kick';
+    if (!this.anim.has(clip)) return false;
+    this.lastKick = type;
+    this.kickCooldown = SETTINGS.kickCooldown * kick.cooldownScale;
+    this.pendingKick = { t: 0.34, type };
+    if (this.onKickStart) this.onKickStart(type);
+    this.anim.once(clip, { timeScale: 1.2 }, () => { /* locomotion resumes next frame */ });
     return true;
   }
 
