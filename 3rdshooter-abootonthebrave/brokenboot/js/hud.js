@@ -136,6 +136,16 @@ export class Hud {
     }
   }
 
+  /** A quick pulse when a fresh trigger press moves the lock to a new attacker. */
+  showLockRetarget() {
+    if (!this.lockInfo) return;
+    this.lockInfo.classList.remove('retarget');
+    void this.lockInfo.offsetWidth;      // restart the animation on a repeat press
+    this.lockInfo.classList.add('retarget');
+    clearTimeout(this._retargetTimer);
+    this._retargetTimer = setTimeout(() => this.lockInfo.classList.remove('retarget'), 320);
+  }
+
   showBanner(title, sub, seconds = 2.4) {
     this.banner.textContent = title;
     this.bannerSub.textContent = sub || '';

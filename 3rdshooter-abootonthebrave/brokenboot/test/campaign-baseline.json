@@ -1,0 +1,72 @@
+{
+  "recordedAt": "2026-10-11T19:46:40.003Z",
+  "seed": 20260411,
+  "waves": [
+    {
+      "wave": 1,
+      "durationSeconds": 26.15
+    },
+    {
+      "wave": 2,
+      "durationSeconds": 33.17
+    },
+    {
+      "wave": 3,
+      "durationSeconds": 33.26
+    },
+    {
+      "wave": 4,
+      "durationSeconds": 36.52
+    },
+    {
+      "wave": 5,
+      "durationSeconds": 37.92
+    },
+    {
+      "wave": 6,
+      "durationSeconds": 36.23
+    },
+    {
+      "wave": 7,
+      "durationSeconds": 41.37
+    },
+    {
+      "wave": 8,
+      "durationSeconds": 43.01
+    },
+    {
+      "wave": 9,
+      "durationSeconds": 206.85
+    },
+    {
+      "wave": 10,
+      "durationSeconds": 44.62
+    }
+  ],
+  "tiers": [
+    {
+      "tier": "Standard Boot",
+      "atSeconds": 0.02
+    },
+    {
+      "tier": "Reinforced Boot",
+      "atSeconds": 67.27
+    },
+    {
+      "tier": "Silver Boot",
+      "atSeconds": 123.7
+    },
+    {
+      "tier": "Gold Boot",
+      "atSeconds": 208.08
+    },
+    {
+      "tier": "Spiked Gold Boot",
+      "atSeconds": 271.13
+    },
+    {
+      "tier": "Tactical Doom Boot",
+      "atSeconds": 501.38
+    }
+  ]
+}

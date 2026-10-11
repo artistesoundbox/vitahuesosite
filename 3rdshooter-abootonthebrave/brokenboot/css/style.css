@@ -90,6 +90,14 @@ html, body {
 }
 .lock-info.show { opacity: 1; }
 
+/* Each fresh aim press re-acquires, so the readout gives a quick pulse to show
+   the lock moved to the attacker the reticle is now closest to. */
+@keyframes lock-retarget {
+  0% { transform: translate(-50%, 26px) scale(1.4); color: #fff; }
+  100% { transform: translate(-50%, 26px) scale(1); }
+}
+.lock-info.retarget { animation: lock-retarget 0.32s ease-out; }
+
 .stance {
   position: absolute; left: 22px; bottom: 128px;
   font-size: 11px; letter-spacing: 0.18em; font-weight: 700;

@@ -68,6 +68,7 @@ export class Game {
     // for a moment after the trigger is released.
     this.lock = null;
     this.lockGrace = 0;
+    this.targetingHeld = false;      // previous frame's trigger state, for the press edge
     // Live multiplier on the cover-break lull, for tuning it in play.
     this.flushTune = 1;
     this.inputManager = new InputManager({
@@ -587,27 +588,45 @@ export class Game {
   }
 
   /**
-   * Left trigger / right mouse / Q: hold the aim on the attacker closest to the
-   * crosshair and glide the view onto them. It steadies the shot while held and
-   * keeps the target for a short grace period after release.
+   * Left trigger / right mouse / Q: acquire the attacker closest to the
+   * crosshair and glide the view onto them. Every fresh press retargets, so the
+   * player picks the next attacker by looking at them and pulling the trigger
+   * again; a held trigger keeps whoever it caught rather than flicking between
+   * two attackers as the view swings. The target survives a short grace period
+   * after release.
    */
   updateTargetLock(dt) {
     this.lockGrace = Math.max(0, this.lockGrace - dt);
 
-    if (!this.input.targeting) {
+    const held = this.input.targeting;
+    const pressed = held && !this.targetingHeld;
+    this.targetingHeld = held;
+
+    if (!held) {
       if (this.lockGrace <= 0) this.lock = null;
       return;
     }
 
-    // Keep an existing lock so the aim does not flick between two attackers as
-    // the view swings, but drop it if they die or leave the cone.
-    if (this.lock) {
-      const angle = this.lockAngleTo(this.lock.enemy);
-      if (angle === null || angle > SETTINGS.lockAngle * 2.4) this.lock = null;
-    }
-    if (!this.lock) {
-      this.lock = this.findLockTarget();
-      if (this.lock) this.audio.lock();
+    if (pressed) {
+      // Re-acquire from scratch on every press: the reticle is pointing at the
+      // attacker the player wants next, so the closest one wins even if a lock
+      // from the previous hold is still alive.
+      const next = this.findLockTarget();
+      const changed = Boolean(next) && next.enemy !== this.lock?.enemy;
+      this.lock = next;
+      if (next) this.audio.lock();
+      if (changed) this.hud.showLockRetarget?.(next.dist);
+    } else {
+      // Keep an existing lock so the aim does not flick between two attackers
+      // as the view swings, but drop it if they die or leave the cone.
+      if (this.lock) {
+        const angle = this.lockAngleTo(this.lock.enemy);
+        if (angle === null || angle > SETTINGS.lockAngle * 2.4) this.lock = null;
+      }
+      if (!this.lock) {
+        this.lock = this.findLockTarget();
+        if (this.lock) this.audio.lock();
+      }
     }
     this.lockGrace = SETTINGS.lockGrace;
     if (!this.lock) return;
