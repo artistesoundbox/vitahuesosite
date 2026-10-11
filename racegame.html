@@ -165,7 +165,11 @@
        freezing on a half-empty page. */
     #results {
       position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-      max-height: calc(100% - 24px); overflow: hidden;
+      /* both caps, not just the height: the board is a fixed-width block of
+         nowrap columns, so on a narrow phone it can be wider than the stage it
+         is centred in — measured 461 wide in a 320-wide window, hanging 79 past
+         the left edge */
+      max-height: calc(100% - 24px); max-width: calc(100% - 12px); overflow: hidden;
       padding: 15px 18px 13px;
       background: rgba(5, 14, 12, 0.84);
       border: 1px solid rgba(90, 255, 190, 0.5); border-radius: 14px;
@@ -183,6 +187,9 @@
     #results h4 small {
       display: block; margin-top: 5px; font-size: 10.5px; font-weight: 400;
       letter-spacing: 0.1em; color: #8fb3c6;
+      /* the heading is nowrap and this line is inside it, so without this the
+         length of the sentence sets the width of the whole board */
+      white-space: normal;
     }
     #results table { border-collapse: collapse; width: 100%; }
     #results td { padding: 3px 0; white-space: nowrap; }
@@ -219,7 +226,7 @@
        and the canvas drag do. It lives above GAS, so the two thumbs that drive
        keep the bottom corners: steer on the left, throttle on the right, and
        look with the right thumb one pad up. */
-    #pad-look { bottom: 96px; right: 14px; }
+    #pad-look { bottom: 110px; right: 14px; }
     #pad-look .nub {
       width: 30%; height: 30%; border-radius: 50%;
       background: rgba(157, 255, 207, 0.85);
@@ -342,9 +349,13 @@
       /* one pad up from GAS, on the same edge: the speed readout takes that band
          on the LEFT, so the two cannot cover each other however narrow the
          phone is */
+      /* one pad up from GAS, and high enough to be clear of the speed readout
+         that takes the band above the left pads: at 320 wide the readout reaches
+         into this column, and measured at the first height it clipped the stick
+         by 14x16 */
       #pad-look {
         right: calc(var(--pad-edge) + var(--safe-r));
-        bottom: calc(16px + var(--safe-b) + var(--pad) + var(--pad-gap));
+        bottom: calc(52px + var(--safe-b) + var(--pad) + var(--pad-gap));
       }
       /* The speed bar is pinned to the VIEWPORT, like the pads, and not to the
          stage. In landscape the stage is 330 tall in a 390-tall screen, so a
@@ -411,8 +422,8 @@
     down. The barriers are there at every height, and the profile is gentle enough that you can hold the throttle over
     every crest — a hill only throws you when its curvature beats gravity, and none of them do. Hold the throttle,
     brake for the chicane, and try not to be the one who parks a starfighter in a wall. A controller works too — left
-    stick or d-pad to steer, RT or A for throttle, LT to brake and reverse, <b>right stick to look around</b>, Start
-    to restart. Drag the canvas to look, too — or press <b>Steer: drag</b> and a thumb anywhere on the screen sets the
+    stick or d-pad to steer, RT or A for throttle, LT to brake and reverse, <b>right stick to look around</b>, or hold
+    <b>LB</b>/<b>RB</b> to swing the view to the sides, Y for sound, Start to restart. Drag the canvas to look, too — or press <b>Steer: drag</b> and a thumb anywhere on the screen sets the
     lock, with a pull up or down for throttle and brake. On a touch screen the <b>look stick</b> above the throttle does
     what the right stick does, and the results board is also a button: <b>tap it to race again</b>. <b>P</b> pauses.</p>
 
@@ -1257,6 +1268,36 @@
       return worst;
     }
 
+    /* ---- how dark the city itself reads ----
+       The environment is not lit. The towers, the streets, the ground, the road
+       and the barriers are merged meshes of baked vertex colours on basic
+       materials, so no light rig can darken them — measured with frameStats(),
+       halving the rig moved the frame's mean luminance by 2%, because almost
+       none of the frame is Lambert. What darkens them is ENV_DIM, applied to the
+       colour of every UNLIT environment material as it is built.
+
+       The lights are simply not in that list, which is the whole point: the
+       window skins, the neon boards, the beacons, the painted arrows, the tube's
+       lit edge and the portal are emissive or their own materials, so darkening
+       the city raises their contrast against it instead of dimming them with it.
+       The centre dashes stay white for the same reason — they are how you read
+       the road at speed. envDim() at the debug handle rescales the same list,
+       which is how the before/after is measured rather than asserted. */
+    const ENV_DIM = 0.6;
+    const envMats = [];
+    function envDim(m) {
+      m.userData.envBase = m.color.clone();
+      m.color.multiplyScalar(ENV_DIM);
+      envMats.push(m);
+      return m;
+    }
+    function setEnvDim(v) {
+      for (let i = 0; i < envMats.length; i++) {
+        envMats[i].color.copy(envMats[i].userData.envBase).multiplyScalar(v);
+      }
+      return +v;
+    }
+
     function buildCity() {
       const rnd = mulberry32(RNG_SEED);
       const half = CITY_HALF;
@@ -1268,7 +1309,7 @@
            to the brightest thing on screen, which looks like missing geometry
            even though it is only dark. It stays darker than it ever was, but
            dark enough to see the tone in it. */
-        new THREE.MeshBasicMaterial({ color: 0x0a0e16 })
+        envDim(new THREE.MeshBasicMaterial({ color: 0x0a0e16 }))
       );
       ground.rotation.x = -Math.PI / 2;
       scene.add(ground);
@@ -1281,7 +1322,7 @@
         pushRect(streets, -half, half, p - STREET_W / 2, p + STREET_W / 2, 0.012);
         pushRect(streets, p - STREET_W / 2, p + STREET_W / 2, -half, half, 0.012);
       });
-      scene.add(new THREE.Mesh(geometryFrom(streets), new THREE.MeshBasicMaterial({ color: 0x18202a })));
+      scene.add(new THREE.Mesh(geometryFrom(streets), envDim(new THREE.MeshBasicMaterial({ color: 0x18202a }))));
 
       buildTrackSurface();
       buildViaduct();
@@ -1313,7 +1354,7 @@
         const h = c[2];
         pushRect(slabs, c[0] - h, c[0] + h, c[1] - h, c[1] + h, 0.018);
       });
-      scene.add(new THREE.Mesh(geometryFrom(slabs), new THREE.MeshBasicMaterial({ color: 0x171e27 })));
+      scene.add(new THREE.Mesh(geometryFrom(slabs), envDim(new THREE.MeshBasicMaterial({ color: 0x171e27 }))));
 
       const boxes = cityBoxes = [];
       centres.forEach(function (c) {
@@ -1449,7 +1490,7 @@
       scene.add(new THREE.Mesh(geometryFrom(clutter), new THREE.MeshLambertMaterial({ vertexColors: true })));
       beaconGroups.forEach(function (A, i) {
         if (!A.idx.length) return;
-        const mat = new THREE.MeshBasicMaterial({ vertexColors: true });
+        const mat = envDim(new THREE.MeshBasicMaterial({ vertexColors: true }));
         mat.userData.rate = 0.34 + i * 0.17;      // each group on its own cycle
         mat.userData.phase = i * 0.31;
         mat.userData.duty = 0.2 + (i % 3) * 0.06; // and its own dwell
@@ -1881,10 +1922,14 @@
         }
       }
 
-      const flat = function (positions, colour, dbl) {
+      /* `dim` marks a surface as part of the city rather than one of its lights:
+         the tarmac and the barriers are environment, the centre dashes are how you
+         read the road at speed and stay white. */
+      const flat = function (positions, colour, dbl, dim) {
         const g = new THREE.BufferGeometry();
         g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        return new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: colour, side: dbl ? THREE.DoubleSide : THREE.FrontSide }));
+        const m = new THREE.MeshBasicMaterial({ color: colour, side: dbl ? THREE.DoubleSide : THREE.FrontSide });
+        return new THREE.Mesh(g, dim ? envDim(m) : m);
       };
       /* The tarmac is markedly darker than it was, and that is most of why the
          painted arrows and the kerbs now read as the brightest things on the
@@ -1892,13 +1937,13 @@
          centre dashes stay pure white — they are how you read which way the
          road goes at speed — and the double side is for the skyway, which you
          can see from underneath. */
-      scene.add(flat(road, 0x5a626e, true));
+      scene.add(flat(road, 0x5a626e, true, true));
       scene.add(flat(dash, 0xffffff));
-      scene.add(flat(bar, 0x3b434e));
+      scene.add(flat(bar, 0x3b434e, false, true));
       const curbGeo = new THREE.BufferGeometry();
       curbGeo.setAttribute('position', new THREE.Float32BufferAttribute(curb.pos, 3));
       curbGeo.setAttribute('color', new THREE.Float32BufferAttribute(curb.col, 3));
-      scene.add(new THREE.Mesh(curbGeo, new THREE.MeshBasicMaterial({ vertexColors: true })));
+      scene.add(new THREE.Mesh(curbGeo, envDim(new THREE.MeshBasicMaterial({ vertexColors: true }))));
     }
 
     /* ---------- a point on the road, in road coordinates ---------- */
@@ -2094,8 +2139,8 @@
         color: 0x8adeff, transparent: true, opacity: 0.085,
         blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
       })));
-      scene.add(new THREE.Mesh(geometryFrom(ribs), new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
-      scene.add(new THREE.Mesh(geometryFrom(PORTAL), new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+      scene.add(new THREE.Mesh(geometryFrom(ribs), envDim(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }))));
+      scene.add(new THREE.Mesh(geometryFrom(PORTAL), envDim(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }))));
       scene.add(new THREE.Mesh(geometryFrom(PORTAL_LIT), new THREE.MeshBasicMaterial({
         vertexColors: true, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false
       })));
@@ -2701,7 +2746,16 @@
         while (d < -Math.PI) d += TAU;
         r.yaw += d * Math.min(1, 9 * dt);
       }
-      const wantRoll = clamp(-look.k * r.v * 0.17 - r.latV * 0.012, -0.5, 0.5);
+      /* The hull leans into the corner — but only where the ROAD does not.
+         A banked corner already leans the whole car; adding a body lean on top
+         of that rolls the hull back toward level, because the lean is measured
+         against the world and the bank is measured against the road. Measured
+         at the corkscrew: 25 degrees of difference between the hull and the
+         deck it is standing on, which reads as a car that has come off the
+         surface rather than one racing along it. So the lean is scaled by how
+         flat the road is, and on the loop (18 degrees of bank) it is nothing. */
+      const leanScale = 1 - Math.min(1, Math.abs(look.b) / BANK_MAX);
+      const wantRoll = clamp((-look.k * r.v * 0.17 - r.latV * 0.012) * leanScale, -0.5, 0.5);
       r.roll += (wantRoll - r.roll) * Math.min(1, 5 * dt);
       /* in the air the nose follows the arc, which is the whole visual payoff
          of a jump — you can see the hull pitch over at the top */
@@ -3381,6 +3435,14 @@
       const ry = gp.axes.length > 3 ? (gp.axes[3] || 0) : 0;
       pad.lookX = Math.abs(rx) > PAD_DEAD ? clamp(rx, -1, 1) : 0;
       pad.lookY = Math.abs(ry) > PAD_DEAD ? clamp(ry, -1, 1) : 0;
+      /* And the bumpers look to the SIDES, which is the one thing the right
+         stick is bad at while the right thumb is also on the throttle: LB swings
+         the view left, RB right, held, at the same rate the stick swings it. The
+         bumper wins when both are asking — it is the deliberate press. Digital
+         buttons, so this is full deflection and the look springs back the moment
+         they are released, exactly like the stick and the canvas drag. */
+      if (down(5)) pad.lookX = 1;
+      else if (down(4)) pad.lookX = -1;
       const rt = Math.max(val(7), down(0) ? 1 : 0);     // A or right trigger
       const lt = val(6);                                // left trigger
       pad.throttle = rt > 0.06 ? rt : 0;
@@ -3392,7 +3454,9 @@
       };
       edge('a', 0, function () { if (!actx) audioReady(); });
       edge('back', 8, function () { togglePause(); });
-      edge('lb', 4, function () { if (!actx) audioReady(); toggleSound(); });
+      /* sound moved to Y: LB is a look now, and a controller has no business
+         spending a shoulder on a mute toggle */
+      edge('y', 3, function () { if (!actx) audioReady(); toggleSound(); });
       edge('start', 9, function () { startRace(); showMsg('RESTART', 800); });
     }
     window.addEventListener('gamepadconnected', function () {
@@ -4098,6 +4162,7 @@
       buildVehicles(buf);
       buildMinimap();
       buildPickButtons();
+      setEnvDim(ENV_DIM);       // every unlit environment material, once they exist
       /* the grid is laid out and then held: the countdown belongs to the player's
          first press, not to the load. loadEl stays up as the start screen. */
       gridStart(true);
@@ -4302,6 +4367,12 @@
           if (renderer) renderer.toneMappingExposure = r.exposure;
           return { hemi: hemiLight && hemiLight.intensity, key: keyLight && keyLight.intensity,
             rim: rimLight && rimLight.intensity, exposure: renderer && renderer.toneMappingExposure };
+        },
+        /* the city's own dimmer: the same materials, rescaled, so "darker city,
+           same lights" is a measurement on one frame instead of a claim */
+        envDim: function (v) {
+          const was = envMats.length ? +envMats[0].color.r.toFixed(4) : null;
+          return { factor: v === undefined ? ENV_DIM : setEnvDim(v), materials: envMats.length, redOfFirst: was };
         },
         /* any rig at all, so an A/B on one scene needs no page reload */
         rigAt: function (hemi, key, rim, exposure) {
@@ -4670,7 +4741,9 @@
           pickups.forEach(function (p) { mix(p.s); mix(p.lat); });
           return (h >>> 0).toString(16);
         },
-        pad: function () { return { live: pad.live, steer: pad.steer, throttle: pad.throttle, brake: pad.brake }; },
+        pad: function () { return { live: pad.live, steer: pad.steer, throttle: pad.throttle, brake: pad.brake,
+          lookX: +pad.lookX.toFixed(3), lookY: +pad.lookY.toFixed(3), look: [+lookYaw.toFixed(3), +lookPitch.toFixed(3)],
+          id: (function () { const gp = firstPad(); return gp ? (gp.id || 'pad') : null; })() }; },
         shake: function (v) { if (v !== undefined) shake = v; return shake; },
         rumble: rumble,
         cam: function () {
