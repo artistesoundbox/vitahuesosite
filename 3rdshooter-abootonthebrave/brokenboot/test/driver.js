@@ -220,6 +220,10 @@ async function runCampaign(options) {
       G.camera.updateMatrixWorld(true);
     };
     const names = () => (G.lock ? G.lock.enemy.label : null);
+    // The trigger is read as an analog axis as well as a button, so both have to
+    // move: clearing only `pressed` left value at 1 and the InputManager never
+    // saw the trigger come up, so no press edge could ever follow it.
+    const setLt = (on) => { lt.pressed = on; lt.value = on ? 1 : 0; };
     // The camera eases toward where it wants to be, so angles read while it is
     // still travelling are a moving target. Half a second is plenty for it to
     // arrive (and it cannot move on its own: the lock's turn rate is zeroed).
@@ -232,7 +236,7 @@ async function runCampaign(options) {
       G.enemyManager.enemies = [];
       G.lock = null;
       G.targetingHeld = false;
-      lt.pressed = false;
+      setLt(false);
       frame();                        // settle: no trigger, no lock
 
       const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -285,7 +289,7 @@ async function runCampaign(options) {
       };
 
       // 1. A fresh press: the attacker nearest the crosshair.
-      lt.pressed = true;
+      setLt(true);
       frame(); frame();
       out.firstPress = names();
 
@@ -314,10 +318,10 @@ async function runCampaign(options) {
 
       // 3. Release and press again: the reticle now sits on the other attacker,
       //    so the new press re-acquires them.
-      lt.pressed = false;
+      setLt(false);
       frame();
       out.afterRelease = names();
-      lt.pressed = true;
+      setLt(true);
       frame(); frame();
       out.freshPress = names();
 
@@ -332,7 +336,7 @@ async function runCampaign(options) {
     } finally {
       SETTINGS.lockRate = savedRate;
       G.enemyManager.enemies = savedEnemies;
-      lt.pressed = true;           // aim-tune held for the rest of the match
+      setLt(true);                 // aim-tune held for the rest of the match
       G.input.targeting = false;
       G.lock = null;
       G.targetingHeld = false;
