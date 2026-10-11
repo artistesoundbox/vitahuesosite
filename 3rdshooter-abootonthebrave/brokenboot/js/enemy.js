@@ -53,6 +53,13 @@ export class Enemy {
     this._move = new THREE.Vector3();
     this._side = new THREE.Vector3();
     this._sep = new THREE.Vector3();
+    this._prevPos = new THREE.Vector3();
+    this._probe = new THREE.Vector3();
+    // Obstacle detour state: see the stuck watchdog in update().
+    this.stuckTime = 0;
+    this.detourTimer = 0;
+    this.detourHeading = null;
+    this._seekYaw = 0;
   }
 
   get position() { return this.object.position; }
@@ -206,14 +213,43 @@ export class Enemy {
       }
     }
 
+    // Steering is a straight line with only a slide along whatever it bumps
+    // into, so an attacker whose target sits on the far side of a crate presses
+    // into the same face indefinitely and the wave can never end. Once the
+    // watchdog below says it has stopped making progress, walk the heading its
+    // whiskers picked instead of straight ahead.
+    this._seekYaw = move.lengthSq() > 1e-6 ? Math.atan2(move.x, move.z) : Math.atan2(dir.x, dir.z);
+    if (this.detourTimer > 0) {
+      this.detourTimer -= dt;
+      this._side.set(Math.sin(this.detourHeading), 0, Math.cos(this.detourHeading));
+      move.addScaledVector(this._side, 1.7);
+    }
+
     if (move.lengthSq() > 1e-6) move.normalize();
     // The whole line moves a little quicker as the game escalates.
     const gait = SETTINGS.enemyWalkSpeed * gaitScale * (this.wounded ? 0.72 : 1) * (ctx.speedScale || 1);
+    this._prevPos.copy(this.object.position);
     this.object.position.addScaledVector(move, gait * dt);
     this.object.position.x += this.knock.x * dt;
     this.object.position.z += this.knock.z * dt;
     this.knock.multiplyScalar(Math.max(0, 1 - 3.2 * dt));
     this.world.resolveCircle(this.object.position, 0.5);
+
+    // Progress watchdog for the detour above.
+    const travelled = Math.hypot(
+      this.object.position.x - this._prevPos.x,
+      this.object.position.z - this._prevPos.z,
+    );
+    if (this.detourTimer <= 0 && move.lengthSq() > 1e-6 && travelled < gait * dt * 0.4) {
+      this.stuckTime += dt;
+      if (this.stuckTime > 1.2) {
+        this.detourHeading = this.pickDetourHeading(this._seekYaw);
+        this.detourTimer = 1.6 + Math.random() * 1.2;
+        this.stuckTime = 0;
+      }
+    } else {
+      this.stuckTime = 0;
+    }
 
     this.yaw = dampAngle(this.yaw, Math.atan2(dir.x, dir.z), 7, dt);
     this.object.rotation.y = this.yaw;
@@ -242,6 +278,37 @@ export class Enemy {
       this.anim.play('idle');
     }
     this.anim.update(dt);
+  }
+
+  /**
+   * A heading to walk around whatever the seek is pressed against.
+   *
+   * Whiskers are cast to either side of the straight line and scored by how far
+   * they run clear, so the attacker edges along the obstacle and rounds its
+   * corner instead of leaning on the same face forever. The heading that was
+   * already working is favoured, which stops it ping-ponging between the two
+   * ends of a wide crate. Probes are cast low: movement collides in the XZ
+   * plane whatever an obstacle's height, so a chest-high ray would sail over
+   * the very crates that are blocking the way.
+   */
+  pickDetourHeading(baseYaw) {
+    const origin = this.object.position;
+    let best = baseYaw;
+    let bestScore = -Infinity;
+    for (const deg of [0, 25, -25, 50, -50, 80, -80, 110, -110, 140, -140]) {
+      const yaw = baseYaw + (deg * Math.PI) / 180;
+      this._probe.set(Math.sin(yaw), 0, Math.cos(yaw));
+      const hit = this.world.raycast(origin, this._probe, 3.2);
+      const clear = hit ? hit.t : 3.2;
+      const reusesLast = this.detourHeading !== null
+        && Math.cos(yaw - this.detourHeading) > 0.9 ? 1.1 : 0;
+      const score = clear + reusesLast - Math.abs(deg) * 0.014;
+      if (score > bestScore) {
+        bestScore = score;
+        best = yaw;
+      }
+    }
+    return best;
   }
 
   /**
@@ -449,7 +516,11 @@ export class EnemyManager {
    */
   updateFlush(dt, player, onFlush) {
     this.sinceElimination += dt;
-    const lastStand = this.aliveCount > 0 && this.aliveCount <= SETTINGS.flushLastStandCount;
+    // Count the whole wave, not just who has stepped out so far: attackers spawn
+    // in on a stagger, so the first seconds of every wave look like three men
+    // left and would trigger a last stand before the line has even formed.
+    const remaining = this.aliveCount + this.queue.length;
+    const lastStand = this.aliveCount > 0 && remaining <= SETTINGS.flushLastStandCount;
     const wasFlushing = this.flushing;
     // They hold cover while the player is making progress; the moment the fight
     // stalls they all come at once. Any kill buys a fresh window of hiding.
