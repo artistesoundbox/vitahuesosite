@@ -958,29 +958,39 @@
     /* ---- banking ----
        The corkscrew used to be a flat road bent into a circle: the deck stayed
        level across its width all the way round, which is the one thing a real
-       spiral ramp never does. The deck now rolls into the corner, by the
+       spiral ramp never does. The deck rolls into the corner now, by the
        equilibrium angle for a cornering speed (tan b = v^2 k / g) softened
-       through tanh: 18 degrees on the loop's 30-unit radius, a few on the
-       gentle bends, and zero on the straights.
+       through tanh: 18 degrees on the loop's 30-unit radius, a few degrees on
+       the bends, and zero on the straights.
 
-       Two things that corner has to be, and both cost a pass over the lap.
+       The first attempt banked every corner as tightly as it was curved, and
+       the road folded. The lap is not one long bend: measured by the length of
+       each run of same-sign curvature it is one 208-unit corner (the loop),
+       one of 87, and a dozen of 44-52 — a serpentine. A surface that rolls to
+       +/-18 degrees inside a 45-unit corner, and back, has to twist 36 degrees
+       in 45 units: the strip of road stops reading as a surface and reads as a
+       creased sheet. Two things fix it, and both are properties of the corner,
+       not of the frame:
 
-       1. SUSTAINED. The lap is not all long bends — it has hairpins of 10-12
-          unit radius and a serpentine whose curvature flips sign every thirty
-          units. Measured against the raw curvature, those banked to full
-          angle too, and because their lefts and rights are 40 units apart the
-          deck rolled +18 and then -18 within one corner: the road stopped
-          being a road and read as a folded sheet of paper. So the bank is
-          driven by the curvature averaged over +/-20 units — longer than any
-          hairpin, far shorter than the 206-unit loop. Averaging a SIGNED
-          curvature over a window longer than the corner cancels the hairpins
-          and the serpentine (a right immediately after a left sums to zero)
-          while the loop, one sign for two hundred units, keeps its angle.
-       2. SLOW TO CHANGE. The roll is then rate-limited to ROLL_RATE per unit
-          of s, relaxed around the closed lap, so the deck can never twist
-          faster than that however the plan view wriggles. Measured, the worst
-          gradient on the lap is 0.23 degrees per unit — a fifth of a degree
-          per metre of road, which is what a real transition is.
+       1. A BANK HAS TO BE RAMPED IN AND OUT. The deck is rate-limited to
+          ROLL_RATE per unit of s (about a fifth of a degree per unit — what a
+          real transition measures), so a corner of length L can carry at most
+          ROLL_RATE*L/BANK_BUILD before it has to come back down. That is the
+          cap, applied per corner before the profile is built. The loop's 208
+          units reach the full 18; the 45-unit corners carry 4-5 degrees.
+       2. THE SIGN IS THE LOCAL ONE. The cap is a magnitude; the sign comes
+          from the curvature under that metre of road, so the deck always
+          leans into the corner it is actually in. (Averaging the SIGNED
+          curvature over a wide window was tried first and leans the wrong way
+          through a serpentine, where the average is dominated by the corner
+          you have just left.)
+
+       What is left after the cap is smoothed over +/-BANK_WIN units and run
+       through the rate limiter again, relaxed forward around the closed lap.
+       Measured: worst roll gradient 0.23 degrees/unit, zero on the straights,
+       18.0 at the loop, and the only place the sign opposes the local corner
+       is the few units where the roll crosses level between two of the 45-unit
+       corners, by at most 5 degrees.
 
        It is applied as a *shear*, not a rotation: a point at lateral offset
        `lat` rises by lat*sin(b) and keeps its plan position. Rotating the
@@ -992,7 +1002,9 @@
        the driver's left, the inside, is the low edge and the outside is up. */
     const BANK_REF = 0.014;        // curvature that banks to tanh(1) of full
     const BANK_MAX = 0.32;         // radians — 18 degrees at full lock
-    const BANK_WIN = 20;           // units of curvature averaged into a bank
+    const BANK_MIN_K = 0.006;      // below this curvature, road counts as straight
+    const BANK_BUILD = 2.5;        // of the roll budget, the share a corner may use
+    const BANK_WIN = 3;            // units the capped profile is smoothed over
     const ROLL_RATE = 0.004;       // radians per unit — the deck's twist limit
     let trackN = 0;
     let tX, tZ, tY, tTX, tTZ, tNX, tNZ, tK, tG, tKY, tB;
@@ -1045,20 +1057,48 @@
         for (let o = -9; o <= 9; o++) sum += k[(i + o + trackN) % trackN];
         tK[i] = sum / 19;
       }
-      /* the bank the sustained curvature asks for, precomputed so the road, the
-         cars and the scenery all read the same number for a given s: the wide
-         average first (see the note on BANK_WIN), then the rate limit, relaxed
-         forward around the closed lap until no step exceeds ROLL_RATE. Twelve
-         passes is what it takes to settle; the constraint is local, so a pass
-         can only ever spread the change, and the loop closes on itself. */
+      /* The bank the corner can carry, precomputed so the road, the cars and
+         the scenery all read the same number for a given s.
+
+         First: how long is the corner that station i is inside? One scan of
+         the closed lap, cutting it into runs of same-sign curvature (and
+         treating anything under BANK_MIN_K as straight, so a run does not
+         straddle a straight). Everything is measured in units of s. */
+      const bankSign = function (i) {
+        return Math.abs(tK[i]) < BANK_MIN_K ? 0 : (tK[i] < 0 ? -1 : 1);
+      };
+      const runLen = new Float32Array(trackN);
+      {
+        let start = 0;
+        for (let i = 0; i < trackN; i++) if (bankSign(i) === 0) { start = i; break; }
+        let rs = (start + 1) % trackN, cs = bankSign(rs), n = 1;
+        for (let step = 2; step <= trackN; step++) {
+          const i = (start + step) % trackN, s = bankSign(i);
+          if (s === cs) { n++; continue; }
+          if (cs !== 0) for (let k = 0; k < n; k++) runLen[(rs + k) % trackN] = n;
+          rs = i; cs = s; n = 1;
+        }
+        if (cs !== 0) for (let k = 0; k < n; k++) runLen[(rs + k) % trackN] = n;
+      }
+      /* Second: the angle. Local sign, magnitude capped by what this corner's
+         length can ramp in and out at ROLL_RATE. */
       const kB = new Float32Array(trackN);
       for (let i = 0; i < trackN; i++) {
-        let sum = 0;
-        for (let o = -BANK_WIN; o <= BANK_WIN; o++) sum += tK[(i + o + trackN) % trackN];
-        kB[i] = sum / (2 * BANK_WIN + 1);
+        const want = BANK_MAX * Math.tanh(Math.abs(tK[i]) / BANK_REF);
+        const cap = ROLL_RATE * runLen[i] / BANK_BUILD;
+        const a = Math.min(want, cap);
+        kB[i] = tK[i] < 0 ? -a : a;
       }
+      /* Third: soften the corners of that profile, then enforce the rate limit
+         itself — relaxed forward around the closed lap until no step exceeds
+         ROLL_RATE. Twelve passes is what it takes to settle; the constraint is
+         local, so a pass can only spread a change, and the loop closes. */
       tB = new Float32Array(trackN);
-      for (let i = 0; i < trackN; i++) tB[i] = BANK_MAX * Math.tanh(kB[i] / BANK_REF);
+      for (let i = 0; i < trackN; i++) {
+        let sum = 0;
+        for (let o = -BANK_WIN; o <= BANK_WIN; o++) sum += kB[(i + o + trackN) % trackN];
+        tB[i] = sum / (2 * BANK_WIN + 1);
+      }
       for (let pass = 0; pass < 12; pass++) {
         for (let i = 0; i < trackN; i++) {
           const j = (i + 1) % trackN, d = tB[j] - tB[i];
