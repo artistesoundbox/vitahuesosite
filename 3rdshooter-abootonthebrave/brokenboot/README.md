@@ -31,31 +31,37 @@ and asset fetches over `file://`.
 | `Space` | Jump |
 | Mouse | Aim (click once to capture the pointer) |
 | Left mouse (hold) | Fire |
+| Right mouse (hold) / `Q` | Aim tune — glide the view onto the attacker nearest the reticle |
 | `R` | Reload |
 | `F` | Boot kick |
+| `C` | Crouch (toggle) |
 | `M` | Mute |
 | `Esc` | Release the cursor (pauses) |
+| `[` / `]` | Debug: shorten / lengthen the cover-break lull (see below) |
+| `\` | Debug: restore the configured lull |
 
 **Xbox-style controller** (detected automatically — no pointer capture needed)
 
 | Input | Action |
 | --- | --- |
-| Left stick | Move (push to the edge to sprint) |
+| Left stick | Move (push to the edge, or `L3`, to sprint) |
 | Right stick | Aim |
 | `RT` | Fire |
-| `LT` / `L3` | Sprint |
+| `LT` | Aim tune — glide the view onto the attacker nearest the reticle |
 | `A` | Boot kick |
 | `B` | Reload |
 | `Y` | Jump |
+| Right stick click | Crouch (toggle) |
 | `X` | Mute |
 | `Menu` | Release the cursor |
 
 **Touch / phone**
 
 Left thumb pad moves, dragging anywhere on the right half aims, and the round
-buttons fire, kick, jump and reload. Sprint is automatic when the stick is pushed
-past ~85%. The compact HUD and the on-screen pad appear automatically on coarse
-pointers, and the layout adapts to portrait and short-landscape phones.
+buttons fire, kick, jump, reload, crouch and hold the aim tune. Sprint is
+automatic when the stick is pushed past ~85%. The compact HUD and the on-screen
+pad appear automatically on coarse pointers, and the layout adapts to portrait
+and short-landscape phones.
 
 ## The combat model
 
@@ -83,9 +89,10 @@ This is the heart of the design, and it is deliberately unusual:
   boot's full `meleeDamage` (55 → 220 by tier), which floors them and leaves them
   bleeding out or ready to be routed by the next kick.
 - **Hiding is temporary.** Attackers hold cover only while the player is making
-  progress. If nothing is eliminated for `flushAfter` (6 s) the whole line breaks
-  cover and charges at once — and the last `flushLastStandCount` (3) attackers of
-  a wave never hide again. Any elimination buys them a fresh window of hiding.
+  progress. If nothing is eliminated for `flushAfter` — 12 s at wave 1, down to
+  3.5 s at wave 10 — the whole line breaks cover and charges at once, and the last
+  `flushLastStandCount` (3) attackers of a wave never hide again. Any elimination
+  buys them a fresh window of hiding.
   This is what stops a wave ending in a slow walk around the forest rounding up
   stragglers, which was the single biggest drag on the pace.
 - **They keep coming.** Routed attackers being gone for good is fine because the
@@ -99,19 +106,79 @@ loads its model and sockets it onto the officer's **right foot** bone.
 Thresholds are set against the whole campaign, which totals 117 attackers, so a
 single run is worth at most 117 credit. A good run reaches **Legendary Broken
 Boot** (102) near the end; **Mythical Diamond** (116) needs a near-perfect,
-boot-only clear. Measured in a full simulated clear: Reinforced 49 s, Silver
-132 s, Gold 190 s, Spiked Gold 261 s, Tactical Doom 323 s, Legendary 385 s.
+boot-only clear. In a full simulated clear of the pre-ramp build the tiers arrived
+at 49 s, 132 s, 190 s, 261 s, 323 s and 385 s; the ramp below brings the late
+waves on faster, and the credit thresholds are unchanged.
 
 Each boot model carries its own fit in `BOOT_SOCKETS` — `size` for the model's
 longest axis and `lift` to raise it until the sole rests on the ground. The
 socket helper centres a model on the foot bone, so a lift is always needed; the
 broken boot is deliberately the big one (0.38 against 0.34–0.36 for the rest).
 
+All three kick clips are right-legged, which is why the boot is socketed there:
+measured through each clip, the right toe travels 1.7 m (`kick`), 2.0 m
+(`kickHigh`) and 1.5 m (`stomp`) while the left foot stays planted within 0.26 m.
+The tier picks the clip too — tiers 0–1 use `kick`, 2–4 `kickHigh`, and 5–7
+`stomp` — so an upgrade is visible in the animation as well as the damage.
+
+## Aim tune, the boot charge and the new pickups
+
+- **Aim tune** (`LT` / right mouse / `Q` / the TARGET button). While held it picks
+  the attacker nearest the **reticle** — by angle, not distance, and only with a
+  clear sight line — then glides the view onto them and holds the lock through a
+  short grace period after release. It tightens the cone of fire
+  (`lockSpreadScale`, 0.45), steadies the reticle and shows a `locked · Nm`
+  readout. It is deliberately a tune rather than a snap: it helps the shot you
+  were already taking instead of yanking the camera onto whoever is closest.
+- **Boot charge.** Routed attackers and gunfire downings feed a meter
+  (`chargePerRout` 9, `chargePerGunfireDown` 3, up to `chargeMax` 100) and charge
+  crates top it up. A full meter spends itself on a charged kick that takes the
+  **whole arc** at once — `chargedExtraRouts` more routed, `chargedKnockbackScale`
+  (1.6×) knockback scaled again by the tier, plus a shockwave, a heavier shake and
+  a `BOOT CHARGED` banner. The routs it causes refill the meter by 9 each, so a
+  well-placed charged kick chains straight into the next one.
+- **Pickups.** An elimination rolls ammo (0.26), field dressing (0.16), fast mag
+  (0.10, instant reload plus 30 reserve), boot charge (0.14), rapid fire (0.08,
+  12 s at `rapidFireScale` 0.55) and plated vest (0.08, 12 s at
+  `armorDamageScale` 0.55); a dry player always drops ammo. Drops drift toward the
+  player from within 6 m so loot earned in a firefight is not lost in the grass.
+- **Stance and jump.** `C` (or a stick click, or the CROUCH button) toggles
+  crouch: it plays the `crouch` clip, moves at `crouchSpeedScale` (0.55), tightens
+  the cone (`crouchSpreadScale`) and shrinks the hit profile (`crouchHitScale`).
+  Jump uses the `jump` clip and clears about 0.94 m.
+
+The cover-break lull is **tunable in play**: `[` and `]` scale it for the session
+(0.2× to 3×) and `\` restores the configured curve, with a toast reporting the
+resulting seconds so the charge timing can be judged against a live fight.
+
+## Pacing: how the fight escalates
+
+The game opens deliberately and turns relentless. Every pacing figure comes from
+one pure function, `waveRamp(wave)` in `config.js`, and every system reads it — so
+the curve is tunable in one place instead of being scattered across the AI:
+
+| Wave | Breather before they break cover | Gap between attackers stepping out | Pressing at once | Walk speed |
+| --- | --- | --- | --- | --- |
+| 1 | 12.0 s | 3.4 s | 1 | 0.92× |
+| 5 | 8.2 s | 2.2 s | 1 | 1.01× |
+| 10 | 3.5 s | 0.7 s | 2 | 1.12× |
+
+Spawns tighten too (1.7 s → 0.75 s), the assault window lengthens (4–6 s →
+7–11 s), attackers hold their firing line closer in (14 m → 10.5 m) and the
+intermission shortens (6.5 s → 4 s).
+
+Measured by driving a walking player through the first 30 s of a wave, wave 10
+puts **2.6× the incoming fire and 3.9× the damage** on the player of wave 1
+(0.77 shots/s and 4.7 damage/s against 0.30 and 1.2 — 140 damage against 36), with
+**2.4× as many attackers pressing at once** (1.60 against 0.66). The first
+cover-break lands 12.0 s into wave 1 and 3.5 s into wave 10, so the late waves
+start pressing sooner as well as harder.
+
 ## What else is implemented
 
 - **Over-the-shoulder camera** that fires along the reticle axis, with cover-aware
   pull-in, recoil that recenters, and screen shake.
-- **Attackers fight from cover, one at a time.** They spawn 32–48 m out and bound
+- **Attackers fight from cover, one at a time.** They spawn 26–38 m out and bound
   forward cover to cover — a spot on the far side of a tree, the car or a crate
   that breaks line of sight — crouching there behind the `crouch` clip. Exactly
   **one** attacker holds the assault token at any moment: it presses in, holds a
@@ -125,12 +192,20 @@ broken boot is deliberately the big one (0.38 against 0.34–0.36 for the rest).
   closed down and kicked rather than leading the player around the forest.
 - **Cover breaking is announced once per wave** (`THEY'RE MOVING`, or `LAST
   STAND` when it is the tail of a wave) so the HUD does not chatter every time
-  they charge again.
+  they charge again. The last-stand test counts the **whole wave** — attackers
+  who have spawned plus those still queued — because they arrive on a stagger and
+  counting only the ones already on their feet made the first seconds of every
+  wave read as a last stand, breaking cover before the line had even formed.
+- **Attackers find their way around obstacles.** Steering is a straight line with
+  only a slide along whatever it bumps into, so an attacker whose target sat on
+  the far side of a crate would press into the same face indefinitely — it could
+  not shoot, could not be reached, and the wave could never end. A stuck watchdog
+  now notices the lack of progress and walks along the obstacle (keeping to one
+  side until the line to the player opens up) instead of leaning on it.
 - **Waves.** Ten waves sized `round(4 + wave * 1.4)` and capped at 18, staggered
   spawns, a cap of 9 alive at once, elite variants from wave 5, and an
-  intermission with a tagline between waves. Measured clear times in a full
-  simulated run: 21 s for wave 1 rising to ~50 s for the late waves, about seven
-  minutes for the whole campaign.
+  intermission with a tagline between waves. Clear times in a simulated run: 26 s
+  for wave 1, then 46 s and 48 s for waves 2 and 3.
 - **Forest.** Instanced pines, a clearing, crates, barriers, rocks and parked cars
   used as cover — all with real collision.
 - **A scanned environment.** `landscape_forest__mountains.glb` is a closed,
@@ -139,10 +214,9 @@ broken boot is deliberately the big one (0.38 against 0.34–0.36 for the rest).
   gradient sky cap. Only its terrain band stays visible on the horizon.
 - **Dynamic music.** The two supplied tracks are crossfaded as beds: one for the
   lulls, one for when there are attackers alive.
-- **Loot.** Roughly a third of eliminations drop ammo, a fifth drop a field
-  dressing, and an elimination while low on rounds always drops ammo so the
-  player can never hard-stall. Drops drift toward the player from within 6 m so a
-  dressing earned in a firefight is not lost in the grass.
+- **Loot.** Six drop types rolled per elimination, with ammo first so a dry
+  player can never hard-stall — see *Aim tune, the boot charge and the new
+  pickups* above for the table.
 - **HUD.** Health, ammo, wave, hostiles, eliminations, boot kills, tier progress,
   damage vignette, hit markers, banners, achievement toasts and an end screen.
 
@@ -220,7 +294,7 @@ download, which is the single biggest remaining improvement.
 
 ## Known limitations / next steps
 
-- No crouch, no aim-down-sights, and weapon pickups are limited to the AK.
+- No aim-down-sights, and the weapon selection is limited to the AK.
 - Achievements are a subset of the design document.
 - Boot fits in `BOOT_SOCKETS` are hand-tuned for this rig's `mixamorigRightFoot`
   bone; a different skeleton would need new `size`/`lift` values.
