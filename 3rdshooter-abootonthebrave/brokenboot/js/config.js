@@ -262,7 +262,34 @@ export const ENEMY_SOURCE = {
   },
 };
 
-export const WEAPON = { model: 'ak-47.glb' };
+// The officer's rifle, welded into his right hand, so the whole fit is listed
+// here and applied once (see socketRifle).
+//
+// `size` is its longest axis in world units. `muzzle` and `magazine` are
+// directions in the model's own frame, measured off its geometry: the barrel is
+// the model's X with the muzzle at -X (the thin end — the stock is the thick
+// one), and the magazine hangs towards -Y, which is told from the sight rail by
+// measuring against the bore line rather than the model's own box: the muzzle is
+// a thin tube centred 0.53 up the box, the middle of the rifle reaches 1.25 below
+// that line and only 0.20 above it, and the magazine is the long side. `grip` is
+// how far up the rifle the hand takes it, measured from the stock end: a third of
+// the way up puts the pistol grip in his fist with the muzzle clear of his own
+// body, as it sits on a real AK.
+//
+// The hand's own frame is what the rifle is bolted to, and it is not the world's:
+// in every pose the officer holds the rifle in — aim, walk, crouch — the hand bone
+// points its own +Y forward and its -X up, while down a plain idle that same +Y
+// hangs at his side. So the mount maps muzzle onto the hand's +Y and magazine onto
+// its -X: the barrel follows wherever the hand points it, the magazine stays
+// underneath, and the idle hangs the rifle muzzle-down. Left unrotated the rifle
+// lies along the hand's X instead, which stands it upright through his fist.
+export const WEAPON = {
+  model: 'ak-47.glb',
+  size: 0.95,
+  grip: 1 / 3,
+  muzzle: [-1, 0, 0],
+  magazine: [0, -1, 0],
+};
 
 // The forest/mountain photogrammetry scene used as the surrounding environment.
 // `span` is the world-space width it is scaled to, `floorY` where its lowest

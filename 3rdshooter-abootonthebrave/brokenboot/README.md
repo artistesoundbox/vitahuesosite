@@ -32,9 +32,9 @@ npm run test:forest     # fifteen forests, audited without playing: could a wave
                         # recorded spread of the same metrics
 npm run test:forest-record  # the same sweep, recorded as the spread later sweeps
                             # are compared against for having got tighter
-npm run test:character  # audit the officer: weighted, anchored, booted, and drawn
-                        # standing on the ground in every state he can be posed in
-                        # and still carrying a boot the tier system can replace
+npm run test:character  # audit the officer: weighted, anchored, rifle in hand, and
+                        # drawn standing on the ground in every state he can be
+                        # posed in, still carrying a boot a tier can replace
 npm run test:probes     # those mechanic checks and the character audit, one page load
 ```
 
@@ -185,17 +185,24 @@ beside its campaign.
 
 `npm run test:character` asks the one question none of the numbers above can: is
 the officer's own mesh file still fit to be worn? It audits the *loaded* model, so
-it sees exactly what three.js sees, and every clause names the part and the bone it
-failed on. Three things have to hold:
+it sees exactly what three.js sees, and every clause names the part, the bone or the
+pose it failed on. Five things have to hold:
 
 | what | limit | the file as shipped |
 | --- | --- | --- |
 | skinned vertices carrying no weight at all | none | none, in 4,086 sampled |
 | a mesh bound to one distant bone, weighted 1.0 | 2% of the mesh, 0.6 m off that bone | 0.0% — the body is blended across three or four bones, and the furthest a rigidly bound vertex sits from its own bone is 0.38 m |
 | the officer's own boot, and every part bound to the rig | present, on a foot bone, on the ground, and gone when a tier replaces it; nothing sitting on the ground may be bound to anything but a foot | `Object_3` on `mixamorigRightFoot`, 0.18 m off that bone, bottom at 0.04 m, 0.385 × 0.491 × 0.517 m |
-| where he is actually drawn, in every state he can be posed in | the lowest drawn point must stay inside a −0.15…0.35 m band of the ground | all eight states stand: 0.003–0.02 m |
+| where he is actually drawn, in every state he can be posed in | the lowest drawn point must stay inside a −0.15…0.35 m band of the ground | all eight states stand: 0.013–0.019 m |
+| the rifle in his right hand, in the poses he holds it in | barrel within 60° of his facing, muzzle at least 0.3 m ahead of his hand, magazine under it | walk 7°, aim 13°, crouch 39° off his facing; muzzle 0.53–0.61 m ahead; magazine under it in all three |
 
-The last clause is a real socketing rather than a naming: the probe pushes the tier
+The boot row is the one the officer's current export fails, and deliberately so: the
+file he ships in now carries his body alone, so there is no own boot for a tier to
+socket over and `test:character` names exactly that. Restoring `Object_3` — the
+boot the game is named after, which the tiers replace — is an asset change, not a
+code one; the numbers in that row are from the export that carried it.
+
+The own-boot clause is a real socketing rather than a naming: the probe pushes the tier
 credit to the first boot with a model, waits for `silverboot.glb` to arrive on the
 right-foot bone, requires the officer's own boot to be hidden when it does, and then
 puts the tier credit, the boot index and the visibility back. A boot the game cannot
@@ -241,6 +248,39 @@ FAIL
 An officer who walks a metre and a half into the ground and aims four metres up in
 the air is invisible from the camera the game gives the player, and none of the
 campaign's own numbers notice.
+
+The rifle clause watches the one part of him that is not his own mesh. The rifle is
+welded into his right hand, so the whole fit is a single rotation in the hand's own
+frame — and that frame is not the world's: in every clip he holds the weapon in, the
+hand's own +Y points forward and its −X up, while down a plain idle that same +Y
+hangs at his side. A model left unrotated lies along the hand's X instead, which
+stands the rifle upright through his fist and aims it at the sky the moment he
+raises it. Nothing else in the campaign can see that: he still fires, still hits,
+still kills, and the only symptom is a soldier sighting down a rifle that is not in
+his hands.
+
+The barrel is measured, never assumed. The two ends of the rifle are compared by
+cross-section and the thinner one is taken as the muzzle — a rifle mounted backwards
+would otherwise sail through every clause here — and the magazine is found as the
+side the geometry reaches furthest from the bore line at that muzzle, which is what
+tells a rifle held the right way up from one held upside down. Both are read fresh
+for the control, because a rifle left unrotated is a *different* shape in the hand's
+frame: measuring the mounted one's axes against an unrotated mount would only report
+the mount back to itself. Left as authored, the same measurement reads **89° off his
+aim with the muzzle 0.24 m from his hand**, and the clause names it:
+
+```
+FAIL
+  - the officer's mesh file: walk: its barrel points 87° off his facing, not at what
+    he is facing and its muzzle sits 0.1 m from his hand instead of in front of it
+    and its magazine is not hanging underneath; aim: its barrel points 89° off his
+    facing ... crouch: its barrel points 126° off his facing ...
+```
+
+The cone is deliberately wide. A hand carrying a rifle swings it well off the aim
+line while crouching, and 39° is that swing; what the clause has to separate is a
+rifle held at his shoulder (7–13° in the clips he shoots from) from the one standing
+upright through his fist (89°).
 
 The probe carries a second control, because a threshold is only worth having if it
 tells the failure from the normal case. An unweighted vertex is bound to bone 0, and

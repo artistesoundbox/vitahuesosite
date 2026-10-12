@@ -1585,6 +1585,219 @@ async function runCampaign(options) {
     }
     lowestDrawn();
 
+    // ------------------------------------------------------ the rifle in his hands
+    /**
+     * Whether the officer is holding his rifle or wearing it.
+     *
+     * The rifle is welded into his right hand, so the whole fit is one constant
+     * rotation in the hand's own frame — and that frame is not the world's: in every
+     * clip he holds the weapon in, the hand's own +Y points forward and its -X up. A
+     * model left unrotated lies along the hand's X instead, which stands the rifle
+     * upright through his fist and aims it at the sky. Nothing else in the campaign
+     * can see that: he still fires, still hits, still kills, and the only symptom is
+     * a soldier sighting down a rifle that is not in his hands.
+     *
+     * The barrel is measured, not assumed. The two ends of the rifle are compared by
+     * cross-section and the thinner one is taken as the muzzle, because a rifle
+     * mounted backwards would otherwise sail through every clause here; the magazine
+     * is found as the long side of the geometry measured against the bore line at
+     * that muzzle, which is what separates a rifle held the right way up from one
+     * held upside down.
+     */
+    // A hand carrying a rifle swings it well off the aim line while crouching and
+    // walking, so the cone is wide on purpose: what it has to separate is a rifle
+    // aimed along his facing (7-13 degrees in the clips he shoots from) from the one
+    // standing upright through his fist, which is 95 degrees off it.
+    const RIFLE_AIM_CONE = 60;    // degrees the barrel may sit off the officer's facing
+    const RIFLE_IN_FRONT = 0.3;   // metres the muzzle must stand ahead of his hand
+    const RIFLE_MAG_DOWN = -0.5;  // how far down the magazine must hang, of unit length
+    const FLASH_TO_BARREL = 0.15; // metres the flash may sit from the barrel's own tip
+    const FLASH_OFF_BARREL = 0.25; // ...and how far the stand-in it replaced sat from it
+    const HOLDING = ['walk', 'aim', 'crouch'];
+    const RIFLE_PHASES = [0.15, 0.5, 0.85];
+
+    out.rifle = { hand: null, loaded: Boolean(p.weaponModel), held: {} };
+    let hand = null;
+    p.model.traverse((o) => { if (!hand && o.isBone && /^mixamorigRightHand$/i.test(o.name)) hand = o; });
+    const rifle = p.weaponModel;
+    if (hand && rifle) {
+      out.rifle.hand = hand.name;
+      // The rifle's own shape, in the frame it is welded to. Read as a function
+      // because the control re-reads it: a rifle left unrotated is a *different*
+      // shape in the hand's frame, and measuring the mounted one's axes against an
+      // unrotated mount would only report the mount back to itself.
+      const readRifle = () => {
+        p.model.updateMatrixWorld(true);
+        const toHand = new THREE.Matrix4().copy(hand.matrixWorld).invert();
+        const pts = [];
+        const sample = new THREE.Vector3();
+        rifle.traverse((o) => {
+          if (!o.isMesh) return;
+          const pos = o.geometry.attributes.position;
+          const step = Math.max(1, Math.floor(pos.count / 400));
+          for (let i = 0; i < pos.count; i += step) {
+            sample.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld).applyMatrix4(toHand);
+            pts.push(sample.clone());
+          }
+        });
+        const bounds = [0, 1, 2].map((i) => {
+          const values = pts.map((q) => q.getComponent(i));
+          return { lo: Math.min(...values), hi: Math.max(...values) };
+        });
+        const barrel = bounds.reduce((best, b) => (b.hi - b.lo > best.hi - best.lo ? b : best), bounds[0]);
+        const barrelAxis = bounds.indexOf(barrel);
+        const across = [0, 1, 2].filter((i) => i !== barrelAxis);
+        const span = barrel.hi - barrel.lo;
+
+        // A slice of each end, to tell the barrel from the stock.
+        const slab = (from, to) => {
+          const got = pts.filter((q) => q.getComponent(barrelAxis) >= from && q.getComponent(barrelAxis) <= to);
+          const centre = across.map((i) => {
+            const values = got.map((q) => q.getComponent(i));
+            return (Math.max(...values) + Math.min(...values)) / 2;
+          });
+          const thickness = across.reduce((sum, i) => {
+            const values = got.map((q) => q.getComponent(i));
+            return sum + (Math.max(...values) - Math.min(...values));
+          }, 0);
+          return { thickness, centre };
+        };
+        const low = slab(barrel.lo, barrel.lo + span * 0.12);
+        const high = slab(barrel.hi - span * 0.12, barrel.hi);
+        const muzzleAtLow = low.thickness <= high.thickness;
+        const bore = muzzleAtLow ? low.centre : high.centre;
+
+        // The muzzle's direction, the point it reaches to, and the magazine: the side
+        // the geometry reaches furthest from the bore line, measured across the
+        // receiver where a magazine actually hangs.
+        const muzzle = new THREE.Vector3().setComponent(barrelAxis, muzzleAtLow ? -1 : 1);
+        const muzzleAt = pts.reduce((best, q) => {
+          const d = (muzzleAtLow ? -1 : 1) * q.getComponent(barrelAxis);
+          return d > best.d ? { d, q } : best;
+        }, { d: -Infinity, q: pts[0] }).q;
+        const magazine = pts.reduce((best, q) => {
+          const at = q.getComponent(barrelAxis);
+          if (at < barrel.lo + span * 0.3 || at > barrel.lo + span * 0.7) return best;
+          const off = across.map((i) => q.getComponent(i) - bore[across.indexOf(i)]);
+          const reach = Math.hypot(off[0], off[1]);
+          return reach > best.reach ? { reach, off } : best;
+        }, { reach: -1, off: [1, 0] });
+        const magazineDirection = new THREE.Vector3();
+        across.forEach((i, k) => magazineDirection.setComponent(i, magazine.off[k]));
+        magazineDirection.normalize();
+
+        return { span, muzzle, muzzleAt, magazineDirection, muzzleEnd: muzzleAtLow ? 'the low end' : 'the high end' };
+      };
+
+      const shape = readRifle();
+      out.rifle.length = +(shape.span / 100).toFixed(2);
+      out.rifle.muzzleEnd = shape.muzzleEnd;
+      out.rifle.magazine = shape.magazineDirection.toArray().map((n) => +n.toFixed(2));
+
+      const facing = new THREE.Vector3();
+      const handAt = new THREE.Vector3();
+      const muzzleWorld = new THREE.Vector3();
+      const measure = (key, seen = shape) => {
+        const clip = holdOne(key);
+        let degOff = 0;
+        let inFront = Infinity;
+        let magazineY = -Infinity;
+        for (const phase of RIFLE_PHASES) {
+          p.anim.mixer.setTime(clip.duration * phase);
+          p.model.updateMatrixWorld(true);
+          const q = hand.getWorldQuaternion(new THREE.Quaternion());
+          facing.set(Math.sin(p.yaw), 0, Math.cos(p.yaw));
+          const barrelWorld = seen.muzzle.clone().applyQuaternion(q).normalize();
+          hand.getWorldPosition(handAt);
+          muzzleWorld.copy(seen.muzzleAt).applyMatrix4(hand.matrixWorld);
+          degOff = Math.max(degOff, Math.acos(Math.max(-1, Math.min(1, barrelWorld.dot(facing)))) * 180 / Math.PI);
+          inFront = Math.min(inFront, muzzleWorld.clone().sub(handAt).dot(facing));
+          magazineY = Math.max(magazineY, seen.magazineDirection.clone().applyQuaternion(q).y);
+        }
+        return {
+          degOff: +degOff.toFixed(0),
+          inFront: +inFront.toFixed(2),
+          magazineY: +magazineY.toFixed(2),
+          pass: degOff <= RIFLE_AIM_CONE && inFront >= RIFLE_IN_FRONT && magazineY <= RIFLE_MAG_DOWN,
+        };
+      };
+
+      holdOne('idle');
+      p.anim.mixer.setTime(0);
+      for (const key of HOLDING) out.rifle.held[key] = measure(key);
+
+      // Where the round leaves him. The flash and the tracer's first frame used to
+      // be pinned to a point in front of his chest on the camera's yaw — a place no
+      // rifle is ever at, and a good half metre from the barrel while he aims. They
+      // now hang off the tip the rifle measured for its own model, so the shot is
+      // measured against that barrel: fire one and see where the flash lands. The
+      // shot goes into the sky, so nothing in the world can be hit by it, and the
+      // ammunition, the timers, the recoil and the camera all go back afterwards.
+      const keptCamera = G.camera.quaternion.clone();
+      const keptPlayer = {
+        ammo: p.ammo, reserve: p.reserve, fireTimer: p.fireTimer,
+        reloading: p.reloading, lastShotAt: p.lastShotAt,
+      };
+      const keptGame = { recoilPitch: G.recoilPitch, shake: G.shake };
+      try {
+        const clip = holdOne('aim');
+        p.anim.mixer.setTime(clip.duration * 0.5);
+        p.model.updateMatrixWorld(true);
+        // Cleared so the probe fires whatever the page was left doing.
+        p.fireTimer = 0;
+        p.reloading = 0;
+        p.ammo = Math.max(p.ammo, 1);
+        G.camera.lookAt(G.camera.position.x, G.camera.position.y + 10, G.camera.position.z);
+        G.camera.updateMatrixWorld(true);
+        G.tryShoot();
+        const flashAt = G.effects.muzzleMesh.position.clone();
+        const barrelAt = shape.muzzleAt.clone().applyMatrix4(hand.matrixWorld);
+        const standIn = p.position.clone().add(new THREE.Vector3(0, 1.35, 0))
+          .add(new THREE.Vector3(Math.sin(G.cameraYaw), 0, Math.cos(G.cameraYaw)).multiplyScalar(0.65));
+        out.rifle.flash = {
+          shown: G.effects.muzzleMesh.visible,
+          toBarrel: +flashAt.distanceTo(barrelAt).toFixed(3),
+          standInOffBarrel: +standIn.distanceTo(barrelAt).toFixed(3),
+        };
+      } finally {
+        G.camera.quaternion.copy(keptCamera);
+        G.camera.updateMatrixWorld(true);
+        Object.assign(p, keptPlayer);
+        Object.assign(G, keptGame);
+      }
+      out.rifle.flashOk = out.rifle.flash.shown && out.rifle.flash.toBarrel <= FLASH_TO_BARREL;
+      // The control: the stand-in this replaced has to be named by the same
+      // measurement, or the clause would pass on the thing it was written against.
+      out.rifle.flashControlNamesIt = out.rifle.flash.standInOffBarrel > FLASH_OFF_BARREL;
+
+      // The control: the mount this clause exists for is no rotation at all, and the
+      // measurement has to name that rather than wave it through. Left as authored,
+      // the rifle lies along the hand's X — the axis he aims at the sky.
+      const authored = rifle.quaternion.clone();
+      rifle.quaternion.identity();
+      const unrotated = measure('aim', readRifle());
+      out.rifle.control = Object.assign({}, unrotated, { namesIt: !unrotated.pass });
+      rifle.quaternion.copy(authored);
+      readRifle();
+
+      out.rifle.limits = {
+        coneDegrees: RIFLE_AIM_CONE, inFront: RIFLE_IN_FRONT, magazineY: RIFLE_MAG_DOWN,
+        flashToBarrel: FLASH_TO_BARREL, flashOffBarrel: FLASH_OFF_BARREL,
+      };
+      out.rifleOk = Object.values(out.rifle.held).every((h) => h.pass)
+        && out.rifle.control.namesIt
+        && out.rifle.flashOk
+        && out.rifle.flashControlNamesIt;
+
+      // Left holding his rifle as a standing officer, the way the footing clause left
+      // him, so later probes move him rather than inherit a kick's last frame.
+      holdOne('idle');
+      for (let i = 0; i < 4; i++) p.anim.mixer.update(1 / 60);
+      p.model.updateMatrixWorld(true);
+    } else {
+      out.rifleOk = false;
+    }
+
     out.limits = {
       wrongBoneDistance: WRONG_BONE_DISTANCE,
       weldShare: WELD_SHARE_LIMIT,
@@ -1601,7 +1814,8 @@ async function runCampaign(options) {
       && out.tierBootSocketed
       && (!out.control.measured || out.control.wouldNameIt)
       && out.statesOnTheGround
-      && out.footingControl.pass;
+      && out.footingControl.pass
+      && out.rifleOk;
     return out;
   }
 

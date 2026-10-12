@@ -337,8 +337,10 @@ export class Game {
     direction.z += (Math.random() - 0.5) * spread;
     direction.normalize();
 
-    const forward = new THREE.Vector3(Math.sin(this.cameraYaw), 0, Math.cos(this.cameraYaw));
-    const muzzle = this.player.position.clone().add(new THREE.Vector3(0, 1.35, 0)).addScaledVector(forward, 0.65);
+    // The flash and the tracer's first frame hang off the barrel itself, which the
+    // rifle measured for its own model. The bullet is still cast from the camera:
+    // what the crosshair covers is what it hits, whatever the rifle is doing.
+    const muzzle = this.player.muzzlePoint();
     this.effects.muzzle(muzzle);
 
     const hit = this.castBullet(origin, direction, SETTINGS.bulletRange);

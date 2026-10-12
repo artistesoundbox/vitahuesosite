@@ -331,7 +331,12 @@ export function attachToBone(bone, model, worldSize, offset = new THREE.Vector3(
   bone.add(model);
   model.position.set(0, 0, 0);
   model.quaternion.identity();
-  if (rotation) model.quaternion.setFromEuler(rotation);
+  // A plain Euler cannot express every fit — an axis and a half-turn is a hard
+  // rotation to write as three angles — so the caller may hand over either.
+  if (rotation) {
+    if (rotation.isQuaternion) model.quaternion.copy(rotation);
+    else model.quaternion.setFromEuler(rotation);
+  }
   model.scale.setScalar(1);
   bone.updateWorldMatrix(true, true);
 
@@ -356,4 +361,88 @@ export function attachToBone(bone, model, worldSize, offset = new THREE.Vector3(
   model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   bone.updateWorldMatrix(true, true);
   return model;
+}
+
+/**
+ * The officer's hand, measured rather than guessed, in the frame the rifle is
+ * bolted to.
+ *
+ * Every clip he holds the weapon in — aim, walk, crouch — points the hand bone's
+ * own +Y forward and its own -X up; the plain idle hangs that same +Y at his side.
+ * Both are properties of the rig and of Mixamo's rifle clips, not of the rifle, so
+ * they live here rather than in the weapon's fit.
+ */
+const HAND_FORWARD = [0, 1, 0];
+const HAND_DOWN = [-1, 0, 0];
+
+/**
+ * Mount the rifle in a hand, gripped and pointing where the hand points.
+ *
+ * The whole fit is one constant rotation, because the rifle is welded to the hand
+ * bone: whatever the clip does to the hand, the rifle goes with it. That rotation
+ * maps a direction in the model's own frame onto a direction in the hand's frame,
+ * and it is built from the four measured directions in WEAPON rather than written
+ * out as angles: the muzzle onto the hand's forward axis, the magazine onto its
+ * down axis. Laid along the hand's X instead — which is what an unrotated model
+ * gets — the rifle stands upright through the officer's fist and points at the sky
+ * the moment he aims, which no angle of clip can fix.
+ *
+ * The hand then has to take the rifle by the grip instead of through its middle:
+ * `attachToBone` centres the prop on the bone, so the rifle is slid its own length
+ * along its barrel until the share of it in `grip` sits behind the hand. Bone axes
+ * are not metres — this rig's are centimetres — so the slide is converted through
+ * the bone's own world scale, the same way the size is.
+ */
+export function socketRifle(bone, model, { size, grip, muzzle, magazine }) {
+  const along = new THREE.Vector3().fromArray(muzzle).normalize();
+  const down = new THREE.Vector3().fromArray(magazine).normalize();
+  // The two directions only have to be measured on the same model; the magazine is
+  // squared up against the barrel so a slightly slanted reading still gives a
+  // rotation rather than a shear.
+  down.sub(along.clone().multiplyScalar(down.dot(along))).normalize();
+
+  const basis = (a, b) => new THREE.Matrix4().makeBasis(a, b, new THREE.Vector3().crossVectors(a, b));
+  const from = basis(along, down);
+  const to = basis(new THREE.Vector3().fromArray(HAND_FORWARD), new THREE.Vector3().fromArray(HAND_DOWN));
+  const rotation = new THREE.Quaternion().setFromRotationMatrix(to.multiply(from.transpose()));
+
+  const rifle = attachToBone(bone, model, size, new THREE.Vector3(), rotation);
+  const boneScale = new THREE.Vector3().setFromMatrixScale(bone.matrixWorld).y || 1;
+  rifle.position.y += (size * (0.5 - grip)) / boneScale;
+
+  // The point a round leaves from: the vertex the rifle reaches furthest along its
+  // own muzzle direction — the tip of the barrel, measured off the model rather
+  // than placed by hand, so a different rifle only has to be measured again. The
+  // game hangs the muzzle flash and the tracer's first frame on it.
+  const muzzle = new THREE.Object3D();
+  muzzle.name = 'muzzle';
+  muzzle.position.copy(tipAlong(rifle, along));
+  rifle.add(muzzle);
+  return { rifle, muzzle };
+}
+
+/**
+ * The point of a model that reaches furthest along one of its own directions.
+ *
+ * Anything with a barrel has its own shape to say where that barrel ends, so the
+ * tip is read off the geometry instead of being offset by a number that only fits
+ * the model it was tuned on.
+ */
+function tipAlong(model, direction) {
+  model.updateWorldMatrix(true, true);
+  const toModel = new THREE.Matrix4().copy(model.matrixWorld).invert();
+  const at = new THREE.Vector3();
+  const furthest = new THREE.Vector3();
+  let best = -Infinity;
+  model.traverse((o) => {
+    if (!o.isMesh) return;
+    const pos = o.geometry.attributes.position;
+    const step = Math.max(1, Math.floor(pos.count / 600));
+    for (let i = 0; i < pos.count; i += step) {
+      at.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld).applyMatrix4(toModel);
+      const reach = at.dot(direction);
+      if (reach > best) { best = reach; furthest.copy(at); }
+    }
+  });
+  return furthest;
 }

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { SETTINGS, BOOT_TIERS, BOOT_SOCKETS, ASSET_BASE, WEAPON, KICKS } from './config.js';
-import { AnimController, findBone, attachToBone, gltfLoader } from './assets.js';
+import { AnimController, findBone, attachToBone, gltfLoader, socketRifle } from './assets.js';
 import { dampAngle, clamp } from './mathx.js';
 
 const MODEL_YAW_OFFSET = 0; // Mixamo characters face +Z, matching atan2(x, z).
@@ -58,6 +58,8 @@ export class Player {
     this.onTierChange = null;
     this.bootModel = null;
     this.loadedBootModel = null;
+    // The point his rounds leave from, put on the rifle when it is socketed.
+    this.muzzle = null;
     this._desired = new THREE.Vector3();
     this._tmp = new THREE.Vector3();
   }
@@ -382,14 +384,32 @@ export class Player {
     }
   }
 
-  /** Attach the rifle to the right hand, normalised to a plausible length. */
+  /**
+   * Where his rounds leave the rifle, in the world.
+   *
+   * The marker rides the rifle, so it follows the hand through every clip and a
+   * shot leaves the barrel the player can see. Until the rifle has loaded there is
+   * nothing to measure, and the flash falls back to a point in front of his chest,
+   * which is where it used to be pinned whatever the rifle was doing.
+   */
+  muzzlePoint(target = new THREE.Vector3()) {
+    if (this.muzzle && this.muzzle.parent) return this.muzzle.getWorldPosition(target);
+    return target.set(
+      this.position.x + Math.sin(this.yaw) * 0.65,
+      this.position.y + 1.35,
+      this.position.z + Math.cos(this.yaw) * 0.65,
+    );
+  }
+
+  /** Attach the rifle to the right hand, gripped and pointing where the hand does. */
   async equipWeapon() {
     try {
       const gltf = await gltfLoader.loadAsync(`${ASSET_BASE}${WEAPON.model}`);
       const bone = findBone(this.model, ['RightHand', 'RightHandIndex1']);
       if (!bone) { console.warn('[player] no right-hand bone for weapon socket'); return; }
-      attachToBone(bone, gltf.scene, 0.95, new THREE.Vector3());
-      this.weaponModel = gltf.scene;
+      const socket = socketRifle(bone, gltf.scene, WEAPON);
+      this.weaponModel = socket.rifle;
+      this.muzzle = socket.muzzle;
     } catch (err) {
       console.warn('[player] weapon failed to load', err);
     }

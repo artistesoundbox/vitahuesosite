@@ -158,9 +158,10 @@ the campaign; pass both to run both probes)
 assert the boot alone can still end it
   --check-character audit the officer's own mesh file and how he is drawn instead: where
                     he stands on the ground in each state, and every skinned vertex
-weighted, nothing welded to a bone it does not sit on, and his own boot still a part
-the tier system can replace. It sockets a tier's boot to prove that last one, so it
-does not combine with --check-forest
+weighted, nothing welded to a bone it does not sit on, his own boot still a part
+the tier system can replace, and his rifle held rather than worn — barrel on his
+facing, muzzle ahead of his hand, magazine underneath. It sockets a tier's boot to
+prove the boot clause, so it does not combine with --check-forest
   --require-finish fail the run if the campaign did not reach the last wave
   --url=URL        page to load (default: served from this repo)
   --port=N         port for the bundled static server
@@ -868,6 +869,12 @@ function assess(report) {
             + `the lowest drawn point between ${cc.worstSink} m and ${cc.worstFloat} m against a ${cc.stateLimits.sink}..${cc.stateLimits.float} m band`);
           findings.push(`the footing measurement follows the rig: lifting him a metre raised that floor by ${cc.footingControl.liftedBy} m`);
         }
+        if (cc.rifleOk) {
+          const held = Object.entries(cc.rifle.held).map(([state, h]) => `${state} ${h.degOff}\u00b0/${h.inFront} m`).join(', ');
+          findings.push(`he is holding his rifle rather than wearing it: in every pose he holds it in its ${cc.rifle.length} m barrel points `
+            + `within ${Math.max(...Object.values(cc.rifle.held).map((h) => h.degOff))}\u00b0 of where he faces (${held}) with the magazine under it, `
+            + `and the probe names an unrotated rifle at ${cc.rifle.control.degOff}\u00b0 off his aim as the failure it exists for`);
+        }
       } else {
         const bits = [];
         if (cc.unweightedTotal > 0) {
@@ -888,6 +895,23 @@ function assess(report) {
           if (!cc.ownBootsHidden) bits.push(`socketing the ${cc.tier} did not hide his own boot`);
         }
         if (!cc.tierBootSocketed) bits.push(`the ${cc.tier} boot never socketed onto the foot`);
+        if (!cc.rifleOk) {
+          if (!cc.rifle || !cc.rifle.loaded) {
+            bits.push('his rifle never loaded, so he fights empty-handed');
+          } else {
+            for (const [state, h] of Object.entries(cc.rifle.held || {})) {
+              const why = [];
+              if (h.degOff > cc.rifle.limits.coneDegrees) why.push(`its barrel points ${h.degOff}\u00b0 off his facing, not at what he is facing`);
+              if (h.inFront < cc.rifle.limits.inFront) why.push(`its muzzle sits ${h.inFront} m from his hand instead of in front of it`);
+              if (h.magazineY > cc.rifle.limits.magazineY) why.push('its magazine is not hanging underneath');
+              if (why.length) bits.push(`${state}: ${why.join(' and ')}`);
+            }
+            if (cc.rifle.control && !cc.rifle.control.namesIt) {
+              bits.push('the probe cannot even name a rifle left unrotated — the mount it exists for — ' +
+                `measuring ${cc.rifle.control.degOff}\u00b0 off his aim and ${cc.rifle.control.inFront} m in front`);
+            }
+          }
+        }
         // The control only speaks when there is a boot to measure it on: with the
         // boot missing altogether, the clause above already says the failure out
         // loud, and a control with nothing to measure would only add noise.
@@ -1109,6 +1133,25 @@ function printReport(report, passed) {
           ? `lifting him a metre raised that floor by ${cc.footingControl.liftedBy} m — the measurement follows the rig`
           : `raising him a metre moved the reading by only ${cc.footingControl.liftedBy} m, so it is not measuring the body at all`}`);
       }
+      // The rifle: welded into the hand, so it is only ever as right as the mount.
+      if (cc.rifle) {
+        console.log('');
+        console.log(`  ${pad('rifle in his hand', 26)}${cc.rifle.loaded ? `${cc.rifle.length} m, on ${cc.rifle.hand}, muzzle at ${cc.rifle.muzzleEnd}` : 'NEVER LOADED'}`);
+        console.log(`  ${pad('pose he holds it in', 26)}${pad('barrel off facing', 18)}${pad('muzzle ahead', 14)}magazine`);
+        for (const [state, h] of Object.entries(cc.rifle.held || {})) {
+          const cone = cc.rifle.limits ? cc.rifle.limits.coneDegrees : 35;
+          const ahead = cc.rifle.limits ? cc.rifle.limits.inFront : 0.3;
+          const down = cc.rifle.limits ? cc.rifle.limits.magazineY : -0.5;
+          console.log(`  ${pad(state, 26)}${pad(`${h.degOff}\u00b0`, 18)}${pad(`${h.inFront} m`, 14)}${h.magazineY <= down ? 'under it' : 'NOT UNDER IT'}`
+            + (h.degOff <= cone && h.inFront >= ahead && h.magazineY <= down ? '' : '  WRONG'));
+        }
+        console.log(`  limits: barrel within ${cc.rifle.limits ? cc.rifle.limits.coneDegrees : 35}\u00b0 of his facing, muzzle at least `
+          + `${cc.rifle.limits ? cc.rifle.limits.inFront : 0.3} m ahead of his hand, magazine under him`);
+        if (cc.rifle.control) {
+          console.log(`  control: left as authored the rifle measures ${cc.rifle.control.degOff}\u00b0 off his aim and ${cc.rifle.control.inFront} m in front — `
+            + (cc.rifle.control.namesIt ? 'the mount failure would be named' : 'SO IT WOULD NOT BE NAMED'));
+        }
+      }
     }
     if (d) {
       if (c || k || cc) console.log('');
@@ -1168,7 +1211,7 @@ function printReport(report, passed) {
       }
     }
     if (passed.ok) {
-      console.log(`\nPASS — ${[c && 'a press retargets to the attacker nearest the crosshair and a held trigger keeps its target', k && 'the three kicks differ, the scenery they launch settles where it lands, and the impact feels as heavy as the mass it hit', cc && "the officer's own mesh file is fully weighted, nothing is welded to a bone it does not sit on, a tier's boot sockets over his own — which goes away — and he is drawn standing on the ground in every state he can be posed in", d && 'a wave can be won with no ammunition left, by closing and booting', sweep && 'every forest audited is one a wave can actually be fought in'].filter(Boolean).join('; ')}.`);
+      console.log(`\nPASS — ${[c && 'a press retargets to the attacker nearest the crosshair and a held trigger keeps its target', k && 'the three kicks differ, the scenery they launch settles where it lands, and the impact feels as heavy as the mass it hit', cc && "the officer's own mesh file is fully weighted, nothing is welded to a bone it does not sit on, he is drawn standing on the ground in every state he can be posed in, and he is holding his rifle rather than wearing it", d && 'a wave can be won with no ammunition left, by closing and booting', sweep && 'every forest audited is one a wave can actually be fought in'].filter(Boolean).join('; ')}.`);
     } else {
       console.log('\nFAIL');
       for (const reason of passed.reasons) console.log(`  - ${reason}`);
