@@ -192,22 +192,40 @@ pose it failed on. Five things have to hold:
 | --- | --- | --- |
 | skinned vertices carrying no weight at all | none | none, in 4,086 sampled |
 | a mesh bound to one distant bone, weighted 1.0 | 2% of the mesh, 0.6 m off that bone | 0.0% — the body is blended across three or four bones, and the furthest a rigidly bound vertex sits from its own bone is 0.38 m |
-| the officer's own boot, and every part bound to the rig | present, on a foot bone, on the ground, and gone when a tier replaces it; nothing sitting on the ground may be bound to anything but a foot | `Object_3` on `mixamorigRightFoot`, 0.18 m off that bone, bottom at 0.04 m, 0.385 × 0.491 × 0.517 m |
+| the officer's own boot, when his file carries one | on a foot bone, on the ground, and hidden while a tier's boot is on | not applicable: this export is his body alone, `bindRigidParts` registers no loose part at all, and the clause reports that rather than passing silently |
+| every tier's boot, on the foot it is socketed onto | it must contain the whole foot, and its sole must stand on the ground | all eight tiers: 100% of his foot vertices inside, sole within 0.000–0.002 m of the grass, at the exact size asked for (0.52 → 1.00 m) |
+| the boot he is wearing when the game starts | socketed at tier 0 without any tier ever moving | Standard Boot, 0.52 m, sole at 0.000 m, 100% of his foot inside |
 | where he is actually drawn, in every state he can be posed in | the lowest drawn point must stay inside a −0.15…0.35 m band of the ground | all eight states stand: 0.013–0.019 m |
 | the rifle in his right hand, in the poses he holds it in | barrel within 60° of his facing, muzzle at least 0.3 m ahead of his hand, magazine under it | walk 7°, aim 13°, crouch 39° off his facing; muzzle 0.53–0.61 m ahead; magazine under it in all three |
 
-The boot row is the one the officer's current export fails, and deliberately so: the
-file he ships in now carries his body alone, so there is no own boot for a tier to
-socket over and `test:character` names exactly that. Restoring `Object_3` — the
-boot the game is named after, which the tiers replace — is an asset change, not a
-code one; the numbers in that row are from the export that carried it.
+The own-boot row is deliberately conditional: the file he ships in now carries his
+body alone, so there is no own boot for a tier to socket over, and the clause says
+so instead of failing on a property his mesh cannot have. It becomes a real test the
+moment an export carries `Object_3` again — the boot the game is named after, which
+the tiers replace — and that is an asset change, not a code one.
 
-The own-boot clause is a real socketing rather than a naming: the probe pushes the tier
-credit to the first boot with a model, waits for `silverboot.glb` to arrive on the
-right-foot bone, requires the officer's own boot to be hidden when it does, and then
-puts the tier credit, the boot index and the visibility back. A boot the game cannot
-register is not merely un-rigged — it is worn *inside* the tier's boot forever, and
-that is what the clause exists to catch.
+The tier-boot clauses are what replaced it, and they are the ones that caught this
+feature's real defects. Three of them, none of which the first version of the probe
+could see because it forced every tier to move and only ever measured a box in world
+axes:
+
+- **He started barefoot.** Boots are loaded when the tier *moves*, and at spawn the
+tier is already 0 — so tier 0 never equipped anything and the first boot a player
+could see was the second tier's. The probe now measures the boot he is wearing
+*before* anything is moved, and removing the spawn equip makes `test:character`
+exit 1 naming exactly that.
+- **The socket's size was measured in world axes.** A rotated model's box is the
+union of its meshes' boxes, which overstates it: a boot asked for at 0.52 m came out
+0.41 m, so the bigger tiers were not merely big, they were smaller than asked while
+their sole floated up to his ankle. The helper now measures real vertices
+(`precise`) in the bone's own frame, which also makes the fit a property of the
+model rather than of the pose it was attached in.
+- **The fit clause was reading the same inflated box.** It now asks whether the
+boot contains his foot *in the foot's own frame*, where the box is the boot's real
+extent — a third smaller than the world-axis box that was passing it.
+
+The control is a boot shrunk to 55%: the same measurement leaves 0% of his foot
+inside it, so a boot too small to wear would be named rather than waved through.
 
 It audits the officer **as he loads**, before any other probe has moved him: a kick
 clip scale-tracks the legs, and geometry bound to a bone is only a fixed distance
@@ -430,8 +448,11 @@ This is the heart of the design, and it is deliberately unusual:
 
 Tiers unlock on tier credit: Standard → Reinforced → Silver → Gold → Spiked Gold →
 Tactical Doom → Legendary Broken → Mythical Diamond, each raising melee damage,
-knockback, the number routed per kick and movement speed. Reaching a tier lazily
-loads its model and sockets it onto the officer's **right foot** bone.
+knockback, the number routed per kick and movement speed. Every tier wears a model,
+loads it when the tier *moves* and sockets it onto the officer's **right foot** bone.
+Tier 0 never moves — he starts in it — so its boot is loaded with his weapon during
+`Game.load`, which is what puts a boot on him for his first kill instead of the first
+tier-up banner.
 
 Thresholds are set against the whole campaign, which totals 117 attackers, so a
 single run is worth at most 117 credit. A good run reaches **Legendary Broken
@@ -440,10 +461,13 @@ boot-only clear. In a full simulated clear of the pre-ramp build the tiers arriv
 at 49 s, 132 s, 190 s, 261 s, 323 s and 385 s; the ramp below brings the late
 waves on faster, and the credit thresholds are unchanged.
 
-Each boot model carries its own fit in `BOOT_SOCKETS` — `size` for the model's
-longest axis and `lift` to raise it until the sole rests on the ground. The
-socket helper centres a model on the foot bone, so a lift is always needed; the
-broken boot is deliberately the big one (0.38 against 0.34–0.36 for the rest).
+Each tier carries its own fit in `BOOT_SOCKETS` — `size`, the model's longest axis
+in metres, and `lift`, which raises it until the sole rests on the ground. The
+socket helper centres a model on the foot bone, so a lift is always needed. Every
+tier's boot is bigger than the plain 0.29 m foot his mesh wears, and they grow from
+0.52 m to 1.00 m, so the ladder is visible on him: Standard is a boot, Diamond is
+most of his shin. The lifts are measured, not guessed — `npm run test:character`
+reports each sole to the millimetre, and that is where the eight values come from.
 
 All three kick clips are right-legged, which is why the boot is socketed there:
 measured through each clip, the right toe travels 1.7 m (`kick`), 2.0 m
@@ -772,7 +796,15 @@ download, which is the single biggest remaining improvement.
 - No aim-down-sights, and the weapon selection is limited to the AK.
 - Achievements are a subset of the design document.
 - Boot fits in `BOOT_SOCKETS` are hand-tuned for this rig's `mixamorigRightFoot`
-  bone; a different skeleton would need new `size`/`lift` values.
+  bone (its axes are centimetres, and its own +Y is not the sky); a different
+  skeleton would need new `size`/`lift` values.
+- The tier's boot is worn on the **kicking** foot only — all three kick clips are
+  right-legged, and the boot is the weapon — so the other foot keeps the plain one
+  his mesh carries. A second, mirrored socket on `mixamorigLeftFoot` would make the
+  pair match, at the cost of covering the foot the animation uses to plant.
+- `size` is the model's true longest axis; the world-axis box around the same boot
+  measures about 1.3× that, because the boot is socketed at an angle. Any future
+  clause about how big a boot *looks* has to say which box it means.
 - The bleed-out floor means a patient player can clear a wave from cover without
   ever closing to melee. It is slow and ammo-hungry by design, but it is a
   legitimate strat.

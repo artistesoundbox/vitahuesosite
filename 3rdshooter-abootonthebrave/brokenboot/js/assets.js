@@ -322,10 +322,20 @@ export function findBone(root, patterns) {
 /**
  * Socket a standalone prop model onto a bone.
  *
- * Everything is measured in world space (where the rig may be scaled to metres)
- * and the resulting correction is converted back through the bone's inverse world
- * matrix, so the prop ends up centred on the bone at the requested world size
- * regardless of the rig's own units.
+ * `worldSize` is metres in the world he is drawn in, and it comes out exact: the
+ * prop is measured with the bone's own transform taken out of the calculation, so
+ * what it is sized and placed against is the model itself rather than the frame it
+ * happened to be attached in. Measuring in world axes instead made both the size and
+ * the fit depend on the pose — a boot socketed at one frame of a clip came out a
+ * different size from the same boot socketed at another, and the sole landed
+ * anywhere from on the grass to his ankle.
+ *
+ * Two details do the work. The box is read from the vertices (`precise`) rather than
+ * from each mesh's own box: the union of transformed boxes overstates a rotated
+ * model, which is how a boot asked for at 0.52 m measured 0.41 m. And the measurement
+ * runs with `bone.matrixWorld` held at identity, because bone axes are not metres —
+ * this rig's are centimetres — so the fit is converted through the bone's own world
+ * scale, the same way the rifle's slide along its barrel is.
  */
 export function attachToBone(bone, model, worldSize, offset = new THREE.Vector3(), rotation = null) {
   bone.add(model);
@@ -340,26 +350,41 @@ export function attachToBone(bone, model, worldSize, offset = new THREE.Vector3(
   model.scale.setScalar(1);
   bone.updateWorldMatrix(true, true);
 
+  const boneWorld = new THREE.Matrix4().copy(bone.matrixWorld);
+  // `offset` is in world axes: a direction, swung into the bone's frame and scaled
+  // out of it, with the translation of the bone's frame left behind. Dividing by the
+  // rig's scale alone is not the same thing — this rig's foot bone does not point its
+  // own +Y at the sky, so a lift applied along its axis pushes the boot into the
+  // ground instead of onto it.
+  const toBoneDirection = new THREE.Matrix4().copy(boneWorld).invert().setPosition(0, 0, 0);
+  const boneScale = new THREE.Vector3().setFromMatrixScale(boneWorld);
+  // The rig is scaled uniformly to his height; the largest axis is the honest one if
+  // a rig ever is not.
+  const unit = Math.max(Math.abs(boneScale.x), Math.abs(boneScale.y), Math.abs(boneScale.z)) || 1;
+
+  // Everything below is measured in the bone's own frame, with the bone's transform
+  // held out of it, so the result is a property of the model and not of the pose the
+  // rig happened to be in when the prop arrived.
+  bone.matrixWorld.identity();
+  model.updateMatrixWorld(true);
+
   // Scale so the prop's longest axis measures `worldSize` in world units.
-  let box = new THREE.Box3().setFromObject(model);
+  let box = new THREE.Box3().setFromObject(model, true);
   const size = box.getSize(new THREE.Vector3());
   const longest = Math.max(size.x, size.y, size.z) || 1;
-  model.scale.setScalar(worldSize / longest);
-  bone.updateWorldMatrix(true, true);
+  model.scale.setScalar(worldSize / (longest * unit));
+  model.updateMatrixWorld(true);
 
-  // Shift the prop so its centre sits on the bone's origin.
-  box = new THREE.Box3().setFromObject(model);
+  // Shift the prop so its centre sits on the bone's origin, pushed by `offset`,
+  // which is in world metres like `worldSize`.
+  box = new THREE.Box3().setFromObject(model, true);
   const center = box.getCenter(new THREE.Vector3());
-  const boneWorld = new THREE.Vector3();
-  bone.getWorldPosition(boneWorld);
-  const deltaWorld = boneWorld.clone().sub(center).add(offset);
+  model.position.add(offset.clone().applyMatrix4(toBoneDirection).sub(center));
+  model.updateMatrixWorld(true);
 
-  const inverse = new THREE.Matrix4().copy(bone.matrixWorld).invert();
-  const deltaLocal = boneWorld.clone().add(deltaWorld).applyMatrix4(inverse);
-  model.position.add(deltaLocal);
-
+  bone.matrixWorld.copy(boneWorld);
+  model.updateMatrixWorld(true);
   model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-  bone.updateWorldMatrix(true, true);
   return model;
 }
 

@@ -1,22 +1,11 @@
 {
   "seed": 20260411,
-  "startedAt": "2026-10-12T07:20:36.541Z",
-  "gameSeconds": 0.56,
-  "steps": 12,
+  "startedAt": "2026-10-12T08:00:38.856Z",
+  "gameSeconds": 0,
+  "steps": 0,
   "waves": [],
-  "tiers": [
-    {
-      "tier": "Silver Boot",
-      "atSeconds": 0.01,
-      "credit": 24
-    }
-  ],
-  "banners": [
-    {
-      "text": "BOOT UPGRADED",
-      "atSeconds": 0.01
-    }
-  ],
+  "tiers": [],
+  "banners": [],
   "eliminations": 0,
   "bootEliminations": 0,
   "lootCollected": 0,
@@ -57,7 +46,7 @@
   "healthAtEnd": null,
   "damageTaken": 0,
   "instrumented": true,
-  "outcome": "probe-failed",
+  "outcome": "probes-passed",
   "errors": [],
   "characterCheck": {
     "meshes": [
@@ -74,7 +63,7 @@
       }
     ],
     "ownBoots": [],
-    "pass": false,
+    "pass": true,
     "unweightedTotal": 0,
     "weldMesh": "Ch15",
     "weldShare": 0,
@@ -85,9 +74,238 @@
     "parts": [],
     "misboundParts": [],
     "noMisboundParts": true,
-    "tier": "Silver Boot",
-    "tierBootSocketed": true,
+    "footPoints": 93,
+    "footBox": {
+      "min": [
+        -0.285,
+        0.012,
+        -0.128
+      ],
+      "max": [
+        -0.07,
+        0.173,
+        0.13
+      ]
+    },
+    "initialBoot": {
+      "tier": "Standard Boot",
+      "index": 0,
+      "socketed": true,
+      "model": "brokenboot.glb",
+      "span": 0.52,
+      "worldSpan": 0.665,
+      "sole": 0,
+      "coveredShare": 1,
+      "coversFoot": true,
+      "soleOnGround": true
+    },
+    "tier": "Standard Boot",
+    "tierOf": "Standard Boot",
+    "boots": [
+      {
+        "tier": "Standard Boot",
+        "model": "brokenboot.glb",
+        "socket": "standard",
+        "socketed": true,
+        "span": 0.52,
+        "sole": 0,
+        "top": 0.513,
+        "box": {
+          "min": [
+            -0.311,
+            0,
+            -0.359
+          ],
+          "max": [
+            -0.005,
+            0.513,
+            0.306
+          ]
+        },
+        "coveredShare": 1,
+        "coversFoot": true,
+        "opensUnderFoot": false
+      },
+      {
+        "tier": "Reinforced Boot",
+        "model": "brokenboot.glb",
+        "socket": "reinforced",
+        "socketed": true,
+        "span": 0.56,
+        "sole": 0,
+        "top": 0.552,
+        "box": {
+          "min": [
+            -0.325,
+            0,
+            -0.384
+          ],
+          "max": [
+            0.004,
+            0.552,
+            0.332
+          ]
+        },
+        "coveredShare": 1,
+        "coversFoot": true,
+        "opensUnderFoot": false
+      },
+      {
+        "tier": "Silver Boot",
+        "model": "silverboot.glb",
+        "socket": "silver",
+        "socketed": true,
+        "span": 0.6,
+        "sole": 0,
+        "top": 0.591,
+        "box": {
+          "min": [
+            -0.339,
+            0,
+            -0.409
+          ],
+          "max": [
+            0.014,
+            0.591,
+            0.358
+          ]
+        },
+        "coveredShare": 1,
+        "coversFoot": true,
+        "opensUnderFoot": false
+      },
+      {
+        "tier": "Gold Boot",
+        "model": "goldboot.glb",
+        "socket": "gold",
+        "socketed": true,
+        "span": 0.66,
+        "sole": 0,
+        "top": 0.651,
+        "box": {
+          "min": [
+            -0.359,
+            0,
+            -0.447
+          ],
+          "max": [
+            0.029,
+            0.651,
+            0.398
+          ]
+        },
+        "coveredShare": 1,
+        "coversFoot": true,
+        "opensUnderFoot": false
+      },
+      {
+        "tier": "Spiked Gold Boot",
+        "model": "goldboot.glb",
+        "socket": "goldSpiked",
+        "socketed": true,
+        "span": 0.72,
+        "sole": 0,
+        "top": 0.71,
+        "box": {
+          "min": [
+            -0.38,
+            0,
+            -0.484
+          ],
+          "max": [
+            0.044,
+            0.71,
+            0.437
+          ]
+        },
+        "coveredShare": 1,
+        "coversFoot": true,
+        "opensUnderFoot": false
+      },
+      {
+        "tier": "Tactical Doom Boot",
+        "model": "brokenboot.glb",
+        "socket": "doom",
+        "socketed": true,
+        "span": 0.8,
+        "sole": 0,
+        "top": 0.788,
+        "box": {
+          "min": [
+            -0.407,
+            0,
+            -0.534
+          ],
+          "max": [
+            0.063,
+            0.788,
+            0.489
+          ]
+        },
+        "coveredShare": 1,
+        "coversFoot": true,
+        "opensUnderFoot": false
+      },
+      {
+        "tier": "Legendary Broken Boot",
+        "model": "brokenboot.glb",
+        "socket": "legendary",
+        "socketed": true,
+        "span": 0.9,
+        "sole": 0,
+        "top": 0.887,
+        "box": {
+          "min": [
+            -0.442,
+            0,
+            -0.597
+          ],
+          "max": [
+            0.088,
+            0.887,
+            0.555
+          ]
+        },
+        "coveredShare": 1,
+        "coversFoot": true,
+        "opensUnderFoot": false
+      },
+      {
+        "tier": "Mythical Diamond Boot",
+        "model": "diamondboot.glb",
+        "socket": "diamond",
+        "socketed": true,
+        "span": 1,
+        "sole": 0,
+        "top": 0.985,
+        "box": {
+          "min": [
+            -0.476,
+            0,
+            -0.659
+          ],
+          "max": [
+            0.112,
+            0.985,
+            0.62
+          ]
+        },
+        "coveredShare": 1,
+        "coversFoot": true,
+        "opensUnderFoot": false
+      }
+    ],
+    "coversControl": {
+      "measured": true,
+      "tier": "Standard Boot",
+      "shrink": 0.55,
+      "share": 0,
+      "namesIt": true
+    },
     "ownBootsHidden": true,
+    "tierBootSocketed": true,
+    "tierBootCoversFoot": true,
+    "tierBootSoleOnGround": true,
     "control": {
       "measured": false,
       "boneZero": "mixamorigHips",
@@ -100,7 +318,7 @@
     },
     "states": {
       "idle": 0.013,
-      "walk": 0.019,
+      "walk": 0.013,
       "aim": 0.013,
       "crouch": 0.013,
       "jump": 0.013,
@@ -110,7 +328,7 @@
     },
     "statesMeasured": 8,
     "worstSink": -0.046,
-    "worstFloat": 0.019,
+    "worstFloat": 0.013,
     "stateLimits": {
       "sink": -0.15,
       "float": 0.35
@@ -125,8 +343,8 @@
       "loaded": true,
       "held": {
         "walk": {
-          "degOff": 7,
-          "inFront": 0.61,
+          "degOff": 4,
+          "inFront": 0.63,
           "magazineY": -0.99,
           "pass": true
         },
@@ -138,12 +356,12 @@
         },
         "crouch": {
           "degOff": 39,
-          "inFront": 0.53,
+          "inFront": 0.54,
           "magazineY": -0.79,
           "pass": true
         }
       },
-      "length": 0.93,
+      "length": 0.95,
       "muzzleEnd": "the high end",
       "magazine": [
         -1,
@@ -152,9 +370,9 @@
       ],
       "flash": {
         "shown": true,
-        "toBarrel": 0.002,
-        "tracerFromBarrel": 0.002,
-        "standInOffBarrel": 0.646
+        "toBarrel": 0.005,
+        "tracerFromBarrel": 0.005,
+        "standInOffBarrel": 0.333
       },
       "flashOk": true,
       "flashControlNamesIt": true,
@@ -186,21 +404,21 @@
     "cone": 0.22,
     "distance": 26,
     "pass": true,
-    "baseHeadingRadians": -0.131,
+    "baseHeadingRadians": 0,
     "anglesRadians": {
       "near": 0.055,
       "far": 0.132
     },
     "firstPress": "near",
     "anglesAtPress": {
-      "near": 0.057,
-      "far": 0.133
+      "near": 0.169,
+      "far": 0.207
     },
     "swingRadians": 0.11,
     "heldDuringSwing": "near",
     "anglesAfterSwing": {
-      "near": 0.146,
-      "far": 0.045
+      "near": 0.216,
+      "far": 0.165
     },
     "farVisible": true,
     "swungOnTarget": true,
@@ -297,7 +515,7 @@
       "silentAtRest": true,
       "went": true,
       "reusedBuffer": true,
-      "offChest": 1.024,
+      "offChest": 0.876,
       "profiles": {
         "kick": {
           "wanted": "kick",
@@ -305,16 +523,16 @@
           "type": "kick",
           "drawn": true,
           "samples": 14,
-          "spread": 0.764,
+          "spread": 0.763,
           "offFoot": 0.059,
           "lift": 0.04,
           "width": 0.15,
           "colour": "#c8b18d",
           "bootColour": "#c8b18d",
           "frames": 75,
-          "path": 3.344,
-          "rise": 0.602,
-          "lowY": 0.14893385331659614,
+          "path": 3.48,
+          "rise": 0.612,
+          "lowY": 0.13952653214345562,
           "highY": 0.7512060836688894
         },
         "sweep": {
@@ -378,7 +596,7 @@
     "pass": true
   },
   "wavesReached": 1,
-  "wallClockSeconds": 3.5,
+  "wallClockSeconds": 12.1,
   "consoleErrors": [],
   "consoleWarnings": [
     "console.warn: THREE.FBXLoader: %s map is not supported in three.js, skipping texture. ShininessExponent",

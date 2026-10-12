@@ -327,21 +327,39 @@ export const SKY = {
 // boot), so the top tier has to sit just under that or it could never be seen.
 // As it stands a good run reaches Legendary Broken Boot near the end, and
 // Mythical Diamond needs a near-perfect boot-only clear.
+// Every tier wears a boot, including the two he starts in: it is one of the four
+// models that ship, at the size its tier asks for, and the joke and the reward are
+// the same thing — the boot he ends up in is twice the one he started with. A tier
+// with no model is a boot *not* worn, which is what the first two used to be, so a
+// run that never reached Silver was a run with no boot in it at all.
 export const BOOT_TIERS = [
-  { name: 'Standard Boot',     kills: 0,   meleeDamage: 55,  knockback: 13,  speedBonus: 0,    model: null,                color: '#c8b18d', socket: 'default' },
-  { name: 'Reinforced Boot',   kills: 10,  meleeDamage: 66,  knockback: 14,  speedBonus: 0,    model: null,                color: '#9fd08a', socket: 'default' },
-  { name: 'Silver Boot',       kills: 24,  meleeDamage: 82,  knockback: 16,  speedBonus: 0.05, model: 'silverboot.glb',    color: '#cfd6de', socket: 'silver' },
-  { name: 'Gold Boot',         kills: 42,  meleeDamage: 105, knockback: 19,  speedBonus: 0.1,  model: 'goldboot.glb',      color: '#f2c94c', socket: 'gold' },
-  { name: 'Spiked Gold Boot',  kills: 62,  meleeDamage: 128, knockback: 26,  speedBonus: 0.1,  model: 'goldboot.glb',      color: '#e0912f', socket: 'gold' },
-  { name: 'Tactical Doom Boot',kills: 82,  meleeDamage: 150, knockback: 30,  speedBonus: 0.12, model: 'brokenboot.glb',    color: '#c0642b', socket: 'broken' },
-  { name: 'Legendary Broken Boot', kills: 102, meleeDamage: 190, knockback: 38, speedBonus: 0.16, model: 'brokenboot.glb', color: '#a33b6b', socket: 'broken' },
-  { name: 'Mythical Diamond Boot', kills: 116, meleeDamage: 220, knockback: 44, speedBonus: 0.18, model: 'diamondboot.glb', color: '#7fe6e0', socket: 'broken' },
+  { name: 'Standard Boot',     kills: 0,   meleeDamage: 55,  knockback: 13,  speedBonus: 0,    model: 'brokenboot.glb',  color: '#c8b18d', socket: 'standard' },
+  { name: 'Reinforced Boot',   kills: 10,  meleeDamage: 66,  knockback: 14,  speedBonus: 0,    model: 'brokenboot.glb',  color: '#9fd08a', socket: 'reinforced' },
+  { name: 'Silver Boot',       kills: 24,  meleeDamage: 82,  knockback: 16,  speedBonus: 0.05, model: 'silverboot.glb',  color: '#cfd6de', socket: 'silver' },
+  { name: 'Gold Boot',         kills: 42,  meleeDamage: 105, knockback: 19,  speedBonus: 0.1,  model: 'goldboot.glb',    color: '#f2c94c', socket: 'gold' },
+  { name: 'Spiked Gold Boot',  kills: 62,  meleeDamage: 128, knockback: 26,  speedBonus: 0.1,  model: 'goldboot.glb',    color: '#e0912f', socket: 'goldSpiked' },
+  { name: 'Tactical Doom Boot',kills: 82,  meleeDamage: 150, knockback: 30,  speedBonus: 0.12, model: 'brokenboot.glb',  color: '#c0642b', socket: 'doom' },
+  { name: 'Legendary Broken Boot', kills: 102, meleeDamage: 190, knockback: 38, speedBonus: 0.16, model: 'brokenboot.glb', color: '#a33b6b', socket: 'legendary' },
+  { name: 'Mythical Diamond Boot', kills: 116, meleeDamage: 220, knockback: 44, speedBonus: 0.18, model: 'diamondboot.glb', color: '#7fe6e0', socket: 'diamond' },
 ];
 
-// The socket helper centres a boot model on the right-foot bone, so each model
-// needs its own fit. `size` is its longest axis in world units; `lift` raises it
-// (also world units) until the sole sits on the ground under a standing foot.
-// The broken boot is deliberately the big, heavy one.
+// The socket helper centres a boot model on the right-foot bone, so each size
+// needs its own fit. `size` is the model's longest axis in world units — the boot
+// he starts in is 0.52 m and the Diamond is 1.00 m, both bigger than the 0.385 ×
+// 0.491 × 0.517 m boot his own mesh used to carry, so every tier swallows the foot
+// rather than perching on it. `lift` raises the model (also world units) until its
+// sole sits on the ground under a standing foot; these are measured, not guessed
+// (see `npm run test:character`, which reports the sole and the coverage).
+export const BOOT_SOCKETS = {
+  standard:   { size: 0.52, lift: 0.036 },
+  reinforced: { size: 0.56, lift: 0.049 },
+  silver:     { size: 0.60, lift: 0.062 },
+  gold:       { size: 0.66, lift: 0.082 },
+  goldSpiked: { size: 0.72, lift: 0.102 },
+  doom:       { size: 0.80, lift: 0.128 },
+  legendary:  { size: 0.90, lift: 0.161 },
+  diamond:    { size: 1.00, lift: 0.194 },
+};
 // The kicks the officer knows, and how a kick is chosen:
 //
 //   standing  the equipped boot's signature — a kick, a high kick once the boot
@@ -385,13 +403,6 @@ export const KICKS = {
     propPower: 16, propLift: 10,
     cooldownScale: 1.3,
   },
-};
-
-export const BOOT_SOCKETS = {
-  default: { size: 0.36, lift: 0.05 },
-  silver:  { size: 0.34, lift: 0.05 },
-  gold:    { size: 0.35, lift: 0.05 },
-  broken:  { size: 0.38, lift: 0.065 },
 };
 
 export const ACHIEVEMENTS = [

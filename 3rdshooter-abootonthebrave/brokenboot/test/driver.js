@@ -1524,6 +1524,123 @@ async function runCampaign(options) {
     // socketed onto the right-foot bone and the officer's boot goes away. A boot
     // that was joined into the body is not registered, so nothing hides and the
     // two are worn at once.
+    // The skinned world position of the officer's own foot, so the tier's boot can
+    // be asked whether it actually goes over it. Every influence is summed: a foot
+    // vertex is usually blended across the ankle and the toe, and placing it at
+    // just one of those bones would measure a foot the rig never draws.
+    // The foot a boot has to cover is named by its bones, not by a height: every
+    // vertex below the ankle catches the officer's other boot as well, and then the
+    // question becomes whether one boot encloses both feet, which no boot does.
+    const footPoints = (match, limit = 3000) => {
+      const points = [];
+      const boneAt = [0, 0, 0];
+      const mul = (e, v) => [
+        e[0] * v[0] + e[4] * v[1] + e[8] * v[2] + e[12] * v[3],
+        e[1] * v[0] + e[5] * v[1] + e[9] * v[2] + e[13] * v[3],
+        e[2] * v[0] + e[6] * v[1] + e[10] * v[2] + e[14] * v[3],
+        e[3] * v[0] + e[7] * v[1] + e[11] * v[2] + e[15] * v[3],
+      ];
+      p.model.traverse((mesh) => {
+        if (!mesh.isSkinnedMesh) return;
+        const geo = mesh.geometry;
+        const pos = geo.attributes.position;
+        const sw = geo.attributes.skinWeight;
+        const si = geo.attributes.skinIndex;
+        if (!sw || !si) return;
+        mesh.skeleton.update();
+        const on = mesh.skeleton.bones.map((b) => match.test(b.name || ''));
+        const bm = mesh.bindMatrix.elements;
+        const bmi = mesh.bindMatrixInverse.elements;
+        const bjs = mesh.skeleton.boneMatrices;
+        const mw = mesh.matrixWorld.elements;
+        const stride = Math.max(1, Math.floor(pos.count / limit));
+        for (let v = 0; v < pos.count; v += stride) {
+          const w = [sw.getX(v), sw.getY(v), sw.getZ(v), sw.getW(v)];
+          if (w[0] + w[1] + w[2] + w[3] <= 1e-6) continue;
+          boneAt[0] = 0; boneAt[1] = 0; boneAt[2] = 0;
+          let share = 0;
+          for (let k = 0; k < 4; k++) {
+            if (w[k] <= 1e-4) continue;
+            const index = si.getComponent(v, k);
+            const e = bjs.subarray(index * 16, index * 16 + 16);
+            const world = mul(mw, mul(bmi, mul(e, mul(bm, [pos.getX(v), pos.getY(v), pos.getZ(v), 1]))));
+            boneAt[0] += world[0] * w[k];
+            boneAt[1] += world[1] * w[k];
+            boneAt[2] += world[2] * w[k];
+            if (on[index]) share += w[k];
+          }
+          // Mostly this foot's: a vertex blended half onto the shin is not a site
+          // for a boot to cover.
+          if (share >= 0.5) points.push(new THREE.Vector3(boneAt[0], boneAt[1], boneAt[2]));
+        }
+      });
+      return points;
+    };
+
+    // The tier's boot has to contain the foot it is socketed onto: a boot smaller
+    // than the foot is not merely un-rigged, it is a boot his foot sticks out of,
+    // which is exactly what a socket that only scales a model to its own longest
+    // axis gets wrong. The right foot is the one every tier's socket uses.
+    // Skinning reads the skeleton's world matrices, so they have to be current
+    // before a single vertex is placed.
+    p.object.updateMatrixWorld(true);
+    p.model.updateMatrixWorld(true);
+    const foot = footPoints(/right[^a-z]*(toe|foot|ankle)/i);
+    const footBox = new THREE.Box3();
+    for (const v of foot) footBox.expandByPoint(v);
+    // The same foot in the frame of the bone the boot is socketed onto, along with a
+    // helper that measures a boot in that same frame. A box taken in world axes
+    // around a rotated boot is a third bigger than the boot itself — room enough for
+    // a foot to stick out of a boot that still "contains" it — so the fit clause is
+    // asked in the foot's own frame, where the box is the boot's real extent.
+    const boneWorld = new THREE.Matrix4().copy(p.kickFoot ? p.kickFoot.matrixWorld : new THREE.Matrix4());
+    const toBone = new THREE.Matrix4().copy(boneWorld).invert();
+    const footLocal = foot.map((v) => v.clone().applyMatrix4(toBone));
+    const footBoxLocal = new THREE.Box3();
+    for (const v of footLocal) footBoxLocal.expandByPoint(v);
+    // What one world metre is worth in the bone's own units (~centimetres here), so a
+    // size measured in the foot's frame can still be reported in metres.
+    const boneUnit = (p.kickFoot ? new THREE.Vector3().setFromMatrixScale(boneWorld).x : 1) || 1;
+    const boxInBoneFrame = (model) => {
+      const kept = new THREE.Matrix4().copy(p.kickFoot.matrixWorld);
+      p.kickFoot.matrixWorld.identity();
+      model.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(model, true);
+      p.kickFoot.matrixWorld.copy(kept);
+      model.updateMatrixWorld(true);
+      return box;
+    };
+    out.footPoints = foot.length;
+    out.footBox = { min: [+footBox.min.x.toFixed(3), +footBox.min.y.toFixed(3), +footBox.min.z.toFixed(3)], max: [+footBox.max.x.toFixed(3), +footBox.max.y.toFixed(3), +footBox.max.z.toFixed(3)] };
+
+    // The boot he is wearing right now, before anything is forced. This is the clause
+    // the first version of this probe could not see: it moved every tier itself, and
+    // so never noticed that the tier the player starts in had equipped nothing at
+    // all — the officer fought his first kills barefoot and the only part of a boot
+    // that ever reached him was the tier-up banner.
+    const initial = { tier: p.boot ? p.boot.name : null, index: p.bootIndex, socketed: Boolean(p.bootModel) };
+    if (p.bootModel) {
+      p.object.updateMatrixWorld(true);
+      // Precise, from the vertices: the union of a rotated model's mesh boxes
+      // overstates it, which is exactly the error that let a boot too small to wear
+      // measure as covering the whole foot.
+      const box = new THREE.Box3().setFromObject(p.bootModel, true);
+      const local = boxInBoneFrame(p.bootModel);
+      const inside = footLocal.filter((v) => local.containsPoint(v)).length;
+      initial.model = p.boot.model;
+      initial.span = +(Math.max(...local.getSize(new THREE.Vector3()).toArray()) * boneUnit).toFixed(3);
+      initial.worldSpan = +Math.max(...box.getSize(new THREE.Vector3()).toArray()).toFixed(3);
+      initial.sole = +box.min.y.toFixed(3);
+      initial.coveredShare = footLocal.length ? +(inside / footLocal.length).toFixed(3) : 0;
+      initial.coversFoot = footLocal.length > 0 && local.containsBox(footBoxLocal);
+      initial.soleOnGround = box.min.y >= -0.06 && box.min.y <= 0.1;
+    } else {
+      initial.model = null;
+      initial.coversFoot = false;
+      initial.soleOnGround = false;
+    }
+    out.initialBoot = initial;
+
     const saved = {
       credit: p.tierCredit,
       index: p.bootIndex,
@@ -1531,26 +1648,99 @@ async function runCampaign(options) {
       loaded: p.loadedBootModel,
       visible: ownMeshes.map((m) => m.visible),
     };
-    const tierIndex = BOOT_TIERS.findIndex((t) => t.model);
-    out.tier = tierIndex >= 0 ? BOOT_TIERS[tierIndex].name : null;
+    // Sockets arrive asynchronously and the game's own loop keeps simulating while
+    // they do, so the world is frozen for the measurements: otherwise those frames
+    // walk the officer out from under the box being measured, and out from under
+    // whatever clause reads him next.
+    const liveStep = G.step;
+    G.step = () => {};
+    out.tier = BOOT_TIERS[0] ? BOOT_TIERS[0].name : null;
+    out.tierOf = out.tier;
+    out.boots = [];
+    out.coversControl = { measured: false, namesIt: false };
+    const hideChecks = [];
     try {
-      if (tierIndex >= 0) {
-        p.tierCredit = Math.max(p.tierCredit, BOOT_TIERS[tierIndex].kills);
+      // Every tier, in order: the question is now whether the boot he is wearing
+      // covers the foot underneath it, so a tier with no model at all is a boot
+      // missing rather than a boot that is fine.
+      for (let ti = 0; ti < BOOT_TIERS.length; ti++) {
+        const tier = BOOT_TIERS[ti];
+        p.tierCredit = Math.max(p.tierCredit, tier.kills);
+        // Each tier replaces the last: leaving them all on the foot would stack
+        // eight boots and measure the pile rather than the fit.
+        if (p.bootModel && p.bootModel.parent) p.bootModel.parent.remove(p.bootModel);
         p.bootIndex = -1;                       // force the tier to move
+        p.bootModel = null;
+        p.loadedBootModel = null;
         p.refreshBootTier();
         for (let i = 0; i < 60 && !p.bootModel; i++) {
           await new Promise((r) => setTimeout(r, 100));
         }
-        out.tierBootSocketed = Boolean(p.bootModel);
-        out.ownBootsHidden = ownMeshes.every((m) => !m.visible);
+        const rec = { tier: tier.name, model: tier.model, socket: tier.socket, socketed: Boolean(p.bootModel) };
+        if (p.bootModel) {
+          p.object.updateMatrixWorld(true);
+          const box = new THREE.Box3().setFromObject(p.bootModel, true);
+          const local = boxInBoneFrame(p.bootModel);
+          const span = local.getSize(new THREE.Vector3());
+          const inside = footLocal.filter((v) => local.containsPoint(v)).length;
+          rec.span = +(Math.max(span.x, span.y, span.z) * boneUnit).toFixed(3);
+          rec.sole = +box.min.y.toFixed(3);
+          rec.top = +box.max.y.toFixed(3);
+          rec.box = {
+            min: [+box.min.x.toFixed(3), +box.min.y.toFixed(3), +box.min.z.toFixed(3)],
+            max: [+box.max.x.toFixed(3), +box.max.y.toFixed(3), +box.max.z.toFixed(3)],
+          };
+          rec.coveredShare = footLocal.length ? +(inside / footLocal.length).toFixed(3) : 0;
+          rec.coversFoot = footLocal.length > 0 && local.containsBox(footBoxLocal);
+          rec.opensUnderFoot = local.max.y <= footBoxLocal.max.y;   // the foot stands out of the top
+          // The control: the same measurement on a boot shrunk until it cannot
+          // cover the foot has to come back negative, or "covers his foot" is a
+          // clause that passes whatever it is shown.
+          if (!out.coversControl.measured) {
+            const scale = p.bootModel.scale.clone();
+            const at = p.bootModel.position.clone();
+            p.bootModel.scale.multiplyScalar(0.55);
+            p.object.updateMatrixWorld(true);
+            const small = boxInBoneFrame(p.bootModel);
+            const shared = footLocal.filter((v) => small.containsPoint(v)).length;
+            const kept = footLocal.length ? shared / footLocal.length : 0;
+            out.coversControl = {
+              measured: true, tier: tier.name, shrink: 0.55,
+              share: +kept.toFixed(3), namesIt: kept < 0.98,
+            };
+            p.bootModel.scale.copy(scale);
+            p.bootModel.position.copy(at);
+            p.object.updateMatrixWorld(true);
+          }
+        }
+        // A tier's boot takes the officer's own boot's place rather than being worn
+        // inside it, which is only a question when his mesh file carries one at all.
+        hideChecks.push(ownMeshes.every((m) => !m.visible));
+        out.boots.push(rec);
+        if (p.bootModel && p.bootModel.parent) p.bootModel.parent.remove(p.bootModel);
       }
+      out.ownBootsHidden = hideChecks.every(Boolean);
+      out.tierBootSocketed = out.boots.every((b) => b.socketed);
+      out.tierBootCoversFoot = out.boots.every((b) => b.coversFoot);
+      out.tierBootSoleOnGround = out.boots.every((b) => b.sole >= -0.06 && b.sole <= 0.1);
     } finally {
       if (p.bootModel && p.bootModel.parent) p.bootModel.parent.remove(p.bootModel);
       p.tierCredit = saved.credit;
       p.bootIndex = saved.index;
-      p.bootModel = saved.bootModel;
+      p.bootModel = null;
       p.loadedBootModel = saved.loaded;
+      // Put the boot he was already wearing back on the foot, rather than leaving
+      // the player in the report's own debris.
+      if (saved.bootModel) {
+        p.bootModel = saved.bootModel;
+        if (p.kickFoot) p.kickFoot.add(saved.bootModel);
+      } else if (p.kickFoot) {
+        p.equipBootModel();
+      }
       ownMeshes.forEach((m, i) => { m.visible = saved.visible[i]; });
+      G.step = liveStep;
+      p.object.updateMatrixWorld(true);
+      p.model.updateMatrixWorld(true);
     }
 
     // The control, and it is the same measurement the audit itself makes: an
@@ -1941,11 +2131,18 @@ async function runCampaign(options) {
     };
     out.pass = out.unweightedTotal === 0
       && out.weldShare <= WELD_SHARE_LIMIT
-      && out.ownBootCount >= 1
       && out.noMisboundParts
-      && out.ownBootsOnTheGround
-      && out.ownBootsHidden
       && out.tierBootSocketed
+      && out.tierBootCoversFoot
+      && out.tierBootSoleOnGround
+      && out.initialBoot.socketed
+      && out.initialBoot.coversFoot
+      && out.initialBoot.soleOnGround
+      && (!out.coversControl.measured || out.coversControl.namesIt)
+      // Only a file that carries the officer's own boot can be asked whether a tier's
+      // boot replaces it; this file carries none, so the tier's boot is the only boot
+      // there is and the clause reports that rather than passing it silently.
+      && (!out.ownBootCount || (out.ownBootsOnTheGround && out.ownBootsHidden))
       && (!out.control.measured || out.control.wouldNameIt)
       && out.statesOnTheGround
       && out.footingControl.pass

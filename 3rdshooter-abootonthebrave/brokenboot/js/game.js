@@ -20,6 +20,9 @@ const LOAD_WEIGHTS = {
   enemyClips: 1.2,
   world: 7.1,
   weapon: 5.9,
+  // The boot he starts in. Each tier loads its own model on top of that file, so
+  // this is the one download every player pays for.
+  boot: 4.0,
 };
 const LOAD_TOTAL = Object.values(LOAD_WEIGHTS).reduce((a, b) => a + b, 0);
 
@@ -161,6 +164,12 @@ export class Game {
 
     await this.player.equipWeapon();
     finish('weapon');
+    // He starts the game already wearing tier 0's boot. Boots are loaded when the
+    // tier *moves*, and at spawn the tier is already 0, so without this the officer
+    // fights his first kills barefoot and the first boot he ever sees is the second
+    // one — the tier-up banner was the only part of a boot that reached him.
+    await this.player.equipBootModel();
+    finish('boot');
     onProgress(100);
 
     this.state = 'ready';

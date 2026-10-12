@@ -880,8 +880,17 @@ function assess(report) {
       const limit = cc.limits ? cc.limits.weldShare : 0.02;
       if (cc.pass) {
         findings.push(`the officer's mesh file audits clean: ${cc.meshes.map((m) => `${m.name} (${m.sampled} sampled)`).join(', ')}, `
-          + `nothing unweighted, no more than ${(cc.weldShare * 100).toFixed(1)}% of a mesh riding one distant bone, and his own boot `
-          + `(${cc.ownBoots.map((b) => b.mesh).join(', ')}) on ${cc.ownBoots.map((b) => b.bone).join(', ')} until the ${cc.tier} replaced it`);
+          + `nothing unweighted, no more than ${(cc.weldShare * 100).toFixed(1)}% of a mesh riding one distant bone, and `
+          + `all ${(cc.boots || []).length} tiers wear a boot that covers his foot (${cc.footPoints} sampled vertices on his right foot) `
+          + `with its sole on the ground at ${cc.boots.map((b) => b.sole).join(', ')} m`);
+        if (cc.initialBoot && cc.initialBoot.socketed) {
+          findings.push(`he starts the game already wearing a boot: ${cc.initialBoot.tier} (tier ${cc.initialBoot.index}), socketed with nothing moving the tier, `
+            + `covering ${(cc.initialBoot.coveredShare * 100).toFixed(1)}% of his foot with its sole at ${cc.initialBoot.sole} m`);
+        }
+        if (cc.coversControl && cc.coversControl.measured && cc.coversControl.namesIt) {
+          findings.push(`the coverage clause would name the failure it exists for: the same measurement on the ${cc.coversControl.tier} `
+            + `shrunk to ${(cc.coversControl.shrink * 100).toFixed(0)}% leaves only ${(cc.coversControl.share * 100).toFixed(1)}% of his foot inside it`);
+        }
         if (cc.control && cc.control.measured) {
           findings.push(`the audit would name the failure it exists for: ${(cc.control.beyondLimitShare * 100).toFixed(1)}% of the officer's own boot vertices sit `
             + `beyond ${cc.control.distanceLimit} m of ${cc.control.boneZero}, which is where an unweighted boot ends up`);
@@ -908,17 +917,32 @@ function assess(report) {
           bits.push(`${(cc.weldShare * 100).toFixed(1)}% of ${cc.weldMesh} is welded to ${cc.weldBone}, up to ${cc.weldDistance} m off that bone `
             + `against a ${cc.limits.wrongBoneDistance} m limit`);
         }
-        if (!(cc.ownBootCount >= 1)) {
-          bits.push('nothing in the officer counts as his own boot, so a tier\'s boot is worn over it instead of replacing it');
-        } else {
-          if (!cc.noMisboundParts) {
-            bits.push(`${cc.misboundParts.map((m) => `${m.mesh} sits on the ground but is bound to ${m.bone}`).join('; ')}, `
-              + 'so a tier\'s boot is worn over it instead of replacing it');
-          }
-          if (!cc.ownBootsOnTheGround) bits.push(`his own boot hangs ${cc.ownBoots.map((b) => `${b.bottom} m`).join(', ')} above the ground`);
-          if (!cc.ownBootsHidden) bits.push(`socketing the ${cc.tier} did not hide his own boot`);
+        if (!cc.noMisboundParts) {
+          bits.push(`${cc.misboundParts.map((m) => `${m.mesh} sits on the ground but is bound to ${m.bone}`).join('; ')}, `
+            + 'so a tier\'s boot is worn over it instead of replacing it');
         }
-        if (!cc.tierBootSocketed) bits.push(`the ${cc.tier} boot never socketed onto the foot`);
+        // The boot question moved when every tier started wearing a model: his mesh
+        // no longer carries a boot of its own for a tier to hide, so what is worth
+        // asserting is the thing a socket can get wrong — a boot that his foot
+        // sticks out of, or one that digs into the ground (or floats above it).
+        if (cc.initialBoot && !cc.initialBoot.socketed) {
+          bits.push(`he starts the game barefoot: tier ${cc.initialBoot.index} (${cc.initialBoot.tier}) has no boot socketed, so the first boot a player sees is the second tier's`);
+        } else if (cc.initialBoot && (!cc.initialBoot.coversFoot || !cc.initialBoot.soleOnGround)) {
+          bits.push(`the boot he starts in (${cc.initialBoot.tier}) does not fit: ${(cc.initialBoot.coveredShare * 100).toFixed(1)}% of his foot inside it, sole at ${cc.initialBoot.sole} m`);
+        }
+        for (const b of cc.boots || []) {
+          if (!b.socketed) { bits.push(`the ${b.tier} never socketed its ${b.model} onto the foot`); continue; }
+          if (!b.coversFoot) {
+            bits.push(`the ${b.tier} boot (${b.span} m) does not cover his foot: ${(b.coveredShare * 100).toFixed(1)}% of its ${cc.footPoints} sampled foot vertices are inside it`);
+          }
+          if (!(b.sole >= -0.06 && b.sole <= 0.1)) {
+            bits.push(`the ${b.tier} boot's sole sits at ${b.sole} m — ${b.sole > 0.1 ? 'floating above the ground' : 'through it'}`);
+          }
+        }
+        if (cc.coversControl && cc.coversControl.measured && !cc.coversControl.namesIt) {
+          bits.push('the coverage clause passes a boot too small to wear: the same measurement on one shrunk to '
+            + `${(cc.coversControl.shrink * 100).toFixed(0)}% still leaves ${(cc.coversControl.share * 100).toFixed(1)}% of his foot inside it`);
+        }
         if (!cc.rifleOk) {
           if (!cc.rifle || !cc.rifle.loaded) {
             bits.push('his rifle never loaded, so he fights empty-handed');
@@ -1161,9 +1185,28 @@ function printReport(report, passed) {
       }
       console.log(`  ${pad('his own boot', 22)}${cc.ownBoots.length
         ? cc.ownBoots.map((b) => `${b.mesh} on ${b.bone}, bottom ${b.bottom} m, ${b.size.join(' × ')} m`).join('; ')
-        : "NOTHING REGISTERED — a tier's boot would be worn over it"}`);
-      console.log(`  ${pad('socketing the tier', 22)}${cc.tier}: ${cc.tierBootSocketed ? 'socketed' : 'NEVER SOCKETED'}, `
-        + `${cc.ownBootsHidden ? "his own boot hidden" : 'his own boot STILL SHOWING'}`);
+        : `none in the mesh file, so the tier supplies it — the question is whether that boot covers his foot (${cc.footPoints} sampled vertices on his right foot)`}`);
+      if (cc.initialBoot) {
+        const b = cc.initialBoot;
+        console.log(`  ${pad('boot he starts in', 22)}${b.socketed
+          ? `${b.tier} (tier ${b.index}) from ${b.model}, ${b.span} m, worn without anything moving the tier — its sole ${b.sole} m, `
+            + `${(b.coveredShare * 100).toFixed(1)}% of his foot inside it`
+          : `NOTHING SOCKETED in ${b.tier} (tier ${b.index}) — he starts barefoot`}`);
+      }
+      if (cc.boots && cc.boots.length) {
+        console.log(`  ${pad('boots, tier by tier', 22)}${pad('model', 18)}${pad('size', 8)}${pad('sole', 8)}covers his foot`);
+        for (const b of cc.boots) {
+          const covers = b.coversFoot
+            ? `yes — ${(b.coveredShare * 100).toFixed(1)}% of his foot vertices inside`
+            : `NO — only ${(b.coveredShare * 100).toFixed(1)}% of his foot vertices inside`;
+          console.log(`  ${pad(b.tier, 22)}${pad(b.model || 'NONE', 18)}${pad(`${b.span} m`, 8)}${pad(`${b.sole} m`, 8)}${b.socketed ? covers : 'NEVER SOCKETED'}`);
+        }
+        if (cc.coversControl && cc.coversControl.measured) {
+          console.log(`  ${pad('control', 22)}the same measurement on the ${cc.coversControl.tier} shrunk to ${(cc.coversControl.shrink * 100).toFixed(0)}% `
+            + `leaves ${(cc.coversControl.share * 100).toFixed(1)}% of his foot inside — `
+            + (cc.coversControl.namesIt ? 'well short, so a boot too small would be named' : 'STILL INSIDE, so a boot too small would not be named'));
+        }
+      }
       if (cc.control) {
         console.log(`  ${pad('control', 22)}${cc.control.measured
           ? `${cc.control.beyondLimit}/${cc.control.bootSampled} of his own boot's vertices (${(cc.control.beyondLimitShare * 100).toFixed(1)}%) sit beyond `
