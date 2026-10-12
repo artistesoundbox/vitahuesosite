@@ -347,7 +347,8 @@
       caves in actual geometry rather than faking it with a texture. Drag sideways to turn a friend
       around: the yaw stays where you leave it, while a tipped-over friend stands itself back up.
       Squeeze sounds are synthesised live
-      in the browser — no audio files ship at all, and every character has its own voice. Your squish count,
+      in the browser and every character has its own voice; the one audio file the page carries is the music
+      bed, mixed low enough to sit under them. Your squish count,
       combos, trophies and last-picked friend are saved on this device only.
     </p>
   </main>
@@ -368,8 +369,8 @@
        normal. That is what makes a fox's snout and a fish's tail
        squash believably without any per-model tweaking.
 
-       Sounds are synthesised with the Web Audio API, so the page
-       ships with no audio files at all.
+       Sounds are synthesised with the Web Audio API. The single file
+       the page ships is the music bed below, held well under them.
        ============================================================ */
 
     const stage    = document.getElementById('squishy-stage');
@@ -449,7 +450,7 @@
     }
 
     /* ============================================================
-       Sound — synthesised on the fly, so no audio files ship.
+       Sound — synthesised on the fly. The one file is the music bed.
        The AudioContext can only start after a real gesture, which
        is exactly what the first squish is.
        ============================================================ */
@@ -468,6 +469,81 @@
       const d = noiseBuf.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
       return actx;
+    }
+
+    /* ---- the music bed ----
+       The only audio files the page has — two of them, played back to back and
+       wrapping, so a long squishing session is not one 52-second loop. The
+       element is deliberately not `loop`: the tracks take turns, and the second
+       starts the moment the first ends.
+
+       Everything else here is synthesised, so this is the one thing that can
+       fail to arrive — and when it does the toy is unchanged, just silent
+       underneath.
+
+       MUSIC_VOLUME is deliberately low, because the squishes are the game and
+       the bed is the room they happen in. Measured against the files' own
+       level (-18.7 and -18.1 dBFS mean) 0.15 lands the bed near -35 dBFS,
+       while every cue lands above it: a full-strength squelch peaks near 0.23
+       amplitude (-12.8 dBFS), and the quietest cues are the chime (-25.2) and
+       the trophy fanfare (-26.0). So the bed sits about 10 dB under the
+       softest cue and 22 dB under a good squish — music you can hear, that
+       never talks over the toy. */
+    const MUSIC_TRACKS = ['Squishy Fun Time.mp3', 'Squishy Fun Time (1).mp3'];
+    const MUSIC_VOLUME = 0.15;
+    /* the element carries its own volume, so the mute button has to speak to
+       both buses: the cues through the Web Audio master, the bed through this */
+    let musicEl = null, musicIdx = -1, musicOk = null, musicWanted = false;
+    function musicTrack() { return MUSIC_TRACKS[musicIdx < 0 ? 0 : musicIdx]; }
+
+    function musicInit() {
+      if (musicEl) return musicEl;
+      try {
+        musicEl = new Audio();
+        musicEl.preload = 'auto';
+        musicEl.volume = MUSIC_VOLUME;
+        musicEl.addEventListener('canplay', function () { musicOk = true; });
+        /* a missing or unplayable file is a silent bed, not a broken page */
+        musicEl.addEventListener('error', function () { musicOk = false; });
+        /* one track finished: on to the other. Switching inside this handler
+           keeps the two butted together instead of leaving a gap. */
+        musicEl.addEventListener('ended', function () { if (!state.muted) musicNext(); });
+      } catch (e) { musicEl = null; }
+      return musicEl;
+    }
+
+    function musicPlay() {
+      musicWanted = true;
+      const el = musicInit();
+      if (!el) return null;
+      const want = musicTrack();
+      if (!el.currentSrc || el.currentSrc.indexOf(want) === -1) { try { el.src = want; } catch (e) {} }
+      el.volume = MUSIC_VOLUME;
+      const p = el.play();
+      /* before the first gesture the browser refuses; the next one tries again */
+      if (p && p.catch) p.catch(function () {});
+      return el;
+    }
+
+    /* the second track, then back to the first — same as the race page's music */
+    function musicNext() {
+      musicIdx = (musicIdx + 1) % MUSIC_TRACKS.length;
+      if (musicEl) { try { musicEl.pause(); } catch (e) {} }
+      return musicPlay();
+    }
+
+    /* one place decides what the bed is doing, so the mute button, the first
+       gesture and the boot path cannot disagree. Muted means no bed, and also
+       no 1.2 MB fetch for someone who has the sound off. */
+    function musicSync() {
+      if (state.muted) {
+        if (musicEl) {
+          musicEl.volume = 0;
+          try { musicEl.pause(); } catch (e) {}
+        }
+        return null;
+      }
+      return musicPlay();
     }
 
     /* a wet squelch whose pitch is the character's voice */
@@ -1370,6 +1446,7 @@
       muteBtn.setAttribute('aria-pressed', state.muted ? 'true' : 'false');
       if (!state.muted) { audioReady(); applyMasterGain(); playSquish(0.5, activeChar().pitch); }
       else { applyMasterGain(); }
+      musicSync();                  // the bed obeys the same button as the cues
       save();
     });
 
@@ -1405,6 +1482,19 @@
     }
 
     /* ---------- boot ---------- */
+    /* The bed can only start from a gesture, and the first press anywhere is
+       one: this listener is spent after that first gesture, and the cue sounds
+       keep re-offering it every time they are played. */
+    ['pointerdown', 'keydown'].forEach(function (ev) {
+      window.addEventListener(ev, function () { musicSync(); }, { once: true });
+    });
+    /* a tab nobody is looking at should not keep playing at them */
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) { if (musicEl) { try { musicEl.pause(); } catch (e) {} } }
+      else musicSync();
+    });
+    musicSync();      // an installed PWA may already be allowed to start it
+
     activeIdx = Math.max(0, CHARACTERS.findIndex(function (c) { return c.id === state.charId; }));
     muteBtn.textContent = state.muted ? '🔇 Sound off' : '🔊 Sound on';
     muteBtn.setAttribute('aria-pressed', state.muted ? 'true' : 'false');
@@ -1455,7 +1545,20 @@
           if (ok) { pulse = 1; lastSquelchAt = 0; }
           return ok;
         },
-        release: function () { pressing = false; pressArmed = false; pulse = 0; pointerInside = false; hitOk = false; return true; }
+        release: function () { pressing = false; pressArmed = false; pulse = 0; pointerInside = false; hitOk = false; return true; },
+        music: function () {
+          return {
+            wanted: musicWanted, ok: musicOk, muted: state.muted,
+            file: MUSIC_TRACKS[musicIdx < 0 ? 0 : musicIdx], tracks: MUSIC_TRACKS.slice(),
+            src: musicEl ? (musicEl.currentSrc || musicEl.src) : null,
+            volume: musicEl ? musicEl.volume : null,
+            loop: musicEl ? musicEl.loop : null,
+            paused: musicEl ? musicEl.paused : null,
+            time: musicEl ? Math.round(musicEl.currentTime * 100) / 100 : null
+          };
+        },
+        /* the element itself, so a check can seek it rather than wait 52 s */
+        musicElement: function () { return musicEl; }
       };
     }
   </script>

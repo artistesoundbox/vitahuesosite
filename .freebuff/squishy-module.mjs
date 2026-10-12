@@ -1,0 +1,1206 @@
+
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    /* ============================================================
+       Squishy — a shelf of soft cartoon friends.
+
+       Every character is a real glTF model. When it loads we freeze
+       a copy of each mesh's rest positions and rest normals, then per
+       frame each vertex runs its own little spring toward "rest spot
+       minus the local dent". A dent is a soft ball of influence
+       around the pointer's contact point, measured in the mesh's own
+       space, and inside it every vertex sinks along its own outward
+       normal. That is what makes a fox's snout and a fish's tail
+       squash believably without any per-model tweaking.
+
+       Sounds are synthesised with the Web Audio API. The single file
+       the page ships is the music bed below, held well under them.
+       ============================================================ */
+
+    const stage    = document.getElementById('squishy-stage');
+    const hintEl   = document.getElementById('squish-hint');
+    const countEl  = document.getElementById('squish-count');
+    const totalEl  = document.getElementById('squish-total');
+    const nowEl    = document.getElementById('now-line');
+    const toastEl  = document.getElementById('squish-toast');
+    const charsEl  = document.getElementById('chars');
+    const muteBtn  = document.getElementById('mute-btn');
+    const comboEl  = document.getElementById('combo-chip');
+    const comboPop = document.getElementById('combo-pop');
+    const energyEl = document.getElementById('energy');
+    const energyFill = document.getElementById('energy-fill');
+    const trophyEl = document.getElementById('trophy');
+    const surpriseBtn = document.getElementById('surprise-btn');
+    const spinBtn = document.getElementById('spin-btn');
+    const flashEl  = document.getElementById('super-flash');
+    const veilEl   = document.getElementById('load-veil');
+    const veilText = document.getElementById('load-text');
+    const veilEmoji= document.getElementById('load-emoji');
+    const veilFill = document.getElementById('load-fill');
+
+    const reducedMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
+
+    /* ---------- the cast ---------- */
+    /* `pitch` is the voice: 1 = the reference squelch, lower = deeper,
+       higher = squeakier. `words` are the little reactions it blurts out. */
+    const CHARACTERS = [
+      { id: 'cat',   name: 'Cat',      emoji: '🐱', file: 'cartoon_cat.glb',          pitch: 1.22, rotY: 0,
+        words: ['Purr…', 'Boop!', 'Mrrow!', 'Meowch!'] },
+      { id: 'dog',   name: 'Dog',      emoji: '🐶', file: 'cartoon_dog.glb',          pitch: 1.02, rotY: 0,
+        words: ['Woof!', 'Boop!', 'Ruff!', 'Squish!'] },
+      { id: 'bunny', name: 'Bunny',    emoji: '🐰', file: 'cartoon_easter_bunny.glb', pitch: 1.38, rotY: 0,
+        words: ['Squeak!', 'Eep!', 'Hop!', 'Boing!'] },
+      { id: 'lion',  name: 'Lion',     emoji: '🦁', file: 'cartoon_lion.glb',         pitch: 0.68, rotY: 0,
+        words: ['Grrr!', 'Mrow!', 'Roar…', 'Oof!'] },
+      { id: 'bird',  name: 'Bird',     emoji: '🐦', file: 'cartoon_bird.glb',         pitch: 1.42, rotY: 0,
+        words: ['Chirp!', 'Peep!', 'Tweet!', 'Flap!'] },
+      { id: 'fish',  name: 'Fish',     emoji: '🐟', file: 'cartoon_fish.glb',         pitch: 0.88, rotY: 0,
+        words: ['Blub!', 'Glub!', 'Bubble!', 'Splash!'] },
+      { id: 'crow',  name: 'Crow',     emoji: '🐦‍⬛', file: 'cartoon_crow.glb',         pitch: 0.82, rotY: 0,
+        words: ['Caw!', 'Kraa!', 'Squawk!', 'Creak!'] },
+      { id: 'punk',  name: 'Punk Guy', emoji: '🤘', file: 'cartoon_punk_guy.glb',     pitch: 0.76, rotY: 0,
+        words: ['Oi!', 'Squish it!', 'Heh.', 'Boing!'] }
+    ];
+
+    const TROPHIES = [
+      { id: 'first',    name: 'First Squish',    icon: '👆', test: function (s) { return s.squishes >= 1; } },
+      { id: 'warmup',   name: 'Finger Warm-Up',  icon: '🔥', test: function (s) { return s.squishes >= 25; } },
+      { id: 'combo',    name: 'Combo Master',    icon: '⚡', test: function (s) { return s.maxCombo >= 10; } },
+      { id: 'collector',name: 'Full Set',        icon: '🎭', test: function (s) { return s.tried.length >= CHARACTERS.length; } },
+      { id: 'super',    name: 'Super Squisher',  icon: '💥', test: function (s) { return s.supers >= 1; } },
+      { id: 'spinner',  name: 'Turntable',       icon: '🌀', test: function (s) { return s.spun >= SPIN_TROPHY; } },
+      { id: 'deep',     name: 'Blob Wrangler',   icon: '🏅', test: function (s) { return s.squishes >= 150; } }
+    ];
+
+    /* ---------- saved progress (this device only) ---------- */
+    const STORE_KEY = 'vh-squishy-v2';
+    const state = { squishes: 0, supers: 0, maxCombo: 0, spun: 0, tried: [], trophies: [], muted: false, charId: 'cat' };
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+      if (Number.isFinite(saved.squishes)   && saved.squishes >= 0) state.squishes = Math.floor(saved.squishes);
+      if (Number.isFinite(saved.supers)     && saved.supers >= 0)   state.supers = Math.floor(saved.supers);
+      if (Number.isFinite(saved.maxCombo)   && saved.maxCombo >= 0) state.maxCombo = Math.floor(saved.maxCombo);
+      if (Number.isFinite(saved.spun)       && saved.spun >= 0)     state.spun = saved.spun;
+      if (Array.isArray(saved.tried))     state.tried = saved.tried.filter(function (x) { return typeof x === 'string'; });
+      if (Array.isArray(saved.trophies))  state.trophies = saved.trophies.filter(function (x) { return typeof x === 'string'; });
+      if (saved.muted === true) state.muted = true;
+      if (typeof saved.charId === 'string' && CHARACTERS.some(function (c) { return c.id === saved.charId; })) state.charId = saved.charId;
+    } catch (e) { /* private mode: keep the defaults */ }
+    if (state.tried.indexOf(state.charId) === -1) state.tried.push(state.charId);
+
+    function save() {
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+      catch (e) { /* nothing to do — the toy still works */ }
+    }
+
+    /* ============================================================
+       Sound — synthesised on the fly. The one file is the music bed.
+       The AudioContext can only start after a real gesture, which
+       is exactly what the first squish is.
+       ============================================================ */
+    let actx = null, master = null, noiseBuf = null;
+
+    function audioReady() {
+      if (actx) return actx;
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      try { actx = new Ctx(); } catch (e) { return null; }
+      master = actx.createGain();
+      master.gain.value = state.muted ? 0 : 0.5;
+      master.connect(actx.destination);
+      const len = Math.max(1, Math.floor(actx.sampleRate * 0.4));
+      noiseBuf = actx.createBuffer(1, len, actx.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      return actx;
+    }
+
+    /* ---- the music bed ----
+       The only audio files the page has — two of them, played back to back and
+       wrapping, so a long squishing session is not one 52-second loop. The
+       element is deliberately not `loop`: the tracks take turns, and the second
+       starts the moment the first ends.
+
+       Everything else here is synthesised, so this is the one thing that can
+       fail to arrive — and when it does the toy is unchanged, just silent
+       underneath.
+
+       MUSIC_VOLUME is deliberately low, because the squishes are the game and
+       the bed is the room they happen in. Measured against the files' own
+       level (about -18.5 dBFS mean) 0.22 puts the bed near -31.7 dBFS, while
+       the cues land above it: a full-strength squelch peaks near 0.23
+       amplitude (-12.8 dBFS) and the quietest one, the whoosh, near 0.075
+       (-22.5 dBFS). So the bed sits 9 dB under the softest cue and 19 dB under
+       a good squish — audible as music, never as a competitor. */
+    const MUSIC_TRACKS = ['Squishy Fun Time.mp3', 'Squishy Fun Time (1).mp3'];
+    const MUSIC_VOLUME = 0.22;
+    /* the element carries its own volume, so the mute button has to speak to
+       both buses: the cues through the Web Audio master, the bed through this */
+    let musicEl = null, musicIdx = -1, musicOk = null, musicWanted = false;
+    function musicTrack() { return MUSIC_TRACKS[musicIdx < 0 ? 0 : musicIdx]; }
+
+    function musicInit() {
+      if (musicEl) return musicEl;
+      try {
+        musicEl = new Audio();
+        musicEl.preload = 'auto';
+        musicEl.volume = MUSIC_VOLUME;
+        musicEl.addEventListener('canplay', function () { musicOk = true; });
+        /* a missing or unplayable file is a silent bed, not a broken page */
+        musicEl.addEventListener('error', function () { musicOk = false; });
+        /* one track finished: on to the other. Switching inside this handler
+           keeps the two butted together instead of leaving a gap. */
+        musicEl.addEventListener('ended', function () { if (!state.muted) musicNext(); });
+      } catch (e) { musicEl = null; }
+      return musicEl;
+    }
+
+    function musicPlay() {
+      musicWanted = true;
+      const el = musicInit();
+      if (!el) return null;
+      const want = musicTrack();
+      if (!el.currentSrc || el.currentSrc.indexOf(want) === -1) { try { el.src = want; } catch (e) {} }
+      el.volume = MUSIC_VOLUME;
+      const p = el.play();
+      /* before the first gesture the browser refuses; the next one tries again */
+      if (p && p.catch) p.catch(function () {});
+      return el;
+    }
+
+    /* the second track, then back to the first — same as the race page's music */
+    function musicNext() {
+      musicIdx = (musicIdx + 1) % MUSIC_TRACKS.length;
+      if (musicEl) { try { musicEl.pause(); } catch (e) {} }
+      return musicPlay();
+    }
+
+    /* one place decides what the bed is doing, so the mute button, the first
+       gesture and the boot path cannot disagree. Muted means no bed, and also
+       no 1.2 MB fetch for someone who has the sound off. */
+    function musicSync() {
+      if (state.muted) {
+        if (musicEl) {
+          musicEl.volume = 0;
+          try { musicEl.pause(); } catch (e) {}
+        }
+        return null;
+      }
+      return musicPlay();
+    }
+
+    /* a wet squelch whose pitch is the character's voice */
+    function playSquish(strength, pitch) {
+      if (state.muted) return;
+      try {
+        const ctx = audioReady(); if (!ctx) return;
+        if (ctx.state === 'suspended') ctx.resume();
+        const t = ctx.currentTime;
+        const s = Math.max(0.25, Math.min(1, strength));
+        const v = pitch || 1;
+        const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 2.2;
+        bp.frequency.setValueAtTime(1700 * v, t);
+        bp.frequency.exponentialRampToValueAtTime(420 * v, t + 0.20);
+        const ng = ctx.createGain();
+        ng.gain.setValueAtTime(0.0001, t);
+        ng.gain.exponentialRampToValueAtTime(0.30 * s, t + 0.022);
+        ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+        src.connect(bp).connect(ng).connect(master || ctx.destination);
+        src.start(t); src.stop(t + 0.30);
+        const osc = ctx.createOscillator(); osc.type = 'sine';
+        osc.frequency.setValueAtTime(180 * v, t);
+        osc.frequency.exponentialRampToValueAtTime(72 * v, t + 0.18);
+        const og = ctx.createGain();
+        og.gain.setValueAtTime(0.0001, t);
+        og.gain.exponentialRampToValueAtTime(0.16 * s, t + 0.02);
+        og.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+        osc.connect(og).connect(master || ctx.destination);
+        osc.start(t); osc.stop(t + 0.24);
+      } catch (e) { /* audio is a bonus, never a failure */ }
+    }
+
+    function playBoing(pitch) {
+      if (state.muted) return;
+      try {
+        const ctx = audioReady(); if (!ctx) return;
+        if (ctx.state === 'suspended') ctx.resume();
+        const t = ctx.currentTime;
+        const v = pitch || 1;
+        const o = ctx.createOscillator(); o.type = 'triangle';
+        o.frequency.setValueAtTime(460 * v, t);
+        o.frequency.exponentialRampToValueAtTime(205 * v, t + 0.16);
+        o.frequency.exponentialRampToValueAtTime(295 * v, t + 0.30);
+        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1700;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.13, t + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+        o.connect(lp).connect(g).connect(master || ctx.destination);
+        o.start(t); o.stop(t + 0.45);
+      } catch (e) {}
+    }
+
+    /* the throw: a short airy whoosh whose body follows how hard you flicked */
+    function playWhoosh(strength) {
+      if (state.muted) return;
+      try {
+        const ctx = audioReady(); if (!ctx || !noiseBuf) return;
+        if (ctx.state === 'suspended') ctx.resume();
+        const t = ctx.currentTime;
+        const s = Math.max(0.25, Math.min(1, strength));
+        const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 0.9;
+        bp.frequency.setValueAtTime(260, t);
+        bp.frequency.exponentialRampToValueAtTime(1500, t + 0.16);
+        bp.frequency.exponentialRampToValueAtTime(480, t + 0.44);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.15 * s, t + 0.13);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.48);
+        src.connect(bp).connect(g).connect(master || ctx.destination);
+        src.start(t); src.stop(t + 0.52);
+      } catch (e) { /* audio is a bonus, never a failure */ }
+    }
+
+    function playChime() {
+      if (state.muted) return;
+      try {
+        const ctx = audioReady(); if (!ctx) return;
+        if (ctx.state === 'suspended') ctx.resume();
+        const t = ctx.currentTime;
+        [660, 880, 1320].forEach(function (f, i) {
+          const o = ctx.createOscillator(); o.type = 'sine';
+          o.frequency.value = f;
+          const g = ctx.createGain();
+          const s = t + i * 0.085;
+          g.gain.setValueAtTime(0.0001, s);
+          g.gain.exponentialRampToValueAtTime(0.11, s + 0.03);
+          g.gain.exponentialRampToValueAtTime(0.0001, s + 0.55);
+          o.connect(g).connect(master || ctx.destination);
+          o.start(s); o.stop(s + 0.6);
+        });
+      } catch (e) {}
+    }
+
+    /* the payoff fanfare: a quick rising arpeggio plus a low boom */
+    function playFanfare() {
+      if (state.muted) return;
+      try {
+        const ctx = audioReady(); if (!ctx) return;
+        if (ctx.state === 'suspended') ctx.resume();
+        const t = ctx.currentTime;
+        [523, 659, 784, 1047, 1319].forEach(function (f, i) {
+          const o = ctx.createOscillator(); o.type = 'sawtooth';
+          o.frequency.value = f;
+          const g = ctx.createGain();
+          const s = t + i * 0.06;
+          g.gain.setValueAtTime(0.0001, s);
+          g.gain.exponentialRampToValueAtTime(0.10, s + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001, s + 0.34);
+          const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2600;
+          o.connect(lp).connect(g).connect(master || ctx.destination);
+          o.start(s); o.stop(s + 0.36);
+        });
+        const o = ctx.createOscillator(); o.type = 'sine';
+        o.frequency.setValueAtTime(120, t);
+        o.frequency.exponentialRampToValueAtTime(48, t + 0.5);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.22, t + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+        o.connect(g).connect(master || ctx.destination);
+        o.start(t); o.stop(t + 0.62);
+      } catch (e) {}
+    }
+
+    function buzz(ms) {
+      try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {}
+    }
+
+    /* ============================================================
+       Rendering (three.js)
+       ============================================================ */
+    const TARGET_SIZE  = 2.6;    // the model's on-screen footprint, in world units
+    const RADIUS_W     = 0.62;   // dent radius, world units
+    const MAX_DEPTH_W  = 0.34;   // deepest cave-in, world units
+    const SPRING_K     = 52;     // stiffness — the "slow rise"
+    const SPRING_D     = 6.4;    // damping — leaves a small, happy overshoot
+
+    /* turning the toy around */
+    const SPIN_PER_PX  = 0.0095; // yaw gained per pixel dragged (~330px = half a turn)
+    const TILT_PER_PX  = 0.0052; // tip gained per pixel dragged
+    const TILT_LIMIT   = 0.50;   // never tip a friend further than this (radians)
+    const SPIN_DAMPING = 1.9;    // how quickly a flicked spin coasts to a stop
+    const TILT_RETURN  = 5.5;    // a tipped-over friend stands back up
+    const SPIN_TROPHY  = 6.283;  // one whole turn of yaw
+
+    let renderer = null, scene = null, camera = null, shadow = null, shadowBase = 1;
+    let modelRoot = null;        // wrapper: idle sway + squash/stretch live here
+    let records = [];            // one per unique geometry in the active model
+    let activeIdx = 0;
+    let loading = false;
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    const worldHit = new THREE.Vector3();
+    const camShake = { amt: 0, x: 0, y: 0 };
+
+    let pointerInside = false, pressing = false, pressArmed = false, hitOk = false;
+    let lastPointerType = 'mouse';
+    let pressAmt = 0, pulse = 0, dentPower = 0, dentActive = false, dentDepth = 0;
+    let lastSquelchAt = 0;
+
+    /* yaw stays where you leave it, so you can look a friend in the back of
+       the head; the tip always springs back upright like a weeble. */
+    let spin = 0, spinVel = 0, tilt = 0, prevSpin = 0;
+    let dragActive = false, dragX = 0, dragY = 0, spunAwarded = false, lastSpinMoveAt = 0;
+
+    /* combo + energy */
+    const COMBO_WINDOW = 900;    // ms between squishes to keep a combo alive
+    const ENERGY_NEED  = 30;     // squish-points to trigger a SUPER SQUISH
+    let combo = 1, lastSquishAt = 0, energy = 0;
+
+    const loader = new GLTFLoader();
+    const cache = new Map();     // file -> { wrapper, records }
+
+    function activeChar() { return CHARACTERS[activeIdx]; }
+
+    function init() {
+      try {
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+      } catch (e) { renderer = null; }
+      if (!renderer) { showFallback(); return; }
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.02;
+      stage.appendChild(renderer.domElement);
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(42, 1, 0.1, 60);
+      camera.position.set(0, 0.15, 6.2);
+      camera.lookAt(0, 0, 0);
+
+      /* a tiny canvas becomes the environment map: that is what gives the
+         toy its soft, glossy sheen without loading an HDRI */
+      try {
+        const c = document.createElement('canvas'); c.width = 64; c.height = 32;
+        const g = c.getContext('2d');
+        const lg = g.createLinearGradient(0, 0, 0, 32);
+        lg.addColorStop(0, '#3b4d8f');
+        lg.addColorStop(0.45, '#141b33');
+        lg.addColorStop(0.72, '#2a1c47');
+        lg.addColorStop(1, '#05070d');
+        g.fillStyle = lg; g.fillRect(0, 0, 64, 32);
+        const rg = g.createRadialGradient(16, 7, 0, 16, 7, 13);
+        rg.addColorStop(0, 'rgba(255,255,255,0.95)');
+        rg.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = rg; g.fillRect(0, 0, 64, 32);
+        const tex = new THREE.CanvasTexture(c);
+        tex.mapping = THREE.EquirectangularReflectionMapping;
+        tex.colorSpace = THREE.SRGBColorSpace;
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        scene.environment = pmrem.fromEquirectangular(tex).texture;
+        pmrem.dispose();
+        tex.dispose();
+      } catch (e) { /* without an env map the lights below still carry it */ }
+
+      scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x2a1830, 0.75));
+      const key = new THREE.DirectionalLight(0xffffff, 1.9); key.position.set(3.5, 4.5, 5.5); scene.add(key);
+      const rim = new THREE.PointLight(0x66ccff, 26, 30); rim.position.set(-4.2, -1.6, 3.2); scene.add(rim);
+      const warm = new THREE.PointLight(0xff77aa, 20, 30); warm.position.set(2.6, -3.2, -2.2); scene.add(warm);
+
+      buildShadow();
+      buildFx();
+      renderer.setAnimationLoop(frame);
+
+      const ro = (typeof ResizeObserver !== 'undefined') ? new ResizeObserver(resize) : null;
+      if (ro) ro.observe(stage);
+      window.addEventListener('resize', resize);
+      resize();
+
+      loadCharacter(activeIdx, true);
+    }
+
+    /* ---- a soft contact shadow so the friend sits on something ---- */
+    function buildShadow() {
+      const c = document.createElement('canvas'); c.width = c.height = 128;
+      const g = c.getContext('2d');
+      const rg = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+      rg.addColorStop(0, 'rgba(0,0,0,0.75)');
+      rg.addColorStop(0.5, 'rgba(0,0,0,0.35)');
+      rg.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = rg; g.fillRect(0, 0, 128, 128);
+      const tex = new THREE.CanvasTexture(c);
+      shadow = new THREE.Mesh(
+        new THREE.PlaneGeometry(3.8, 3.8),
+        new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.75 })
+      );
+      shadow.rotation.x = -Math.PI / 2;
+      shadow.position.y = -1.6;
+      scene.add(shadow);
+    }
+
+    /* ============================================================
+       Particles — a plain 2D canvas above the WebGL one, so bursts
+       cost nothing in the 3D scene and never eat pointer input.
+       ============================================================ */
+    let fx = null, fxc = null, parts = [];
+
+    function buildFx() {
+      fx = document.createElement('canvas');
+      fx.className = 'fx-canvas';
+      stage.appendChild(fx);
+      fxc = fx.getContext('2d');
+    }
+
+    const SPARK_COLORS = ['#ff74a4', '#ffd166', '#6ae0ff', '#b07cff', '#9dff5c', '#ffffff'];
+    const SPARK_EMOJI  = ['✨', '💖', '⭐', '💫'];
+
+    function spawnBurst(x, y, n, power) {
+      const heavy = power || 1;
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const sp = (0.9 + Math.random() * 2.6) * heavy;
+        parts.push({
+          x: x, y: y,
+          vx: Math.cos(a) * sp * 60,
+          vy: Math.sin(a) * sp * 60 - 90,
+          life: 0.75 + Math.random() * 0.7,
+          age: 0,
+          size: 3 + Math.random() * 5,
+          rot: Math.random() * Math.PI,
+          spin: (Math.random() - 0.5) * 9,
+          color: SPARK_COLORS[(Math.random() * SPARK_COLORS.length) | 0],
+          emoji: Math.random() < 0.22 ? SPARK_EMOJI[(Math.random() * SPARK_EMOJI.length) | 0] : null
+        });
+      }
+      if (parts.length > 260) parts = parts.slice(parts.length - 260);
+    }
+
+    function drawFx(dt) {
+      if (!fxc || !fx) return;
+      const w = fx.width / (fx._dpr || 1), h = fx.height / (fx._dpr || 1);
+      fxc.clearRect(0, 0, w, h);
+      if (!parts.length) return;
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const p = parts[i];
+        p.age += dt;
+        if (p.age >= p.life) { parts.splice(i, 1); continue; }
+        p.vy += 640 * dt;            // gravity
+        p.vx *= (1 - 0.9 * dt);      // drag
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        p.rot += p.spin * dt;
+        const k = 1 - p.age / p.life;
+        fxc.globalAlpha = Math.max(0, Math.min(1, k));
+        if (p.emoji) {
+          fxc.save();
+          fxc.translate(p.x, p.y);
+          fxc.rotate(p.rot);
+          fxc.font = (p.size * 3.4) + 'px system-ui, sans-serif';
+          fxc.textAlign = 'center'; fxc.textBaseline = 'middle';
+          fxc.fillText(p.emoji, 0, 0);
+          fxc.restore();
+        } else {
+          fxc.save();
+          fxc.translate(p.x, p.y);
+          fxc.rotate(p.rot);
+          fxc.fillStyle = p.color;
+          fxc.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+          fxc.restore();
+        }
+      }
+      fxc.globalAlpha = 1;
+    }
+
+    /* ============================================================
+       Loading a character
+       ============================================================ */
+    function setVeil(show, emoji, text, pct) {
+      veilEmoji.textContent = emoji || '🐱';
+      if (text != null) veilText.textContent = text;
+      veilFill.style.width = Math.round(Math.max(0, Math.min(1, pct || 0)) * 100) + '%';
+      veilEl.classList.toggle('hidden', !show);
+    }
+
+    /* We view every character head-on, so what decides how big it looks on
+       screen is its width and height — NOT its depth. Normalising by the
+       deepest axis (a quadruped's body length) would leave the lion and the
+       dog visibly smaller than the bird or the bunny. Fit the footprint
+       instead, and every friend arrives at the same size.
+       Returns the fitted world size so the shadow can be placed under it. */
+    function normalize(root) {
+      root.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(root);
+      const size = box.getSize(new THREE.Vector3());
+      const footprint = Math.max(size.x, size.y) || 1;
+      root.scale.setScalar(TARGET_SIZE / footprint);
+      root.updateMatrixWorld(true);
+      const box2 = new THREE.Box3().setFromObject(root);
+      const center = box2.getCenter(new THREE.Vector3());
+      root.position.sub(center);         // sit the model on the origin
+      root.updateMatrixWorld(true);
+      return box2.getSize(new THREE.Vector3());
+    }
+
+    /* Freeze each unique geometry's rest shape once, so every vertex can
+       spring home again no matter how badly we maul it. */
+    function buildRecords(root) {
+      const recs = [];
+      const seen = new Set();
+      root.traverse(function (o) {
+        if (!o.isMesh || !o.geometry) return;
+        if (o.visible === false) return;      // hidden baked shadow shells: no physics wasted on them
+        const g = o.geometry;
+        if (seen.has(g)) return;                       // shared geometry: deform it once
+        seen.add(g);
+        const pos = g.attributes.position;
+        if (!pos) return;
+        if (!g.attributes.normal) g.computeVertexNormals();
+        const nrmAttr = g.attributes.normal;
+        const N = pos.count;
+        const ws = o.getWorldScale(new THREE.Vector3());
+        const invScale = 1 / (Math.abs(ws.x) || 1);    // mesh-local units per world unit
+        recs.push({
+          geo: g,
+          pos: pos,
+          base: new Float32Array(pos.array),
+          nrm: new Float32Array(nrmAttr.array),
+          vel: new Float32Array(N * 3),
+          N: N,
+          mesh: o,
+          invScale: invScale,
+          radius: RADIUS_W * invScale,
+          depth: MAX_DEPTH_W * invScale,
+          localHit: new THREE.Vector3(0, 1e9, 0)
+        });
+      });
+      return recs;
+    }
+
+    function resetRecords(recs) {
+      for (let r = 0; r < recs.length; r++) {
+        const rec = recs[r];
+        rec.pos.array.set(rec.base);
+        rec.vel.fill(0);
+        rec.localHit.set(0, 1e9, 0);
+        rec.pos.needsUpdate = true;
+      }
+    }
+
+    function activate(idx) {
+      const entry = cache.get(CHARACTERS[idx].file);
+      if (!entry) return;
+      if (modelRoot) { scene.remove(modelRoot); endPress(); }
+      activeIdx = idx;
+      modelRoot = entry.wrapper;
+      records = entry.records;
+      /* a freshly picked friend always arrives facing you, upright */
+      spin = 0; spinVel = 0; tilt = 0; prevSpin = 0; dragActive = false;
+      modelRoot.rotation.set(0, CHARACTERS[idx].rotY, 0);
+      scene.add(modelRoot);
+      modelRoot.updateMatrixWorld(true);
+      resetRecords(records);
+      if (state.tried.indexOf(CHARACTERS[idx].id) === -1) state.tried.push(CHARACTERS[idx].id);
+      state.charId = CHARACTERS[idx].id;
+      save();
+      renderChars();
+      nowEl.textContent = 'Now squishing: ' + CHARACTERS[idx].name;
+      checkTrophies();
+    }
+
+    function loadCharacter(idx, firstLoad) {
+      const ch = CHARACTERS[idx];
+      if (cache.has(ch.file)) { activate(idx); if (firstLoad) hintEl.classList.remove('dim'); return; }
+      if (loading) return;
+      loading = true;
+      setVeil(true, ch.emoji, 'Loading ' + ch.name, 0.04);
+      loader.load(ch.file, function (gltf) {
+        const inner = gltf.scene;
+        inner.traverse(function (o) {
+          /* Some Sketchfab exports carry a full-size duplicate of the body as a
+             "shadow" shell, which simply darkens the character if we draw it. */
+          if (o.isMesh && /shadow/i.test(o.name || '')) { o.visible = false; return; }
+          if (o.isMesh && o.material) {
+            const mats = Array.isArray(o.material) ? o.material : [o.material];
+            mats.forEach(function (m) {
+              if (m.map) m.map.colorSpace = THREE.SRGBColorSpace;
+              m.envMapIntensity = 0.85;
+              if (m.side === THREE.FrontSide) m.side = THREE.DoubleSide;  // a squashed mesh shows its inside
+            });
+          }
+        });
+        const fitted = normalize(inner);
+        const wrapper = new THREE.Group();
+        wrapper.add(inner);
+        const recs = buildRecords(inner);
+        cache.set(ch.file, { wrapper: wrapper, records: recs });
+        /* park the contact shadow just under this character's feet */
+        if (shadow) {
+          shadow.position.y = -(fitted.y / 2) - 0.22;
+          shadowBase = Math.max(0.5, Math.min(1.35, fitted.x / 2.0));
+        }
+        loading = false;
+        setVeil(true, ch.emoji, ch.name + ' ready', 1);
+        setTimeout(function () { setVeil(false); }, 260);
+        activate(idx);
+        if (firstLoad) hintEl.classList.remove('dim');
+      }, function (ev) {
+        if (ev && ev.total) setVeil(true, ch.emoji, 'Loading ' + ch.name, ev.loaded / ev.total);
+        else setVeil(true, ch.emoji, 'Loading ' + ch.name, 0.35);
+      }, function () {
+        loading = false;
+        setVeil(false);
+        showToast('Could not load ' + ch.name + ' — check squishy/' + ch.file);
+      });
+    }
+
+    function selectCharacter(idx) {
+      if (idx === activeIdx && modelRoot) return;
+      if (!cache.has(CHARACTERS[idx].file)) { loadCharacter(idx); return; }
+      playChime();
+      activate(idx);
+      spawnBurst(stage.clientWidth / 2, stage.clientHeight / 2, 10, 0.7);
+    }
+
+    function renderChars() {
+      charsEl.textContent = '';
+      CHARACTERS.forEach(function (ch, i) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'charbtn' + (state.tried.indexOf(ch.id) !== -1 ? ' seen' : '');
+        b.setAttribute('aria-pressed', i === activeIdx ? 'true' : 'false');
+        b.setAttribute('aria-label', ch.name);
+        b.title = ch.name;
+        b.dataset.index = String(i);
+        const em = document.createElement('span'); em.className = 'em'; em.textContent = ch.emoji;
+        const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = ch.name;
+        b.appendChild(em); b.appendChild(nm);
+        b.addEventListener('click', function () { selectCharacter(i); });
+        charsEl.appendChild(b);
+      });
+    }
+
+    function renderTrophy() {
+      trophyEl.textContent = '🏆 ' + state.trophies.length + '/' + TROPHIES.length;
+    }
+
+    function resize() {
+      if (!renderer) return;
+      const w = stage.clientWidth, h = stage.clientHeight;
+      if (!w || !h) return;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      if (fx) {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        fx._dpr = dpr;
+        fx.width = Math.max(1, Math.round(w * dpr));
+        fx.height = Math.max(1, Math.round(h * dpr));
+        fxc.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+    }
+
+    /* ============================================================
+       The squish itself: every vertex springs toward its target,
+       which is its rest spot pushed inward all around the contact.
+       ============================================================ */
+    function stepSprings(dt) {
+      const steps = dt > 1 / 90 ? 2 : 1;
+      const h = dt / steps;
+      const on = dentActive;
+      let maxDisp = 0;
+
+      for (let r = 0; r < records.length; r++) {
+        const rec = records[r];
+        const arr = rec.pos.array, base = rec.base, nrm = rec.nrm, vel = rec.vel, N = rec.N;
+        const lx = rec.localHit.x, ly = rec.localHit.y, lz = rec.localHit.z;
+        const R2 = rec.radius * rec.radius;
+        const dep = dentDepth * rec.invScale;
+
+        for (let s = 0; s < steps; s++) {
+          for (let i = 0; i < N; i++) {
+            const i3 = i * 3;
+            let tx = base[i3], ty = base[i3 + 1], tz = base[i3 + 2];
+
+            if (on) {
+              const dx = base[i3] - lx, dy = base[i3 + 1] - ly, dz = base[i3 + 2] - lz;
+              const d2 = dx * dx + dy * dy + dz * dz;
+              if (d2 < R2) {
+                let f = 1 - d2 / R2;
+                f = f * f * (3 - 2 * f);            // smoothstep falloff across the dent
+                const p = dep * f;
+                /* sink along this vertex's own resting normal: that is what
+                   makes any model cave in, not just a sphere */
+                tx -= nrm[i3] * p; ty -= nrm[i3 + 1] * p; tz -= nrm[i3 + 2] * p;
+              }
+            }
+
+            const cx = arr[i3], cy = arr[i3 + 1], cz = arr[i3 + 2];
+            let vx = vel[i3], vy = vel[i3 + 1], vz = vel[i3 + 2];
+            vx += ((tx - cx) * SPRING_K - vx * SPRING_D) * h;
+            vy += ((ty - cy) * SPRING_K - vy * SPRING_D) * h;
+            vz += ((tz - cz) * SPRING_K - vz * SPRING_D) * h;
+
+            const nx = cx + vx * h, ny = cy + vy * h, nz = cz + vz * h;
+            vel[i3] = vx; vel[i3 + 1] = vy; vel[i3 + 2] = vz;
+            arr[i3] = nx; arr[i3 + 1] = ny; arr[i3 + 2] = nz;
+
+            if (s === steps - 1) {
+              const ax = nx - base[i3], ay = ny - base[i3 + 1], az = nz - base[i3 + 2];
+              const sq = ax * ax + ay * ay + az * az;
+              if (sq > maxDisp) maxDisp = sq;
+            }
+          }
+        }
+        rec.pos.needsUpdate = true;
+      }
+      return Math.sqrt(maxDisp);
+    }
+
+    const clock = new THREE.Clock();
+
+    function frame() {
+      const dt = Math.min(clock.getDelta(), 1 / 30);
+      const t = clock.elapsedTime;
+
+      if (modelRoot) {
+        if (!dragActive) {
+          /* the throw: a flicked friend coasts, slowing all the while */
+          if (reducedMotion) {
+            spinVel = 0;
+          } else if (spinVel) {
+            spin += spinVel * dt;
+            spinVel *= Math.exp(-SPIN_DAMPING * dt);
+            if (Math.abs(spinVel) < 0.04) spinVel = 0;
+          }
+          /* let go and it stands back up — but stays turned where you left it */
+          tilt += (0 - tilt) * Math.min(1, TILT_RETURN * dt);
+          if (Math.abs(tilt) < 0.0008) tilt = 0;
+        }
+
+        const rotY = activeChar().rotY;
+        /* tilt about the world's X, so turning the friend never changes which
+           way "up" means — that is what makes the yaw feel like a turntable */
+        modelRoot.rotation.set(
+          tilt + (reducedMotion ? 0 : Math.cos(t * 0.8) * 0.03),
+          rotY + spin + (reducedMotion ? 0 : Math.sin(t * 0.5) * 0.10),
+          0
+        );
+        modelRoot.position.y = reducedMotion ? 0 : Math.sin(t * 1.3) * 0.04;
+        /* squash-and-stretch the whole friend while it is being squeezed */
+        const sq = reducedMotion ? 0 : dentPower;
+        modelRoot.scale.set(1 + 0.055 * sq, 1 - 0.075 * sq, 1 + 0.055 * sq);
+
+        /* total turn, for the Turntable trophy (drag and throw both count) */
+        if (spin !== prevSpin) {
+          state.spun += Math.abs(spin - prevSpin);
+          prevSpin = spin;
+          if (!spunAwarded && state.spun >= SPIN_TROPHY) { spunAwarded = true; checkTrophies(); }
+        }
+      }
+
+      /* how hard we are squishing right now */
+      const want = pressing && pressArmed ? 1 : ((pointerInside && hitOk) ? 0.34 : 0);
+      const rate = want > pressAmt ? 16 : 20;
+      pressAmt += (want - pressAmt) * Math.min(1, rate * dt);
+      if (pulse > 0.001) { pulse *= Math.exp(-5.2 * dt); if (pulse < 0.001) pulse = 0; }
+      dentPower = Math.min(1, pressAmt + pulse);
+      dentActive = dentPower > 0.012;
+      dentDepth = MAX_DEPTH_W * dentPower;
+
+      const maxDisp = stepSprings(dt);
+      if (modelRoot && (dentActive || maxDisp > 0.0035)) {
+        for (let r = 0; r < records.length; r++) records[r].geo.computeVertexNormals();
+      }
+
+      /* combo decay */
+      if (combo > 1 && performance.now() - lastSquishAt > COMBO_WINDOW) setCombo(1);
+
+      /* camera kick */
+      if (camShake.amt > 0.0005) {
+        camShake.amt *= Math.exp(-6.5 * dt);
+        camShake.x = (Math.random() * 2 - 1) * camShake.amt;
+        camShake.y = (Math.random() * 2 - 1) * camShake.amt;
+      } else { camShake.amt = 0; camShake.x = 0; camShake.y = 0; }
+      camera.position.set(camShake.x, 0.15 + camShake.y, 6.2);
+
+      if (shadow) shadow.scale.setScalar(shadowBase * (1 - 0.06 * dentPower));
+
+      drawFx(dt);
+      renderer.render(scene, camera);
+    }
+
+    /* ============================================================
+       Input
+       ============================================================ */
+    function setPointer(e) {
+      const r = stage.getBoundingClientRect();
+      pointer.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+      pointer.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+
+    function probeHit() {
+      if (!modelRoot) return false;
+      raycaster.setFromCamera(pointer, camera);
+      const hits = raycaster.intersectObject(modelRoot, true);
+      if (!hits.length) return false;
+      worldHit.copy(hits[0].point);
+      for (let r = 0; r < records.length; r++) {
+        const rec = records[r];
+        rec.localHit.copy(worldHit);
+        rec.mesh.worldToLocal(rec.localHit);
+      }
+      return true;
+    }
+
+    /* One horizontal pixel is a fixed slice of turn, so the friend tracks your
+       finger exactly. We also remember how fast you were turning, because that
+       is the throw the friend keeps after you let go. Dragging down tips it
+       toward you: the tip springs back upright on release, the yaw does not. */
+    function spinByDrag(x, y) {
+      const dx = x - dragX, dy = y - dragY;
+      dragX = x; dragY = y;
+      if (dx) {
+        const dRad = dx * SPIN_PER_PX;
+        spin += dRad;
+        /* Measure the throw from real elapsed time, not from a guess at the
+           frame rate: a flick has to feel the same on a 120Hz phone as it does
+           on a 60Hz laptop. The average is time-weighted for the same reason. */
+        const now = performance.now();
+        const dtm = Math.max(0.004, Math.min(0.12, (now - lastSpinMoveAt) / 1000));
+        lastSpinMoveAt = now;
+        const v = dRad / dtm;
+        spinVel += (v - spinVel) * (1 - Math.exp(-dtm / 0.045));
+        if (spinVel > 20) spinVel = 20;
+        else if (spinVel < -20) spinVel = -20;
+      }
+      if (dy) tilt = Math.max(-TILT_LIMIT, Math.min(TILT_LIMIT, tilt + dy * TILT_PER_PX));
+    }
+
+    const toastTimer = { id: 0 };
+    function showToast(text) {
+      toastEl.textContent = text;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer.id);
+      toastTimer.id = setTimeout(function () { toastEl.classList.remove('show'); }, 2600);
+    }
+
+    function react(text, x, y) {
+      const el = document.createElement('div');
+      el.className = 'react';
+      el.textContent = text;
+      el.style.left = Math.round(x) + 'px';
+      el.style.top = Math.round(y) + 'px';
+      stage.appendChild(el);
+      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 950);
+    }
+
+    let comboPopTimer = { id: 0 };
+    function setCombo(n) {
+      combo = n;
+      comboEl.innerHTML = 'Combo &times;' + n;
+      comboEl.classList.toggle('hot', n >= 3);
+    }
+    function popCombo(text) {
+      comboPop.textContent = text;
+      comboPop.classList.add('show');
+      clearTimeout(comboPopTimer.id);
+      comboPopTimer.id = setTimeout(function () { comboPop.classList.remove('show'); }, 620);
+    }
+
+    function setEnergy(v) {
+      energy = Math.max(0, Math.min(ENERGY_NEED, v));
+      energyFill.style.width = Math.round((energy / ENERGY_NEED) * 100) + '%';
+      energyEl.classList.toggle('full', energy >= ENERGY_NEED - 0.001);
+    }
+
+    function checkTrophies() {
+      let won = false;
+      TROPHIES.forEach(function (tr) {
+        if (state.trophies.indexOf(tr.id) !== -1) return;
+        if (tr.test(state)) {
+          state.trophies.push(tr.id);
+          showToast(tr.icon + ' Trophy: ' + tr.name);
+          won = true;
+        }
+      });
+      if (won) { playChime(); save(); }
+      renderTrophy();
+    }
+
+    function superSquish() {
+      state.supers++;
+      save();
+      flashEl.classList.add('on');
+      setTimeout(function () { flashEl.classList.remove('on'); }, 90);
+      stage.classList.add('super');
+      setTimeout(function () { stage.classList.remove('super'); }, 650);
+      camShake.amt = 0.16;
+      playFanfare();
+      buzz([24, 40, 24, 40, 60]);
+      popCombo('SUPER SQUISH!');
+      const w = stage.clientWidth, h = stage.clientHeight;
+      spawnBurst(w / 2, h / 2, 70, 1.8);
+      spawnBurst(w * 0.26, h * 0.42, 22, 1.3);
+      spawnBurst(w * 0.74, h * 0.42, 22, 1.3);
+      showToast('💥 SUPER SQUISH! ×' + state.supers);
+      checkTrophies();
+    }
+
+    function countSquish(clientX, clientY) {
+      const now = performance.now();
+      if (now - lastSquishAt <= COMBO_WINDOW) combo = Math.min(combo + 1, 99);
+      else combo = 1;
+      lastSquishAt = now;
+      if (combo > state.maxCombo) state.maxCombo = combo;
+      setCombo(combo);
+
+      state.squishes++;
+      countEl.textContent = String(state.squishes);
+      totalEl.textContent = String(state.squishes);
+
+      setEnergy(energy + combo);
+      if (energy >= ENERGY_NEED) { setEnergy(0); superSquish(); }
+      else if (combo >= 3) popCombo('COMBO ×' + combo);
+
+      if (clientX != null) {
+        const ch = activeChar();
+        react(ch.words[(Math.random() * ch.words.length) | 0], clientX, clientY);
+        spawnBurst(clientX, clientY, 7, 0.85);
+      }
+      hintEl.classList.add('dim');
+      save();
+      checkTrophies();
+    }
+
+    stage.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      /* the sound toggle lives inside the stage — let it keep its own click */
+      if (e.target && e.target.closest && e.target.closest('button')) return;
+      if (!modelRoot) return;
+      lastPointerType = e.pointerType || 'mouse';
+      pointerInside = true;
+      const pt = setPointer(e);
+      if (typeof stage.setPointerCapture === 'function') {
+        try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+      }
+      const ok = probeHit();
+      hitOk = ok;
+      pressing = true;
+      pressArmed = ok;
+      /* any press can also become a turn: we just wait to see it move */
+      dragActive = true;
+      dragX = pt.x; dragY = pt.y;
+      spinVel = 0;
+      lastSpinMoveAt = performance.now();
+      if (ok) {
+        lastSquelchAt = 0;
+        playSquish(1, activeChar().pitch);
+        buzz(lastPointerType === 'mouse' ? 12 : 22);
+        countSquish(pt.x, pt.y);
+      }
+    });
+
+    stage.addEventListener('pointermove', function (e) {
+      if (!modelRoot) return;
+      pointerInside = true;
+      const pt = setPointer(e);
+      if (!pressing) return;
+      if (dragActive) {
+        spinByDrag(pt.x, pt.y);
+        /* the dent is measured against the model's world matrices, so the
+           turn we just applied has to reach them before we raycast */
+        modelRoot.updateMatrixWorld(true);
+      }
+      const ok = probeHit();
+      hitOk = ok;
+      if (!ok) return;                       // dragging off the model keeps the last contact
+      if (pressing && !pressArmed) {         // the press started just off it: arm it now
+        pressArmed = true;
+        lastSquelchAt = 0;
+        playSquish(0.7, activeChar().pitch);
+      }
+      if (pressing && pressArmed) {
+        /* dragging across the surface: a soft squelch now and then */
+        const now = performance.now();
+        if (now - lastSquelchAt > 260) {
+          playSquish(0.5, activeChar().pitch);
+          lastSquelchAt = now;
+          buzz(8);
+        }
+      }
+    });
+
+    function endPress() {
+      if (pressing && pressArmed) playBoing(activeChar().pitch);
+      /* a flick keeps going after you let go, with a little whoosh */
+      if (dragActive && Math.abs(spinVel) > 1.2) {
+        playWhoosh(Math.abs(spinVel) / 16);
+        buzz(10);
+      }
+      pressing = false;
+      pressArmed = false;
+      dragActive = false;
+      /* a touch has no hover state: let go and the friend is left alone */
+      if (lastPointerType !== 'mouse') { pointerInside = false; hitOk = false; }
+    }
+    stage.addEventListener('pointerup', endPress);
+    stage.addEventListener('pointercancel', endPress);
+    window.addEventListener('blur', endPress);
+    stage.addEventListener('pointerleave', function (e) {
+      if (e.pointerType === 'mouse' && !pressing) { pointerInside = false; hitOk = false; }
+    });
+
+    /* keyboard: space or enter gives the friend a good poke */
+    stage.addEventListener('keydown', function (e) {
+      if (e.key === ' ' || e.key === 'Enter' || e.key === 'Spacebar') {
+        e.preventDefault();
+        if (!modelRoot) return;
+        pulse = 1;
+        playSquish(0.9, activeChar().pitch);
+        countSquish(stage.clientWidth / 2, stage.clientHeight * 0.42);
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        /* turn without a pointer: a quarter turn-ish per nudge */
+        e.preventDefault();
+        if (!modelRoot) return;
+        spinVel = 0;
+        spin += (e.key === 'ArrowRight' ? 1 : -1) * 0.24;
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (!modelRoot) return;
+        const d = (e.key === 'ArrowDown' ? 1 : -1) * 0.10;
+        tilt = Math.max(-TILT_LIMIT, Math.min(TILT_LIMIT, tilt + d));
+      }
+    });
+
+    function applyMasterGain() {
+      if (master && actx) {
+        try { master.gain.setTargetAtTime(state.muted ? 0 : 0.5, actx.currentTime, 0.02); } catch (err) {}
+      }
+    }
+
+    muteBtn.addEventListener('click', function () {
+      state.muted = !state.muted;
+      muteBtn.textContent = state.muted ? '🔇 Sound off' : '🔊 Sound on';
+      muteBtn.setAttribute('aria-pressed', state.muted ? 'true' : 'false');
+      if (!state.muted) { audioReady(); applyMasterGain(); playSquish(0.5, activeChar().pitch); }
+      else { applyMasterGain(); }
+      musicSync();                  // the bed obeys the same button as the cues
+      save();
+    });
+
+    surpriseBtn.addEventListener('click', function () {
+      let next = activeIdx;
+      while (next === activeIdx && CHARACTERS.length > 1) next = (Math.random() * CHARACTERS.length) | 0;
+      selectCharacter(next);
+    });
+
+    /* give the current friend a shove, for anyone who would rather click than drag */
+    spinBtn.addEventListener('click', function () {
+      if (!modelRoot) return;
+      /* with motion turned down, turn it in one clean step instead of a glide */
+      if (reducedMotion) { spin += Math.PI; playWhoosh(0.5); return; }
+      spinVel = (Math.random() < 0.5 ? -1 : 1) * (9 + Math.random() * 5);
+      playWhoosh(0.75);
+      spawnBurst(stage.clientWidth / 2, stage.clientHeight * 0.42, 8, 0.7);
+    });
+
+    function showFallback() {
+      stage.textContent = '';
+      const wrap = document.createElement('div');
+      wrap.className = 'fallback';
+      const blob = document.createElement('div');
+      blob.className = 'fallback-blob';
+      blob.title = 'Press me';
+      const msg = document.createElement('p');
+      msg.textContent = 'This browser can’t run WebGL, so here is a hand-made squishy. Press it — it squashes too.';
+      wrap.appendChild(blob);
+      wrap.appendChild(msg);
+      stage.appendChild(wrap);
+      showToast('WebGL unavailable');
+    }
+
+    /* ---------- boot ---------- */
+    /* The bed can only start from a gesture, and the first press anywhere is
+       one: this listener is spent after that first gesture, and the cue sounds
+       keep re-offering it every time they are played. */
+    ['pointerdown', 'keydown'].forEach(function (ev) {
+      window.addEventListener(ev, function () { musicSync(); }, { once: true });
+    });
+    /* a tab nobody is looking at should not keep playing at them */
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) { if (musicEl) { try { musicEl.pause(); } catch (e) {} } }
+      else musicSync();
+    });
+    musicSync();      // an installed PWA may already be allowed to start it
+
+    activeIdx = Math.max(0, CHARACTERS.findIndex(function (c) { return c.id === state.charId; }));
+    muteBtn.textContent = state.muted ? '🔇 Sound off' : '🔊 Sound on';
+    muteBtn.setAttribute('aria-pressed', state.muted ? 'true' : 'false');
+    countEl.textContent = String(state.squishes);
+    totalEl.textContent = String(state.squishes);
+    nowEl.textContent = 'Now squishing: ' + CHARACTERS[activeIdx].name;
+    renderChars();
+    renderTrophy();
+    setCombo(1);
+    setEnergy(0);
+    init();
+
+    /* a tiny debug handle, only when ?debug is in the URL */
+    if (location.search.indexOf('debug') !== -1) {
+      window.__squishy = {
+        select: function (id) {
+          const i = CHARACTERS.findIndex(function (c) { return c.id === id; });
+          if (i >= 0) selectCharacter(i);
+          return i;
+        },
+        state: function () {
+          let verts = 0, maxDisp = 0;
+          for (let r = 0; r < records.length; r++) {
+            const rec = records[r];
+            verts += rec.N;
+            const arr = rec.pos.array;
+            for (let i = 0; i < rec.N; i++) {
+              const i3 = i * 3;
+              const dx = arr[i3] - rec.base[i3], dy = arr[i3 + 1] - rec.base[i3 + 1], dz = arr[i3 + 2] - rec.base[i3 + 2];
+              const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+              if (d > maxDisp) maxDisp = d;
+            }
+          }
+          return {
+            ready: !!modelRoot, active: activeChar().id, records: records.length, verts: verts,
+            rotY: modelRoot ? modelRoot.rotation.y : null,
+            maxDisp: maxDisp, dentPower: dentPower, combo: combo,
+            energy: energy, squishes: state.squishes, supers: state.supers,
+            spin: spin, spinVel: spinVel, tilt: tilt, spun: state.spun, dragActive: dragActive,
+            rotX: modelRoot ? modelRoot.rotation.x : null,
+            trophies: state.trophies.slice(), cache: cache.size
+          };
+        },
+        press: function () {
+          pointer.set(0, 0); pointerInside = true;
+          const ok = probeHit();
+          hitOk = ok; pressing = true; pressArmed = ok;
+          if (ok) { pulse = 1; lastSquelchAt = 0; }
+          return ok;
+        },
+        release: function () { pressing = false; pressArmed = false; pulse = 0; pointerInside = false; hitOk = false; return true; },
+        music: function () {
+          return {
+            wanted: musicWanted, ok: musicOk, muted: state.muted,
+            file: MUSIC_TRACKS[musicIdx < 0 ? 0 : musicIdx], tracks: MUSIC_TRACKS.slice(),
+            src: musicEl ? (musicEl.currentSrc || musicEl.src) : null,
+            volume: musicEl ? musicEl.volume : null,
+            loop: musicEl ? musicEl.loop : null,
+            paused: musicEl ? musicEl.paused : null,
+            time: musicEl ? Math.round(musicEl.currentTime * 100) / 100 : null
+          };
+        }
+      };
+    }
+  
