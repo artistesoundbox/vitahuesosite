@@ -19,9 +19,7 @@ if (!globalThis.document) {
     }),
   };
 }
-const { FBXLoader } = await import(
-  pathToFileURL(new URL('./node_modules/three/examples/jsm/loaders/FBXLoader.js', import.meta.url).pathname).href
-);
+const { FBXLoader } = await import('./node_modules/three/examples/jsm/loaders/FBXLoader.js');
 
 const files = process.argv.slice(2);
 for (const file of files) {
