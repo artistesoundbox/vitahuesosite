@@ -1754,9 +1754,14 @@ async function runCampaign(options) {
         const barrelAt = shape.muzzleAt.clone().applyMatrix4(hand.matrixWorld);
         const standIn = p.position.clone().add(new THREE.Vector3(0, 1.35, 0))
           .add(new THREE.Vector3(Math.sin(G.cameraYaw), 0, Math.cos(G.cameraYaw)).multiplyScalar(0.65));
+        // The tracer is a line laid from the same point: its own start is the mesh's
+        // position, which says whether the round's visible path leaves the barrel too
+        // or only the flash does.
+        const tracer = G.effects.tracers.reduce((best, t) => (t.life > (best ? best.life : 0) ? t : best), null);
         out.rifle.flash = {
           shown: G.effects.muzzleMesh.visible,
           toBarrel: +flashAt.distanceTo(barrelAt).toFixed(3),
+          tracerFromBarrel: tracer ? +tracer.mesh.position.distanceTo(barrelAt).toFixed(3) : null,
           standInOffBarrel: +standIn.distanceTo(barrelAt).toFixed(3),
         };
       } finally {
@@ -1765,7 +1770,10 @@ async function runCampaign(options) {
         Object.assign(p, keptPlayer);
         Object.assign(G, keptGame);
       }
-      out.rifle.flashOk = out.rifle.flash.shown && out.rifle.flash.toBarrel <= FLASH_TO_BARREL;
+      out.rifle.flashOk = out.rifle.flash.shown
+        && out.rifle.flash.toBarrel <= FLASH_TO_BARREL
+        && out.rifle.flash.tracerFromBarrel !== null
+        && out.rifle.flash.tracerFromBarrel <= FLASH_TO_BARREL;
       // The control: the stand-in this replaced has to be named by the same
       // measurement, or the clause would pass on the thing it was written against.
       out.rifle.flashControlNamesIt = out.rifle.flash.standInOffBarrel > FLASH_OFF_BARREL;

@@ -871,6 +871,8 @@ function assess(report) {
         }
         if (cc.rifleOk) {
           const held = Object.entries(cc.rifle.held).map(([state, h]) => `${state} ${h.degOff}\u00b0/${h.inFront} m`).join(', ');
+          findings.push(`his shot leaves the barrel it was measured from: the muzzle flash lands ${cc.rifle.flash.toBarrel} m and the tracer starts `
+            + `${cc.rifle.flash.tracerFromBarrel} m from the rifle's own tip, where the stand-in they replaced sat ${cc.rifle.flash.standInOffBarrel} m away`);
           findings.push(`he is holding his rifle rather than wearing it: in every pose he holds it in its ${cc.rifle.length} m barrel points `
             + `within ${Math.max(...Object.values(cc.rifle.held).map((h) => h.degOff))}\u00b0 of where he faces (${held}) with the magazine under it, `
             + `and the probe names an unrotated rifle at ${cc.rifle.control.degOff}\u00b0 off his aim as the failure it exists for`);
@@ -905,6 +907,23 @@ function assess(report) {
               if (h.inFront < cc.rifle.limits.inFront) why.push(`its muzzle sits ${h.inFront} m from his hand instead of in front of it`);
               if (h.magazineY > cc.rifle.limits.magazineY) why.push('its magazine is not hanging underneath');
               if (why.length) bits.push(`${state}: ${why.join(' and ')}`);
+            }
+            if (!cc.rifle.flashOk) {
+              if (!cc.rifle.flash.shown) bits.push('firing the rifle showed no muzzle flash at all');
+              else {
+                if (cc.rifle.flash.toBarrel > cc.rifle.limits.flashToBarrel) {
+                  bits.push(`the muzzle flash lands ${cc.rifle.flash.toBarrel} m from the rifle's tip instead of on it`);
+                }
+                if (cc.rifle.flash.tracerFromBarrel === null || cc.rifle.flash.tracerFromBarrel > cc.rifle.limits.flashToBarrel) {
+                  bits.push(cc.rifle.flash.tracerFromBarrel === null
+                    ? 'firing the rifle drew no tracer'
+                    : `the tracer starts ${cc.rifle.flash.tracerFromBarrel} m from the rifle's tip instead of at it`);
+                }
+              }
+            }
+            if (!cc.rifle.flashControlNamesIt) {
+              bits.push(`the probe cannot tell the barrel from the stand-in it replaced: that sat only ${cc.rifle.flash.standInOffBarrel} m off the tip, `
+                + `under the ${cc.rifle.limits.flashOffBarrel} m it has to be out by`);
             }
             if (cc.rifle.control && !cc.rifle.control.namesIt) {
               bits.push('the probe cannot even name a rifle left unrotated — the mount it exists for — ' +
@@ -1150,6 +1169,14 @@ function printReport(report, passed) {
         if (cc.rifle.control) {
           console.log(`  control: left as authored the rifle measures ${cc.rifle.control.degOff}\u00b0 off his aim and ${cc.rifle.control.inFront} m in front — `
             + (cc.rifle.control.namesIt ? 'the mount failure would be named' : 'SO IT WOULD NOT BE NAMED'));
+        }
+        if (cc.rifle.flash) {
+          const on = cc.rifle.flash.toBarrel <= (cc.rifle.limits ? cc.rifle.limits.flashToBarrel : 0.15);
+          console.log('');
+          console.log(`  ${pad('where the round leaves', 26)}${cc.rifle.flash.shown ? 'flash fired' : 'NO FLASH'}, ${cc.rifle.flash.toBarrel} m from the rifle's own tip, `
+            + `tracer from ${cc.rifle.flash.tracerFromBarrel === null ? 'NOWHERE' : `${cc.rifle.flash.tracerFromBarrel} m`} — ${on ? 'both on the barrel' : 'NOT ON THE BARREL'}`);
+          console.log(`  ${pad('control', 26)}a point in front of his chest, which is what the flash used to be pinned to, sits `
+            + `${cc.rifle.flash.standInOffBarrel} m off that tip — ${cc.rifle.flashControlNamesIt ? 'so the clause names it' : 'SO IT WOULD NOT BE NAMED'}`);
         }
       }
     }

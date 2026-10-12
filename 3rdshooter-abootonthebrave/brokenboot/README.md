@@ -282,6 +282,25 @@ line while crouching, and 39° is that swing; what the clause has to separate is
 rifle held at his shoulder (7–13° in the clips he shoots from) from the one standing
 upright through his fist (89°).
 
+Holding it is not the same as firing from it, so the audit fires one round and looks
+at where the flash lands. The flash and the tracer's first frame used to hang off a
+point in front of his chest, on the camera's yaw — a place no rifle is ever at, and
+**0.648 m from the barrel** while he aims. They now hang off the rifle's own tip,
+which `socketRifle` measures the same way the size and the mount are measured: the
+vertex the model reaches furthest along its own muzzle direction, so the tip of the
+barrel is read off the geometry instead of offset by a number that fits one rifle.
+The bullet itself is still cast from the camera, because what the crosshair covers
+has to be what it hits, whatever the rifle is doing.
+
+Both are measured, not just the flash: the tracer is a line laid from the same point,
+and its own start is read back off the mesh, so a change that moved one and not the
+other is still caught. The probe's shot is fired at the sky, so nothing it might have
+hit is disturbed, and the ammunition, the timers, the recoil, the shake and the
+camera are all put back afterwards. The measurement reads **0.005 m from the tip for
+both the flash and the tracer** — on the barrel — and its control is that same
+stand-in: it sits 0.649 m off the tip, so the clause would name the failure it was
+written against rather than pass on it.
+
 The probe carries a second control, because a threshold is only worth having if it
 tells the failure from the normal case. An unweighted vertex is bound to bone 0, and
 bone 0 of this rig is `mixamorigHips`, so the audit asks what would have become of

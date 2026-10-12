@@ -414,11 +414,11 @@ export function socketRifle(bone, model, { size, grip, muzzle, magazine }) {
   // own muzzle direction — the tip of the barrel, measured off the model rather
   // than placed by hand, so a different rifle only has to be measured again. The
   // game hangs the muzzle flash and the tracer's first frame on it.
-  const muzzle = new THREE.Object3D();
-  muzzle.name = 'muzzle';
-  muzzle.position.copy(tipAlong(rifle, along));
-  rifle.add(muzzle);
-  return { rifle, muzzle };
+  const tip = new THREE.Object3D();
+  tip.name = 'muzzle';
+  tip.position.copy(tipAlong(rifle, along));
+  rifle.add(tip);
+  return { rifle, muzzle: tip };
 }
 
 /**
