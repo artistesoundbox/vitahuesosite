@@ -32,7 +32,8 @@ npm run test:forest     # fifteen forests, audited without playing: could a wave
                         # recorded spread of the same metrics
 npm run test:forest-record  # the same sweep, recorded as the spread later sweeps
                             # are compared against for having got tighter
-npm run test:character  # audit the officer's own mesh file: weighted, anchored,
+npm run test:character  # audit the officer: weighted, anchored, booted, and drawn
+                        # standing on the ground in every state he can be posed in
                         # and still carrying a boot the tier system can replace
 npm run test:probes     # those mechanic checks and the character audit, one page load
 ```
@@ -192,6 +193,7 @@ failed on. Three things have to hold:
 | skinned vertices carrying no weight at all | none | none, in 4,086 sampled |
 | a mesh bound to one distant bone, weighted 1.0 | 2% of the mesh, 0.6 m off that bone | 0.0% — the body is blended across three or four bones, and the furthest a rigidly bound vertex sits from its own bone is 0.38 m |
 | the officer's own boot, and every part bound to the rig | present, on a foot bone, on the ground, and gone when a tier replaces it; nothing sitting on the ground may be bound to anything but a foot | `Object_3` on `mixamorigRightFoot`, 0.18 m off that bone, bottom at 0.04 m, 0.385 × 0.491 × 0.517 m |
+| where he is actually drawn, in every state he can be posed in | the lowest drawn point must stay inside a −0.15…0.35 m band of the ground | all eight states stand: 0.003–0.02 m |
 
 The last clause is a real socketing rather than a naming: the probe pushes the tier
 credit to the first boot with a model, waits for `silverboot.glb` to arrive on the
@@ -205,7 +207,42 @@ clip scale-tracks the legs, and geometry bound to a bone is only a fixed distanc
 from it in the pose it was authored in, so the numbers are only comparable on the
 figure nothing has posed yet.
 
+The footing clause is the one that watches him *move*, and it exists because a rig
+can be weighted flawlessly and still not be on screen. The clip files carry the
+rig's own travel baked into the root bone, and they are not all authored in the
+units — or for the skeleton — that this mesh wears: the officer's embedded idle
+clip moves the hips in metres while the walk, aim, crouch, jump and kick files move
+them in centimetres. Left on the root, the larger values throw the whole body out of
+the world the moment a state other than idle comes up — a walk that plays metres
+underground, an aim that floats metres overhead — and every other number here stays
+healthy while it happens, because the fight goes on and the officer's recorded
+position never moves. So each state is posed alone and sampled right across its
+cycle, and its lowest drawn vertex is measured against the ground. A blended rig is
+not measured: a crossfade draws a body neither clip poses, and an action left at
+zero weight writes nothing, so the states are silenced one at a time and the one
+being measured is held at full weight.
+
 The probe carries its own control, because a threshold is only worth having if it
+tells the failure from the normal case. The footing measurement has to follow the rig
+it is looking at, so the officer is lifted a metre and the reading has to rise a
+metre with him; a measurement taken against a pose nothing re-skins returns the same
+height whatever the body does, and a pass from it would say nothing.
+
+The same edit that breaks the mesh clauses shows the footing clause failing on its
+own, when the clips are left as they are shipped:
+
+```
+FAIL
+  - the officer's mesh file: walk draws him at -1.523 m; aim draws him at 3.932 m;
+    crouch draws him at -2.681 m; jump draws him at -7.129 m; kick draws him at
+    -0.978 m, outside the -0.15..0.35 m band a standing officer stays in
+```
+
+An officer who walks a metre and a half into the ground and aims four metres up in
+the air is invisible from the camera the game gives the player, and none of the
+campaign's own numbers notice.
+
+The probe carries a second control, because a threshold is only worth having if it
 tells the failure from the normal case. An unweighted vertex is bound to bone 0, and
 bone 0 of this rig is `mixamorigHips`, so the audit asks what would have become of
 the boot it just measured: **64% of the officer's own boot vertices sit more than

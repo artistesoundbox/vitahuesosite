@@ -156,7 +156,8 @@ target) instead of playing the campaign
 the campaign; pass both to run both probes)
   --check-dry      play a whole wave with the officer's ammunition taken away, and
 assert the boot alone can still end it
-  --check-character audit the officer's own mesh file instead: every skinned vertex
+  --check-character audit the officer's own mesh file and how he is drawn instead: where
+                    he stands on the ground in each state, and every skinned vertex
 weighted, nothing welded to a bone it does not sit on, and his own boot still a part
 the tier system can replace. It sockets a tier's boot to prove that last one, so it
 does not combine with --check-forest
@@ -862,6 +863,11 @@ function assess(report) {
           findings.push(`the audit would name the failure it exists for: ${(cc.control.beyondLimitShare * 100).toFixed(1)}% of the officer's own boot vertices sit `
             + `beyond ${cc.control.distanceLimit} m of ${cc.control.boneZero}, which is where an unweighted boot ends up`);
         }
+        if (cc.states) {
+          findings.push(`the officer stands on the ground in every state he is drawn in (${Object.keys(cc.states).length} of them), `
+            + `the lowest drawn point between ${cc.worstSink} m and ${cc.worstFloat} m against a ${cc.stateLimits.sink}..${cc.stateLimits.float} m band`);
+          findings.push(`the footing measurement follows the rig: lifting him a metre raised that floor by ${cc.footingControl.liftedBy} m`);
+        }
       } else {
         const bits = [];
         if (cc.unweightedTotal > 0) {
@@ -888,6 +894,21 @@ function assess(report) {
         if (cc.control && cc.control.measured && !cc.control.wouldNameIt) {
           bits.push(`the audit cannot even name the failure it exists for: only ${(cc.control.beyondLimitShare * 100).toFixed(1)}% of the officer's own boot would land `
             + `beyond ${cc.control.distanceLimit} m of ${cc.control.boneZero} if it were bound there, against a ${(cc.control.weldShareBudget * 100).toFixed(0)}% budget`);
+        }
+        // Where the officer is actually drawn. A clip whose baked travel is left
+        // on the root bone throws the body out of the world the moment he walks,
+        // and nothing else here sees it: the fight plays on and he is simply gone.
+        if (cc.states && !cc.statesOnTheGround) {
+          const off = Object.entries(cc.states)
+            .filter(([, y]) => y < cc.stateLimits.sink || y > cc.stateLimits.float)
+            .map(([state, y]) => `${state} draws him at ${y} m`);
+          bits.push(`${off.join('; ')}, outside the ${cc.stateLimits.sink}..${cc.stateLimits.float} m band a standing officer stays in`);
+        }
+        if (cc.footingControl && !cc.footingControl.pass) {
+          bits.push(`the footing measurement does not follow the rig at all (lifting the officer a metre moved its reading by ${cc.footingControl.liftedBy} m), so its verdict means nothing`);
+        }
+        if (cc.states && cc.statesOnTheGround && cc.states) {
+          findings.push(`the officer stands on the ground in every state he is drawn in: ${Object.entries(cc.states).map(([k, v]) => `${k} ${v} m`).join(', ')}`);
         }
         reasons.push(`the officer's mesh file: ${bits.join('; ') || 'the probe did not pass'}`);
       }
@@ -1072,6 +1093,22 @@ function printReport(report, passed) {
               : 'UNDER THE BUDGET, SO IT WOULD NOT BE NAMED')
           : 'nothing to measure it on: the officer has no own boot left to ask the question of'}`);
       }
+      // Where he is actually drawn, state by state — the reading a player sees at
+      // once and none of the campaign's own numbers can show.
+      if (cc.states) {
+        console.log('');
+        console.log(`  ${pad('state he is drawn in', 26)}${pad('lowest point', 14)}verdict`);
+        for (const [state, y] of Object.entries(cc.states)) {
+          const under = y < cc.stateLimits.sink;
+          const air = y > cc.stateLimits.float;
+          const note = under ? 'UNDER THE GROUND' : air ? 'IN THE AIR' : 'standing';
+          console.log(`  ${pad(state, 26)}${pad(`${y} m`, 14)}${note}`);
+        }
+        console.log(`  band: a standing officer's lowest drawn point stays between ${cc.stateLimits.sink} m and ${cc.stateLimits.float} m`);
+        console.log(`  control: ${cc.footingControl.pass
+          ? `lifting him a metre raised that floor by ${cc.footingControl.liftedBy} m — the measurement follows the rig`
+          : `raising him a metre moved the reading by only ${cc.footingControl.liftedBy} m, so it is not measuring the body at all`}`);
+      }
     }
     if (d) {
       if (c || k || cc) console.log('');
@@ -1131,7 +1168,7 @@ function printReport(report, passed) {
       }
     }
     if (passed.ok) {
-      console.log(`\nPASS — ${[c && 'a press retargets to the attacker nearest the crosshair and a held trigger keeps its target', k && 'the three kicks differ, the scenery they launch settles where it lands, and the impact feels as heavy as the mass it hit', cc && "the officer's own mesh file is fully weighted, nothing is welded to a bone it does not sit on, and a tier's boot sockets over his own — which goes away", d && 'a wave can be won with no ammunition left, by closing and booting', sweep && 'every forest audited is one a wave can actually be fought in'].filter(Boolean).join('; ')}.`);
+      console.log(`\nPASS — ${[c && 'a press retargets to the attacker nearest the crosshair and a held trigger keeps its target', k && 'the three kicks differ, the scenery they launch settles where it lands, and the impact feels as heavy as the mass it hit', cc && "the officer's own mesh file is fully weighted, nothing is welded to a bone it does not sit on, a tier's boot sockets over his own — which goes away — and he is drawn standing on the ground in every state he can be posed in", d && 'a wave can be won with no ammunition left, by closing and booting', sweep && 'every forest audited is one a wave can actually be fought in'].filter(Boolean).join('; ')}.`);
     } else {
       console.log('\nFAIL');
       for (const reason of passed.reasons) console.log(`  - ${reason}`);

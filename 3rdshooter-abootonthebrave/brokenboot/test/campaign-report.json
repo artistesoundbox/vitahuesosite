@@ -1,20 +1,20 @@
 {
   "seed": 20260411,
-  "startedAt": "2026-10-12T04:08:37.276Z",
-  "gameSeconds": 0.56,
+  "startedAt": "2026-10-12T05:47:07.729Z",
+  "gameSeconds": 0.57,
   "steps": 12,
   "waves": [],
   "tiers": [
     {
       "tier": "Silver Boot",
-      "atSeconds": 0.01,
+      "atSeconds": 0.02,
       "credit": 24
     }
   ],
   "banners": [
     {
       "text": "BOOT UPGRADED",
-      "atSeconds": 0.01
+      "atSeconds": 0.02
     }
   ],
   "eliminations": 0,
@@ -57,75 +57,79 @@
   "healthAtEnd": null,
   "damageTaken": 0,
   "instrumented": true,
-  "outcome": "probes-passed",
+  "outcome": "probe-failed",
   "errors": [],
   "characterCheck": {
     "meshes": [
       {
-        "name": "Ch15001",
+        "name": "Ch15",
         "verts": 138891,
         "sampled": 4086,
         "unweighted": 0,
         "single": 1856,
         "far": 0,
         "farShare": 0,
-        "worst": 0.377,
+        "worst": 0.374,
         "worstBone": "mixamorigLeftUpLeg"
       }
     ],
-    "ownBoots": [
-      {
-        "mesh": "Object_3",
-        "bone": "mixamorigRightFoot",
-        "bottom": 0.044,
-        "size": [
-          0.385,
-          0.491,
-          0.517
-        ]
-      }
-    ],
-    "pass": true,
+    "ownBoots": [],
+    "pass": false,
     "unweightedTotal": 0,
-    "weldMesh": "Ch15001",
+    "weldMesh": "Ch15",
     "weldShare": 0,
     "weldBone": "mixamorigLeftUpLeg",
-    "weldDistance": 0.377,
-    "ownBootCount": 1,
-    "ownBootsOnTheGround": true,
-    "parts": [
-      {
-        "mesh": "Object_3",
-        "bone": "mixamorigRightFoot",
-        "metres": 0.184,
-        "bottom": 0.044,
-        "onFoot": true,
-        "atTheGround": true
-      }
-    ],
+    "weldDistance": 0.374,
+    "ownBootCount": 0,
+    "ownBootsOnTheGround": false,
+    "parts": [],
     "misboundParts": [],
     "noMisboundParts": true,
     "tier": "Silver Boot",
     "tierBootSocketed": true,
     "ownBootsHidden": true,
     "control": {
-      "measured": true,
+      "measured": false,
       "boneZero": "mixamorigHips",
-      "bootSampled": 2013,
-      "beyondLimit": 1288,
-      "beyondLimitShare": 0.6398,
+      "bootSampled": 0,
+      "beyondLimit": 0,
+      "beyondLimitShare": 0,
       "distanceLimit": 0.6,
       "weldShareBudget": 0.02,
-      "wouldNameIt": true
+      "wouldNameIt": false
+    },
+    "states": {
+      "idle": 0.013,
+      "walk": 0.019,
+      "aim": 0.013,
+      "crouch": 0.013,
+      "jump": 0.013,
+      "kick": 0.013,
+      "kickHigh": -0.046,
+      "stomp": 0.013
+    },
+    "statesMeasured": 8,
+    "worstSink": -0.046,
+    "worstFloat": 0.019,
+    "stateLimits": {
+      "sink": -0.15,
+      "float": 0.35
+    },
+    "statesOnTheGround": true,
+    "footingControl": {
+      "liftedBy": 1,
+      "pass": true
     },
     "limits": {
       "wrongBoneDistance": 0.6,
       "weldShare": 0.02,
-      "samples": 4000
+      "samples": 4000,
+      "groundSink": -0.15,
+      "groundFloat": 0.35
     }
   },
   "wavesReached": 1,
-  "wallClockSeconds": 3.9,
+  "wallClockSeconds": 6,
   "consoleErrors": [],
   "consoleWarnings": [
     "console.warn: THREE.FBXLoader: %s map is not supported in three.js, skipping texture. ShininessExponent",

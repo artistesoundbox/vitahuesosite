@@ -61,6 +61,144 @@ function takeClip(root) {
 }
 
 /**
+ * Drop a clip's baked root translation.
+ *
+ * Mixamo bakes the rig's own travel into the root bone, and the clip files here
+ * are not all authored in the same units as the mesh that wears them: the
+ * officer's embedded idle clip moves the hips by centimetres' worth of numbers
+ * while the walk, aim, crouch, jump and kick files move them by roughly a
+ * hundred times that. Played on a rig that has already been scaled to metres,
+ * the larger values throw the whole body out of the world — metres underground
+ * while walking, metres into the air while aiming — which reads as a character
+ * who floats and then vanishes off screen.
+ *
+ * The game drives every character's position itself, from its own velocity and
+ * gravity, so the root's translation is not wanted from any clip: only the
+ * rotations that pose the body are kept. Translation tracks on the other bones
+ * are bind offsets rather than motion and are left alone.
+ */
+function stripRootMotion(clip, rootBoneName, modelNodeNames) {
+  if (!clip || !clip.tracks) return clip;
+  clip.tracks = clip.tracks.filter((track) => {
+    if (!track.name.endsWith('.position')) return true;
+    const node = track.name.slice(0, -'.position'.length);
+    // The skeleton's own root bone, and the top-level object it hangs off (the
+    // armature), are the two nodes that carry a clip's travel.
+    if (node === rootBoneName) return false;
+    return !modelNodeNames.has(node);
+  });
+  return clip;
+}
+
+/**
+ * Stand every clip on the rig's own rest pose.
+ *
+ * With the root's travel gone a clip poses the body from the rig's rest
+ * position, but the clip files were not written for this skeleton: the walk,
+ * crouch, kick and jump files are crouched firing poses authored for a rig of
+ * slightly different proportions, so on this officer their leg angles leave his
+ * feet most of a metre off the ground. Each clip is therefore measured against
+ * the mesh's own rest pose — how far its lowest foot bone sits from where this
+ * rig's foot rests — and the root bone is pinned to a constant that closes that
+ * gap. The officer is then standing where the game says he is in every state,
+ * whatever the clip was drawn for.
+ */
+function anchorClipsToGround(root, clips, rootBoneName) {
+  let rootBone = null;
+  const skinned = [];
+  root.traverse((o) => {
+    if (!rootBone && o.isBone && o.name === rootBoneName) rootBone = o;
+    if (o.isSkinnedMesh) skinned.push(o);
+  });
+  if (!rootBone || !skinned.length) return;
+
+  const at = new THREE.Vector3();
+  // The lowest point of the body as it is actually drawn, which is what a player
+  // reads as standing on the ground or not. Bones alone would be fooled by a
+  // clip whose ankle sits high while the boot it carries does not.
+  const lowestPoint = () => {
+    root.updateMatrixWorld(true);
+    let low = Infinity;
+    for (const mesh of skinned) {
+      const pos = mesh.geometry.attributes.position;
+      const step = Math.max(1, Math.floor(pos.count / 400));
+      for (let v = 0; v < pos.count; v += step) {
+        mesh.getVertexPosition(v, at);
+        at.applyMatrix4(mesh.matrixWorld);
+        if (at.y < low) low = at.y;
+      }
+    }
+    return low;
+  };
+
+  const mixer = new THREE.AnimationMixer(root);
+  /**
+   * The lowest the body ever gets across a whole clip. A clip's authored first
+   * frame is often a pose outside its cycle — the walk file opens with a stride
+   * that stands most of a metre above every other frame of it — so anchoring on
+   * one frame would judge the clip by its exception.
+   */
+  const clipFloor = (clip) => {
+    if (!clip || !clip.tracks) return Infinity;
+    const action = mixer.clipAction(clip);
+    action.play();
+    let low = Infinity;
+    const steps = 12;
+    for (let i = 0; i < steps; i++) {
+      mixer.setTime((clip.duration * i) / steps);
+      const y = lowestPoint();
+      if (y < low) low = y;
+    }
+    action.stop();
+    return low;
+  };
+
+  const rest = rootBone.position.clone();
+  // The idle clip is the pose the character is meant to stand in, so its floor
+  // is the height every other clip is measured against.
+  const reference = clips.idle || Object.values(clips)[0];
+  const standing = clipFloor(reference);
+  if (!Number.isFinite(standing)) {
+    rootBone.position.copy(rest);
+    lowestPoint();
+    return;
+  }
+
+  // A height in the world has to be carried into the root bone's own axes: this
+  // rig does not put the world's up on the bone's Y, so a correction written on
+  // the wrong axis slides the officer sideways instead of setting him down.
+  const toLocal = new THREE.Matrix3();
+  if (rootBone.parent) {
+    rootBone.parent.updateWorldMatrix(true, false);
+    toLocal.setFromMatrix4(rootBone.parent.matrixWorld).invert();
+  } else {
+    toLocal.identity();
+  }
+
+  for (const clip of Object.values(clips)) {
+    if (!clip || !clip.tracks) continue;
+    // Positive means the clip sinks below the standing pose, which is the clip's
+    // own business; only a clip left standing in the air is corrected.
+    const lift = standing - clipFloor(clip);
+    rootBone.position.copy(rest);
+    lowestPoint();
+    if (!Number.isFinite(lift) || lift > -0.01) continue;
+    const pinned = rest.clone().add(new THREE.Vector3(0, lift, 0).applyMatrix3(toLocal));
+    clip.tracks = clip.tracks.filter((t) => t.name !== `${rootBoneName}.position`);
+    clip.tracks.push(new THREE.VectorKeyframeTrack(
+      `${rootBoneName}.position`,
+      [0, clip.duration],
+      [pinned.x, pinned.y, pinned.z, pinned.x, pinned.y, pinned.z],
+    ));
+  }
+
+  mixer.stopAllAction();
+  mixer.uncacheRoot(root);
+  rootBone.position.copy(rest);
+  lowestPoint();
+}
+
+/**
  * Load a character mesh together with its named animation clips.
  * Clips are keyed by the state name used by the animation controller,
  * because Mixamo bakes every clip with the same internal name.
@@ -84,7 +222,18 @@ export async function buildCharacter({ meshUrl, clipUrls = {}, targetHeight, onP
     }
   }
 
+  // The root bone and the top-level objects of this file name the nodes that
+  // carry a clip's travel; every clip is measured against them before it is
+  // handed on.
+  let rootBoneName = null;
+  root.traverse((o) => {
+    if (!rootBoneName && o.isBone && !(o.parent && o.parent.isBone)) rootBoneName = o.name;
+  });
+  const modelNodeNames = new Set(root.children.map((c) => c.name));
+  for (const clip of Object.values(clips)) stripRootMotion(clip, rootBoneName, modelNodeNames);
+
   normalizeCharacter(root, targetHeight);
+  anchorClipsToGround(root, clips, rootBoneName);
 
   return {
     root,

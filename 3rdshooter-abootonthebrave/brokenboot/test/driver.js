@@ -1481,10 +1481,116 @@ async function runCampaign(options) {
       };
     }
 
+    // ------------------------------------------------- the officer's footing
+    // A clip can weight every vertex perfectly, sit on the right bone and still
+    // put the officer somewhere he is not: the clip files bake the rig's own
+    // travel, and they are not all authored in the units — or for the skeleton —
+    // that this mesh wears. A walk file written for a rig a hundred times taller
+    // throws the whole body metres into the air the moment he moves, and a kick
+    // file written for a crouched rig leaves his feet hanging. None of it shows in
+    // the campaign's own numbers: the fight plays on, the officer's recorded
+    // position never moves, and the only symptom is that the player cannot see
+    // him. So every state he can be drawn in gets measured against the ground.
+    //
+    // The lowest drawn vertex is what is measured, not a bone: a boot's underside
+    // is what a player reads as standing, and it can sit a long way from the ankle
+    // bone carrying it. Each state is sampled right across its cycle, because a
+    // clip's authored first frame is often a pose outside that cycle.
+    const GROUND_SINK = -0.15;   // how far below the ground a state may reach
+    const GROUND_FLOAT = 0.35;   // and how far above it
+    const STATE_SAMPLES = 12;
+    const drawn = [];
+    p.model.traverse((o) => { if (o.isSkinnedMesh) drawn.push(o); });
+    const at = new THREE.Vector3();
+    const lowestDrawn = () => {
+      p.model.updateMatrixWorld(true);
+      let low = Infinity;
+      for (const mesh of drawn) {
+        const pos = mesh.geometry.attributes.position;
+        const step = Math.max(1, Math.floor(pos.count / 400));
+        for (let v = 0; v < pos.count; v += step) {
+          mesh.getVertexPosition(v, at);
+          at.applyMatrix4(mesh.matrixWorld);
+          if (at.y < low) low = at.y;
+        }
+      }
+      return low;
+    };
+
+    // Each state is posed alone. A crossfade blends two clips into a body neither
+    // one draws, and an action left at zero weight writes nothing at all, so the
+    // rig would be measured in the pose the last state happened to leave it in —
+    // both of which report a height no clip is responsible for.
+    const holdOne = (key) => {
+      for (const [other, action] of Object.entries(p.anim.actions)) {
+        action.stopFading();
+        action.enabled = other === key;
+        action.setEffectiveWeight(other === key ? 1 : 0);
+      }
+      const held = p.anim.actions[key];
+      held.reset();
+      held.setEffectiveWeight(1);
+      held.play();
+      p.anim.name = key;
+      return held.getClip();
+    };
+
+    out.states = {};
+    for (const key of Object.keys(p.anim.actions)) {
+      const clip = holdOne(key);
+      let low = Infinity;
+      for (let i = 0; i < STATE_SAMPLES; i++) {
+        p.anim.mixer.setTime((clip.duration * i) / STATE_SAMPLES);
+        const y = lowestDrawn();
+        if (y < low) low = y;
+      }
+      out.states[key] = +low.toFixed(3);
+    }
+    const floors = Object.values(out.states);
+    out.statesMeasured = floors.length;
+    out.worstSink = floors.length ? +Math.min(...floors).toFixed(3) : 0;
+    out.worstFloat = floors.length ? +Math.max(...floors).toFixed(3) : 0;
+    out.stateLimits = { sink: GROUND_SINK, float: GROUND_FLOAT };
+    out.statesOnTheGround = floors.length > 0
+      && floors.every((y) => y >= GROUND_SINK && y <= GROUND_FLOAT);
+
+    // The control: the measurement has to follow the rig it is looking at. Lifting
+    // the officer a metre must raise the floor by a metre. A measurement taken
+    // against a pose that is never re-skinned — the trap this clause was written
+    // after — returns the same height whatever the body does, and a pass from it
+    // would say nothing at all.
+    holdOne('idle');
+    p.anim.mixer.setTime(0);
+    const beforeLift = lowestDrawn();
+    const restingY = p.model.position.y;
+    p.model.position.y = restingY + 1;
+    const liftedBy = lowestDrawn() - beforeLift;
+    p.model.position.y = restingY;
+    lowestDrawn();
+    out.footingControl = {
+      liftedBy: +liftedBy.toFixed(3),
+      pass: Math.abs(liftedBy - 1) < 0.05,
+    };
+    // Left as he was found: every action usable again, and the officer standing
+    // in his idle, so later probes move him themselves rather than inheriting
+    // whichever clip this clause happened to stop on.
+    for (const action of Object.values(p.anim.actions)) {
+      action.stopFading();
+      action.enabled = true;
+      action.setEffectiveWeight(0);
+    }
+    if (p.anim.actions.idle) {
+      holdOne('idle');
+      for (let i = 0; i < 4; i++) p.anim.mixer.update(1 / 60);
+    }
+    lowestDrawn();
+
     out.limits = {
       wrongBoneDistance: WRONG_BONE_DISTANCE,
       weldShare: WELD_SHARE_LIMIT,
       samples: SAMPLES,
+      groundSink: GROUND_SINK,
+      groundFloat: GROUND_FLOAT,
     };
     out.pass = out.unweightedTotal === 0
       && out.weldShare <= WELD_SHARE_LIMIT
@@ -1493,7 +1599,9 @@ async function runCampaign(options) {
       && out.ownBootsOnTheGround
       && out.ownBootsHidden
       && out.tierBootSocketed
-      && (!out.control.measured || out.control.wouldNameIt);
+      && (!out.control.measured || out.control.wouldNameIt)
+      && out.statesOnTheGround
+      && out.footingControl.pass;
     return out;
   }
 
