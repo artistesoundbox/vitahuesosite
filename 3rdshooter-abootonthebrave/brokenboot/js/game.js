@@ -27,6 +27,13 @@ const LOAD_WEIGHTS = {
 const LOAD_TOTAL = Object.values(LOAD_WEIGHTS).reduce((a, b) => a + b, 0);
 
 const MUSIC = ['A Broken Boot On The Brave1.mp3', 'A Broken Boot On The Brave 2.mp3'];
+// The boot's own recorded sounds, beside the music in the asset folder: the yelp of
+// whoever it meets (two takes, so no two kicks land alike) and the swing itself.
+const BOOT_SOUNDS = {
+  ouch: 'ouch.mp3',
+  oua: 'oua.mp3',
+  bsh: 'bsh.mp3',
+};
 const TAGLINES = [
   'One Man. One Forest. One Broken Boot.',
   "I'm Not Trapped Here With You. You're Trapped Here With Me.",
@@ -110,6 +117,12 @@ export class Game {
     this.sceneryKicked = 0;
     this.carsKicked = 0;
     this.kicksTaught = new Set();
+    // Notes that have been shown once: anything the game teaches when it first happens
+    // rather than explaining up front lives here, and a hint repeated every time it is
+    // triggered is only noise. `sweepAsked` is the pad's own sweep button, remembered
+    // from the press to the connect a third of a second later.
+    this.taught = new Set();
+    this.sweepAsked = false;
     // Every elimination this match, boot or bullet. It is counted from zero: it used
     // to be undefined until the first one, which made it NaN from then on.
     this.enemiesKilledTotal = 0;
@@ -194,6 +207,9 @@ export class Game {
     this.timer.update();
     this.timer.getDelta(); // discard the loading-time delta
     this.audio.playMusic(MUSIC.map((track) => `${ASSET_BASE}${track}`));
+    // Fetched while the first wave is already under way; until they land the boot
+    // keeps its synthesised voice.
+    this.audio.loadSamples(Object.entries(BOOT_SOUNDS).map(([name, file]) => [name, `${ASSET_BASE}${file}`]));
     this.startWave(1);
     // Pose the officer and put the camera behind him before the first frame the
     // player sees. Without mouse capture the world is paused, and a paused frame
@@ -266,8 +282,9 @@ export class Game {
     for (const action of manager.takeActions()) {
       if (action === 'kick') this.player.melee();
       // The pad's own sweep button: the low sweep from wherever the officer is, so the
-      // crouched kick does not cost a crouch first.
-      else if (action === 'sweep') this.player.melee('sweep');
+      // crouched kick does not cost a crouch first. Recorded only if the kick really
+      // started, and read back when it connects (see resolveMelee).
+      else if (action === 'sweep') this.sweepAsked = this.player.melee('sweep');
       else if (action === 'jump') this.player.jump();
       else if (action === 'reload') this.player.beginReload();
       else if (action === 'crouch') this.player.toggleCrouch();
@@ -282,6 +299,19 @@ export class Game {
   toggleMute() {
     this.audio.setMuted(!this.audio.muted);
     this.hud.toast('Audio', this.audio.muted ? 'Muted' : 'Unmuted');
+  }
+
+  /**
+   * Say something once, the first time the thing it explains happens. Returns
+   * whether it was shown, so the caller can let one note stand in for another — the
+   * sweep's button note already names the crouched route, and there is no sense in
+   * toasting both at once.
+   */
+  teach(key, title, sub) {
+    if (this.taught.has(key)) return false;
+    this.taught.add(key);
+    this.hud.toast(title, sub);
+    return true;
   }
 
   // ----------------------------------------------------------------- waves
@@ -435,6 +465,10 @@ export class Game {
     // it: a body crossing three metres in a third of a second reads as a glitch.
     this.slowMotion(SETTINGS.fatalitySlowmo);
     this.hud.showBanner('FATALITY', enemy.elite ? 'ELITE HEADSHOT' : 'HEADSHOT', 1.2);
+    // Explained the first time it happens, because a player who has read the banner
+    // still does not know what decided it — the finishing round, not the aim.
+    this.teach('fatality', 'HEADSHOT FINISHER',
+      'The round that finishes them through the head throws the body; anything else folds them where they stand');
   }
 
   /**
@@ -658,15 +692,22 @@ export class Game {
     }
 
     // The three kicks are contextual, so each one is introduced the first time
-    // it is thrown rather than explained up front.
+    // it is thrown rather than explained up front. The pad's own sweep button is the
+    // one input the stance does not imply, so it gets a note of its own — and that
+    // note names the crouched route, which is why the kick's hint is not stacked on
+    // top of it when the button is what threw the first sweep.
+    const sweepByButton = this.sweepAsked && type === 'sweep';
+    this.sweepAsked = false;
+    const buttonNote = sweepByButton && this.teach('sweep-button', 'X \u2014 LOW SWEEP',
+      'Low and wide from wherever you stand; crouch and kick does the same');
     if (!this.kicksTaught.has(type)) {
       this.kicksTaught.add(type);
       const hint = {
-        sweep: 'Crouch and kick (or X on a pad): low, wide, and it takes the legs out',
+        sweep: 'Crouch and kick, or X: low, wide, and it takes the legs out',
         high: 'Kick from the air: the longest reach and the hardest landing',
         stomp: 'The boot is heavy enough to stomp: everything around, at once',
       }[type];
-      if (hint) this.hud.toast(kick.name.toUpperCase(), hint);
+      if (hint && !buttonNote) this.hud.toast(kick.name.toUpperCase(), hint);
     }
 
     // The impact itself, as the camera feels it. What the boot met decides how
@@ -691,6 +732,7 @@ export class Game {
     } else {
       this.audio.kick();
     }
+    this.audio.bootSwing();
     if (routed > 0) {
       this.hud.showBanner(
         charged ? `${boot.name.toUpperCase()}` : 'THE BOOT',

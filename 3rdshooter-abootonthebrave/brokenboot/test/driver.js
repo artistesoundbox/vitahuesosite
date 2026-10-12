@@ -232,6 +232,14 @@ async function runCampaign(options) {
     const savedRate = SETTINGS.lockRate;
     const savedEnemies = G.enemyManager.enemies;
     const lt = pad.buttons[6];
+    const p = G.player;
+    // The officer is held where the probe found him and kept on his feet. He is the
+    // eye every angle here is measured from, and the page keeps playing underneath
+    // the harness: an officer killed by the wave while the probes run loses his lock
+    // — one run in three did exactly that, which is a report that depends on the
+    // wall clock rather than on the rule being measured.
+    const officerAt = p.object.position.clone();
+    const savedOfficer = { maxHealth: p.maxHealth, health: p.health, alive: p.alive };
     // Far enough out that swinging the view moves the aim far more than it
     // slides the over-the-shoulder camera: at 6 m the parallax from the eye
     // moving sideways was the same size as the swing being tested.
@@ -239,6 +247,10 @@ async function runCampaign(options) {
 
     // One of the frame's real stages, in the order update() runs them.
     const frame = () => {
+      p.alive = true;
+      p.health = p.maxHealth;
+      p.object.position.copy(officerAt);
+      p.object.updateMatrixWorld(true);
       G.inputManager.update(FRAME);
       G.applyInput(FRAME);
       G.updateTargetLock(FRAME);
@@ -370,6 +382,9 @@ async function runCampaign(options) {
       G.lock = null;
       G.targetingHeld = false;
       setMove(0, 0, false);
+      Object.assign(p, savedOfficer);
+      p.object.position.copy(officerAt);
+      p.object.updateMatrixWorld(true);
     }
   }
 
@@ -762,6 +777,46 @@ async function runCampaign(options) {
       out.selection.padKickControl = throws(() => pressPad(0));
       endSwing();
 
+      // 6. And the button explains itself once. The kick only connects a third of a
+      //    second after the press, so the note has to survive that gap and then never
+      //    come back: the same press again has to say nothing at all, which is the
+      //    control — a clause asserting only that a note appeared would pass on a game
+      //    that repeats it every kick.
+      const savedTaught = new Set(G.taught);
+      const savedKickHints = new Set(G.kicksTaught);
+      const seen = [];
+      const origToast = G.hud.toast.bind(G.hud);
+      G.hud.toast = (title, desc) => { seen.push(`${title} | ${desc || ''}`); return origToast(title, desc); };
+      const wind = (forget) => {
+        standing();
+        G.sweepAsked = false;
+        if (forget) G.taught.delete('sweep-button');
+        seen.length = 0;
+      };
+      const connect = () => {
+        pressPad(2);
+        for (let i = 0; i < 40; i++) G.step(1 / 60);   // to the connect, where the note lives
+      };
+      try {
+        wind(true);
+        connect();
+        out.selection.sweepNote = seen.find((t) => /sweep/i.test(t)) || null;
+        out.selection.sweepNotesShown = seen.length;
+
+        // The flag stays set for this one: the same press again has to say nothing.
+        wind(false);
+        connect();
+        out.selection.sweepNoteAgain = seen.find((t) => /sweep/i.test(t)) || null;
+      } finally {
+        G.hud.toast = origToast;
+        G.taught.clear();
+        for (const key of savedTaught) G.taught.add(key);
+        G.kicksTaught.clear();
+        for (const key of savedKickHints) G.kicksTaught.add(key);
+        G.sweepAsked = false;
+        endSwing();
+      }
+
       const f = out.feel;
       f.bodyMass = SETTINGS.bodyMass;
       f.bootColour = p.boot.color;
@@ -780,6 +835,9 @@ async function runCampaign(options) {
         && out.selection.padSweep === 'sweep'
         && out.selection.keySweep === 'sweep'
         && out.selection.padKickControl === 'kick'
+        // The sweep's button explains itself once, and only once.
+        && Boolean(out.selection.sweepNote)
+        && out.selection.sweepNoteAgain === null
         && out.profilesDiffer
         && out.scenery.speedAfterKick > 1
         && out.scenery.movedMeters > 1
@@ -933,6 +991,8 @@ async function runCampaign(options) {
       spawnFrames: 1800,    // frames to wait for an attacker if the field is empty
       followSeconds: 3,     // how long the corpse's own motion is followed
       launchFrames: 6,      // the first frames of the flight, read as the launch
+      roomMin: 0,           // m of clearance the body needs where it dies (0 = not embedded)
+      roomComfortable: 0.4, // m of clearance the report calls an open spot
       travelMin: 1.5,       // m a thrown body has to travel before it lands
       peakMin: 0.25,        // m it has to rise off the ground on the way
       tumbleMin: 45,        // degrees it has to turn over by the time it lands
@@ -1014,18 +1074,59 @@ async function runCampaign(options) {
         const hit = G.castBullet(eye(), G.camera.getWorldDirection(new THREE.Vector3()), SETTINGS.bulletRange);
         return Boolean(hit && hit.enemy === subject && hit.part === part);
       };
-      /** The heading the officer was standing on, or null if none of them is clear. */
+      /**
+       * How much room the throw has on this heading, in metres: the clearance of the
+       * body's own collision radius from every trunk and prop between where it dies and
+       * where it lands.
+       *
+       * A clear line is not enough. A body that dies inside a trunk's collision circle
+       * is shoved sideways by `resolveCircle` on its very first frame, so the throw then
+       * measures the tree it was standing in: this clause first failed at 27° off the
+       * shot within a tenth of a second, which is not something a body in the air can
+       * do on its own.
+       */
+      const bodyRadius = 0.5;         // what a corpse is pushed out of the world with
+      /** Room to fall, from where the body dies to where it lands, in metres. */
+      const roomToThrow = (yaw) => {
+        let worst = Infinity;
+        for (let d = 0; d <= 3.4; d += 0.5) {
+          const at = new THREE.Vector3(p.position.x, 0, p.position.z)
+            .addScaledVector(forward(yaw), LIMITS.distance + d);
+          for (const c of G.world.cylinders) {
+            worst = Math.min(worst, Math.hypot(at.x - c.x, at.z - c.z) - c.r);
+          }
+          for (const b of G.world.boxes) {
+            const dx = Math.max(b.min.x - at.x, 0, at.x - b.max.x);
+            const dz = Math.max(b.min.z - at.z, 0, at.z - b.max.z);
+            worst = Math.min(worst, Math.hypot(dx, dz));
+          }
+        }
+        return worst;
+      };
+
+      /**
+       * The heading the officer was standing on: whichever of them has lines to both
+       * parts and the most room to fall. Not a heading that is merely *good enough* — the
+       * forest is not built for this probe, and the roomiest of a bad lot is the one
+       * whose measurements are about the throw rather than about the nearest trunk.
+       */
       const findSpot = () => {
         const from = G.cameraYaw;
+        let best = null;
         for (let i = 0; i < 120; i++) {
           const yaw = from + (i * Math.PI) / 60 - Math.PI / 2;
-          if (reaches(yaw, 'head') && reaches(yaw, 'body')) return { yaw };
+          if (!reaches(yaw, 'head') || !reaches(yaw, 'body')) continue;
+          const room = roomToThrow(yaw);
+          if (!best || room > best.room) best = { yaw, room };
         }
-        return null;
+        if (best) { best.room = +(best.room - bodyRadius).toFixed(2); }
+        return best;
       };
       let spot = findSpot();
       if (!spot) { out.detail = 'no heading with a clear line to both the head and the chest'; return out; }
       out.headingOffsetRadians = +(spot.yaw - G.cameraYaw).toFixed(2);
+      out.roomToThrow = spot.room;
+      out.roomFound = spot.room >= LIMITS.roomComfortable;
 
       // He is held in one place for the whole measurement: an attacker walking in
       // would move the death point, and the travel is measured from that.
@@ -1064,6 +1165,17 @@ async function runCampaign(options) {
        */
       const half = (aim) => {
         const tried = [];
+        // Watched out here rather than inside one attempt: the note is shown by the
+        // downing itself, and the half has to be able to say whether it was shown at
+        // all (the fatality) or not (the chest), whichever attempt finished them.
+        const notes = [];
+        const origToast = G.hud.toast.bind(G.hud);
+        G.hud.toast = (title, desc) => { notes.push(`${title} | ${desc || ''}`); return origToast(title, desc); };
+        const savedTaught = new Set(G.taught);
+        // Cleared so this probe watches the note happen rather than inheriting it from
+        // whatever the page was doing before, and put back at the end.
+        G.taught.delete('fatality');
+        try {
         for (let attempt = 1; attempt <= LIMITS.attempts; attempt++) {
           // The officer is re-pinned and the sightline re-checked: an attempt that
           // starts with a crate on the line would only ever measure the crate.
@@ -1207,9 +1319,15 @@ async function runCampaign(options) {
           return {
             attempts: attempt,
             shots,
+            noteShown: notes.find((t) => /head|finish|fatality/i.test(t)) || null,
+            notesShownAtDowning: notes.slice(),
             secondsToDown: +(frames * FRAME).toFixed(2),
             downingRound: downingPart,
             threwTheBody: thrown,
+            // Read again here rather than trusted from the spot found before the first
+            // attempt: the officer is re-pinned every time, so the ground the body will
+            // fall through is this attempt's.
+            roomToThrow: spot.room,
             travelledMetres: +travel.toFixed(2),
             roseMetres: +peak.toFixed(2),
             launchSpeed,
@@ -1235,6 +1353,11 @@ async function runCampaign(options) {
           };
         }
         return { note: `no ${aim} finishing round in ${LIMITS.attempts} attempts`, tried };
+        } finally {
+          G.hud.toast = origToast;
+          G.taught.clear();
+          for (const key of savedTaught) G.taught.add(key);
+        }
       };
 
       out.head = half('head');
@@ -1286,6 +1409,13 @@ async function runCampaign(options) {
       && head.decalSmearedOff !== null && head.decalSmearedOff <= LIMITS.decalSmeared
       && head.decalOnGround <= 0.05 && head.decalLifeLeft > 0
       && control.slowSeconds === 0 && control.decalsLeft === 0
+      // The fatality explains itself the first time it happens, and the chest downing
+      // — which is the same downing with the same accounting — does not.
+      && Boolean(head.noteShown)
+      && control.noteShown === null
+      // And the body was not set down inside a trunk, where the world's own collision
+      // would push it sideways and the angles above would be the forest's.
+      && head.roomToThrow >= LIMITS.roomMin
       && out.sameCredit && head.creditPaid === SETTINGS.bulletKillWeight
       && head.eliminations === 1 && control.eliminations === 1
       && /FATALITY/.test(head.banner) && !/FATALITY/.test(control.banner));

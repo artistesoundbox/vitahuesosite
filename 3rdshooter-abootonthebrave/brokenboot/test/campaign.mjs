@@ -841,6 +841,8 @@ function assess(report) {
       if (k.selection.padSweep !== 'sweep') bits.push(`the pad's sweep button throws ${k.selection.padSweep} from a standing start`);
       if (k.selection.keySweep !== 'sweep') bits.push(`X on the keyboard throws ${k.selection.keySweep} from a standing start`);
       if (k.selection.padKickControl !== 'kick') bits.push(`the control failed: the pad's kick button threw ${k.selection.padKickControl} instead of the standing kick`);
+      if (!k.selection.sweepNote) bits.push('the sweep\'s own button never explained itself');
+      if (k.selection.sweepNoteAgain) bits.push(`the sweep button's note came back on the next press: "${k.selection.sweepNoteAgain}"`);
       if (!k.profilesDiffer) bits.push('the three kicks do not differ in reach, arc and power');
       if (!(k.scenery.movedMeters > 1)) bits.push(`the kicked ${k.scenery.kind} moved only ${k.scenery.movedMeters}m`);
       if (!k.scenery.tumbled) bits.push(`the kicked ${k.scenery.kind} never tumbled`);
@@ -877,6 +879,9 @@ function assess(report) {
         if (!sw.went) bits.push('the swish was still on screen after the swing had finished');
         if (!sw.reusedBuffer) bits.push('every kick builds itself a new ribbon');
         if (!(sw.offChest > 0.1)) bits.push('the chest control sits on the boot, so the clause would not name it');
+        if (k.selection.sweepNote && !k.selection.sweepNoteAgain) {
+          findings.push(`the sweep's own button explains itself once through the real pad: "${k.selection.sweepNote}", and the same press again says nothing`);
+        }
         if (sw.typesThrown && sw.shapesOrdered && sw.went && sw.reusedBuffer) {
           findings.push('every kick draws its own swing from the foot it was thrown with: '
             + Object.entries(sw.profiles).map(([t, r]) => `${t} ${r.samples} points over ${r.spread} m, ${r.width} m of stroke`).join('; ')
@@ -1075,13 +1080,18 @@ function assess(report) {
             if (h.decalOnGround === null || h.decalOnGround > 0.05) bits.push(`the stain sits at ${h.decalOnGround} m, not on the grass`);
             if (!(h.decalLifeLeft > 0)) bits.push('the stain was gone the moment it was drawn');
           }
+          if (!(h.roomToThrow >= fc.limits.roomMin)) {
+            bits.push(`the body was set down with ${h.roomToThrow} m of room to fall, so the world's own collision pushed it and the angles above are the forest's, not the throw's`);
+          }
           if (!/FATALITY/.test(h.banner)) bits.push(`the head downing announced "${h.banner}" rather than a FATALITY`);
+          if (!h.noteShown) bits.push(`the fatality never explained itself (the HUD said ${JSON.stringify(h.notesShownAtDowning)})`);
         } else {
           if (h.threwTheBody) bits.push('a finishing round through the chest threw the body too');
           if (!(h.travelledMetres <= fc.limits.stillMax)) {
             bits.push(`a chest downing moved the body ${h.travelledMetres} m, so the measurement does not name the throw`);
           }
           if (/FATALITY/.test(h.banner)) bits.push('a chest downing was announced as a FATALITY');
+          if (h.noteShown) bits.push(`a chest downing explained the fatality: "${h.noteShown}"`);
           if (h.slowSeconds > 0) bits.push('a chest downing slowed the world down');
           if (h.decalsLeft !== 0) bits.push(`a chest downing left ${h.decalsLeft} stain(s) on the grass`);
         }
@@ -1101,7 +1111,7 @@ function assess(report) {
       const h = fcPass.head;
       findings.push(`a finishing round through the head throws the body: it rose ${h.roseMetres} m, travelled `
         + `${h.travelledMetres} m from where it died and turned over ${h.turnedDegrees}°, ${h.offShotDegrees}° off the shot that sent it `
-        + `(landing facing the way the round was going)`);
+        + `(landing facing the way the round was going), measured with ${h.roomToThrow} m of clear ground for it to fall through`);
       findings.push(`a finishing round through the chest does not: the same measurement on the same attacker in the same place `
         + `moved the body ${fcPass.control.travelledMetres} m and announced "${fcPass.control.banner}", which is what names the throw `
         + `as the thing measured rather than the death`);
@@ -1111,6 +1121,7 @@ function assess(report) {
         + `and hands itself back at full speed when the window runs out (\u00d7${h.slowScaleAfter})`);
       findings.push(`it leaves its mark where it lands: one stain ${h.decalOffLanding} m from the landing point, on the grass at ${h.decalOnGround} m, `
         + `smeared ${h.decalSmearedOff}\u00b0 off the way the body was still travelling, with ${h.decalLifeLeft}s of it left to fade`);
+      findings.push(`the fatality explains itself the first time: "${h.noteShown}" once, and nothing of the sort on the chest downing that follows`);
       findings.push(`the flung body is not cover: the cast that finds a living attacker on that line finds only the ground where this one is lying`);
     }
     if (report.failedRequests?.length) reasons.push(`${report.failedRequests.length} failed request(s): ${report.failedRequests[0]}`);
@@ -1240,6 +1251,8 @@ function printReport(report, passed) {
       console.log(`  ${pad('pad X', 22)}${pad(k.selection.padSweep, 12)}${k.selection.padSweep === 'sweep' ? 'the low sweep from a standing start' : 'WRONG'}`);
       console.log(`  ${pad('keyboard X', 22)}${pad(k.selection.keySweep, 12)}${k.selection.keySweep === 'sweep' ? 'the same, off the key map' : 'WRONG'}`);
       console.log(`  ${pad('control: pad A', 22)}${pad(k.selection.padKickControl, 12)}${k.selection.padKickControl === 'kick' ? 'still the boot\'s own standing kick' : 'WRONG'}`);
+      console.log(`  the button explains itself once: ${k.selection.sweepNote ? `"${k.selection.sweepNote}"` : 'NEVER'}`
+        + `; the same press again says ${k.selection.sweepNoteAgain ? `"${k.selection.sweepNoteAgain}" — WRONG` : 'nothing'}`);
       console.log('');
       console.log(`  ${pad('kick', 10)}${pad('reach', 8)}${pad('arc', 8)}${pad('damage', 8)}${pad('prop power', 10)}`);
       for (const [key, prof] of Object.entries(k.profiles)) {
@@ -1418,7 +1431,7 @@ function printReport(report, passed) {
           ? `one, ${h.decalOffLanding} m from the landing point, ${h.decalSmearedOff}\u00b0 off the way it was going, on the grass at ${h.decalOnGround} m, ${h.decalLifeLeft}s left`
           : (label === 'through the chest' && h.decalsLeft === 0 ? 'none, which is the point' : `${h.decalsLeft} of them — WRONG`);
         console.log(`  ${pad('the stain', 18)}${stainLine}`);
-        console.log(`  ${pad('', 18)}announced "${h.banner}"`);
+        console.log(`  ${pad('', 18)}announced "${h.banner}"${h.noteShown ? `, then explained itself: "${h.noteShown}"` : (label === 'through the chest' && !h.noteShown ? ', and said nothing more' : ', AND NEVER EXPLAINED ITSELF')}`);
       }
       if (fat.weight !== undefined) {
         console.log(`  the weight both halves paid: ${fat.weight} of a tier point (the gunfire downing's), boot routs remain the full point`);

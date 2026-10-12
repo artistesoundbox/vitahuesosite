@@ -1,5 +1,6 @@
-// Synthesised combat sound effects plus the provided music tracks.
-// No external audio files are required for the effects themselves.
+// Synthesised combat sound effects plus the provided music tracks and the boot's
+// own recorded takes. Every sample is optional: the synthesis stands in for one
+// that is missing, so the game never depends on a file being there.
 
 /**
  * Two-track dynamic music.
@@ -73,6 +74,11 @@ export class GameAudio {
     this.musicVolume = 0.32;
     this.sfxVolume = 0.5;
     this.muted = false;
+    // Decoded sample files, by name, and the names that have already been asked
+    // for — so a restart does not refetch, and a file that will not decode is not
+    // retried on every wave.
+    this.samples = Object.create(null);
+    this.sampleTried = new Set();
   }
 
   resume() {
@@ -134,13 +140,70 @@ export class GameAudio {
     src.stop(t + duration + 0.02);
   }
 
+  /**
+   * Fetch and decode the sample files, as [name, url] pairs. These arrive
+   * asynchronously while the match is already playable, so anything asked for
+   * before its file lands falls back to the synthesis.
+   */
+  loadSamples(entries) {
+    if (!this.ctx) return;
+    for (const [name, url] of entries) {
+      if (this.sampleTried.has(name)) continue;
+      this.sampleTried.add(name);
+      fetch(url)
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.arrayBuffer();
+        })
+        .then((data) => this.ctx.decodeAudioData(data))
+        .then((buffer) => { this.samples[name] = buffer; })
+        .catch(() => { /* the synthesised version stands in */ });
+    }
+  }
+
+  /**
+   * Play a loaded sample through the same master gain as the synthesis, so mute
+   * and the effects volume apply to it. `rate` shifts the take's pitch, which is
+   * what keeps a sound played on every kick from sounding like one file on repeat.
+   * Returns whether it played at all.
+   */
+  sample(name, gain = 0.7, rate = 1) {
+    const buffer = this.samples[name];
+    if (!this.ctx || !buffer) return false;
+    const t = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    src.playbackRate.value = rate;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(gain * this.sfxVolume, t);
+    src.connect(g).connect(this.master);
+    src.start(t);
+    return true;
+  }
+
   shoot() { this.noise(0.16, 4200, 0.42); this.blip(180, 0.09, 'square', 0.16, 60); }
   enemyShoot() { this.noise(0.14, 2600, 0.2); this.blip(140, 0.08, 'triangle', 0.08, 50); }
   kick() { this.blip(120, 0.22, 'sawtooth', 0.26, 40); this.noise(0.18, 900, 0.3); }
+  /**
+   * The boot meeting something, laid over the swing on every kick whether it lands
+   * or whiffs — the synthesis is already the feel of the kick, this is the sound of
+   * it. Nothing to fall back to: `kick()` is the fallback.
+   */
+  bootSwing() { this.sample('bsh', 0.8, 0.92 + Math.random() * 0.16); }
   impact() { this.noise(0.12, 1400, 0.28); this.blip(220, 0.1, 'square', 0.12, 80); }
 
-  /** The scream of someone who has just met the boot. */
+  /**
+   * The scream of someone who has just met the boot: one of the recorded takes if
+   * it has loaded, the synthesis if neither has. Two takes picked at random, each
+   * pitched a little off the file, so a wave of kicks does not play the same yelp
+   * over and over.
+   */
   scream() {
+    const take = Math.random() < 0.5 ? 'ouch' : 'oua';
+    if (this.sample(take, 0.85, 0.94 + Math.random() * 0.12)) {
+      this.noise(0.2, 1300, 0.1);   // the hit under the voice
+      return;
+    }
     this.blip(760, 0.5, 'sawtooth', 0.2, 170);
     setTimeout(() => this.blip(560, 0.42, 'square', 0.14, 130), 80);
     setTimeout(() => this.blip(380, 0.34, 'triangle', 0.1, 90), 170);
