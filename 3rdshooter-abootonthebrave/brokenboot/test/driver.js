@@ -1613,6 +1613,71 @@ async function runCampaign(options) {
     out.footPoints = foot.length;
     out.footBox = { min: [+footBox.min.x.toFixed(3), +footBox.min.y.toFixed(3), +footBox.min.z.toFixed(3)], max: [+footBox.max.x.toFixed(3), +footBox.max.y.toFixed(3), +footBox.max.z.toFixed(3)] };
 
+    // How a boot *sits*, which no box can see: a boot can be inside its own box, cover
+    // a whole foot, and still be standing on its toe with the sole facing backwards —
+    // which is exactly what shipped, and what every box clause passed. Two readings,
+    // both off the model itself: the tilt of its sole from the ground, fitted through
+    // the vertices that touch the ground, and the angle between its toe and the
+    // foot's, the foot's coming from the rig's own toe bone rather than from a guess.
+    const SOLE_TILT_LIMIT = 8;
+    const TOE_ANGLE_LIMIT = 25;
+    const modelAxes = await import(new URL('js/config.js', location.href).href).then((m) => m.BOOT_MODEL_AXES);
+    const rigToeBone = (await import(new URL('js/assets.js', location.href).href).then((m) => m.findBone))
+      (p.model, ['RightToeBase', 'RightToe_End']);
+    const det3 = (a, b, c, d, e, f, g, h, i) => a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+    const seated = (model) => {
+      model.updateMatrixWorld(true);
+      const pts = [];
+      model.traverse((o) => {
+        if (!o.isMesh) return;
+        const pos = o.geometry.attributes.position;
+        for (let i = 0; i < pos.count; i += 3) {
+          pts.push(new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(o.matrixWorld));
+        }
+      });
+
+      const spin = new THREE.Quaternion();
+      model.getWorldQuaternion(spin);
+      // Which way the boot's sole faces, taken from the model's own measured axis. Not
+      // a plane fitted through its lowest vertices: a boot rolled onto its side has no
+      // horizontal lowest band at all, which is exactly how a socket in the wrong
+      // frame came to be measured as "7° off level" while it lay on its side.
+      const soleWorld = new THREE.Vector3().fromArray(modelAxes.sole)
+        .applyQuaternion(spin).normalize();
+      const soleTilt = Math.acos(Math.max(-1, Math.min(1, soleWorld.y))) * 180 / Math.PI;
+      const bootToe = new THREE.Vector3().fromArray(modelAxes.toe)
+        .applyQuaternion(spin).setY(0).normalize();
+      const at = p.kickFoot.getWorldPosition(new THREE.Vector3());
+      const footToe = rigToeBone
+        ? rigToeBone.getWorldPosition(new THREE.Vector3()).sub(at).setY(0).normalize()
+        : null;
+      const toeDeg = footToe
+        ? Math.acos(Math.max(-1, Math.min(1, bootToe.dot(footToe)))) * 180 / Math.PI
+        : null;
+      return { soleTilt: +soleTilt.toFixed(1), toeDeg: toeDeg === null ? null : +toeDeg.toFixed(1), verts: pts.length };
+    };
+    const sitsRight = (seat) => seat.soleTilt <= SOLE_TILT_LIMIT
+      && (seat.toeDeg === null || seat.toeDeg <= TOE_ANGLE_LIMIT);
+    // Seating is read with him standing, because `level` is a fact about the ground and
+    // the ground is only where it should be under a foot that is planted. This section
+    // runs after probes that leave him mid-kick, and a boot measured in a raised foot
+    // reads 65° off level while it is seated perfectly.
+    const standStill = () => {
+      for (const [other, action] of Object.entries(p.anim.actions)) {
+        action.stopFading();
+        action.enabled = other === 'idle';
+        action.setEffectiveWeight(other === 'idle' ? 1 : 0);
+      }
+      const idle = p.anim.actions.idle;
+      if (idle) { idle.reset(); idle.setEffectiveWeight(1); idle.play(); p.anim.name = 'idle'; }
+      p.anim.mixer.setTime(0);
+      p.object.updateMatrixWorld(true);
+      p.model.updateMatrixWorld(true);
+    };
+    out.seatLimits = { soleTilt: SOLE_TILT_LIMIT, toe: TOE_ANGLE_LIMIT };
+    out.seatControls = { sole: { measured: false, namesIt: false }, toe: { measured: false, namesIt: false } };
+    out.sameAsSpawn = { measured: false, namesIt: false };
+
     // The boot he is wearing right now, before anything is forced. This is the clause
     // the first version of this probe could not see: it moved every tier itself, and
     // so never noticed that the tier the player starts in had equipped nothing at
@@ -1620,6 +1685,7 @@ async function runCampaign(options) {
     // that ever reached him was the tier-up banner.
     const initial = { tier: p.boot ? p.boot.name : null, index: p.bootIndex, socketed: Boolean(p.bootModel) };
     if (p.bootModel) {
+      standStill();
       p.object.updateMatrixWorld(true);
       // Precise, from the vertices: the union of a rotated model's mesh boxes
       // overstates it, which is exactly the error that let a boot too small to wear
@@ -1634,10 +1700,13 @@ async function runCampaign(options) {
       initial.coveredShare = footLocal.length ? +(inside / footLocal.length).toFixed(3) : 0;
       initial.coversFoot = footLocal.length > 0 && local.containsBox(footBoxLocal);
       initial.soleOnGround = box.min.y >= -0.06 && box.min.y <= 0.1;
+      Object.assign(initial, seated(p.bootModel));
+      initial.sitsRight = sitsRight(initial);
     } else {
       initial.model = null;
       initial.coversFoot = false;
       initial.soleOnGround = false;
+      initial.sitsRight = false;
     }
     out.initialBoot = initial;
 
@@ -1665,6 +1734,9 @@ async function runCampaign(options) {
       // missing rather than a boot that is fine.
       for (let ti = 0; ti < BOOT_TIERS.length; ti++) {
         const tier = BOOT_TIERS[ti];
+        // Standing, and at the same point of the same clip every time, so the sole
+        // heights of eight tiers can be compared to each other and to the ground.
+        standStill();
         p.tierCredit = Math.max(p.tierCredit, tier.kills);
         // Each tier replaces the last: leaving them all on the foot would stack
         // eight boots and measure the pile rather than the fit.
@@ -1693,6 +1765,47 @@ async function runCampaign(options) {
           rec.coveredShare = footLocal.length ? +(inside / footLocal.length).toFixed(3) : 0;
           rec.coversFoot = footLocal.length > 0 && local.containsBox(footBoxLocal);
           rec.opensUnderFoot = local.max.y <= footBoxLocal.max.y;   // the foot stands out of the top
+          Object.assign(rec, seated(p.bootModel));
+          rec.sitsRight = sitsRight(rec);
+          // The spawn boot and the same tier socketed again have to land in the same
+          // place. They did not: the offset used to be baked against the pose the rig
+          // was in, so a tier equipped at spawn sat four centimetres lower than the
+          // same tier equipped a moment later.
+          if (ti === saved.index && out.initialBoot.socketed && !out.sameAsSpawn.measured) {
+            out.sameAsSpawn = {
+              measured: true, tier: tier.name, spawnSole: out.initialBoot.sole, resocketedSole: rec.sole,
+              spawnTilt: out.initialBoot.soleTilt, resocketedTilt: rec.soleTilt,
+              metres: +Math.abs(rec.sole - out.initialBoot.sole).toFixed(3),
+              namesIt: Math.abs(rec.sole - out.initialBoot.sole) > 0.02,
+            };
+          }
+          // The controls: the same two measurements on a boot rolled 30° and on one
+          // yawed 45° have to come back wrong, or "level" and "facing the way the
+          // foot faces" are clauses that pass whatever they are shown.
+          if (!out.seatControls.sole.measured) {
+            const spin = p.bootModel.quaternion.clone();
+            p.bootModel.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), Math.PI / 6);
+            p.object.updateMatrixWorld(true);
+            const rolled = seated(p.bootModel);
+            out.seatControls.sole = {
+              measured: true, tier: tier.name, rolledBy: 30,
+              tilt: rolled.soleTilt, namesIt: rolled.soleTilt > SOLE_TILT_LIMIT,
+            };
+            p.bootModel.quaternion.copy(spin);
+            p.object.updateMatrixWorld(true);
+          }
+          if (!out.seatControls.toe.measured) {
+            const spin = p.bootModel.quaternion.clone();
+            p.bootModel.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+            p.object.updateMatrixWorld(true);
+            const yawed = seated(p.bootModel);
+            out.seatControls.toe = {
+              measured: true, tier: tier.name, yawedBy: 90,
+              toe: yawed.toeDeg, namesIt: yawed.toeDeg !== null && yawed.toeDeg > TOE_ANGLE_LIMIT,
+            };
+            p.bootModel.quaternion.copy(spin);
+            p.object.updateMatrixWorld(true);
+          }
           // The control: the same measurement on a boot shrunk until it cannot
           // cover the foot has to come back negative, or "covers his foot" is a
           // clause that passes whatever it is shown.
@@ -1723,6 +1836,7 @@ async function runCampaign(options) {
       out.tierBootSocketed = out.boots.every((b) => b.socketed);
       out.tierBootCoversFoot = out.boots.every((b) => b.coversFoot);
       out.tierBootSoleOnGround = out.boots.every((b) => b.sole >= -0.06 && b.sole <= 0.1);
+      out.tierBootSitsRight = out.boots.every((b) => b.sitsRight);
     } finally {
       if (p.bootModel && p.bootModel.parent) p.bootModel.parent.remove(p.bootModel);
       p.tierCredit = saved.credit;
@@ -2138,6 +2252,13 @@ async function runCampaign(options) {
       && out.initialBoot.socketed
       && out.initialBoot.coversFoot
       && out.initialBoot.soleOnGround
+      && out.initialBoot.sitsRight
+      && out.tierBootSitsRight
+      && (!out.seatControls.sole.measured || out.seatControls.sole.namesIt)
+      && (!out.seatControls.toe.measured || out.seatControls.toe.namesIt)
+      // The same tier, socketed twice in two different poses, has to land in the same
+      // place — this is the clause that catches a fit baked against the pose.
+      && (!out.sameAsSpawn.measured || !out.sameAsSpawn.namesIt)
       && (!out.coversControl.measured || out.coversControl.namesIt)
       // Only a file that carries the officer's own boot can be asked whether a tier's
       // boot replaces it; this file carries none, so the tier's boot is the only boot

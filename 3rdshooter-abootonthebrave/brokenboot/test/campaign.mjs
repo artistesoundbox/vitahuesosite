@@ -883,6 +883,9 @@ function assess(report) {
           + `nothing unweighted, no more than ${(cc.weldShare * 100).toFixed(1)}% of a mesh riding one distant bone, and `
           + `all ${(cc.boots || []).length} tiers wear a boot that covers his foot (${cc.footPoints} sampled vertices on his right foot) `
           + `with its sole on the ground at ${cc.boots.map((b) => b.sole).join(', ')} m`);
+        findings.push(`every tier's boot is seated on the foot it was socketed onto: its sole lies within ${Math.max(...cc.boots.map((b) => b.soleTilt))}\u00b0 of level `
+          + `and its toe points within ${Math.max(...cc.boots.map((b) => b.toeDeg ?? 0))}\u00b0 of the rig's own toe bone, `
+          + `where a boot rolled ${cc.seatControls.sole.rolledBy}\u00b0 reads ${cc.seatControls.sole.tilt}\u00b0 off level and one yawed ${cc.seatControls.toe.yawedBy}\u00b0 reads ${cc.seatControls.toe.toe}\u00b0 off the foot, both named`);
         if (cc.initialBoot && cc.initialBoot.socketed) {
           findings.push(`he starts the game already wearing a boot: ${cc.initialBoot.tier} (tier ${cc.initialBoot.index}), socketed with nothing moving the tier, `
             + `covering ${(cc.initialBoot.coveredShare * 100).toFixed(1)}% of his foot with its sole at ${cc.initialBoot.sole} m`);
@@ -938,6 +941,18 @@ function assess(report) {
           if (!(b.sole >= -0.06 && b.sole <= 0.1)) {
             bits.push(`the ${b.tier} boot's sole sits at ${b.sole} m — ${b.sole > 0.1 ? 'floating above the ground' : 'through it'}`);
           }
+          if (!b.sitsRight) {
+            const why = [];
+            if (b.soleTilt > cc.seatLimits.soleTilt) why.push(`its sole is ${b.soleTilt}\u00b0 off the ground`);
+            if (b.toeDeg !== null && b.toeDeg > cc.seatLimits.toe) why.push(`its toe points ${b.toeDeg}\u00b0 away from the foot's`);
+            bits.push(`the ${b.tier} boot sits wrong on the foot: ${why.join(' and ')}`);
+          }
+        }
+        if (cc.seatControls && cc.seatControls.sole.measured && !cc.seatControls.sole.namesIt) {
+          bits.push('the level clause passes a boot rolled 30\u00b0 off the ground');
+        }
+        if (cc.seatControls && cc.seatControls.toe.measured && !cc.seatControls.toe.namesIt) {
+          bits.push('the toe clause passes a boot yawed 45\u00b0 away from the foot');
         }
         if (cc.coversControl && cc.coversControl.measured && !cc.coversControl.namesIt) {
           bits.push('the coverage clause passes a boot too small to wear: the same measurement on one shrunk to '
@@ -1194,12 +1209,21 @@ function printReport(report, passed) {
           : `NOTHING SOCKETED in ${b.tier} (tier ${b.index}) — he starts barefoot`}`);
       }
       if (cc.boots && cc.boots.length) {
-        console.log(`  ${pad('boots, tier by tier', 22)}${pad('model', 18)}${pad('size', 8)}${pad('sole', 8)}covers his foot`);
+        console.log(`  ${pad('boots, tier by tier', 22)}${pad('model', 18)}${pad('size', 8)}${pad('sole', 9)}${pad('level', 10)}${pad('toe', 10)}covers his foot`);
         for (const b of cc.boots) {
           const covers = b.coversFoot
             ? `yes — ${(b.coveredShare * 100).toFixed(1)}% of his foot vertices inside`
             : `NO — only ${(b.coveredShare * 100).toFixed(1)}% of his foot vertices inside`;
-          console.log(`  ${pad(b.tier, 22)}${pad(b.model || 'NONE', 18)}${pad(`${b.span} m`, 8)}${pad(`${b.sole} m`, 8)}${b.socketed ? covers : 'NEVER SOCKETED'}`);
+          const tiltLimit = cc.seatLimits ? cc.seatLimits.soleTilt : 8;
+          const toeLimit = cc.seatLimits ? cc.seatLimits.toe : 25;
+          const level = `${b.soleTilt}\u00b0${b.soleTilt > tiltLimit ? ' TILTED' : ' level'}`;
+          const toe = b.toeDeg === null ? '—' : `${b.toeDeg}\u00b0${b.toeDeg > toeLimit ? ' AWAY' : ' on'}`;
+          console.log(`  ${pad(b.tier, 22)}${pad(b.model || 'NONE', 18)}${pad(`${b.span} m`, 8)}${pad(`${b.sole} m`, 9)}${pad(level, 10)}${pad(toe, 10)}${b.socketed ? covers : 'NEVER SOCKETED'}`);
+        }
+        if (cc.seatControls && cc.seatControls.sole && cc.seatControls.sole.measured) {
+          console.log(`  ${pad('seat control', 22)}rolled ${cc.seatControls.sole.rolledBy}\u00b0 the ${cc.seatControls.sole.tier} reads ${cc.seatControls.sole.tilt}\u00b0 off the ground — `
+            + (cc.seatControls.sole.namesIt ? 'named' : 'NOT NAMED') + `; yawed ${cc.seatControls.toe.yawedBy}\u00b0 its toe reads ${cc.seatControls.toe.toe}\u00b0 off the foot's — `
+            + (cc.seatControls.toe.namesIt ? 'named' : 'NOT NAMED'));
         }
         if (cc.coversControl && cc.coversControl.measured) {
           console.log(`  ${pad('control', 22)}the same measurement on the ${cc.coversControl.tier} shrunk to ${(cc.coversControl.shrink * 100).toFixed(0)}% `

@@ -1,6 +1,11 @@
 import * as THREE from 'three';
-import { SETTINGS, BOOT_TIERS, BOOT_SOCKETS, ASSET_BASE, WEAPON, KICKS } from './config.js';
-import { AnimController, findBone, attachToBone, gltfLoader, socketRifle } from './assets.js';
+import {
+  SETTINGS, BOOT_TIERS, BOOT_SOCKETS, BOOT_MODEL_AXES, BOOT_BONE_AXES,
+  ASSET_BASE, WEAPON, KICKS,
+} from './config.js';
+import {
+  AnimController, findBone, attachToBone, gltfLoader, mountRotation, socketRifle,
+} from './assets.js';
 import { dampAngle, clamp } from './mathx.js';
 
 const MODEL_YAW_OFFSET = 0; // Mixamo characters face +Z, matching atan2(x, z).
@@ -392,12 +397,26 @@ export class Player {
       if (this.bootModel && this.bootModel.parent) this.bootModel.parent.remove(this.bootModel);
       const boot = gltf.scene;
       const socket = BOOT_SOCKETS[tier.socket] || BOOT_SOCKETS.default;
+      // Mounted from the two measured frames rather than an Euler: the boots' own
+      // sole and toe, onto the right-foot bone's. A guessed rotation had the boot
+      // standing on its toe with the sole facing backwards. The lift runs along the
+      // boot's own sole direction, so it raises the sole by its own figure rather
+      // than along whatever axis the rig happened to be in when it arrived.
+      const up = new THREE.Vector3().fromArray(BOOT_BONE_AXES.sole).normalize();
+      // Forward is the foot's toe axis laid flat in the boot's own sole plane, so a
+      // lift raises the sole without sliding it forward and a forward offset slides it
+      // without burying the sole: the two axes this rig calls forward and up are 60°
+      // apart, and adding them as they come moves a boot 0.5 m forward per metre of
+      // lift.
+      const ahead = new THREE.Vector3().fromArray(BOOT_BONE_AXES.toe).normalize()
+        .addScaledVector(up, -new THREE.Vector3().fromArray(BOOT_BONE_AXES.toe).normalize().dot(up))
+        .normalize();
       attachToBone(
         bone,
         boot,
         socket.size,
-        new THREE.Vector3(0, socket.lift, 0.03),
-        new THREE.Euler(-Math.PI / 2, 0, 0),
+        up.clone().multiplyScalar(socket.lift).addScaledVector(ahead, socket.forward || 0),
+        mountRotation(BOOT_MODEL_AXES, BOOT_BONE_AXES),
       );
       this.bootModel = boot;
     } catch (err) {

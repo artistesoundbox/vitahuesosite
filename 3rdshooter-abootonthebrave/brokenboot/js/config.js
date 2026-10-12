@@ -350,15 +350,33 @@ export const BOOT_TIERS = [
 // rather than perching on it. `lift` raises the model (also world units) until its
 // sole sits on the ground under a standing foot; these are measured, not guessed
 // (see `npm run test:character`, which reports the sole and the coverage).
+// Which way a boot's own axes point, measured off the four models that ship: the
+// author made them all the same way, so this is a property of the boots and not of
+// a tier — the sole faces +Y and the toe runs along +Z. Each model's own sole is
+// 1.9° off flat, which is the model's own tilt rather than a socket's.
+export const BOOT_MODEL_AXES = { sole: [0.009, 0.999, -0.032], toe: [0, 0, 1] };
+
+// The right-foot bone is a different frame, and not a rotated copy of the model's:
+// its toe runs along +Y (the rig's own toe bones put it there), and its sole, taken
+// from the vertices that touch the ground, faces mostly +Z. The socket maps one
+// pair onto the other, so a boot arrives level and pointing where the foot points.
+// A guessed Euler — -90° about x — did neither: it stood the boot on its toe with
+// the sole facing backwards, which is the lopsided boot this replaced.
+export const BOOT_BONE_AXES = { sole: [0.046, -0.592, 0.804], toe: [0.006, 0.976, 0.218] };
+
+// `lift` is metres along the boot's own sole direction and `forward` metres along
+// the foot's; both start from the bone the boot is socketed onto, which is the ankle
+// joint and sits near the back of a foot. Centring a boot on the bone alone hangs it
+// off the heel, so every tier carries a forward offset as well as a lift.
 export const BOOT_SOCKETS = {
-  standard:   { size: 0.52, lift: 0.036 },
-  reinforced: { size: 0.56, lift: 0.049 },
-  silver:     { size: 0.60, lift: 0.062 },
-  gold:       { size: 0.66, lift: 0.082 },
-  goldSpiked: { size: 0.72, lift: 0.102 },
-  doom:       { size: 0.80, lift: 0.128 },
-  legendary:  { size: 0.90, lift: 0.161 },
-  diamond:    { size: 1.00, lift: 0.194 },
+  standard:   { size: 0.52, lift: 0.023, forward: 0 },
+  reinforced: { size: 0.56, lift: 0.035, forward: 0 },
+  silver:     { size: 0.60, lift: 0.047, forward: 0 },
+  gold:       { size: 0.66, lift: 0.066, forward: 0 },
+  goldSpiked: { size: 0.72, lift: 0.084, forward: 0 },
+  doom:       { size: 0.80, lift: 0.108, forward: 0 },
+  legendary:  { size: 0.90, lift: 0.139, forward: 0 },
+  diamond:    { size: 1.00, lift: 0.170, forward: 0 },
 };
 // The kicks the officer knows, and how a kick is chosen:
 //

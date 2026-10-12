@@ -320,6 +320,30 @@ export function findBone(root, patterns) {
 }
 
 /**
+ * The rotation that lays one frame onto another, built from two measured directions
+ * in each rather than from three guessed angles.
+ *
+ * `from` is the model's own frame (its sole, its toe), `to` the frame it has to sit
+ * in (the bone's). The second direction is squared up against the first so a
+ * slightly slanted reading gives a rotation rather than a shear, and the third axis
+ * is the cross product, so the result is always a proper rotation. This is the same
+ * construction the rifle's mount is built from, and it is why neither fit has a
+ * magic Euler in it: a boot or a rifle that arrives tilted or backwards is a
+ * measurement that moved, and measuring again is the fix.
+ */
+export function mountRotation(from, to) {
+  const a = new THREE.Vector3().fromArray(from.sole).normalize();
+  const b = new THREE.Vector3().fromArray(from.toe).normalize();
+  b.sub(a.clone().multiplyScalar(b.dot(a))).normalize();
+  const c = new THREE.Vector3().fromArray(to.sole).normalize();
+  const d = new THREE.Vector3().fromArray(to.toe).normalize();
+  d.sub(c.clone().multiplyScalar(d.dot(c))).normalize();
+  const basis = (x, y) => new THREE.Matrix4().makeBasis(x, y, new THREE.Vector3().crossVectors(x, y));
+  return new THREE.Quaternion()
+    .setFromRotationMatrix(basis(c, d).multiply(basis(a, b).transpose()));
+}
+
+/**
  * Socket a standalone prop model onto a bone.
  *
  * `worldSize` is metres in the world he is drawn in, and it comes out exact: the
@@ -351,12 +375,6 @@ export function attachToBone(bone, model, worldSize, offset = new THREE.Vector3(
   bone.updateWorldMatrix(true, true);
 
   const boneWorld = new THREE.Matrix4().copy(bone.matrixWorld);
-  // `offset` is in world axes: a direction, swung into the bone's frame and scaled
-  // out of it, with the translation of the bone's frame left behind. Dividing by the
-  // rig's scale alone is not the same thing — this rig's foot bone does not point its
-  // own +Y at the sky, so a lift applied along its axis pushes the boot into the
-  // ground instead of onto it.
-  const toBoneDirection = new THREE.Matrix4().copy(boneWorld).invert().setPosition(0, 0, 0);
   const boneScale = new THREE.Vector3().setFromMatrixScale(boneWorld);
   // The rig is scaled uniformly to his height; the largest axis is the honest one if
   // a rig ever is not.
@@ -375,11 +393,14 @@ export function attachToBone(bone, model, worldSize, offset = new THREE.Vector3(
   model.scale.setScalar(worldSize / (longest * unit));
   model.updateMatrixWorld(true);
 
-  // Shift the prop so its centre sits on the bone's origin, pushed by `offset`,
-  // which is in world metres like `worldSize`.
+  // Shift the prop so its centre sits on the bone's origin, pushed by `offset`, which
+  // is in the bone's own frame and in world metres. It is deliberately not a world
+  // direction swung into the bone: an offset baked against the pose the rig happened
+  // to be in means the same boot sits differently when it is equipped at spawn than
+  // when it is equipped mid-kick, which is four centimetres of sole on this rig.
   box = new THREE.Box3().setFromObject(model, true);
   const center = box.getCenter(new THREE.Vector3());
-  model.position.add(offset.clone().applyMatrix4(toBoneDirection).sub(center));
+  model.position.add(offset.clone().divideScalar(unit).sub(center));
   model.updateMatrixWorld(true);
 
   bone.matrixWorld.copy(boneWorld);
@@ -419,17 +440,14 @@ const HAND_DOWN = [-1, 0, 0];
  * the bone's own world scale, the same way the size is.
  */
 export function socketRifle(bone, model, { size, grip, muzzle, magazine }) {
+  // The barrel onto the hand's forward axis, the magazine onto its down axis — the
+  // same two-direction mount a boot gets, measured on the model rather than written
+  // as angles.
+  const rotation = mountRotation(
+    { sole: magazine, toe: muzzle },
+    { sole: HAND_DOWN, toe: HAND_FORWARD },
+  );
   const along = new THREE.Vector3().fromArray(muzzle).normalize();
-  const down = new THREE.Vector3().fromArray(magazine).normalize();
-  // The two directions only have to be measured on the same model; the magazine is
-  // squared up against the barrel so a slightly slanted reading still gives a
-  // rotation rather than a shear.
-  down.sub(along.clone().multiplyScalar(down.dot(along))).normalize();
-
-  const basis = (a, b) => new THREE.Matrix4().makeBasis(a, b, new THREE.Vector3().crossVectors(a, b));
-  const from = basis(along, down);
-  const to = basis(new THREE.Vector3().fromArray(HAND_FORWARD), new THREE.Vector3().fromArray(HAND_DOWN));
-  const rotation = new THREE.Quaternion().setFromRotationMatrix(to.multiply(from.transpose()));
 
   const rifle = attachToBone(bone, model, size, new THREE.Vector3(), rotation);
   const boneScale = new THREE.Vector3().setFromMatrixScale(bone.matrixWorld).y || 1;
