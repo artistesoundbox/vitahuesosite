@@ -128,17 +128,19 @@
 
        MUSIC_VOLUME is deliberately low, because the squishes are the game and
        the bed is the room they happen in. Measured against the files' own
-       level (about -18.5 dBFS mean) 0.22 puts the bed near -31.7 dBFS, while
-       the cues land above it: a full-strength squelch peaks near 0.23
-       amplitude (-12.8 dBFS) and the quietest one, the whoosh, near 0.075
-       (-22.5 dBFS). So the bed sits 9 dB under the softest cue and 19 dB under
-       a good squish — audible as music, never as a competitor. */
+       level (-18.7 and -18.1 dBFS mean) 0.15 lands the bed near -35 dBFS,
+       while every cue lands above it: a full-strength squelch peaks near 0.23
+       amplitude (-12.8 dBFS), and the quietest cues are the chime (-25.2) and
+       the trophy fanfare (-26.0). So the bed sits about 10 dB under the
+       softest cue and 22 dB under a good squish — music you can hear, that
+       never talks over the toy. */
     const MUSIC_TRACKS = ['Squishy Fun Time.mp3', 'Squishy Fun Time (1).mp3'];
-    const MUSIC_VOLUME = 0.22;
+    const MUSIC_VOLUME = 0.15;
     /* the element carries its own volume, so the mute button has to speak to
        both buses: the cues through the Web Audio master, the bed through this */
-    let musicEl = null, musicIdx = -1, musicOk = null, musicWanted = false;
+    let musicEl = null, musicIdx = -1, musicLoaded = -1, musicOk = null, musicWanted = false;
     function musicTrack() { return MUSIC_TRACKS[musicIdx < 0 ? 0 : musicIdx]; }
+    function musicIndex() { return musicIdx < 0 ? 0 : musicIdx; }
 
     function musicInit() {
       if (musicEl) return musicEl;
@@ -160,8 +162,14 @@
       musicWanted = true;
       const el = musicInit();
       if (!el) return null;
-      const want = musicTrack();
-      if (!el.currentSrc || el.currentSrc.indexOf(want) === -1) { try { el.src = want; } catch (e) {} }
+      /* "is this the right track?" is tracked by index rather than by reading
+         back el.currentSrc: the browser answers with a percent-encoded URL, so
+         a name with a space in it would never compare equal — and comparing
+         wrongly here means re-assigning src, which restarts the track from 0
+         on every single gesture. */
+      if (musicLoaded !== musicIndex()) {
+        try { el.src = musicTrack(); musicLoaded = musicIndex(); } catch (e) {}
+      }
       el.volume = MUSIC_VOLUME;
       const p = el.play();
       /* before the first gesture the browser refuses; the next one tries again */
@@ -1193,12 +1201,21 @@
         music: function () {
           return {
             wanted: musicWanted, ok: musicOk, muted: state.muted,
-            file: MUSIC_TRACKS[musicIdx < 0 ? 0 : musicIdx], tracks: MUSIC_TRACKS.slice(),
+            file: musicTrack(), loaded: musicLoaded, tracks: MUSIC_TRACKS.slice(),
             src: musicEl ? (musicEl.currentSrc || musicEl.src) : null,
             volume: musicEl ? musicEl.volume : null,
             loop: musicEl ? musicEl.loop : null,
             paused: musicEl ? musicEl.paused : null,
             time: musicEl ? Math.round(musicEl.currentTime * 100) / 100 : null
+          };
+        },
+        /* the element itself, so a check can seek it rather than wait 52 s */
+        musicElement: function () { return musicEl; },
+        audio: function () {
+          return {
+            ctx: actx ? actx.state : null,
+            master: (master && actx) ? master.gain.value : null,
+            musicVolume: musicEl ? musicEl.volume : null
           };
         }
       };
