@@ -7,6 +7,14 @@ const MODEL_YAW_OFFSET = 0; // Mixamo characters face +Z, matching atan2(x, z).
 // An unskinned part further than this from every bone is scenery the character
 // happens to stand next to, not gear worn on it.
 const RIGID_PART_RANGE = 0.4;
+// The clip plays at this rate, and the swish is drawn for as long as it runs.
+// A fixed window would be wrong for the kicks that are not shaped like the
+// standing one — the flying high kick is still winding its leg up where the
+// standing kick has already turned — and the fallback covers a rig that carries
+// no clip for the kick at all.
+const KICK_TIME_SCALE = 1.2;
+const KICK_SWING_FALLBACK = 0.5;
+const KICK_SWING_MAX = 1.4;
 
 export class Player {
   constructor(template) {
@@ -20,6 +28,11 @@ export class Player {
     this.ownBoots = [];
     this.rigidParts = [];
     this.bindRigidParts();
+    // The foot a kick is thrown with — the same one the boot is strapped to — so
+    // the swish can be drawn from the boot rather than from the middle of him.
+    this.kickFoot = findBone(this.model, ['RightToe_End', 'RightToeBase', 'RightFoot']);
+    this.swingLeft = 0;
+    this.swingKick = null;
 
     this.velocity = new THREE.Vector3();
     this.velocityY = 0;
@@ -85,6 +98,7 @@ export class Player {
     this.time += dt;
     this.fireTimer = Math.max(0, this.fireTimer - dt);
     this.kickCooldown = Math.max(0, this.kickCooldown - dt);
+    this.swingLeft = Math.max(0, this.swingLeft - dt);
     for (const key of Object.keys(this.powerups)) {
       if (this.powerups[key] > 0) this.powerups[key] = Math.max(0, this.powerups[key] - dt);
     }
@@ -256,7 +270,14 @@ export class Player {
     this.kickCooldown = SETTINGS.kickCooldown * kick.cooldownScale;
     this.pendingKick = { t: 0.34, type };
     if (this.onKickStart) this.onKickStart(type);
-    this.anim.once(clip, { timeScale: 1.2 }, () => { /* locomotion resumes next frame */ });
+    const action = this.anim.once(clip, { timeScale: KICK_TIME_SCALE }, () => { /* locomotion resumes next frame */ });
+    // The swing is what the swish traces, and it starts with the clip rather than
+    // with the connect — the two windows overlap by design. Its length is the
+    // clip's own, which is why the trail follows each kick's rhythm instead of one
+    // number picked for the standing kick.
+    const seconds = action && action.getClip ? action.getClip().duration : KICK_SWING_FALLBACK * KICK_TIME_SCALE;
+    this.swingLeft = Math.min(seconds / KICK_TIME_SCALE, KICK_SWING_MAX);
+    this.swingKick = type;
     return true;
   }
 
@@ -392,6 +413,22 @@ export class Player {
    * nothing to measure, and the flash falls back to a point in front of his chest,
    * which is where it used to be pinned whatever the rifle was doing.
    */
+  /**
+   * Where the kicking foot is, in the world — the point the swish is drawn from.
+   *
+   * It is the bone the boot is strapped to, so the arc on screen is the arc the
+   * boot travels through whatever the clip does. Until the rig has that bone
+   * there is nothing to trace, and the point falls back to the front of his feet.
+   */
+  kickFootPoint(target = new THREE.Vector3()) {
+    if (this.kickFoot) return this.kickFoot.getWorldPosition(target);
+    return target.set(
+      this.position.x + Math.sin(this.yaw) * 0.35,
+      this.position.y + 0.25,
+      this.position.z + Math.cos(this.yaw) * 0.35,
+    );
+  }
+
   muzzlePoint(target = new THREE.Vector3()) {
     if (this.muzzle && this.muzzle.parent) return this.muzzle.getWorldPosition(target);
     return target.set(

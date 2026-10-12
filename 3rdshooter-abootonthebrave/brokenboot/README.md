@@ -503,7 +503,8 @@ cannot reach the gate at either mass (3.53 m/s now, 2.35 before).
 `npm run test:kick` asserts the lot: that the three kicks differ in reach, arc and
 power, that crouching and being airborne select the sweep and the high kick, that
 kicked scenery really moves, tumbles, settles and drags its collision box with it,
-and that the boot *feels* as heavy as the mass it met.
+that the swing itself is drawn from the foot it was thrown with in the tier's own
+colour, and that the boot *feels* as heavy as the mass it met.
 
 ## What the boot feels like when it lands
 
@@ -539,6 +540,45 @@ the arc sets it. Measured through the harness:
 - **The screen edges** light up warm (never the red damage vignette, so a heavy
   boot does not read as taking a hit), fading from `flashImpact`, and `kickFlashMass`
   says what mass fills it — a car does.
+- **The swing itself** is drawn, which is the one part of a kick that had no picture
+  at all. A ribbon follows the right-foot bone — the foot the boot is strapped to —
+  for as long as the clip it threw is running, tinted with the tier's colour and
+  widened by the tier, so a Diamond boot's arc is fatter than a Standard one's. Four
+  things keep it honest:
+  - **The window is the clip's, not a number.** The kicks do not share a rhythm —
+    the standing kick's foot is already turning while the flying high kick is still
+    winding up — so a fixed window drew a stub through one and missed the other
+    entirely. The high kick's clip, for instance, runs 2.5 s and its leg does not
+    move until 0.6 s in.
+  - **The arc stays armed for the whole swing**, not just between its own points: a
+    stroke that lived only between samples died in that wind-up, and `clearSwish()`
+    threw away the arc the kick was about to draw.
+  - **The foot is stepped to in 6 cm increments**, not one point per frame. A kick
+    moves its foot 0.14 m between frames at its fastest, so a point per frame left
+    the end of the stroke behind the boot and drew the rest of it faceted on a
+    slower machine; stepping means the newest point is on the boot at any frame
+    rate, and the stroke spans the newest 14 steps — 0.84 m of the foot's path.
+  - **The ribbon turns its edge to the eye** (width across the path *and* the view,
+    so it reads as a stroke rather than as a plank seen end-on).
+
+  It is one 14-point buffer reused by every kick: no post-processing pass, no
+  per-kick allocation, one draw call for the fifth of a second the arc is on screen.
+  Measured through the harness, one throw per kick the officer knows:
+
+  | kick | arc points | arc travel | stroke | foot's own path | in |
+  | --- | --- | --- | --- | --- | --- |
+  | standing kick | 14 | 0.764 m | 0.150 m | 3.48 m, 0.61 m of it rise | the boot's colour |
+  | crouched sweep | 14 | 0.763 m | 0.195 m | 3.52 m, 0.62 m of it rise | the boot's colour |
+  | airborne high kick | 14 | 0.770 m | 0.105 m | 4.18 m, 1.20 m of it rise | the boot's colour |
+  | stomp | 14 | 0.761 m | 0.273 m | 2.59 m, 0.46 m of it rise | the boot's colour |
+
+  Every point of every arc is within **0.06 m** of the boot it was thrown with — the
+  sampling step, so nothing trails further behind than the resolution it is drawn
+  at — the shapes are ordered by design (the high kick narrowest, then the standing
+  kick, the sweep and the stomp widest), the arcs are gone once the swing and its
+  fade are over, and all four reuse the one buffer. The control is the mistake the
+  clause exists for: a stroke pinned to the middle of him sits **0.876 m** off the
+  boot, so the clause names that instead of waving it through.
 
 A charged kick multiplies the whole thing by `chargedKnockbackScale` (1.6×), so a
 full meter into a car is the heaviest thing in the game: capped shake, capped

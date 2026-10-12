@@ -152,8 +152,8 @@ fight in? Combine with --world-seed=N to audit that one forest only
   --honest         play the match for real: the officer can die, and the report says where
   --check-lock     assert the aim trigger rule (fresh press retargets, held keeps its
 target) instead of playing the campaign
-  --check-kick     assert the three kicks and the scenery they move (also instead of
-the campaign; pass both to run both probes)
+  --check-kick     assert the three kicks, the scenery they move and the swing they
+draw (also instead of the campaign; pass both to run both probes)
   --check-dry      play a whole wave with the officer's ammunition taken away, and
 assert the boot alone can still end it
   --check-character audit the officer's own mesh file and how he is drawn instead: where
@@ -849,6 +849,28 @@ function assess(report) {
       if (f.frameRollDegrees !== undefined && !(f.frameRollDegrees > 1)) bits.push(`the frame did not roll (${f.frameRollDegrees}°)`);
       if (f.stopFrames !== undefined && !(f.stopFrames >= 2 && f.stopFrames <= 12)) bits.push(`the hit-stop froze time for ${f.stopFrames} frame(s)`);
       if (f.edgeFlashOpacity !== undefined && !(f.edgeFlashOpacity > 0.5)) bits.push('the screen edge never lit up on a heavy connect');
+      const sw = k.swish;
+      if (sw) {
+        if (!sw.silentAtRest) bits.push('the swish was on screen before any kick was thrown');
+        for (const [wanted, r] of Object.entries(sw.profiles || {})) {
+          if (!r.thrown) { bits.push(`the ${wanted} was never thrown, so nothing swung`); continue; }
+          if (r.type !== wanted) bits.push(`the ${wanted} was thrown as a ${r.type}`);
+          if (!r.drawn) bits.push(`the ${wanted} drew no arc at all`);
+          if (r.offFoot > 0.1) bits.push(`the ${wanted}'s arc trails ${r.offFoot} m off the boot it was thrown with`);
+          if (r.samples < 6) bits.push(`the ${wanted}'s swing was drawn from ${r.samples} point(s) of arc`);
+          if (!(r.spread > 0.3)) bits.push(`the ${wanted}'s swish never travelled (${r.spread} m across the whole swing)`);
+          if (r.colour !== r.bootColour) bits.push(`the ${wanted}'s swish is drawn in ${r.colour} instead of the boot's ${r.bootColour}`);
+        }
+        if (sw.shapesOrdered === false) bits.push('all four kicks draw the same width of arc, so the shapes do not differ');
+        if (!sw.went) bits.push('the swish was still on screen after the swing had finished');
+        if (!sw.reusedBuffer) bits.push('every kick builds itself a new ribbon');
+        if (!(sw.offChest > 0.1)) bits.push('the chest control sits on the boot, so the clause would not name it');
+        if (sw.typesThrown && sw.shapesOrdered && sw.went && sw.reusedBuffer) {
+          findings.push('every kick draws its own swing from the foot it was thrown with: '
+            + Object.entries(sw.profiles).map(([t, r]) => `${t} ${r.samples} points over ${r.spread} m, ${r.width} m of stroke`).join('; ')
+            + `, one ribbon reused for all four, and a stroke from the middle of him (${sw.offChest} m off the boot) is what the clause names`);
+        }
+      }
       reasons.push(`kicks and scenery: ${bits.join('; ') || 'the probe did not pass'}`);
     }
     // The officer's own mesh file. Every clause names the part and the bone, so a
@@ -1098,6 +1120,21 @@ function printReport(report, passed) {
         row('a car', f.car, s.mass);
         console.log(`  the camera was shoved back ${f.cameraPushBack} m and the frame rolled ${f.frameRollDegrees}\u00b0 (${f.rollFollowsSide ? 'away from the impact, both sides' : 'WRONG'})`);
         console.log(`  hit-stop: a body froze ${f.stopFrames} frame(s) at \u00d7${f.stopScale} world time, then the clock ran clean again; screen edge lit to ${f.edgeFlashOpacity}`);
+      }
+      if (k.swish) {
+        const sw = k.swish;
+        console.log('');
+        console.log(`  ${pad('the swing is drawn', 22)}${pad('points', 8)}${pad('travel', 10)}${pad('stroke', 10)}colour and fit`);
+        for (const [type, r] of Object.entries(sw.profiles || {})) {
+          console.log(`  ${pad(type, 22)}${pad(r.samples, 8)}${pad(`${r.spread} m`, 10)}${pad(`${r.width} m`, 10)}`
+            + `${r.colour}${r.colour === r.bootColour ? " (the boot's own)" : " NOT THE BOOT'S"}`
+            + `${r.offFoot > 0.1 ? ` — ${r.offFoot} m off the boot, WRONG` : ' on the boot'}`);
+        }
+        console.log(`  control               a stroke from the middle of him sits ${sw.offChest} m off the boot`
+          + `${sw.offChest > 0.1 ? ' — so the clause names it' : ' — SO IT WOULD NOT BE NAMED'}`);
+        console.log(`  the shapes differ     ${sw.shapesOrdered ? 'high the narrowest, then the standing kick, the sweep and the stomp widest' : 'NO — all four draw the same width'}`
+          + `; ${sw.reusedBuffer ? 'all four reuse the one ribbon' : 'EACH KICK BUILDS A NEW RIBBON'}, gone ${sw.went ? 'once the swing ended' : 'NEVER'}`);
+        console.log(`  the legs themselves   ${Object.entries(sw.profiles || {}).map(([t, r]) => `${t} ${r.path} m of travel, ${r.rise} m of it rise`).join('; ')}`);
       }
       if (k.detail) console.log(`  ${k.detail}`);
     }

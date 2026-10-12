@@ -608,8 +608,107 @@ async function runCampaign(options) {
       out.feel.edgeFlashOpacity = +((edge && parseFloat(edge.style.opacity)) || 0).toFixed(3);
       if (edge) { G.hud.flashImpact(0); G.hud.update(G.hudState(), 1); }
 
+      // The swing itself, drawn. A kick is thrown through the real path here (so
+      // the connect still lands 0.34 s in), and the arc is measured against the
+      // foot it was thrown with, frame by frame, until the swing is over. A
+      // stroke pinned to the middle of him — the way the muzzle flash used to be
+      // pinned to his chest — is the control: it has to be named by the same
+      // measurement, or the clause would pass on the thing it was written against.
+      // How far the newest point of the arc may sit from the boot it was drawn
+      // from: the sampling step is 0.06 m, so this is that step plus the frame's
+      // own travel, and far tighter than the 0.6 m the chest control sits at.
+      const SWISH_ON_FOOT = 0.1;
+      const swish = G.effects.stroke;
+      const savedSwish = {
+        swing: p.swingLeft, kick: p.swingKick, cooldown: p.kickCooldown, pending: p.pendingKick,
+        boot: p.bootIndex, crouch: p.crouching, grounded: p.grounded, credit: p.tierCredit,
+      };
+      try {
+        G.enemyManager.enemies = [];
+        out.swish = { silentAtRest: !G.effects.swishMesh.visible, went: false, reusedBuffer: false, offChest: 0, profiles: {} };
+        const ring = swish.ring;
+        const n = ring.length;
+        const buffer = G.effects.swishGeo.getAttribute('position').array;
+        // One throw per kick the officer knows, because each is supposed to draw
+        // its own stroke: the crouched sweep, the airborne high kick, and the
+        // standing one the tier decides. A top boot standing still gives the stomp.
+        const poses = [
+          ['kick', { crouch: false, grounded: true, boot: 0 }],
+          ['sweep', { crouch: true, grounded: true, boot: 0 }],
+          ['high', { crouch: false, grounded: false, boot: 0 }],
+          ['stomp', { crouch: false, grounded: true, boot: 5 }],
+        ];
+        for (const [wanted, pose] of poses) {
+          p.crouching = pose.crouch;
+          p.grounded = pose.grounded;
+          p.bootIndex = pose.boot;
+          p.kickCooldown = 0;
+          p.pendingKick = null;
+          p.swingLeft = 0;
+          const rec = {
+            wanted, thrown: false, type: null, drawn: false, samples: 0,
+            spread: 0, offFoot: 0, lift: 0, width: 0, colour: null, bootColour: p.boot.color,
+            frames: 0, path: 0, rise: 0, lowY: null, highY: null,
+          };
+          rec.thrown = p.melee();
+          rec.type = p.swingKick;
+          rec.lift = swish.lift;
+          let prevFoot = null;
+          for (let i = 0; i < 120 && p.swingLeft > 0; i++) {
+            G.step(1 / 60);
+            rec.frames += 1;
+            const where = p.kickFootPoint();
+            if (prevFoot) rec.path += where.distanceTo(prevFoot);
+            prevFoot = where.clone();
+            rec.lowY = rec.lowY === null ? where.y : Math.min(rec.lowY, where.y);
+            rec.highY = rec.highY === null ? where.y : Math.max(rec.highY, where.y);
+            rec.drawn = rec.drawn || G.effects.swishMesh.visible;
+            if (swish.count < 2) continue;
+            const foot = where.clone().setY(where.y + swish.lift);
+            const newest = ring[(swish.head + swish.count - 1) % n];
+            const oldest = ring[swish.head % n];
+            rec.samples = Math.max(rec.samples, swish.count);
+            rec.offFoot = Math.max(rec.offFoot, +newest.distanceTo(foot).toFixed(3));
+            rec.spread = Math.max(rec.spread, +oldest.distanceTo(newest).toFixed(3));
+          }
+          rec.path = +rec.path.toFixed(3);
+          rec.rise = +((rec.highY === null ? 0 : rec.highY - rec.lowY)).toFixed(3);
+          rec.width = +swish.width.toFixed(3);
+          rec.colour = `#${G.effects.swishMat.color.getHexString()}`;
+          out.swish.profiles[wanted] = rec;
+          // The clip has to finish before the next kick is allowed, so the four
+          // throws are four separate swings rather than one long one.
+          for (let i = 0; i < 300 && !p.canMelee(); i++) G.step(1 / 60);
+        }
+        const prof = out.swish.profiles;
+        out.swish.typesThrown = Object.entries(prof).every(([wanted, r]) => r.thrown && r.type === wanted);
+        // The shapes differ by design: a sweep is the widest low arc, the high
+        // kick the narrowest, and the stomp the widest of the four.
+        out.swish.shapesOrdered = prof.high.width < prof.kick.width
+          && prof.kick.width < prof.sweep.width
+          && prof.sweep.width < prof.stomp.width;
+        // One buffer for all four throws: no ribbon is built per kick.
+        out.swish.reusedBuffer = G.effects.swishGeo.getAttribute('position').array === buffer;
+        for (let i = 0; i < 60; i++) G.step(1 / 60);   // let the last one fade
+        out.swish.went = !G.effects.swishMesh.visible && swish.count === 0;
+        // The control: a stroke from the middle of him is nowhere near the boot.
+        out.swish.offChest = +p.position.clone().setY(p.position.y + 1.0)
+          .distanceTo(p.kickFootPoint()).toFixed(3);
+      } finally {
+        G.effects.clearSwish();
+        p.swingLeft = savedSwish.swing;
+        p.swingKick = savedSwish.kick;
+        p.kickCooldown = savedSwish.cooldown;
+        p.pendingKick = savedSwish.pending;
+        p.bootIndex = savedSwish.boot;
+        p.crouching = savedSwish.crouch;
+        p.grounded = savedSwish.grounded;
+        p.tierCredit = savedSwish.credit;
+      }
+
       const f = out.feel;
       f.bodyMass = SETTINGS.bodyMass;
+      f.bootColour = p.boot.color;
       f.whiffShake = SETTINGS.kickWhiffShake;
       f.feelScaledByMass = f.car.shake > f.body.shake
         && f.car.kickback > f.body.kickback
@@ -638,8 +737,19 @@ async function runCampaign(options) {
         && f.hitStopFromBody > 0
         && f.stopScale === SETTINGS.kickStopScale
         && f.stopFrames >= 2 && f.stopFrames <= 12
-        && Math.abs(f.worldTimeAfterStop - frame) < 1e-5
-        && f.edgeFlashOpacity > 0.5;
+        &&        Math.abs(f.worldTimeAfterStop - frame) < 1e-5
+        && f.edgeFlashOpacity > 0.5
+        && out.swish.silentAtRest
+        && out.swish.typesThrown
+        && Object.values(out.swish.profiles).every((r) => r.drawn
+          && r.offFoot <= SWISH_ON_FOOT
+          && r.samples >= 6
+          && r.spread > 0.3
+          && r.colour === r.bootColour)
+        && out.swish.shapesOrdered
+        && out.swish.reusedBuffer
+        && out.swish.went
+        && out.swish.offChest > SWISH_ON_FOOT;
       return out;
     } finally {
       G.step = savedStep;

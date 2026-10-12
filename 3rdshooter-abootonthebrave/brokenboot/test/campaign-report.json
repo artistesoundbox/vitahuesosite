@@ -1,8 +1,8 @@
 {
   "seed": 20260411,
-  "startedAt": "2026-10-12T06:55:03.176Z",
-  "gameSeconds": 0.61,
-  "steps": 13,
+  "startedAt": "2026-10-12T07:20:36.541Z",
+  "gameSeconds": 0.56,
+  "steps": 12,
   "waves": [],
   "tiers": [
     {
@@ -154,7 +154,7 @@
         "shown": true,
         "toBarrel": 0.002,
         "tracerFromBarrel": 0.002,
-        "standInOffBarrel": 0.648
+        "standInOffBarrel": 0.646
       },
       "flashOk": true,
       "flashControlNamesIt": true,
@@ -186,7 +186,7 @@
     "cone": 0.22,
     "distance": 26,
     "pass": true,
-    "baseHeadingRadians": 0,
+    "baseHeadingRadians": -0.131,
     "anglesRadians": {
       "near": 0.055,
       "far": 0.132
@@ -200,7 +200,7 @@
     "heldDuringSwing": "near",
     "anglesAfterSwing": {
       "near": 0.146,
-      "far": 0.046
+      "far": 0.045
     },
     "farVisible": true,
     "swungOnTarget": true,
@@ -289,13 +289,96 @@
       "worldTimeAfterStop": 0.01667,
       "edgeFlashOpacity": 0.931,
       "bodyMass": 2,
+      "bootColour": "#c0642b",
       "whiffShake": 0.3,
       "feelScaledByMass": true
+    },
+    "swish": {
+      "silentAtRest": true,
+      "went": true,
+      "reusedBuffer": true,
+      "offChest": 1.024,
+      "profiles": {
+        "kick": {
+          "wanted": "kick",
+          "thrown": true,
+          "type": "kick",
+          "drawn": true,
+          "samples": 14,
+          "spread": 0.764,
+          "offFoot": 0.059,
+          "lift": 0.04,
+          "width": 0.15,
+          "colour": "#c8b18d",
+          "bootColour": "#c8b18d",
+          "frames": 75,
+          "path": 3.344,
+          "rise": 0.602,
+          "lowY": 0.14893385331659614,
+          "highY": 0.7512060836688894
+        },
+        "sweep": {
+          "wanted": "sweep",
+          "thrown": true,
+          "type": "sweep",
+          "drawn": true,
+          "samples": 14,
+          "spread": 0.763,
+          "offFoot": 0.059,
+          "lift": 0.12,
+          "width": 0.195,
+          "colour": "#c8b18d",
+          "bootColour": "#c8b18d",
+          "frames": 75,
+          "path": 3.522,
+          "rise": 0.62,
+          "lowY": 0.13113662374637997,
+          "highY": 0.7512060836688894
+        },
+        "high": {
+          "wanted": "high",
+          "thrown": true,
+          "type": "high",
+          "drawn": true,
+          "samples": 14,
+          "spread": 0.77,
+          "offFoot": 0.059,
+          "lift": 0.04,
+          "width": 0.105,
+          "colour": "#c8b18d",
+          "bootColour": "#c8b18d",
+          "frames": 84,
+          "path": 4.184,
+          "rise": 1.203,
+          "lowY": 0.23152529551597262,
+          "highY": 1.4341370766374768
+        },
+        "stomp": {
+          "wanted": "stomp",
+          "thrown": true,
+          "type": "stomp",
+          "drawn": true,
+          "samples": 14,
+          "spread": 0.761,
+          "offFoot": 0.058,
+          "lift": 0.14,
+          "width": 0.273,
+          "colour": "#c0642b",
+          "bootColour": "#c0642b",
+          "frames": 84,
+          "path": 2.589,
+          "rise": 0.463,
+          "lowY": 0.16866430266615257,
+          "highY": 0.6313563055147935
+        }
+      },
+      "typesThrown": true,
+      "shapesOrdered": true
     },
     "pass": true
   },
   "wavesReached": 1,
-  "wallClockSeconds": 3.8,
+  "wallClockSeconds": 3.5,
   "consoleErrors": [],
   "consoleWarnings": [
     "console.warn: THREE.FBXLoader: %s map is not supported in three.js, skipping texture. ShininessExponent",

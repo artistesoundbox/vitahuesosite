@@ -3,6 +3,23 @@ import * as THREE from 'three';
 const TRACER_LIFE = 0.09;
 const FLASH_LIFE = 0.06;
 
+// The swish: the arc a thrown boot cuts, as one strip that follows the foot and
+// fades behind it. A point is only accepted once the foot has travelled
+// `SWISH_STEP`, so a slow kick does not spend its whole ribbon standing still,
+// and the buffer is fixed — a kick reuses it rather than allocating.
+const SWISH_SAMPLES = 14;
+const SWISH_LIFE = 0.22;
+const SWISH_STEP = 0.06;
+const SWISH_WIDTH = 0.15;
+// Per-kick shape: how fat the stroke is drawn, and how far above the foot it
+// rides, so a sweep along the grass does not sink its edge into the ground.
+const SWISH_SHAPES = {
+  kick:  { width: 1.0, lift: 0.04 },
+  sweep: { width: 1.3, lift: 0.12 },
+  high:  { width: 0.7, lift: 0.04 },
+  stomp: { width: 1.4, lift: 0.14 },
+};
+
 // Pickup palette: body colour, emissive glow and halo, per loot type.
 const PICKUP_LOOK = {
   ammo:   { body: 0x2f4f3a, glow: 0x1b3a26, halo: 0x8ef0b0 },
@@ -58,6 +75,137 @@ export class Effects {
     this.muzzleMesh = new THREE.Mesh(this.muzzleGeo, this.muzzleMat);
     this.muzzleMesh.visible = false;
     scene.add(this.muzzleMesh);
+
+    // One ribbon, reused by every kick: `SWISH_SAMPLES` points, each with a left
+    // and right edge, drawn as a strip that grows with the swing.
+    this.swishGeo = new THREE.BufferGeometry();
+    this.swishGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SWISH_SAMPLES * 2 * 3), 3));
+    const swishIndex = [];
+    for (let i = 0; i < SWISH_SAMPLES - 1; i++) {
+      const a = i * 2;
+      swishIndex.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+    }
+    this.swishGeo.setIndex(swishIndex);
+    this.swishGeo.setDrawRange(0, 0);
+    this.swishMat = new THREE.MeshBasicMaterial({
+      color: 0xffe6a8, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+    });
+    this.swishMesh = new THREE.Mesh(this.swishGeo, this.swishMat);
+    this.swishMesh.visible = false;
+    this.swishMesh.frustumCulled = false;
+    scene.add(this.swishMesh);
+    this.stroke = {
+      ring: Array.from({ length: SWISH_SAMPLES }, () => new THREE.Vector3()),
+      head: 0, count: 0, life: 0, width: SWISH_WIDTH, lift: 0,
+      _side: new THREE.Vector3(), _a: new THREE.Vector3(), _b: new THREE.Vector3(),
+      _target: new THREE.Vector3(), _step: new THREE.Vector3(),
+    };
+  }
+
+  /**
+   * Start a kick's arc: tinted with the tier that threw it, widened by the tier
+   * so a Diamond boot leaves a fatter stroke than a Standard one, and shaped by
+   * the kick being thrown.
+   */
+  swish(color = 0xffe6a8, tierIndex = 0, type = 'kick') {
+    const shape = SWISH_SHAPES[type] || SWISH_SHAPES.kick;
+    const s = this.stroke;
+    s.head = 0;
+    s.count = 0;
+    s.life = SWISH_LIFE;
+    s.lift = shape.lift;
+    s.width = SWISH_WIDTH * shape.width * (1 + tierIndex * 0.06);
+    this.swishMat.color.set(color);
+    this.swishMat.opacity = 0;
+    this.swishMesh.visible = false;
+    this.swishGeo.setDrawRange(0, 0);
+  }
+
+  /** Put one point on the end of the arc, dropping the old head when full. */
+  pushSwishPoint(point) {
+    const s = this.stroke;
+    s.ring[(s.head + s.count) % SWISH_SAMPLES].copy(point);
+    if (s.count < SWISH_SAMPLES) s.count += 1;
+    else s.head = (s.head + 1) % SWISH_SAMPLES;
+  }
+
+  /**
+   * Walk the arc out to the foot, and hand the ribbon's edges to the eye.
+   *
+   * The foot is stepped to in `SWISH_STEP` increments rather than one point per
+   * frame: a kick moves its foot 0.14 m between frames at its fastest, so a point
+   * per frame would leave the end of the stroke behind the boot and draw the rest
+   * of it visibly faceted on a slower machine. Returns whether the foot moved
+   * enough to add anything.
+   */
+  swishSample(point, viewDir) {
+    const s = this.stroke;
+    if (s.life <= 0) return false;
+    const target = s._target.copy(point);
+    target.y += s.lift;
+    let last = s.count ? s.ring[(s.head + s.count - 1) % SWISH_SAMPLES] : null;
+    let added = false;
+    let guard = 0;
+    while ((!last || last.distanceTo(target) >= SWISH_STEP) && guard++ < SWISH_SAMPLES) {
+      if (last) s._step.copy(target).sub(last).setLength(SWISH_STEP).add(last);
+      this.pushSwishPoint(last ? s._step : target);
+      last = s.ring[(s.head + s.count - 1) % SWISH_SAMPLES];
+      added = true;
+    }
+    if (!added) return false;
+
+    this.openSwish(s.ring, s.count, viewDir);
+    s.life = SWISH_LIFE;
+    this.swishMesh.visible = s.count >= 2;
+    return true;
+  }
+
+  /** Lay the ribbon's two edges along the path and set what to draw of it. */
+  openSwish(ring, count, viewDir) {
+    const s = this.stroke;
+    const pos = this.swishGeo.getAttribute('position');
+    const view = viewDir || s._b.set(0, 0, 1);
+    for (let i = 0; i < count; i++) {
+      const p = ring[(s.head + i) % SWISH_SAMPLES];
+      const before = ring[(s.head + Math.max(0, i - 1)) % SWISH_SAMPLES];
+      const after = ring[(s.head + Math.min(count - 1, i + 1)) % SWISH_SAMPLES];
+      s._a.subVectors(after, before);
+      if (s._a.lengthSq() < 1e-8) s._a.set(0, 1, 0);
+      s._a.normalize();
+      // Width across the path and the eye, so the stroke is seen as a stroke
+      // rather than as a plank turned edge-on to the camera.
+      s._side.crossVectors(s._a, view);
+      if (s._side.lengthSq() < 1e-6) s._side.set(1, 0, 0);
+      s._side.normalize();
+      // Fat at the foot, thinning back along where it has been.
+      const t = count > 1 ? i / (count - 1) : 1;
+      const half = s.width * (0.2 + 0.8 * t);
+      pos.setXYZ(i * 2, p.x + s._side.x * half, p.y + s._side.y * half, p.z + s._side.z * half);
+      pos.setXYZ(i * 2 + 1, p.x - s._side.x * half, p.y - s._side.y * half, p.z - s._side.z * half);
+    }
+    pos.needsUpdate = true;
+    this.swishGeo.setDrawRange(0, Math.max(0, (count - 1) * 6));
+  }
+
+  /**
+   * Keep the current arc armed while its kick is still swinging.
+   *
+   * A stroke that only lived between its own points would die in the pause
+   * before a slow kick's strike — the flying high kick stands on its wind-up for
+   * half a second with the leg barely moving, and the arc it is supposed to draw
+   * happens after that. The fade is measured from the end of the swing instead.
+   */
+  holdSwish() {
+    if (this.stroke.count || this.stroke.life > 0) this.stroke.life = SWISH_LIFE;
+  }
+
+  /** Stop the current arc, leaving the buffer for the next kick to reuse. */
+  clearSwish() {
+    this.stroke.count = 0;
+    this.stroke.life = 0;
+    this.swishMesh.visible = false;
+    this.swishGeo.setDrawRange(0, 0);
   }
 
   tracer(from, to, color = 0xffe6a8) {
@@ -179,6 +327,14 @@ export class Effects {
       if (p.life <= 0) p.mesh.visible = false;
     }
 
+    // The swish is only ever alive during a kick and a fifth of a second after
+    // it, so this is one opacity write on the frames a kick is being thrown.
+    if (this.stroke.life > 0) {
+      this.stroke.life -= dt;
+      this.swishMat.opacity = Math.max(0, (this.stroke.life / SWISH_LIFE) * 0.75);
+      if (this.stroke.life <= 0) this.clearSwish();
+    }
+
     if (this.flashLife > 0) {
       this.flashLife -= dt;
       this.flash.intensity = Math.max(0, this.flash.intensity * 0.6);
@@ -216,6 +372,7 @@ export class Effects {
   }
 
   reset() {
+    this.clearSwish();
     for (const t of this.tracers) { t.life = 0; t.mesh.visible = false; }
     for (const p of this.particles) { p.life = 0; p.mesh.visible = false; }
     for (const p of this.pickups) this.scene.remove(p.mesh);

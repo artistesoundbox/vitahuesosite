@@ -105,6 +105,7 @@ export class Game {
 
     this._tmpA = new THREE.Vector3();
     this._tmpB = new THREE.Vector3();
+    this._tmpSwish = new THREE.Vector3();
 
     this.bindEvents();
   }
@@ -151,6 +152,7 @@ export class Game {
     this.player = new Player(this.playerTemplate);
     this.scene.add(this.player.object);
     this.player.onKickHit = (type) => this.resolveMelee(type);
+    this.player.onKickStart = (type) => this.beginSwish(type);
     this.player.onReload = () => this.audio.reload();
     this.player.onTierChange = (boot) => this.onTierUp(boot);
 
@@ -491,6 +493,30 @@ export class Game {
    * throws the most scenery. The equipped tier still supplies the damage and
    * knockback they scale, so upgrades are felt whichever kick it is.
    */
+  /**
+   * A kick is thrown: start the swish in the tier's own colour, shaped by the
+   * kick. It is drawn from the foot each frame it is live (see updateSwish), so
+   * what it traces is the clip, not a canned arc.
+   */
+  beginSwish(type = this.player.lastKick) {
+    const boot = this.player.boot;
+    this.effects.swish(new THREE.Color(boot.color).getHex(), this.player.bootIndex, type);
+  }
+
+  /**
+   * Feed the swish the boot's position while the kick is swinging. Two metres of
+   * arc at 60 Hz is ~28 frames of it, and the ribbon only keeps the newest 14
+   * points, so the tail leaves as the foot comes round.
+   */
+  updateSwish() {
+    if (this.player.swingLeft <= 0) return;
+    // Armed for the whole swing rather than only between points: a kick that
+    // stands still on its wind-up must not lose the arc it is about to draw.
+    this.effects.holdSwish();
+    const point = this.player.kickFootPoint(this.player.swingPoint || (this.player.swingPoint = new THREE.Vector3()));
+    this.effects.swishSample(point, this.camera.getWorldDirection(this._tmpSwish));
+  }
+
   resolveMelee(type = this.player.lastKick) {
     const boot = this.player.boot;
     const kick = KICKS[type] || KICKS.kick;
@@ -932,6 +958,7 @@ export class Game {
   step(dt) {
     this.applyInput(dt);
     this.player.update(dt, { input: this.input, world: this.world, cameraYaw: this.cameraYaw });
+    this.updateSwish();
     this.enemyManager.update(dt, {
       player: this.player,
       onFire: (enemy, dist, wounded, suppressed) => this.enemyFire(enemy, dist, wounded, suppressed),
