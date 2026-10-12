@@ -138,9 +138,11 @@
     const MUSIC_VOLUME = 0.15;
     /* the element carries its own volume, so the mute button has to speak to
        both buses: the cues through the Web Audio master, the bed through this */
-    let musicEl = null, musicIdx = -1, musicLoaded = -1, musicOk = null, musicWanted = false;
-    function musicTrack() { return MUSIC_TRACKS[musicIdx < 0 ? 0 : musicIdx]; }
-    function musicIndex() { return musicIdx < 0 ? 0 : musicIdx; }
+    /* musicIdx starts at 0, not at a "nothing chosen yet" -1: (-1 + 1) % 2 is
+       0, so a sentinel would make the first advance land back on track 1 and
+       the second track would never be heard. */
+    let musicEl = null, musicIdx = 0, musicLoaded = -1, musicOk = null, musicWanted = false;
+    function musicTrack() { return MUSIC_TRACKS[musicIdx]; }
 
     function musicInit() {
       if (musicEl) return musicEl;
@@ -167,8 +169,8 @@
          a name with a space in it would never compare equal — and comparing
          wrongly here means re-assigning src, which restarts the track from 0
          on every single gesture. */
-      if (musicLoaded !== musicIndex()) {
-        try { el.src = musicTrack(); musicLoaded = musicIndex(); } catch (e) {}
+      if (musicLoaded !== musicIdx) {
+        try { el.src = musicTrack(); musicLoaded = musicIdx; } catch (e) {}
       }
       el.volume = MUSIC_VOLUME;
       const p = el.play();
