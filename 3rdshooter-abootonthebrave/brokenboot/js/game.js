@@ -176,6 +176,13 @@ export class Game {
     this.timer.getDelta(); // discard the loading-time delta
     this.audio.playMusic(MUSIC.map((track) => `${ASSET_BASE}${track}`));
     this.startWave(1);
+    // Pose the officer and put the camera behind him before the first frame the
+    // player sees. Without mouse capture the world is paused, and a paused frame
+    // should show the character standing on his patch of ground rather than the
+    // inside of his own boots, which reads as a missing model rather than a pause.
+    this.player.anim.play('idle');
+    this.player.anim.update(1); // long enough for the crossfade to land
+    this.updateCamera(1);
   }
 
   get paused() { return this.state === 'playing' && document.pointerLockElement === null; }
@@ -1065,6 +1072,9 @@ export class Game {
           this.inputManager.update(dt);
           this.inputManager.consumeLook();
           this.inputManager.takeActions();
+          // The officer keeps breathing while the world holds still: a figure
+          // frozen mid-walk on a paused frame reads as a broken character.
+          if (this.player) this.player.anim.update(dt);
           this.hud.update(this.hudState(), dt);
           this.hud.setPaused(true, this.inputManager.touchMode
             ? 'Use the on-screen controls to begin'

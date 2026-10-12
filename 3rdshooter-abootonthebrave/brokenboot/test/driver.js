@@ -25,6 +25,9 @@ async function runCampaign(options) {
     checkKick: false,
     // Play a whole wave with the officer's ammunition taken away.
     checkDry: false,
+    // Audit the officer's own mesh file: weighted, anchored, and still carrying a
+    // boot the tier system can replace.
+    checkCharacter: false,
     // Audit these forest seeds instead of playing the campaign (the forest the
     // page is already playing is always audited too).
     forestSeeds: null,
@@ -54,7 +57,7 @@ async function runCampaign(options) {
   }
 
   const THREE = await import('three');
-  const { SETTINGS, KICKS } = await import('./js/config.js');
+  const { SETTINGS, KICKS, BOOT_TIERS } = await import('./js/config.js');
   const SENS = SETTINGS.mouseSensitivity;
   const errors = [];
   window.addEventListener('error', (e) => errors.push(`window.onerror: ${e.message}`));
@@ -1249,12 +1252,262 @@ async function runCampaign(options) {
     }
   };
 
+  // ------------------------------------------------------ the character asset
+  /**
+   * The officer's mesh file, audited for the three things one bad re-export of
+   * him breaks at once: vertices the skin never weights, geometry welded to a
+   * bone it does not sit on, and an own boot the tier system can no longer
+   * replace.
+   *
+   * Joining the big boot into the body mesh does all three. The exporter ships
+   * the boot's 50-odd thousand vertices unweighted; three.js rescues an
+   * unweighted vertex by binding it to bone 0, which here is `mixamorigHips`, so
+   * the whole boot rides his pelvis; and because the boot is no longer a separate
+   * part, `bindRigidParts()` finds nothing to register as `ownBoots`, so a tier's
+   * boot is worn on top of it rather than replacing it. None of that shows in the
+   * campaign's own numbers — it plays fine and simply looks wrong — so the asset
+   * gets its own probe.
+   */
+  async function probeCharacter() {
+    const p = G.player;
+    const out = { meshes: [], ownBoots: [], pass: false };
+    // How far a vertex may sit from the only bone that moves it. The officer's own
+    // boot rides ~0.4 m off the ankle bone and his head gear sits on his skull; a
+    // boot welded to the hips lands 0.6-1.0 m away, which is the failure named here.
+    const WRONG_BONE_DISTANCE = 0.6;
+    // The share of a mesh allowed to sit that far off. Blended vertices follow
+    // several bones and are exempt by construction, so this only ever counts
+    // rigidly-bound geometry — and a joined boot is two thirds of the mesh.
+    const WELD_SHARE_LIMIT = 0.02;
+    const SAMPLES = 4000;
+
+    /** Weight, influences and the distance to the one bone that moves a vertex. */
+    const auditMesh = (mesh) => {
+      const geo = mesh.geometry;
+      const pos = geo.attributes.position;
+      const sw = geo.attributes.skinWeight;
+      const si = geo.attributes.skinIndex;
+      if (!sw || !si) return null;
+      mesh.skeleton.update();
+      const bm = mesh.bindMatrix.elements;
+      const bmi = mesh.bindMatrixInverse.elements;
+      const bjs = mesh.skeleton.boneMatrices;
+      const mw = mesh.matrixWorld.elements;
+      const mul = (e, v) => [
+        e[0] * v[0] + e[4] * v[1] + e[8] * v[2] + e[12] * v[3],
+        e[1] * v[0] + e[5] * v[1] + e[9] * v[2] + e[13] * v[3],
+        e[2] * v[0] + e[6] * v[1] + e[10] * v[2] + e[14] * v[3],
+        e[3] * v[0] + e[7] * v[1] + e[11] * v[2] + e[15] * v[3],
+      ];
+      const at = new THREE.Vector3();
+      const stride = Math.max(1, Math.floor(pos.count / SAMPLES));
+      let unweighted = 0;
+      let single = 0;
+      let far = 0;
+      let worst = 0;
+      let worstBone = null;
+
+      for (let v = 0; v < pos.count; v += stride) {
+        const w = [sw.getX(v), sw.getY(v), sw.getZ(v), sw.getW(v)];
+        if (w[0] + w[1] + w[2] + w[3] <= 1e-6) { unweighted += 1; continue; }
+        // The slot a weight sits in is not the bone it names: skinIndex holds the
+        // bone, and only that indexes the skeleton and its matrices.
+        const slot = w.findIndex((x) => x > 1e-4);
+        if (w[slot] < 0.999) continue;           // a blended vertex follows several bones
+        if (w.filter((x) => x > 1e-4).length !== 1) continue;
+        const boneIndex = si.getComponent(v, slot);
+        const bone = mesh.skeleton.bones[boneIndex];
+        if (!bone) continue;
+        single += 1;
+        // With one influence at full weight the vertex moves exactly with that
+        // bone, so the distance between them is the same in every pose and no
+        // bind pose has to be reconstructed to measure it.
+        const bind = mul(bm, [pos.getX(v), pos.getY(v), pos.getZ(v), 1]);
+        const e = bjs.subarray(boneIndex * 16, boneIndex * 16 + 16);
+        const world = mul(mw, mul(bmi, mul(e, bind)));
+        bone.getWorldPosition(at);
+        const d = Math.hypot(world[0] - at.x, world[1] - at.y, world[2] - at.z);
+        if (d > WRONG_BONE_DISTANCE) far += 1;
+        if (d > worst) { worst = d; worstBone = bone.name; }
+      }
+      return {
+        sampled: Math.ceil(pos.count / stride),
+        unweighted,
+        single,
+        far,
+        farShare: +(far / Math.max(1, single)).toFixed(4),
+        worst: +worst.toFixed(3),
+        worstBone,
+      };
+    };
+
+    p.model.updateMatrixWorld(true);
+    p.model.traverse((o) => {
+      if (!o.isSkinnedMesh) return;
+      const seen = auditMesh(o);
+      if (!seen) return;
+      out.meshes.push({
+        name: o.name,
+        verts: o.geometry.attributes.position.count,
+        ...seen,
+      });
+    });
+    out.unweightedTotal = out.meshes.reduce((n, m) => n + m.unweighted, 0);
+    // The mesh that is worst welded is the one to name, and it is named by its
+    // bone as well as its share, so a report says what is riding what.
+    const worstMesh = out.meshes.reduce(
+      (best, m) => (best === null || m.farShare > best.farShare ? m : best),
+      null,
+    );
+    out.weldMesh = worstMesh ? worstMesh.name : null;
+    out.weldShare = worstMesh ? worstMesh.farShare : 0;
+    out.weldBone = worstMesh ? worstMesh.worstBone : null;
+    out.weldDistance = worstMesh ? worstMesh.worst : 0;
+
+    const ownMeshes = p.ownBoots || [];
+    out.ownBoots = ownMeshes.map((m) => {
+      const b = new THREE.Box3().setFromObject(m);
+      const part = (p.rigidParts || []).find((r) => r.mesh === m);
+      return {
+        mesh: m.name,
+        bone: part ? part.bone : null,
+        bottom: +b.min.y.toFixed(3),
+        size: [(b.max.x - b.min.x), (b.max.y - b.min.y), (b.max.z - b.min.z)]
+          .map((n) => +n.toFixed(3)),
+      };
+    });
+    out.ownBootCount = out.ownBoots.length;
+    out.ownBootsOnTheGround = out.ownBootCount > 0
+      && out.ownBoots.every((b) => b.bottom < 0.25);
+
+    // Every loose part the game bound to the rig, and where each one ended up. The
+    // game binds a part to whichever bone is nearest, so a part that sits on the
+    // ground is a boot and a boot on anything but a foot is a boot no tier will
+    // replace — the second way a re-export breaks him, and the one the own-boot
+    // clauses above cannot see on their own.
+    out.parts = (p.rigidParts || []).map((part) => {
+      const b = new THREE.Box3().setFromObject(part.mesh);
+      return {
+        mesh: part.mesh.name,
+        bone: part.bone,
+        metres: +part.metres.toFixed(3),
+        bottom: +b.min.y.toFixed(3),
+        onFoot: /toe|foot|ankle/i.test(part.bone || ''),
+        atTheGround: b.min.y < 0.25,
+      };
+    });
+    out.misboundParts = out.parts.filter((part) => part.atTheGround && !part.onFoot);
+    out.noMisboundParts = out.misboundParts.length === 0;
+
+    // The tier's own boot has to be able to take the officer's place: it is
+    // socketed onto the right-foot bone and the officer's boot goes away. A boot
+    // that was joined into the body is not registered, so nothing hides and the
+    // two are worn at once.
+    const saved = {
+      credit: p.tierCredit,
+      index: p.bootIndex,
+      bootModel: p.bootModel,
+      loaded: p.loadedBootModel,
+      visible: ownMeshes.map((m) => m.visible),
+    };
+    const tierIndex = BOOT_TIERS.findIndex((t) => t.model);
+    out.tier = tierIndex >= 0 ? BOOT_TIERS[tierIndex].name : null;
+    try {
+      if (tierIndex >= 0) {
+        p.tierCredit = Math.max(p.tierCredit, BOOT_TIERS[tierIndex].kills);
+        p.bootIndex = -1;                       // force the tier to move
+        p.refreshBootTier();
+        for (let i = 0; i < 60 && !p.bootModel; i++) {
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        out.tierBootSocketed = Boolean(p.bootModel);
+        out.ownBootsHidden = ownMeshes.every((m) => !m.visible);
+      }
+    } finally {
+      if (p.bootModel && p.bootModel.parent) p.bootModel.parent.remove(p.bootModel);
+      p.tierCredit = saved.credit;
+      p.bootIndex = saved.index;
+      p.bootModel = saved.bootModel;
+      p.loadedBootModel = saved.loaded;
+      ownMeshes.forEach((m, i) => { m.visible = saved.visible[i]; });
+    }
+
+    // The control, and it is the same measurement the audit itself makes: an
+    // unweighted vertex is bound to bone 0, and bone 0 of this rig is the hips, so
+    // a joined boot ends up sitting exactly where its own vertices measure against
+    // the hips. Take the officer's real boot, ask that question of its real
+    // vertices, and the share that would land beyond the distance limit has to
+    // beat the weld budget — otherwise the audit is too loose to name the defect
+    // it exists for and a pass would be worth nothing.
+    let hips = null;
+    p.model.traverse((o) => { if (!hips && o.isBone && /hips/i.test(o.name)) hips = o; });
+    if (hips && ownMeshes.length) {
+      const boot = ownMeshes[0];
+      boot.updateMatrixWorld(true);
+      const pos = boot.geometry.attributes.position;
+      const at = hips.getWorldPosition(new THREE.Vector3());
+      const v = new THREE.Vector3();
+      const step = Math.max(1, Math.floor(pos.count / 2000));
+      let beyond = 0;
+      let count = 0;
+      for (let i = 0; i < pos.count; i += step) {
+        v.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(boot.matrixWorld);
+        if (v.distanceTo(at) > WRONG_BONE_DISTANCE) beyond += 1;
+        count += 1;
+      }
+      const share = beyond / Math.max(1, count);
+      out.control = {
+        measured: true,
+        boneZero: hips.name,
+        bootSampled: count,
+        beyondLimit: beyond,
+        beyondLimitShare: +share.toFixed(4),
+        distanceLimit: WRONG_BONE_DISTANCE,
+        weldShareBudget: WELD_SHARE_LIMIT,
+        wouldNameIt: share > WELD_SHARE_LIMIT,
+      };
+    } else {
+      out.control = {
+        // No own boot to ask the question of, which is already a failure of its
+        // own: the control simply has nothing to measure, and says so.
+        measured: false,
+        boneZero: hips ? hips.name : null,
+        bootSampled: 0,
+        beyondLimit: 0,
+        beyondLimitShare: 0,
+        distanceLimit: WRONG_BONE_DISTANCE,
+        weldShareBudget: WELD_SHARE_LIMIT,
+        wouldNameIt: false,
+      };
+    }
+
+    out.limits = {
+      wrongBoneDistance: WRONG_BONE_DISTANCE,
+      weldShare: WELD_SHARE_LIMIT,
+      samples: SAMPLES,
+    };
+    out.pass = out.unweightedTotal === 0
+      && out.weldShare <= WELD_SHARE_LIMIT
+      && out.ownBootCount >= 1
+      && out.noMisboundParts
+      && out.ownBootsOnTheGround
+      && out.ownBootsHidden
+      && out.tierBootSocketed
+      && (!out.control.measured || out.control.wouldNameIt);
+    return out;
+  }
+
   // ------------------------------------------------------------------ run
   const startButton = document.getElementById('start-button');
   if (startButton) startButton.click();
   if (G.state !== 'playing') G.start();
   if (G.state !== 'playing') return { fatal: `game did not start (state ${G.state})` };
-  if (opts.checkLock || opts.checkKick || opts.checkDry || opts.forestSeeds) {
+  if (opts.checkLock || opts.checkKick || opts.checkDry || opts.checkCharacter || opts.forestSeeds) {
+    // First, on the officer exactly as he loads. The other probes leave him in a
+    // stretched pose — a kick clip scale-tracks the legs — and geometry bound to a
+    // bone is only a fixed distance from it in the pose it was authored in, so the
+    // audit is only comparable when nothing has moved him yet.
+    if (opts.checkCharacter) report.characterCheck = await probeCharacter();
     if (opts.checkLock) report.lockCheck = probeLockRetarget();
     if (opts.checkKick) report.kickCheck = probeKicks();
     // Last, because unlike the others it plays a real wave and moves the officer.
@@ -1264,6 +1517,7 @@ async function runCampaign(options) {
     if (opts.forestSeeds) report.forestSweep = await probeForestSweep(opts.forestSeeds);
     const pass = (!report.lockCheck || report.lockCheck.pass)
       && (!report.kickCheck || report.kickCheck.pass)
+      && (!report.characterCheck || report.characterCheck.pass)
       && (!report.dryCheck || report.dryCheck.pass)
       && (!report.forestSweep || report.forestSweep.pass);
     report.gameSeconds = +report.gameSeconds.toFixed(2);

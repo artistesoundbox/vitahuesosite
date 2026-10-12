@@ -10,7 +10,8 @@
     "test:aim": "node test/campaign.mjs --check-lock",
     "test:kick": "node test/campaign.mjs --check-kick",
     "test:dry": "node test/campaign.mjs --check-dry",
-    "test:probes": "node test/campaign.mjs --check-lock --check-kick",
+    "test:probes": "node test/campaign.mjs --check-lock --check-kick --check-character",
+    "test:character": "node test/campaign.mjs --check-character",
     "test:forest": "node test/campaign.mjs --check-forest=15",
     "test:forest-record": "node test/campaign.mjs --check-forest=15 --record-forest",
     "test:fuzz": "node test/campaign.mjs --fuzz=10"

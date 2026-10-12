@@ -32,7 +32,9 @@ npm run test:forest     # fifteen forests, audited without playing: could a wave
                         # recorded spread of the same metrics
 npm run test:forest-record  # the same sweep, recorded as the spread later sweeps
                             # are compared against for having got tighter
-npm run test:probes     # both of those mechanic checks, one page load
+npm run test:character  # audit the officer's own mesh file: weighted, anchored,
+                        # and still carrying a boot the tier system can replace
+npm run test:probes     # those mechanic checks and the character audit, one page load
 ```
 
 There is no test framework and no new dependency: the runner is a small CDP
@@ -49,7 +51,8 @@ eliminations, which snapshots whoever is left, whether they can see the player
 and whether the pilot is even firing), an error or a failed request from the
 page, a frame cap reached mid-campaign, pacing that has moved more than 40%
 against a recorded baseline, a forest that a wave could not be fought in, and —
-when one is asked for — any mechanic probe whose own assertion does not hold. A death is a datapoint, not a failure, unless
+when one is asked for — any mechanic probe or character audit whose own assertion
+does not hold. A death is a datapoint, not a failure, unless
 `--require-finish` is passed — and since victory and death are the same terminal
 state on screen, the end-screen title is what decides which one it was.
 
@@ -178,6 +181,55 @@ forest with its metrics, its verdict, the control's and the drift against the
 baseline, `test/campaign-forest-baseline.json` is the spread those sweeps are
 compared against, and `test/campaign-fuzz.json` carries each seed's `terrain` verdict
 beside its campaign.
+
+`npm run test:character` asks the one question none of the numbers above can: is
+the officer's own mesh file still fit to be worn? It audits the *loaded* model, so
+it sees exactly what three.js sees, and every clause names the part and the bone it
+failed on. Three things have to hold:
+
+| what | limit | the file as shipped |
+| --- | --- | --- |
+| skinned vertices carrying no weight at all | none | none, in 4,086 sampled |
+| a mesh bound to one distant bone, weighted 1.0 | 2% of the mesh, 0.6 m off that bone | 0.0% — the body is blended across three or four bones, and the furthest a rigidly bound vertex sits from its own bone is 0.38 m |
+| the officer's own boot, and every part bound to the rig | present, on a foot bone, on the ground, and gone when a tier replaces it; nothing sitting on the ground may be bound to anything but a foot | `Object_3` on `mixamorigRightFoot`, 0.18 m off that bone, bottom at 0.04 m, 0.385 × 0.491 × 0.517 m |
+
+The last clause is a real socketing rather than a naming: the probe pushes the tier
+credit to the first boot with a model, waits for `silverboot.glb` to arrive on the
+right-foot bone, requires the officer's own boot to be hidden when it does, and then
+puts the tier credit, the boot index and the visibility back. A boot the game cannot
+register is not merely un-rigged — it is worn *inside* the tier's boot forever, and
+that is what the clause exists to catch.
+
+It audits the officer **as he loads**, before any other probe has moved him: a kick
+clip scale-tracks the legs, and geometry bound to a bone is only a fixed distance
+from it in the pose it was authored in, so the numbers are only comparable on the
+figure nothing has posed yet.
+
+The probe carries its own control, because a threshold is only worth having if it
+tells the failure from the normal case. An unweighted vertex is bound to bone 0, and
+bone 0 of this rig is `mixamorigHips`, so the audit asks what would have become of
+the boot it just measured: **64% of the officer's own boot vertices sit more than
+0.6 m from the hips**, well over the 2% budget, which means a boot joined into the
+body and welded there would be named rather than waved through. The control has to
+say so, and a control with no own boot to measure — the joined case — reports that
+instead of inventing a verdict.
+
+That is not hypothetical. Joining the big boot into the body mesh and re-exporting
+the officer is one edit that breaks all three clauses at once, and `test:character`
+names each of them:
+
+```
+FAIL
+  - the officer's mesh file: 71.9% of Ch15 is welded to mixamorigHips, up to
+    1.046 m off that bone against a 0.6 m limit; nothing in the officer counts as
+    his own boot, so a tier's boot is worn over it instead of replacing it
+```
+
+Two thirds of the mesh riding the pelvis, and no boot left that a tier can replace.
+The same file reports **nothing unweighted**, which is the whole reason the weld
+clause exists: an unweighted vertex does not stay unweighted — three.js rescues it
+by binding it to bone 0 — so "no unweighted vertices" is not by itself evidence of a
+sound rig.
 
 `npm run test:dry` is the regression check for the first of them. It plays a
 whole wave for real — same patched step, same pilot, same wave one — with the

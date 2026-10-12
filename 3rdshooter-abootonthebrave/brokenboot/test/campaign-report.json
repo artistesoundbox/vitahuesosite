@@ -1,11 +1,22 @@
 {
   "seed": 20260411,
-  "startedAt": "2026-10-12T01:59:43.525Z",
-  "gameSeconds": 0,
-  "steps": 0,
+  "startedAt": "2026-10-12T04:08:37.276Z",
+  "gameSeconds": 0.56,
+  "steps": 12,
   "waves": [],
-  "tiers": [],
-  "banners": [],
+  "tiers": [
+    {
+      "tier": "Silver Boot",
+      "atSeconds": 0.01,
+      "credit": 24
+    }
+  ],
+  "banners": [
+    {
+      "text": "BOOT UPGRADED",
+      "atSeconds": 0.01
+    }
+  ],
   "eliminations": 0,
   "bootEliminations": 0,
   "lootCollected": 0,
@@ -48,120 +59,73 @@
   "instrumented": true,
   "outcome": "probes-passed",
   "errors": [],
-  "lockCheck": {
-    "cone": 0.22,
-    "distance": 26,
-    "pass": true,
-    "baseHeadingRadians": 0,
-    "anglesRadians": {
-      "near": 0.055,
-      "far": 0.132
-    },
-    "firstPress": "near",
-    "anglesAtPress": {
-      "near": 0.169,
-      "far": 0.207
-    },
-    "swingRadians": 0.11,
-    "heldDuringSwing": "near",
-    "anglesAfterSwing": {
-      "near": 0.216,
-      "far": 0.165
-    },
-    "farVisible": true,
-    "swungOnTarget": true,
-    "afterRelease": "near",
-    "freshPress": "far"
-  },
-  "kickCheck": {
-    "selection": {
-      "crouched": "sweep",
-      "airborne": "high",
-      "standingStandardBoot": "kick",
-      "standingSilverBoot": "high",
-      "standingTopBoot": "stomp"
-    },
-    "profiles": {
-      "kick": {
-        "name": "Kick",
-        "range": 3.6,
-        "arcDegrees": 108,
-        "damageScale": 1,
-        "propPower": 10
-      },
-      "sweep": {
-        "name": "Low Sweep",
-        "range": 2.7,
-        "arcDegrees": 144,
-        "damageScale": 0.7,
-        "propPower": 7
-      },
-      "high": {
-        "name": "High Kick",
-        "range": 4.3,
-        "arcDegrees": 76,
-        "damageScale": 1.15,
-        "propPower": 13
-      },
-      "stomp": {
-        "name": "Stomp",
-        "range": 3.3,
-        "arcDegrees": 180,
-        "damageScale": 1.4,
-        "propPower": 16
+  "characterCheck": {
+    "meshes": [
+      {
+        "name": "Ch15001",
+        "verts": 138891,
+        "sampled": 4086,
+        "unweighted": 0,
+        "single": 1856,
+        "far": 0,
+        "farShare": 0,
+        "worst": 0.377,
+        "worstBone": "mixamorigLeftUpLeg"
       }
+    ],
+    "ownBoots": [
+      {
+        "mesh": "Object_3",
+        "bone": "mixamorigRightFoot",
+        "bottom": 0.044,
+        "size": [
+          0.385,
+          0.491,
+          0.517
+        ]
+      }
+    ],
+    "pass": true,
+    "unweightedTotal": 0,
+    "weldMesh": "Ch15001",
+    "weldShare": 0,
+    "weldBone": "mixamorigLeftUpLeg",
+    "weldDistance": 0.377,
+    "ownBootCount": 1,
+    "ownBootsOnTheGround": true,
+    "parts": [
+      {
+        "mesh": "Object_3",
+        "bone": "mixamorigRightFoot",
+        "metres": 0.184,
+        "bottom": 0.044,
+        "onFoot": true,
+        "atTheGround": true
+      }
+    ],
+    "misboundParts": [],
+    "noMisboundParts": true,
+    "tier": "Silver Boot",
+    "tierBootSocketed": true,
+    "ownBootsHidden": true,
+    "control": {
+      "measured": true,
+      "boneZero": "mixamorigHips",
+      "bootSampled": 2013,
+      "beyondLimit": 1288,
+      "beyondLimitShare": 0.6398,
+      "distanceLimit": 0.6,
+      "weldShareBudget": 0.02,
+      "wouldNameIt": true
     },
-    "scenery": {
-      "kind": "car",
-      "mass": 4.5,
-      "speedAfterKick": 4.19,
-      "peakSpeed": 5.9,
-      "movedMeters": 4.67,
-      "tumbled": true,
-      "settleSeconds": 1,
-      "settled": true,
-      "boxFollowed": 5.08
-    },
-    "profilesDiffer": true,
-    "feel": {
-      "whiff": {
-        "shake": 0.3,
-        "kickback": 0,
-        "roll": 0,
-        "hitStop": 0
-      },
-      "body": {
-        "shake": 0.9,
-        "kickback": 0.32,
-        "roll": 3.2,
-        "hitStop": 0.06
-      },
-      "car": {
-        "shake": 2,
-        "kickback": 0.72,
-        "roll": 7.2,
-        "hitStop": 0.135
-      },
-      "carRoll": 7.2,
-      "openSightline": true,
-      "cameraPushBack": 0.161,
-      "frameRollDegrees": 6.3,
-      "carLeftRoll": -7.2,
-      "rollFollowsSide": true,
-      "hitStopFromBody": 0.06,
-      "worldTimeDuringStop": 0.002,
-      "stopScale": 0.12,
-      "stopFrames": 3,
-      "worldTimeAfterStop": 0.01667,
-      "edgeFlashOpacity": 0.931,
-      "bodyMass": 2,
-      "whiffShake": 0.3,
-      "feelScaledByMass": true
-    },
-    "pass": true
+    "limits": {
+      "wrongBoneDistance": 0.6,
+      "weldShare": 0.02,
+      "samples": 4000
+    }
   },
   "wavesReached": 1,
-  "wallClockSeconds": 0.7,
+  "wallClockSeconds": 3.9,
   "consoleErrors": [],
   "consoleWarnings": [
     "console.warn: THREE.FBXLoader: %s map is not supported in three.js, skipping texture. ShininessExponent",

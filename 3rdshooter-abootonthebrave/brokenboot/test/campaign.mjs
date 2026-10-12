@@ -107,6 +107,7 @@ function parseArgs(argv) {
       case '--check-lock': opts.checkLock = true; break;
       case '--check-kick': opts.checkKick = true; break;
       case '--check-dry': opts.checkDry = true; break;
+      case '--check-character': opts.checkCharacter = true; break;
       // Bare `--fuzz` is five campaigns; `--fuzz=12` is twelve.
       case '--fuzz': opts.fuzz = Number.isFinite(num) ? Math.max(1, Math.floor(num)) : 5; break;
       // Bare `--check-forest` is fifteen forests, plus the one the page plays.
@@ -155,6 +156,10 @@ target) instead of playing the campaign
 the campaign; pass both to run both probes)
   --check-dry      play a whole wave with the officer's ammunition taken away, and
 assert the boot alone can still end it
+  --check-character audit the officer's own mesh file instead: every skinned vertex
+weighted, nothing welded to a bone it does not sit on, and his own boot still a part
+the tier system can replace. It sockets a tier's boot to prove that last one, so it
+does not combine with --check-forest
   --require-finish fail the run if the campaign did not reach the last wave
   --url=URL        page to load (default: served from this repo)
   --port=N         port for the bundled static server
@@ -261,12 +266,16 @@ let profileDir = null;
 let exitCode = 0;
 
 async function main() {
-  if (opts.fuzz && (opts.checkLock || opts.checkKick || opts.checkDry || opts.checkForest || opts.baseline || opts.record || opts.recordForest)) {
+  if (opts.fuzz && (opts.checkLock || opts.checkKick || opts.checkDry || opts.checkCharacter || opts.checkForest || opts.baseline || opts.record || opts.recordForest)) {
     console.error('--fuzz plays whole campaigns, so it does not combine with the mechanic probes, with --check-forest, or with --baseline/--record/--record-forest.');
     return 2;
   }
   if (opts.checkForest && (opts.baseline || opts.record)) {
     console.error('--check-forest audits terrain without playing a campaign, so it has no wave timings to compare or record.');
+    return 2;
+  }
+  if (opts.checkCharacter && opts.checkForest) {
+    console.error('--check-character sockets a boot model onto the officer in the page, so it does not combine with --check-forest, which spends the page on terrain.');
     return 2;
   }
   if (opts.recordForest && !opts.checkForest) {
@@ -421,6 +430,7 @@ async function main() {
       checkLock: opts.checkLock || false,
       checkKick: opts.checkKick || false,
       checkDry: opts.checkDry || false,
+      checkCharacter: opts.checkCharacter || false,
       // An empty list is a sweep of the one forest the page is already playing.
       forestSeeds: opts.checkForest ? (opts.worldSeed ? [] : fuzzSeedList(opts.checkForest)) : null,
     })}); })()`;
@@ -790,7 +800,7 @@ function assess(report) {
   }
 
   // The probes are single assertions about one mechanic, not a campaign.
-  if (report.lockCheck || report.kickCheck || report.dryCheck || report.forestSweep) {
+  if (report.lockCheck || report.kickCheck || report.dryCheck || report.characterCheck || report.forestSweep) {
     const l = report.lockCheck;
     const k = report.kickCheck;
     const d = report.dryCheck;
@@ -838,6 +848,49 @@ function assess(report) {
       if (f.stopFrames !== undefined && !(f.stopFrames >= 2 && f.stopFrames <= 12)) bits.push(`the hit-stop froze time for ${f.stopFrames} frame(s)`);
       if (f.edgeFlashOpacity !== undefined && !(f.edgeFlashOpacity > 0.5)) bits.push('the screen edge never lit up on a heavy connect');
       reasons.push(`kicks and scenery: ${bits.join('; ') || 'the probe did not pass'}`);
+    }
+    // The officer's own mesh file. Every clause names the part and the bone, so a
+    // bad export says which edit broke it rather than only that something did.
+    const cc = report.characterCheck;
+    if (cc) {
+      const limit = cc.limits ? cc.limits.weldShare : 0.02;
+      if (cc.pass) {
+        findings.push(`the officer's mesh file audits clean: ${cc.meshes.map((m) => `${m.name} (${m.sampled} sampled)`).join(', ')}, `
+          + `nothing unweighted, no more than ${(cc.weldShare * 100).toFixed(1)}% of a mesh riding one distant bone, and his own boot `
+          + `(${cc.ownBoots.map((b) => b.mesh).join(', ')}) on ${cc.ownBoots.map((b) => b.bone).join(', ')} until the ${cc.tier} replaced it`);
+        if (cc.control && cc.control.measured) {
+          findings.push(`the audit would name the failure it exists for: ${(cc.control.beyondLimitShare * 100).toFixed(1)}% of the officer's own boot vertices sit `
+            + `beyond ${cc.control.distanceLimit} m of ${cc.control.boneZero}, which is where an unweighted boot ends up`);
+        }
+      } else {
+        const bits = [];
+        if (cc.unweightedTotal > 0) {
+          bits.push(`${cc.unweightedTotal} sampled skin vertex/vertices of the officer carry no weight at all`);
+        }
+        if (cc.weldShare > limit) {
+          bits.push(`${(cc.weldShare * 100).toFixed(1)}% of ${cc.weldMesh} is welded to ${cc.weldBone}, up to ${cc.weldDistance} m off that bone `
+            + `against a ${cc.limits.wrongBoneDistance} m limit`);
+        }
+        if (!(cc.ownBootCount >= 1)) {
+          bits.push('nothing in the officer counts as his own boot, so a tier\'s boot is worn over it instead of replacing it');
+        } else {
+          if (!cc.noMisboundParts) {
+            bits.push(`${cc.misboundParts.map((m) => `${m.mesh} sits on the ground but is bound to ${m.bone}`).join('; ')}, `
+              + 'so a tier\'s boot is worn over it instead of replacing it');
+          }
+          if (!cc.ownBootsOnTheGround) bits.push(`his own boot hangs ${cc.ownBoots.map((b) => `${b.bottom} m`).join(', ')} above the ground`);
+          if (!cc.ownBootsHidden) bits.push(`socketing the ${cc.tier} did not hide his own boot`);
+        }
+        if (!cc.tierBootSocketed) bits.push(`the ${cc.tier} boot never socketed onto the foot`);
+        // The control only speaks when there is a boot to measure it on: with the
+        // boot missing altogether, the clause above already says the failure out
+        // loud, and a control with nothing to measure would only add noise.
+        if (cc.control && cc.control.measured && !cc.control.wouldNameIt) {
+          bits.push(`the audit cannot even name the failure it exists for: only ${(cc.control.beyondLimitShare * 100).toFixed(1)}% of the officer's own boot would land `
+            + `beyond ${cc.control.distanceLimit} m of ${cc.control.boneZero} if it were bound there, against a ${(cc.control.weldShareBudget * 100).toFixed(0)}% budget`);
+        }
+        reasons.push(`the officer's mesh file: ${bits.join('; ') || 'the probe did not pass'}`);
+      }
     }
     if (report.failedRequests?.length) reasons.push(`${report.failedRequests.length} failed request(s): ${report.failedRequests[0]}`);
     // The forest sweep: every layout it rebuilt, and the two ways the sweep
@@ -939,10 +992,11 @@ function printReport(report, passed) {
   console.log('');
 
   // The mechanic probes: one assertion each, no campaign.
-  if (report.lockCheck || report.kickCheck || report.dryCheck || report.forestSweep) {
+  if (report.lockCheck || report.kickCheck || report.dryCheck || report.characterCheck || report.forestSweep) {
     const c = report.lockCheck;
     const k = report.kickCheck;
     const d = report.dryCheck;
+    const cc = report.characterCheck;
     const sweep = report.forestSweep;
     if (c) {
       console.log('Aim trigger (left trigger / right mouse / Q)');
@@ -983,8 +1037,44 @@ function printReport(report, passed) {
       }
       if (k.detail) console.log(`  ${k.detail}`);
     }
+    if (cc) {
+      if (c || k || d) console.log('');
+      const weldBudget = cc.limits ? cc.limits.weldShare : 0.02;
+      const boneLimit = cc.limits ? cc.limits.wrongBoneDistance : 0.6;
+      console.log("The officer's own mesh file");
+      console.log(`  ${pad('mesh', 12)}${pad('verts', 10)}${pad('sampled', 9)}${pad('unweighted', 12)}${pad('on one distant bone', 20)}verdict`);
+      for (const m of cc.meshes) {
+        const share = `${(m.farShare * 100).toFixed(1)}%`;
+        const verdict = m.farShare > weldBudget
+          ? `WRONG — ${(m.farShare * 100).toFixed(1)}% over the ${(weldBudget * 100).toFixed(0)}% budget, worst ${m.worstBone} at ${m.worst} m`
+          : (m.worstBone
+            ? `worst ${m.worstBone} at ${m.worst} m; ${(m.farShare * 100).toFixed(1)}% past the ${boneLimit} m limit, budget ${(weldBudget * 100).toFixed(0)}%`
+            : 'no rigidly bound geometry');
+        console.log(`  ${pad(m.name, 12)}${pad(m.verts, 10)}${pad(m.sampled, 9)}${pad(m.unweighted, 12)}${pad(share, 20)}${verdict}`);
+      }
+      if (cc.parts && cc.parts.length) {
+        console.log(`  ${pad('bound parts', 22)}${cc.parts.map((m) => `${m.mesh} → ${m.bone} (${m.metres} m off, bottom ${m.bottom} m)`).join('; ')}`);
+      }
+      if (cc.misboundParts && cc.misboundParts.length) {
+        console.log(`  ${pad('misbound', 22)}${cc.misboundParts.map((m) => `${m.mesh} on the ground but bound to ${m.bone}`).join('; ')} — WRONG`);
+      }
+      console.log(`  ${pad('his own boot', 22)}${cc.ownBoots.length
+        ? cc.ownBoots.map((b) => `${b.mesh} on ${b.bone}, bottom ${b.bottom} m, ${b.size.join(' × ')} m`).join('; ')
+        : "NOTHING REGISTERED — a tier's boot would be worn over it"}`);
+      console.log(`  ${pad('socketing the tier', 22)}${cc.tier}: ${cc.tierBootSocketed ? 'socketed' : 'NEVER SOCKETED'}, `
+        + `${cc.ownBootsHidden ? "his own boot hidden" : 'his own boot STILL SHOWING'}`);
+      if (cc.control) {
+        console.log(`  ${pad('control', 22)}${cc.control.measured
+          ? `${cc.control.beyondLimit}/${cc.control.bootSampled} of his own boot's vertices (${(cc.control.beyondLimitShare * 100).toFixed(1)}%) sit beyond `
+            + `${cc.control.distanceLimit} m of ${cc.control.boneZero}, where an unweighted boot ends up — `
+            + (cc.control.wouldNameIt
+              ? `over the ${(cc.control.weldShareBudget * 100).toFixed(0)}% budget, so it would be named`
+              : 'UNDER THE BUDGET, SO IT WOULD NOT BE NAMED')
+          : 'nothing to measure it on: the officer has no own boot left to ask the question of'}`);
+      }
+    }
     if (d) {
-      if (c || k) console.log('');
+      if (c || k || cc) console.log('');
       console.log('A wave with no ammunition');
       console.log(`  ${pad('rounds', 26)}none in the magazine, none in the reserve, every frame`);
       console.log(`  ${pad('closed to boot range', 26)}${d.closedToBootRangeSeconds === null ? 'never' : `${d.closedToBootRangeSeconds}s`}`);
@@ -995,7 +1085,7 @@ function printReport(report, passed) {
       }
     }
     if (sweep) {
-      if (c || k || d) console.log('');
+      if (c || k || d || cc) console.log('');
       const control = sweep.control;
       console.log('Forest fairness');
       console.log(`  control: an empty field is ${control.openFair ? 'fair' : 'UNFAIR'}, and a trunk wall round the clearing is ${control.sealedUnfair ? 'unfair' : 'FAIR'} — ${control.pass ? 'the audit can tell them apart' : 'IT CANNOT TELL THEM APART'}`);
@@ -1041,7 +1131,7 @@ function printReport(report, passed) {
       }
     }
     if (passed.ok) {
-      console.log(`\nPASS — ${[c && 'a press retargets to the attacker nearest the crosshair and a held trigger keeps its target', k && 'the three kicks differ, the scenery they launch settles where it lands, and the impact feels as heavy as the mass it hit', d && 'a wave can be won with no ammunition left, by closing and booting', sweep && 'every forest audited is one a wave can actually be fought in'].filter(Boolean).join('; ')}.`);
+      console.log(`\nPASS — ${[c && 'a press retargets to the attacker nearest the crosshair and a held trigger keeps its target', k && 'the three kicks differ, the scenery they launch settles where it lands, and the impact feels as heavy as the mass it hit', cc && "the officer's own mesh file is fully weighted, nothing is welded to a bone it does not sit on, and a tier's boot sockets over his own — which goes away", d && 'a wave can be won with no ammunition left, by closing and booting', sweep && 'every forest audited is one a wave can actually be fought in'].filter(Boolean).join('; ')}.`);
     } else {
       console.log('\nFAIL');
       for (const reason of passed.reasons) console.log(`  - ${reason}`);
