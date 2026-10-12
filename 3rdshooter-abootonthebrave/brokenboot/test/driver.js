@@ -42,6 +42,10 @@ async function runCampaign(options) {
   // damage taken.
   const INSTRUMENT_MAX_HEALTH = 1000000;
 
+  // The boot's own recorded takes, by the names the game knows them by. They are
+  // fetched as the match starts, so anything reading them has to wait for them.
+  const BOOT_TAKES = ['ouch', 'oua', 'bsh'];
+
   const G = window.__brokenBoot;
   if (!G || !G.player || !G.enemyManager) return { fatal: 'game object missing' };
 
@@ -823,13 +827,11 @@ async function runCampaign(options) {
       //    rather than assuming — a file that never arrives leaves the synthesis in
       //    place, and that has to show up here rather than be papered over. The pitch
       //    each take is played at has to move, or every kick is one file on repeat.
-      const takes = ['ouch', 'oua', 'bsh'];
-      for (let i = 0; i < 60 && takes.some((n) => !G.audio.samples[n]); i++) {
-        await new Promise((r) => setTimeout(r, 100));
-      }
+      // Whoever dispatched this probe has already waited for the takes to land (see
+      // waitForBootTakes), so what is in the map now is what the match has.
       out.takes = {
-        loaded: takes.filter((n) => G.audio.samples[n]),
-        missing: takes.filter((n) => !G.audio.samples[n]),
+        loaded: BOOT_TAKES.filter((n) => G.audio.samples[n]),
+        missing: BOOT_TAKES.filter((n) => !G.audio.samples[n]),
         swings: 0,
         swingPitches: [],
         yelp: [],
@@ -2943,6 +2945,20 @@ async function runCampaign(options) {
     return out;
   }
 
+  /**
+   * Leave the page a moment to finish fetching and decoding the boot's recorded
+   * takes. They load while the match is already playing, so a probe that measured
+   * them on the instant would be measuring the display: this is what makes the
+   * difference between a file that decoded and a file that never arrived.
+   */
+  async function waitForBootTakes(timeoutMs = 6000) {
+    const until = Date.now() + timeoutMs;
+    while (Date.now() < until && BOOT_TAKES.some((n) => !G.audio.samples[n])) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return BOOT_TAKES.filter((n) => G.audio.samples[n]);
+  }
+
   // ------------------------------------------------------------------ run
   const startButton = document.getElementById('start-button');
   if (startButton) startButton.click();
@@ -2950,12 +2966,21 @@ async function runCampaign(options) {
   if (G.state !== 'playing') return { fatal: `game did not start (state ${G.state})` };
   if (opts.checkLock || opts.checkKick || opts.checkDry || opts.checkCharacter
     || opts.checkFatality || opts.forestSeeds) {
+    // The page runs its own loop underneath the harness, and each probe here drives
+    // `step` itself and measures a still world. Left running, how far the page had
+    // got on its own becomes part of the measurement — which is how a probe that
+    // waits for an asset moves the numbers of the probe that follows it. So the loop
+    // is parked for the whole section and started again when the probes are done.
+    if (G._raf) { cancelAnimationFrame(G._raf); G._raf = 0; }
     // First, on the officer exactly as he loads. The other probes leave him in a
     // stretched pose — a kick clip scale-tracks the legs — and geometry bound to a
     // bone is only a fixed distance from it in the pose it was authored in, so the
     // audit is only comparable when nothing has moved him yet.
     if (opts.checkCharacter) report.characterCheck = await probeCharacter();
     if (opts.checkLock) report.lockCheck = probeLockRetarget();
+    // Held until the boot's own takes have landed, so the kick probe reads the
+    // recorded sounds rather than the synthesis standing in for them.
+    if (opts.checkKick) await waitForBootTakes();
     if (opts.checkKick) report.kickCheck = probeKicks();
     // After the other mechanic probes, so their rounds and their draws are exactly
     // the ones they were: this one fires a real magazine of its own.
@@ -2965,6 +2990,8 @@ async function runCampaign(options) {
     // The sweep rebuilds its own forests rather than playing one, so it goes
     // after everything that touches this page's world.
     if (opts.forestSeeds) report.forestSweep = await probeForestSweep(opts.forestSeeds);
+    // The page may as well be alive again now the measuring is over.
+    if (!G._raf) G.run();
     const pass = (!report.lockCheck || report.lockCheck.pass)
       && (!report.kickCheck || report.kickCheck.pass)
       && (!report.characterCheck || report.characterCheck.pass)
