@@ -403,14 +403,13 @@ export class Player {
       // boot's own sole direction, so it raises the sole by its own figure rather
       // than along whatever axis the rig happened to be in when it arrived.
       const up = new THREE.Vector3().fromArray(BOOT_BONE_AXES.sole).normalize();
+      const toe = new THREE.Vector3().fromArray(BOOT_BONE_AXES.toe).normalize();
       // Forward is the foot's toe axis laid flat in the boot's own sole plane, so a
-      // lift raises the sole without sliding it forward and a forward offset slides it
-      // without burying the sole: the two axes this rig calls forward and up are 60°
-      // apart, and adding them as they come moves a boot 0.5 m forward per metre of
-      // lift.
-      const ahead = new THREE.Vector3().fromArray(BOOT_BONE_AXES.toe).normalize()
-        .addScaledVector(up, -new THREE.Vector3().fromArray(BOOT_BONE_AXES.toe).normalize().dot(up))
-        .normalize();
+      // lift raises the sole without sliding the boot forward and a forward offset
+      // slides it without burying the sole: the two axes this rig calls forward and up
+      // are 60° apart, and adding them as they come moves a boot half a metre forward
+      // for every metre of lift.
+      const ahead = toe.clone().addScaledVector(up, -toe.dot(up)).normalize();
       attachToBone(
         bone,
         boot,
