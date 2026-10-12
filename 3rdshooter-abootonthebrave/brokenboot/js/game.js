@@ -105,6 +105,9 @@ export class Game {
     this.sceneryKicked = 0;
     this.carsKicked = 0;
     this.kicksTaught = new Set();
+    // Every elimination this match, boot or bullet. It is counted from zero: it used
+    // to be undefined until the first one, which made it NaN from then on.
+    this.enemiesKilledTotal = 0;
 
     this._tmpA = new THREE.Vector3();
     this._tmpB = new THREE.Vector3();

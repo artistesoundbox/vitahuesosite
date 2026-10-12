@@ -35,7 +35,10 @@ npm run test:forest-record  # the same sweep, recorded as the spread later sweep
 npm run test:character  # audit the officer: weighted, anchored, rifle in hand, and
                         # drawn standing on the ground in every state he can be
                         # posed in, still carrying a boot a tier can replace
-npm run test:probes     # those mechanic checks and the character audit, one page load
+npm run test:fatality   # shoot an attacker down through the head and then through
+                        # the chest: only the head throws the body, and both pay the
+                        # same tier credit
+npm run test:probes     # those mechanic checks and both audits, one page load
 ```
 
 There is no test framework and no new dependency: the runner is a small CDP
@@ -418,6 +421,19 @@ This is the heart of the design, and it is deliberately unusual:
 - **Gunfire wounds first.** An attacker's health floors out at `bulletMinHealth`
   (6); no single burst drops them, and wounded attackers slow down and shoot less
   accurately.
+- **A finishing round through the head is a fatality.** The round that actually
+  finishes an attacker — the one that takes the bleed-out timer under zero — decides
+  it: `head`, and the body leaves the ground. `fatalityThrow` (6.4 m/s) sends it
+  where the shot was going, `fatalityLift` (4.2 m/s) puts it half a metre up for
+  four tenths of a second, and `fatalitySpin` (6.0 rad/s) turns it most of the way
+  over by the time it lands. It comes down two and a half metres downrange, skids
+  (`fatalitySkid`), then sinks. A round through the chest — or a bleed-out that runs
+  out between rounds — folds them where they stand, which is the other banner.
+  Nothing else changes: the credit, the loot roll and the wave pacing are a
+  downing's, so the boot is still the way to the next tier. The throw is worked out
+  from the shot itself (its direction, and which side it came from) rather than from
+  dice, because a campaign that drew different numbers from something that happens
+  after the fight is over is no longer the same campaign.
 - **Keep firing and they eventually bleed out.** Once an attacker is driven to
   the floor it starts a bleed-out timer (`bleedoutTime`, 15 s). Every extra hit
   takes `bleedoutHitPush` (0.8 s) off it, so putting one down with the rifle takes

@@ -1,25 +1,527 @@
 {
   "seed": 20260411,
-  "startedAt": "2026-10-12T08:24:14.688Z",
-  "gameSeconds": 0.21,
-  "steps": 5,
-  "waves": [],
+  "startedAt": "2026-10-12T08:43:56.653Z",
+  "gameSeconds": 382.25,
+  "steps": 22935,
+  "waves": [
+    {
+      "wave": 1,
+      "startSeconds": 0,
+      "clearSeconds": 21.75,
+      "durationSeconds": 21.75,
+      "hostilesAtStart": 5,
+      "eliminations": 5,
+      "damageTaken": 18,
+      "damagePerSecond": 0.83,
+      "longestGapSeconds": 6.4
+    },
+    {
+      "wave": 2,
+      "startSeconds": 21.75,
+      "clearSeconds": 48,
+      "durationSeconds": 26.25,
+      "hostilesAtStart": 7,
+      "eliminations": 7,
+      "damageTaken": 9,
+      "damagePerSecond": 0.34,
+      "longestGapSeconds": 10.4
+    },
+    {
+      "wave": 3,
+      "startSeconds": 48,
+      "clearSeconds": 83.12,
+      "durationSeconds": 35.12,
+      "hostilesAtStart": 8,
+      "eliminations": 8,
+      "damageTaken": 18,
+      "damagePerSecond": 0.51,
+      "longestGapSeconds": 9.2
+    },
+    {
+      "wave": 4,
+      "startSeconds": 83.12,
+      "clearSeconds": 120.88,
+      "durationSeconds": 37.76,
+      "hostilesAtStart": 10,
+      "eliminations": 10,
+      "damageTaken": 27,
+      "damagePerSecond": 0.71,
+      "longestGapSeconds": 10.7
+    },
+    {
+      "wave": 5,
+      "startSeconds": 120.88,
+      "clearSeconds": 156.08,
+      "durationSeconds": 35.2,
+      "hostilesAtStart": 11,
+      "eliminations": 11,
+      "damageTaken": 34.4,
+      "damagePerSecond": 0.98,
+      "longestGapSeconds": 9.9
+    },
+    {
+      "wave": 6,
+      "startSeconds": 156.08,
+      "clearSeconds": 200.12,
+      "durationSeconds": 44.04,
+      "hostilesAtStart": 12,
+      "eliminations": 12,
+      "damageTaken": 76.5,
+      "damagePerSecond": 1.74,
+      "longestGapSeconds": 12.2
+    },
+    {
+      "wave": 7,
+      "startSeconds": 200.12,
+      "clearSeconds": 242.6,
+      "durationSeconds": 42.48,
+      "hostilesAtStart": 14,
+      "eliminations": 14,
+      "damageTaken": 52.4,
+      "damagePerSecond": 1.23,
+      "longestGapSeconds": 11.1
+    },
+    {
+      "wave": 8,
+      "startSeconds": 242.6,
+      "clearSeconds": 291.7,
+      "durationSeconds": 49.1,
+      "hostilesAtStart": 15,
+      "eliminations": 15,
+      "damageTaken": 66.4,
+      "damagePerSecond": 1.35,
+      "longestGapSeconds": 12.2
+    },
+    {
+      "wave": 9,
+      "startSeconds": 291.7,
+      "clearSeconds": 340.97,
+      "durationSeconds": 49.27,
+      "hostilesAtStart": 17,
+      "eliminations": 17,
+      "damageTaken": 82.3,
+      "damagePerSecond": 1.67,
+      "longestGapSeconds": 8.9
+    },
+    {
+      "wave": 10,
+      "startSeconds": 340.97,
+      "clearSeconds": 382.25,
+      "durationSeconds": 41.28,
+      "hostilesAtStart": 18,
+      "eliminations": 18,
+      "damageTaken": 45,
+      "damagePerSecond": 1.09,
+      "longestGapSeconds": 13.7,
+      "closedByHarness": false,
+      "endedByVictory": true
+    }
+  ],
   "tiers": [
     {
       "tier": "Standard Boot",
-      "atSeconds": 0.01,
+      "atSeconds": 0.02,
       "credit": 0
+    },
+    {
+      "tier": "Reinforced Boot",
+      "atSeconds": 55.67,
+      "credit": 10.25
+    },
+    {
+      "tier": "Silver Boot",
+      "atSeconds": 125.43,
+      "credit": 24.25
+    },
+    {
+      "tier": "Gold Boot",
+      "atSeconds": 195.27,
+      "credit": 42.5
+    },
+    {
+      "tier": "Spiked Gold Boot",
+      "atSeconds": 283.87,
+      "credit": 62
+    },
+    {
+      "tier": "Tactical Doom Boot",
+      "atSeconds": 352.78,
+      "credit": 82.25
     }
   ],
   "banners": [
     {
       "text": "WAVE 1",
-      "atSeconds": 0.01
+      "atSeconds": 0.02
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 6.47
+    },
+    {
+      "text": "LAST STAND",
+      "atSeconds": 10.13
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 10.55
+    },
+    {
+      "text": "WAVE CLEARED",
+      "atSeconds": 15.52
+    },
+    {
+      "text": "WAVE 2",
+      "atSeconds": 21.75
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 25.97
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 28.6
+    },
+    {
+      "text": "LAST STAND",
+      "atSeconds": 33.47
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 36.32
+    },
+    {
+      "text": "STANDARD BOOT",
+      "atSeconds": 40.68
+    },
+    {
+      "text": "WAVE CLEARED",
+      "atSeconds": 42.05
+    },
+    {
+      "text": "WAVE 3",
+      "atSeconds": 48
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 51.3
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 55.67
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 59.57
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 60.95
+    },
+    {
+      "text": "LAST STAND",
+      "atSeconds": 63.75
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 68.35
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 71.47
+    },
+    {
+      "text": "WAVE CLEARED",
+      "atSeconds": 77.43
+    },
+    {
+      "text": "WAVE 4",
+      "atSeconds": 83.12
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 88.13
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 91.32
+    },
+    {
+      "text": "REINFORCED BOOT",
+      "atSeconds": 103.1
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 105.75
+    },
+    {
+      "text": "LAST STAND",
+      "atSeconds": 107
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 109.6
+    },
+    {
+      "text": "WAVE CLEARED",
+      "atSeconds": 115.48
+    },
+    {
+      "text": "WAVE 5",
+      "atSeconds": 120.88
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 125.43
+    },
+    {
+      "text": "LAST STAND",
+      "atSeconds": 142.57
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 147.4
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 148.88
+    },
+    {
+      "text": "WAVE CLEARED",
+      "atSeconds": 150.97
+    },
+    {
+      "text": "WAVE 6",
+      "atSeconds": 156.08
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 163.2
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 168.62
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 177.22
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 181.65
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 184.35
+    },
+    {
+      "text": "LAST STAND",
+      "atSeconds": 188.52
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 193.72
+    },
+    {
+      "text": "WAVE CLEARED",
+      "atSeconds": 195.27
+    },
+    {
+      "text": "WAVE 7",
+      "atSeconds": 200.12
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 205.02
+    },
+    {
+      "text": "BOOT CHARGED",
+      "atSeconds": 205.13
+    },
+    {
+      "text": "GOLD BOOT",
+      "atSeconds": 207.1
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 211.25
+    },
+    {
+      "text": "THEY’RE MOVING",
+      "atSeconds": 222.77
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 225.48
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 231.03
+    },
+    {
+      "text": "LAST STAND",
+      "atSeconds": 231.73
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 232.78
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 233.82
+    },
+    {
+      "text": "WAVE CLEARED",
+      "atSeconds": 238.03
+    },
+    {
+      "text": "WAVE 8",
+      "atSeconds": 242.6
+    },
+    {
+      "text": "THEY’RE MOVING",
+      "atSeconds": 248
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 250.22
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 250.35
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 264.98
+    },
+    {
+      "text": "GOLD BOOT",
+      "atSeconds": 269.57
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 272.22
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 274.75
+    },
+    {
+      "text": "LAST STAND",
+      "atSeconds": 279.1
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 283.87
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 284.73
+    },
+    {
+      "text": "WAVE CLEARED",
+      "atSeconds": 287.42
+    },
+    {
+      "text": "WAVE 9",
+      "atSeconds": 291.7
+    },
+    {
+      "text": "THEY’RE MOVING",
+      "atSeconds": 296.15
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 296.37
+    },
+    {
+      "text": "BOOT CHARGED",
+      "atSeconds": 303.77
+    },
+    {
+      "text": "SPIKED GOLD BOOT",
+      "atSeconds": 305.85
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 307.93
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 328.15
+    },
+    {
+      "text": "LAST STAND",
+      "atSeconds": 328.65
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 329.38
+    },
+    {
+      "text": "BOOT CHARGED",
+      "atSeconds": 330.83
+    },
+    {
+      "text": "SPIKED GOLD BOOT",
+      "atSeconds": 332.45
+    },
+    {
+      "text": "WAVE CLEARED",
+      "atSeconds": 336.95
+    },
+    {
+      "text": "WAVE 10",
+      "atSeconds": 340.97
+    },
+    {
+      "text": "THEY’RE MOVING",
+      "atSeconds": 344.48
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 350.7
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 352.18
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 352.78
+    },
+    {
+      "text": "TACTICAL DOOM BOOT",
+      "atSeconds": 366.25
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 370.15
+    },
+    {
+      "text": "LAST STAND",
+      "atSeconds": 373.15
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 378.48
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 380.42
+    },
+    {
+      "text": "BOOT CHARGED",
+      "atSeconds": 380.48
+    },
+    {
+      "text": "TACTICAL DOOM BOOT",
+      "atSeconds": 382.25
     }
   ],
-  "eliminations": 0,
-  "bootEliminations": 0,
-  "lootCollected": 0,
+  "eliminations": 117,
+  "bootEliminations": 87,
+  "lootCollected": 71,
   "worldSeed": 1337,
   "layoutHash": -2113197778,
   "forest": {
@@ -55,456 +557,14 @@
     }
   },
   "healthAtEnd": null,
-  "damageTaken": 0,
+  "damageTaken": 429.07499999995343,
   "instrumented": true,
-  "outcome": "probes-passed",
+  "outcome": "victory",
   "errors": [],
-  "characterCheck": {
-    "meshes": [
-      {
-        "name": "Ch15",
-        "verts": 138891,
-        "sampled": 4086,
-        "unweighted": 0,
-        "single": 1856,
-        "far": 0,
-        "farShare": 0,
-        "worst": 0.374,
-        "worstBone": "mixamorigLeftUpLeg"
-      }
-    ],
-    "ownBoots": [],
-    "pass": true,
-    "unweightedTotal": 0,
-    "weldMesh": "Ch15",
-    "weldShare": 0,
-    "weldBone": "mixamorigLeftUpLeg",
-    "weldDistance": 0.374,
-    "ownBootCount": 0,
-    "ownBootsOnTheGround": false,
-    "parts": [],
-    "misboundParts": [],
-    "noMisboundParts": true,
-    "footPoints": 93,
-    "footBox": {
-      "min": [
-        -0.285,
-        0.012,
-        -0.128
-      ],
-      "max": [
-        -0.07,
-        0.173,
-        0.13
-      ]
-    },
-    "seatLimits": {
-      "soleTilt": 8,
-      "toe": 25
-    },
-    "seatControls": {
-      "sole": {
-        "measured": true,
-        "tier": "Standard Boot",
-        "rolledBy": 30,
-        "tilt": 29,
-        "namesIt": true
-      },
-      "toe": {
-        "measured": true,
-        "tier": "Standard Boot",
-        "yawedBy": 90,
-        "toe": 41.3,
-        "namesIt": true
-      }
-    },
-    "sameAsSpawn": {
-      "measured": true,
-      "tier": "Standard Boot",
-      "spawnSole": -0.001,
-      "resocketedSole": -0.001,
-      "spawnTilt": 2.1,
-      "resocketedTilt": 2.1,
-      "metres": 0,
-      "namesIt": false
-    },
-    "centreControl": {
-      "measured": true,
-      "tier": "Standard Boot",
-      "movedBack": 0.2,
-      "gap": -0.2,
-      "namesIt": true
-    },
-    "bootCentreLimit": 0.05,
-    "initialBoot": {
-      "tier": "Standard Boot",
-      "index": 0,
-      "socketed": true,
-      "model": "brokenboot.glb",
-      "span": 0.52,
-      "worldSpan": 0.475,
-      "sole": -0.001,
-      "coveredShare": 1,
-      "coversFoot": true,
-      "soleOnGround": true,
-      "soleTilt": 2.1,
-      "toeDeg": 0.9,
-      "verts": 16956,
-      "sitsRight": true
-    },
-    "tier": "Standard Boot",
-    "tierOf": "Standard Boot",
-    "boots": [
-      {
-        "tier": "Standard Boot",
-        "model": "brokenboot.glb",
-        "socket": "standard",
-        "socketed": true,
-        "span": 0.52,
-        "sole": -0.001,
-        "top": 0.425,
-        "box": {
-          "min": [
-            -1.183,
-            -0.001,
-            -0.466
-          ],
-          "max": [
-            -0.875,
-            0.425,
-            0.009
-          ]
-        },
-        "coveredShare": 1,
-        "coversFoot": true,
-        "centreGap": 0,
-        "centred": true,
-        "opensUnderFoot": false,
-        "soleTilt": 2.1,
-        "toeDeg": 0.9,
-        "verts": 16956,
-        "sitsRight": true
-      },
-      {
-        "tier": "Reinforced Boot",
-        "model": "brokenboot.glb",
-        "socket": "reinforced",
-        "socketed": true,
-        "span": 0.56,
-        "sole": -0.001,
-        "top": 0.458,
-        "box": {
-          "min": [
-            -1.196,
-            -0.001,
-            -0.485
-          ],
-          "max": [
-            -0.865,
-            0.458,
-            0.026
-          ]
-        },
-        "coveredShare": 1,
-        "coversFoot": true,
-        "centreGap": 0,
-        "centred": true,
-        "opensUnderFoot": false,
-        "soleTilt": 2.1,
-        "toeDeg": 0.9,
-        "verts": 16956,
-        "sitsRight": true
-      },
-      {
-        "tier": "Silver Boot",
-        "model": "silverboot.glb",
-        "socket": "silver",
-        "socketed": true,
-        "span": 0.6,
-        "sole": -0.001,
-        "top": 0.49,
-        "box": {
-          "min": [
-            -1.21,
-            -0.001,
-            -0.505
-          ],
-          "max": [
-            -0.854,
-            0.49,
-            0.043
-          ]
-        },
-        "coveredShare": 1,
-        "coversFoot": true,
-        "centreGap": 0,
-        "centred": true,
-        "opensUnderFoot": false,
-        "soleTilt": 2.1,
-        "toeDeg": 0.9,
-        "verts": 16956,
-        "sitsRight": true
-      },
-      {
-        "tier": "Gold Boot",
-        "model": "goldboot.glb",
-        "socket": "gold",
-        "socketed": true,
-        "span": 0.66,
-        "sole": -0.001,
-        "top": 0.54,
-        "box": {
-          "min": [
-            -1.229,
-            -0.001,
-            -0.534
-          ],
-          "max": [
-            -0.839,
-            0.54,
-            0.069
-          ]
-        },
-        "coveredShare": 1,
-        "coversFoot": true,
-        "centreGap": 0,
-        "centred": true,
-        "opensUnderFoot": false,
-        "soleTilt": 2.1,
-        "toeDeg": 0.9,
-        "verts": 16956,
-        "sitsRight": true
-      },
-      {
-        "tier": "Spiked Gold Boot",
-        "model": "goldboot.glb",
-        "socket": "goldSpiked",
-        "socketed": true,
-        "span": 0.72,
-        "sole": -0.001,
-        "top": 0.589,
-        "box": {
-          "min": [
-            -1.249,
-            -0.001,
-            -0.563
-          ],
-          "max": [
-            -0.823,
-            0.589,
-            0.095
-          ]
-        },
-        "coveredShare": 1,
-        "coversFoot": true,
-        "centreGap": 0,
-        "centred": true,
-        "opensUnderFoot": false,
-        "soleTilt": 2.1,
-        "toeDeg": 0.9,
-        "verts": 16956,
-        "sitsRight": true
-      },
-      {
-        "tier": "Tactical Doom Boot",
-        "model": "brokenboot.glb",
-        "socket": "doom",
-        "socketed": true,
-        "span": 0.8,
-        "sole": -0.002,
-        "top": 0.654,
-        "box": {
-          "min": [
-            -1.275,
-            -0.002,
-            -0.601
-          ],
-          "max": [
-            -0.802,
-            0.654,
-            0.129
-          ]
-        },
-        "coveredShare": 1,
-        "coversFoot": true,
-        "centreGap": 0,
-        "centred": true,
-        "opensUnderFoot": false,
-        "soleTilt": 2.1,
-        "toeDeg": 0.9,
-        "verts": 16956,
-        "sitsRight": true
-      },
-      {
-        "tier": "Legendary Broken Boot",
-        "model": "brokenboot.glb",
-        "socket": "legendary",
-        "socketed": true,
-        "span": 0.9,
-        "sole": -0.001,
-        "top": 0.736,
-        "box": {
-          "min": [
-            -1.308,
-            -0.001,
-            -0.65
-          ],
-          "max": [
-            -0.775,
-            0.736,
-            0.172
-          ]
-        },
-        "coveredShare": 1,
-        "coversFoot": true,
-        "centreGap": 0,
-        "centred": true,
-        "opensUnderFoot": false,
-        "soleTilt": 2.1,
-        "toeDeg": 0.9,
-        "verts": 16956,
-        "sitsRight": true
-      },
-      {
-        "tier": "Mythical Diamond Boot",
-        "model": "diamondboot.glb",
-        "socket": "diamond",
-        "socketed": true,
-        "span": 1,
-        "sole": -0.001,
-        "top": 0.818,
-        "box": {
-          "min": [
-            -1.341,
-            -0.001,
-            -0.698
-          ],
-          "max": [
-            -0.749,
-            0.818,
-            0.215
-          ]
-        },
-        "coveredShare": 1,
-        "coversFoot": true,
-        "centreGap": 0,
-        "centred": true,
-        "opensUnderFoot": false,
-        "soleTilt": 2.1,
-        "toeDeg": 0.9,
-        "verts": 16956,
-        "sitsRight": true
-      }
-    ],
-    "coversControl": {
-      "measured": true,
-      "tier": "Standard Boot",
-      "shrink": 0.55,
-      "share": 0,
-      "namesIt": true
-    },
-    "ownBootsHidden": true,
-    "tierBootSocketed": true,
-    "tierBootCoversFoot": true,
-    "tierBootSoleOnGround": true,
-    "tierBootSitsRight": true,
-    "tiersCentred": true,
-    "control": {
-      "measured": false,
-      "boneZero": "mixamorigHips",
-      "bootSampled": 0,
-      "beyondLimit": 0,
-      "beyondLimitShare": 0,
-      "distanceLimit": 0.6,
-      "weldShareBudget": 0.02,
-      "wouldNameIt": false
-    },
-    "states": {
-      "idle": 0.013,
-      "walk": 0.019,
-      "aim": 0.013,
-      "crouch": 0.013,
-      "jump": 0.013,
-      "kick": 0.013,
-      "kickHigh": -0.046,
-      "stomp": 0.013
-    },
-    "statesMeasured": 8,
-    "worstSink": -0.046,
-    "worstFloat": 0.019,
-    "stateLimits": {
-      "sink": -0.15,
-      "float": 0.35
-    },
-    "statesOnTheGround": true,
-    "footingControl": {
-      "liftedBy": 1,
-      "pass": true
-    },
-    "rifle": {
-      "hand": "mixamorigRightHand",
-      "loaded": true,
-      "held": {
-        "walk": {
-          "degOff": 7,
-          "inFront": 0.62,
-          "magazineY": -0.99,
-          "pass": true
-        },
-        "aim": {
-          "degOff": 13,
-          "inFront": 0.61,
-          "magazineY": -0.95,
-          "pass": true
-        },
-        "crouch": {
-          "degOff": 39,
-          "inFront": 0.54,
-          "magazineY": -0.79,
-          "pass": true
-        }
-      },
-      "length": 0.95,
-      "muzzleEnd": "the high end",
-      "magazine": [
-        -1,
-        0,
-        0.03
-      ],
-      "flash": {
-        "shown": true,
-        "toBarrel": 0.005,
-        "tracerFromBarrel": 0.005,
-        "standInOffBarrel": 0.522
-      },
-      "flashOk": true,
-      "flashControlNamesIt": true,
-      "control": {
-        "degOff": 89,
-        "inFront": 0.24,
-        "magazineY": 0.05,
-        "pass": false,
-        "namesIt": true
-      },
-      "limits": {
-        "coneDegrees": 60,
-        "inFront": 0.3,
-        "magazineY": -0.5,
-        "flashToBarrel": 0.15,
-        "flashOffBarrel": 0.25
-      }
-    },
-    "rifleOk": true,
-    "limits": {
-      "wrongBoneDistance": 0.6,
-      "weldShare": 0.02,
-      "samples": 4000,
-      "groundSink": -0.15,
-      "groundFloat": 0.35
-    }
-  },
-  "wavesReached": 1,
-  "wallClockSeconds": 14.6,
+  "endTitle": "ONE-MAN ARMY",
+  "wavesReached": 10,
+  "stalledWave": null,
+  "wallClockSeconds": 3.7,
   "consoleErrors": [],
   "consoleWarnings": [
     "console.warn: THREE.FBXLoader: %s map is not supported in three.js, skipping texture. ShininessExponent",

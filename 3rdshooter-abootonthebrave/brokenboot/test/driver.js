@@ -28,6 +28,9 @@ async function runCampaign(options) {
     // Audit the officer's own mesh file: weighted, anchored, and still carrying a
     // boot the tier system can replace.
     checkCharacter: false,
+    // Assert what a finishing round through the head does that one through the body
+    // does not, and that it pays the same for it.
+    checkFatality: false,
     // Audit these forest seeds instead of playing the campaign (the forest the
     // page is already playing is always audited too).
     forestSeeds: null,
@@ -842,6 +845,345 @@ async function runCampaign(options) {
       && out.eliminations > 0
       && out.bootEliminations === out.eliminations
       && closedIn !== null;
+    return out;
+  }
+
+  /**
+   * The fatality: a finishing round through the head throws the body, and a
+   * finishing round through the body does not.
+   *
+   * The clause exists because those two are easy to blur. A fatality is a finishing
+   * move on a body that is already down, so everything it must *not* change is what
+   * this measures: a head downing has to pay exactly what a chest downing pays (the
+   * weighted tier credit, one elimination, the same loot roll), because progression
+   * belongs to the boot. What it may change is only how the body goes down.
+   *
+   * Both halves are the same measurement on the same attacker held in the same place:
+   * eight metres up the aim line, real rounds fired through `tryShoot` at the part
+   * under test, the bleed-out allowed to finish them, and then three seconds of the
+   * corpse's own motion. The head case has to show it leaving the ground, travelling
+   * downrange and turning over; the chest case has to show it staying where it fell
+   * — which is what names the throw as the thing being measured rather than the
+   * death, since both bodies end up face down on the ground either way.
+   */
+  function probeFatality() {
+    const p = G.player;
+    const LIMITS = {
+      distance: 8,          // m the subject is held at, up the aim line
+      maxFrames: 2500,      // rounds to spend per half before giving up on it
+      attempts: 8,          // a head downing can be spoilt by a round clipping the chest
+      spawnFrames: 1800,    // frames to wait for an attacker if the field is empty
+      followSeconds: 3,     // how long the corpse's own motion is followed
+      launchFrames: 6,      // the first frames of the flight, read as the launch
+      travelMin: 1.5,       // m a thrown body has to travel before it lands
+      peakMin: 0.25,        // m it has to rise off the ground on the way
+      tumbleMin: 45,        // degrees it has to turn over by the time it lands
+      launchMin: 4.5,       // m/s it has to leave at (the setting is 6.4)
+      launchMax: 8,         // and the most it may leave at
+      stillMax: 0.05,       // m the body-shot control is allowed to move
+      offShotMax: 15,       // degrees the throw may diverge from the shot itself
+    };
+    const out = { distance: LIMITS.distance, limits: LIMITS, pass: false };
+    const savedEnemies = G.enemyManager.enemies.slice();
+    const saved = {
+      maxHealth: p.maxHealth, health: p.health, ammo: p.ammo, reserve: p.reserve,
+      fireTimer: p.fireTimer, reloading: p.reloading, alive: p.alive,
+      camera: G.camera.quaternion.clone(),
+    };
+    // The field is parked, not emptied: the attackers already out there are moved
+    // off the list (so they neither shoot the officer nor walk into the aim line)
+    // and put back at the end, since every later probe plays the wave they belong to.
+    const field = G.enemyManager.enemies;
+    const parked = field.splice(0, field.length);
+    let subject = parked.shift() || null;
+
+    const eye = () => G.camera.getWorldPosition(new THREE.Vector3());
+    const forward = (yaw) => new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+    const parkNewcomers = () => {
+      for (let i = field.length - 1; i >= 0; i--) {
+        if (field[i] !== subject) parked.push(field.splice(i, 1)[0]);
+      }
+    };
+    const keepOfficerUp = () => { p.alive = true; p.health = p.maxHealth; subject.fireTimer = 999; };
+    const flatten = (e) => Math.hypot(e.position.x - p.position.x, e.position.z - p.position.z);
+
+    try {
+      p.maxHealth = INSTRUMENT_MAX_HEALTH;   // the officer has to outlast the measurement
+      p.health = INSTRUMENT_MAX_HEALTH;
+      p.alive = true;
+      // The earlier probes may have left the wave dry: wait for the next attacker to
+      // walk on rather than measuring an empty field.
+      if (!subject) {
+        for (let i = 0; i < LIMITS.spawnFrames && !subject; i++) {
+          G.step(FRAME);
+          subject = field.find((e) => e && !e.dead && !e.routed) || null;
+        }
+        if (!subject) { out.detail = 'no attacker took the field to be shot'; return out; }
+      }
+      if (!field.includes(subject)) field.push(subject);
+      parkNewcomers();
+
+      // Nobody moves but the body under test. The officer is pinned where the probe
+      // found him — he can be walked by input a probe does not own (a stick left held,
+      // a camera still easing), and a measurement taken while he strolls down the aim
+      // line is a measurement of two moving things. He is also pinned because the
+      // sightline depends on where he is standing: walking two metres sideways put a
+      // crate on it, which is how the chest half of this clause once read 2 hits out
+      // of 625 rounds.
+      const officerAt = p.position.clone();
+      stopMoving();
+      const pinOfficer = () => {
+        p.position.copy(officerAt);
+        p.object.updateMatrixWorld(true);
+      };
+
+      // A spot where the rounds really do reach the part being tested: holding him
+      // eight metres out is not enough either, because the officer is as likely as not
+      // to have a crate or a trunk on that heading, and a round that meets one
+      // measures nothing. Both halves shoot from the same spot, so what the two bodies
+      // do afterwards is the only thing that differs between them.
+      const atChest = () => new THREE.Vector3(subject.position.x, subject.position.y + 1.05, subject.position.z);
+      const somethingAt = (part) => (part === 'head' ? subject.headPosition.clone() : atChest());
+      const reaches = (yaw, part) => {
+        subject.position.copy(p.position).addScaledVector(forward(yaw), LIMITS.distance);
+        subject.position.y = 0;
+        subject.object.updateMatrixWorld(true);
+        G.camera.lookAt(part === 'head' ? subject.headPosition : atChest());
+        G.camera.updateMatrixWorld(true);
+        const hit = G.castBullet(eye(), G.camera.getWorldDirection(new THREE.Vector3()), SETTINGS.bulletRange);
+        return Boolean(hit && hit.enemy === subject && hit.part === part);
+      };
+      /** The heading the officer was standing on, or null if none of them is clear. */
+      const findSpot = () => {
+        const from = G.cameraYaw;
+        for (let i = 0; i < 120; i++) {
+          const yaw = from + (i * Math.PI) / 60 - Math.PI / 2;
+          if (reaches(yaw, 'head') && reaches(yaw, 'body')) return { yaw };
+        }
+        return null;
+      };
+      let spot = findSpot();
+      if (!spot) { out.detail = 'no heading with a clear line to both the head and the chest'; return out; }
+      out.headingOffsetRadians = +(spot.yaw - G.cameraYaw).toFixed(2);
+
+      // He is held in one place for the whole measurement: an attacker walking in
+      // would move the death point, and the travel is measured from that.
+      const holdSubject = () => {
+        subject.position.copy(p.position).addScaledVector(forward(spot.yaw), LIMITS.distance);
+        subject.position.y = 0;
+        subject.object.updateMatrixWorld(true);
+      };
+      const aimAt = (part) => (part === 'head' ? subject.headPosition.clone() : atChest());
+      const resetSubject = () => {
+        subject.health = subject.maxHealth;
+        subject.wounded = false;
+        subject.bleeding = false;
+        subject.bleedTimer = 0;
+        subject.dead = false;
+        subject.routed = false;
+        subject.thrown = false;
+        subject.landed = false;
+        subject.deathTimer = 0;
+        subject.removeMe = false;
+        subject.throwVel.set(0, 0, 0);
+        subject.knock.set(0, 0, 0);
+        subject.model.rotation.set(0, 0, 0);
+        subject.object.rotation.y = 0;
+        holdSubject();
+        keepOfficerUp();
+      };
+
+      /**
+       * Fire real rounds at one part until the bleed-out puts them down, then follow
+       * the body. `aim` is both where the rounds are sent and the part the finishing
+       * round has to land on: with the officer aiming at the head, a round that clips
+       * the chest instead finishes it without a fatality, and an attempt that ends
+       * that way (or whose bleed-out runs out between rounds) is thrown away rather
+       * than counted — the part of the finishing round is what decides a fatality.
+       */
+      const half = (aim) => {
+        const tried = [];
+        for (let attempt = 1; attempt <= LIMITS.attempts; attempt++) {
+          // The officer is re-pinned and the sightline re-checked: an attempt that
+          // starts with a crate on the line would only ever measure the crate.
+          pinOfficer();
+          const again = findSpot();
+          if (again) spot = again;
+          resetSubject();
+          // The control for the corpse clause: the same cast finds him while he is
+          // alive. Without it, "the round no longer finds his body" would only be
+          // restating that the cast misses, which it does not.
+          const headOfCast = eye();
+          const foundWhileAlive = (() => {
+            const target = somethingAt(aim);
+            const hit = G.castBullet(headOfCast, target.sub(headOfCast).normalize(), SETTINGS.bulletRange);
+            return Boolean(hit && hit.enemy === subject);
+          })();
+          const creditBefore = p.tierCredit;
+          const killedBefore = G.enemiesKilledTotal;
+          let shots = 0;
+          let frames = 0;
+          let downingPart = null;
+          let downingDirection = null;
+          // The banner is read here, at the moment of the downing, rather than after the
+          // loop: a finishing round can be the last attacker of a wave, and the
+          // wave-cleared banner then lands on top of it in the very same frame.
+          let downingBanner = '';
+          const origDamage = G.damageEnemy.bind(G);
+          G.damageEnemy = (enemy, amount, part, direction) => {
+            const wasDown = enemy.dead;
+            const result = origDamage(enemy, amount, part, direction);
+            if (!wasDown && enemy.dead) {
+              downingPart = part;
+              downingDirection = direction ? direction.clone() : null;
+              downingBanner = `${G.hud.banner.textContent} / ${G.hud.bannerSub.textContent}`;
+            }
+            return result;
+          };
+          try {
+            while (!subject.dead && frames < LIMITS.maxFrames) {
+              parkNewcomers();
+              pinOfficer();
+              holdSubject();
+              keepOfficerUp();
+              G.camera.lookAt(aimAt(aim));
+              G.camera.updateMatrixWorld(true);
+              // Cleared so the probe fires whatever the page was left doing, the way
+              // the rifle's own clause does: the rounds are the probe's, not a
+              // magazine's.
+              p.fireTimer = 0;
+              p.reloading = 0;
+              p.ammo = Math.max(p.ammo, 1);
+              G.tryShoot();
+              shots += 1;
+              G.step(FRAME);
+              frames += 1;
+            }
+          } finally {
+            G.damageEnemy = origDamage;
+          }
+          // An attempt that missed the part it was aimed at, or whose bleed-out ran out
+          // between rounds, is not the half this clause is measuring: the part of the
+          // *finishing* round is what decides a fatality, so a retry is recorded and
+          // the next attempt starts over.
+          if (!subject.dead || downingPart !== aim) {
+            tried.push({ shots, frames, dead: subject.dead, downingPart, health: +subject.health.toFixed(1) });
+            continue;
+          }
+
+          const banner = downingBanner;
+          const thrown = subject.thrown;
+          const diedAt = subject.position.clone();
+          const yawAtDeath = subject.model.rotation.y;
+          const spinSign = downingDirection ? (downingDirection.x >= 0 ? -1 : 1) : null;
+          // A flung body must not soak rounds meant for the living. He was found on
+          // this line a moment ago, while he was alive; the same cast now finds the
+          // ground where he is lying.
+          const from = eye();
+          const castAt = G.castBullet(from, diedAt.clone().setY(diedAt.y + 0.9).sub(from).normalize(), SETTINGS.bulletRange);
+          const corpseIsNotATarget = !castAt || castAt.enemy !== subject;
+
+          // The launch is read off the first frames of the flight, and the travel off
+          // the flight itself, before it lands. What happens after that belongs to the
+          // scenery — a body that comes to rest against a trunk is pushed about by the
+          // collision it shares with everything else in the world, and measuring that
+          // instead would be measuring the forest rather than the throw.
+          const launchFrames = LIMITS.launchFrames;
+          let peak = 0;
+          let travel = 0;
+          let launchTravel = 0;
+          let turn = 0;
+          let turnAtLanding = null;
+          let launchDir = null;
+          const horizontal = () => new THREE.Vector3(
+            subject.position.x - diedAt.x, 0, subject.position.z - diedAt.z,
+          );
+          for (let i = 0; i < Math.round(LIMITS.followSeconds / FRAME); i++) {
+            pinOfficer();
+            keepOfficerUp();
+            G.step(FRAME);
+            peak = Math.max(peak, subject.position.y);
+            const far = horizontal().length();
+            if (!subject.landed) travel = far;
+            turn = Math.abs(subject.model.rotation.y - yawAtDeath) * 180 / Math.PI;
+            if (turnAtLanding === null && subject.landed) turnAtLanding = turn;
+            if (i === launchFrames - 1) {
+              launchTravel = far;
+              launchDir = horizontal();
+            }
+          }
+          const launchSpeed = +(launchTravel / (launchFrames * FRAME)).toFixed(2);
+          const offShot = launchDir && launchDir.length() > 1e-3 && downingDirection
+            ? Math.acos(Math.max(-1, Math.min(1, launchDir.clone().normalize().dot(
+              downingDirection.clone().setY(0).normalize())))) * 180 / Math.PI
+            : null;
+          return {
+            attempts: attempt,
+            shots,
+            secondsToDown: +(frames * FRAME).toFixed(2),
+            downingRound: downingPart,
+            threwTheBody: thrown,
+            travelledMetres: +travel.toFixed(2),
+            roseMetres: +peak.toFixed(2),
+            launchSpeed,
+            turnedDegrees: +(turnAtLanding === null ? turn : turnAtLanding).toFixed(0),
+            offShotDegrees: offShot === null ? null : +offShot.toFixed(1),
+            spinFromTheShotsSide: spinSign === null ? null
+              : Math.sign(subject.model.rotation.y - yawAtDeath) === spinSign,
+            corpseIsNotATarget,
+            corpseWasATargetWhileAlive: foundWhileAlive,
+            banner,
+            creditPaid: +(p.tierCredit - creditBefore).toFixed(3),
+            eliminations: G.enemiesKilledTotal - killedBefore,
+            restingPlace: subject.position.toArray().map((n) => +n.toFixed(2)),
+            distanceFromOfficer: +flatten(subject).toFixed(2),
+          };
+        }
+        return { note: `no ${aim} finishing round in ${LIMITS.attempts} attempts`, tried };
+      };
+
+      out.head = half('head');
+      out.control = half('body');
+    } finally {
+      // Everyone the field had goes back on it, including the attacker the probe shot
+      // — he is dead now, which is what really happened to him, and the wave goes on
+      // around him. Nothing is left orphaned in the scene: an attacker held off the
+      // list is never updated again, so a forgotten one would stand frozen in it.
+      field.splice(0, field.length);
+      for (const e of [...savedEnemies, subject, ...parked]) {
+        if (e && !field.includes(e)) field.push(e);
+      }
+      for (const key of Object.keys(saved)) {
+        if (key === 'camera') continue;
+        p[key] = saved[key];
+      }
+      G.camera.quaternion.copy(saved.camera);
+      G.camera.updateMatrixWorld(true);
+    }
+
+    const head = out.head;
+    const control = out.control;
+    // What a downing is weighted at, so the harness can name the number it wanted
+    // rather than repeating it from somewhere else.
+    out.weight = SETTINGS.bulletKillWeight;
+    out.sameCredit = Boolean(head.creditPaid !== undefined && control.creditPaid !== undefined
+      && head.creditPaid === control.creditPaid);
+    out.pass = Boolean(head.attempts && control.attempts
+      && head.threwTheBody === true
+      && control.threwTheBody === false
+      && head.travelledMetres >= LIMITS.travelMin
+      && head.roseMetres >= LIMITS.peakMin
+      && head.turnedDegrees >= LIMITS.tumbleMin
+      && head.launchSpeed >= LIMITS.launchMin && head.launchSpeed <= LIMITS.launchMax
+      && control.travelledMetres <= LIMITS.stillMax
+      && head.offShotDegrees !== null && head.offShotDegrees <= LIMITS.offShotMax
+      && head.spinFromTheShotsSide === true
+      && head.corpseIsNotATarget && control.corpseIsNotATarget
+      && head.corpseWasATargetWhileAlive && control.corpseWasATargetWhileAlive
+      && out.sameCredit && head.creditPaid === SETTINGS.bulletKillWeight
+      && head.eliminations === 1 && control.eliminations === 1
+      && /FATALITY/.test(head.banner) && !/FATALITY/.test(control.banner));
+    if (out.pass) delete out.detail;
     return out;
   }
 
@@ -2312,7 +2654,8 @@ async function runCampaign(options) {
   if (startButton) startButton.click();
   if (G.state !== 'playing') G.start();
   if (G.state !== 'playing') return { fatal: `game did not start (state ${G.state})` };
-  if (opts.checkLock || opts.checkKick || opts.checkDry || opts.checkCharacter || opts.forestSeeds) {
+  if (opts.checkLock || opts.checkKick || opts.checkDry || opts.checkCharacter
+    || opts.checkFatality || opts.forestSeeds) {
     // First, on the officer exactly as he loads. The other probes leave him in a
     // stretched pose — a kick clip scale-tracks the legs — and geometry bound to a
     // bone is only a fixed distance from it in the pose it was authored in, so the
@@ -2320,6 +2663,9 @@ async function runCampaign(options) {
     if (opts.checkCharacter) report.characterCheck = await probeCharacter();
     if (opts.checkLock) report.lockCheck = probeLockRetarget();
     if (opts.checkKick) report.kickCheck = probeKicks();
+    // After the other mechanic probes, so their rounds and their draws are exactly
+    // the ones they were: this one fires a real magazine of its own.
+    if (opts.checkFatality) report.fatalityCheck = probeFatality();
     // Last, because unlike the others it plays a real wave and moves the officer.
     if (opts.checkDry) report.dryCheck = probeDryWave();
     // The sweep rebuilds its own forests rather than playing one, so it goes
@@ -2328,6 +2674,7 @@ async function runCampaign(options) {
     const pass = (!report.lockCheck || report.lockCheck.pass)
       && (!report.kickCheck || report.kickCheck.pass)
       && (!report.characterCheck || report.characterCheck.pass)
+      && (!report.fatalityCheck || report.fatalityCheck.pass)
       && (!report.dryCheck || report.dryCheck.pass)
       && (!report.forestSweep || report.forestSweep.pass);
     report.gameSeconds = +report.gameSeconds.toFixed(2);

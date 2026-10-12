@@ -108,6 +108,7 @@ function parseArgs(argv) {
       case '--check-kick': opts.checkKick = true; break;
       case '--check-dry': opts.checkDry = true; break;
       case '--check-character': opts.checkCharacter = true; break;
+      case '--check-fatality': opts.checkFatality = true; break;
       // Bare `--fuzz` is five campaigns; `--fuzz=12` is twelve.
       case '--fuzz': opts.fuzz = Number.isFinite(num) ? Math.max(1, Math.floor(num)) : 5; break;
       // Bare `--check-forest` is fifteen forests, plus the one the page plays.
@@ -162,6 +163,11 @@ weighted, nothing welded to a bone it does not sit on, his own boot still a part
 the tier system can replace, and his rifle held rather than worn — barrel on his
 facing, muzzle ahead of his hand, magazine underneath. It sockets a tier's boot to
 prove the boot clause, so it does not combine with --check-forest
+  --check-fatality shoot an attacker down through the head and then through the chest,
+                   and assert that only the head throws the body — and that the head
+                   pays exactly what the chest pays for it (the same weighted credit,
+                   one elimination, the same loot roll), because the boot is still the
+                   way to the next tier
   --require-finish fail the run if the campaign did not reach the last wave
   --url=URL        page to load (default: served from this repo)
   --port=N         port for the bundled static server
@@ -268,7 +274,8 @@ let profileDir = null;
 let exitCode = 0;
 
 async function main() {
-  if (opts.fuzz && (opts.checkLock || opts.checkKick || opts.checkDry || opts.checkCharacter || opts.checkForest || opts.baseline || opts.record || opts.recordForest)) {
+  if (opts.fuzz && (opts.checkLock || opts.checkKick || opts.checkDry || opts.checkCharacter
+    || opts.checkFatality || opts.checkForest || opts.baseline || opts.record || opts.recordForest)) {
     console.error('--fuzz plays whole campaigns, so it does not combine with the mechanic probes, with --check-forest, or with --baseline/--record/--record-forest.');
     return 2;
   }
@@ -433,6 +440,7 @@ async function main() {
       checkKick: opts.checkKick || false,
       checkDry: opts.checkDry || false,
       checkCharacter: opts.checkCharacter || false,
+      checkFatality: opts.checkFatality || false,
       // An empty list is a sweep of the one forest the page is already playing.
       forestSeeds: opts.checkForest ? (opts.worldSeed ? [] : fuzzSeedList(opts.checkForest)) : null,
     })}); })()`;
@@ -802,7 +810,8 @@ function assess(report) {
   }
 
   // The probes are single assertions about one mechanic, not a campaign.
-  if (report.lockCheck || report.kickCheck || report.dryCheck || report.characterCheck || report.forestSweep) {
+  if (report.lockCheck || report.kickCheck || report.dryCheck || report.characterCheck
+    || report.fatalityCheck || report.forestSweep) {
     const l = report.lockCheck;
     const k = report.kickCheck;
     const d = report.dryCheck;
@@ -1021,6 +1030,60 @@ function assess(report) {
         reasons.push(`the officer's mesh file: ${bits.join('; ') || 'the probe did not pass'}`);
       }
     }
+    // The fatality: the two halves are the one measurement taken twice, so the failure
+    // names the number that went wrong rather than only that one did.
+    const fc = report.fatalityCheck;
+    if (fc && !fc.pass) {
+      const bits = [];
+      if (fc.detail) bits.push(fc.detail);
+      for (const [label, h] of [['head', fc.head], ['chest', fc.control]]) {
+        if (!h) { bits.push(`the ${label} half did not run`); continue; }
+        if (h.note) { bits.push(`the ${label} half never finished an attacker: ${h.note}`); continue; }
+        if (label === 'head') {
+          if (!h.threwTheBody) bits.push('a finishing round through the head left the body where it stood');
+          if (!(h.travelledMetres >= fc.limits.travelMin)) bits.push(`a thrown body travelled only ${h.travelledMetres} m`);
+          if (!(h.roseMetres >= fc.limits.peakMin)) bits.push(`a thrown body rose only ${h.roseMetres} m`);
+          if (!(h.turnedDegrees >= fc.limits.tumbleMin)) bits.push(`a thrown body turned over only ${h.turnedDegrees}°`);
+          if (h.offShotDegrees === null || h.offShotDegrees > fc.limits.offShotMax) {
+            bits.push(`the body was thrown ${h.offShotDegrees}° off the shot that sent it`);
+          }
+          if (h.spinFromTheShotsSide === false) bits.push('the tumble turned the wrong way for the side the round came from');
+          if (!h.corpseIsNotATarget) bits.push('the round that felled him could still find his body in the air');
+          if (!h.corpseWasATargetWhileAlive) {
+            bits.push('the cast the corpse clause uses never found a living attacker on that line, so it names nothing');
+          }
+          if (!/FATALITY/.test(h.banner)) bits.push(`the head downing announced "${h.banner}" rather than a FATALITY`);
+        } else {
+          if (h.threwTheBody) bits.push('a finishing round through the chest threw the body too');
+          if (!(h.travelledMetres <= fc.limits.stillMax)) {
+            bits.push(`a chest downing moved the body ${h.travelledMetres} m, so the measurement does not name the throw`);
+          }
+          if (/FATALITY/.test(h.banner)) bits.push('a chest downing was announced as a FATALITY');
+        }
+        if (h.eliminations !== 1) bits.push(`the ${label} downing counted ${h.eliminations} elimination(s)`);
+      }
+      if (fc.head && fc.control && fc.head.creditPaid !== undefined
+        && fc.head.creditPaid !== fc.control.creditPaid) {
+        bits.push(`the head paid ${fc.head.creditPaid} of a tier point where the chest paid ${fc.control.creditPaid}`);
+      } else if (fc.head && fc.head.creditPaid !== undefined && fc.head.creditPaid !== fc.weight) {
+        bits.push(`a downing paid ${fc.head.creditPaid} of a tier point instead of the ${fc.weight} it is weighted at`);
+      }
+      reasons.push(`the fatality: ${bits.join('; ') || 'the probe did not pass'}`);
+    }
+    // The fatality's own findings, so a passing run says what the throw measured.
+    const fcPass = report.fatalityCheck;
+    if (fcPass && fcPass.pass) {
+      const h = fcPass.head;
+      findings.push(`a finishing round through the head throws the body: it rose ${h.roseMetres} m, travelled `
+        + `${h.travelledMetres} m from where it died and turned over ${h.turnedDegrees}°, ${h.offShotDegrees}° off the shot that sent it `
+        + `(landing facing the way the round was going)`);
+      findings.push(`a finishing round through the chest does not: the same measurement on the same attacker in the same place `
+        + `moved the body ${fcPass.control.travelledMetres} m and announced "${fcPass.control.banner}", which is what names the throw `
+        + `as the thing measured rather than the death`);
+      findings.push(`the fatality is only how the body goes down: both halves paid ${h.creditPaid} of a tier point `
+        + `(the gunfire weight, ${fcPass.weight}) for ${h.eliminations} elimination(s) each, so the boot is still the way to the next tier`);
+      findings.push(`the flung body is not cover: the cast that finds a living attacker on that line finds only the ground where this one is lying`);
+    }
     if (report.failedRequests?.length) reasons.push(`${report.failedRequests.length} failed request(s): ${report.failedRequests[0]}`);
     // The forest sweep: every layout it rebuilt, and the two ways the sweep
     // itself could be lying — a rebuilt forest that is not the one being played,
@@ -1121,11 +1184,13 @@ function printReport(report, passed) {
   console.log('');
 
   // The mechanic probes: one assertion each, no campaign.
-  if (report.lockCheck || report.kickCheck || report.dryCheck || report.characterCheck || report.forestSweep) {
+  if (report.lockCheck || report.kickCheck || report.dryCheck || report.characterCheck
+    || report.fatalityCheck || report.forestSweep) {
     const c = report.lockCheck;
     const k = report.kickCheck;
     const d = report.dryCheck;
     const cc = report.characterCheck;
+    const fat = report.fatalityCheck;
     const sweep = report.forestSweep;
     if (c) {
       console.log('Aim trigger (left trigger / right mouse / Q)');
@@ -1293,8 +1358,37 @@ function printReport(report, passed) {
         }
       }
     }
-    if (d) {
+    if (fat) {
       if (c || k || cc) console.log('');
+      console.log('The fatality');
+      if (fat.detail) console.log(`  ${fat.detail}`);
+      console.log(`  the same attacker, held ${fat.distance} m up the aim line, shot down through each part in turn:`);
+      console.log(`  ${pad('finishing round', 18)}${pad('the body', 16)}${pad('travelled', 11)}${pad('rose', 8)}${pad('turned', 9)}${pad('credit', 8)}verdict`);
+      for (const [label, h] of [['through the head', fat.head], ['through the chest', fat.control]]) {
+        if (!h) { console.log(`  ${pad(label, 18)}DID NOT RUN`); continue; }
+        if (h.note) { console.log(`  ${pad(label, 18)}NEVER FINISHED HIM: ${h.note}`); continue; }
+        const limit = fat.limits || {};
+        const good = label === 'through the head'
+          ? (h.threwTheBody && h.travelledMetres >= limit.travelMin && h.roseMetres >= limit.peakMin
+            && h.turnedDegrees >= limit.tumbleMin && h.eliminations === 1)
+          : (!h.threwTheBody && h.travelledMetres <= limit.stillMax && h.eliminations === 1);
+        console.log(`  ${pad(label, 18)}${pad(h.threwTheBody ? 'thrown' : 'stayed put', 16)}`
+          + `${pad(`${h.travelledMetres} m`, 11)}${pad(`${h.roseMetres} m`, 8)}${pad(`${h.turnedDegrees}\u00b0`, 9)}`
+          + `${pad(h.creditPaid, 8)}${good ? 'as it should be' : 'WRONG'}`);
+        if (label === 'through the head' && h.downingRound === 'head') {
+          console.log(`  ${pad('', 18)}${h.shots} round(s) over ${h.secondsToDown}s to bleed him out, the last one through the head, `
+            + `${h.offShotDegrees}\u00b0 off the shot that sent it${h.spinFromTheShotsSide ? ', tumbling away from the side the round came from' : ', TUMBLING THE WRONG WAY'}`);
+        }
+        console.log(`  ${pad('', 18)}${h.corpseWasATargetWhileAlive ? 'the line finds a living attacker' : 'THE LINE NEVER FOUND A LIVING ATTACKER'}, `
+          + `${h.corpseIsNotATarget ? 'and finds only the ground once he is down' : 'AND STILL FINDS HIS FLUNG BODY'}`);
+        console.log(`  ${pad('', 18)}announced "${h.banner}"`);
+      }
+      if (fat.weight !== undefined) {
+        console.log(`  the weight both halves paid: ${fat.weight} of a tier point (the gunfire downing's), boot routs remain the full point`);
+      }
+    }
+    if (d) {
+      if (c || k || cc || fat) console.log('');
       console.log('A wave with no ammunition');
       console.log(`  ${pad('rounds', 26)}none in the magazine, none in the reserve, every frame`);
       console.log(`  ${pad('closed to boot range', 26)}${d.closedToBootRangeSeconds === null ? 'never' : `${d.closedToBootRangeSeconds}s`}`);
@@ -1305,7 +1399,7 @@ function printReport(report, passed) {
       }
     }
     if (sweep) {
-      if (c || k || d || cc) console.log('');
+      if (c || k || d || cc || fat) console.log('');
       const control = sweep.control;
       console.log('Forest fairness');
       console.log(`  control: an empty field is ${control.openFair ? 'fair' : 'UNFAIR'}, and a trunk wall round the clearing is ${control.sealedUnfair ? 'unfair' : 'FAIR'} — ${control.pass ? 'the audit can tell them apart' : 'IT CANNOT TELL THEM APART'}`);
