@@ -3,7 +3,6 @@ import { SETTINGS, VEHICLE, LANDSCAPE, SKY, ASSET_BASE } from './config.js';
 import { gltfLoader } from './assets.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-const PRNG_SEED = 1337;
 function makeRandom(seed) {
   let s = seed >>> 0;
   return () => {
@@ -42,7 +41,13 @@ function groundTexture() {
 }
 
 export class World {
-  constructor(scene) {
+  /**
+   * `seed` fixes the forest. The trees, the cover and the cars all come out of
+   * one stream, so the same seed always builds the same layout and a different
+   * one builds a different one — which is what lets the harness fuzz the terrain
+   * as well as the fight, and what `layoutHash` is the fingerprint of.
+   */
+  constructor(scene, seed = SETTINGS.worldSeed) {
     this.scene = scene;
     this.cylinders = []; // { x, z, r, top }
     this.boxes = [];     // THREE.Box3
@@ -51,7 +56,12 @@ export class World {
     // with the mesh — so a car shoved out of the way opens the firing line it
     // was blocking, for the player and the attackers alike.
     this.props = [];
-    this.rand = makeRandom(PRNG_SEED);
+    this.seed = seed >>> 0;
+    this.rand = makeRandom(this.seed);
+    // Folded from every tree, crate and car as it is placed: two seeds that built
+    // different forests cannot share it, and a report can say which forest it got
+    // without dumping 165 positions.
+    this.layoutHash = 0;
     this._ray = new THREE.Ray();
     this._tmp = new THREE.Vector3();
     // Separate scratch vector: hasLineOfSight() rewrites _tmp, so a probe point
@@ -60,6 +70,14 @@ export class World {
     // raycast() writes its box hit into _tmp, so the sight test must aim along
     // its own vector or the tree pass would read a hit point as a direction.
     this._sightDir = new THREE.Vector3();
+  }
+
+  /** Fold one placed thing into the layout fingerprint. */
+  mixLayout(x, z) {
+    const ix = Math.round(x * 100) | 0;
+    const iz = Math.round(z * 100) | 0;
+    this.layoutHash = (Math.imul(this.layoutHash, 31) + ix + Math.imul(iz, 7919)) | 0;
+    return this.layoutHash;
   }
 
   /** Nearest blocker along a ray, or null. Used for bullets and line of sight. */
@@ -489,6 +507,7 @@ function buildTrees(world, scene) {
     tops.setMatrixAt(placed, dummy.matrix);
 
     world.addCylinder(x, z, 0.42 * scale, 9 * scale);
+    world.mixLayout(x, z);
     placed++;
   }
   trunks.count = cones.count = tops.count = placed;
@@ -528,6 +547,7 @@ function buildCover(world, scene) {
     const box = new THREE.Box3().setFromObject(mesh).expandByScalar(-0.05);
     world.addBox(box);
     world.addProp(mesh, box, prop);
+    world.mixLayout(p.x, p.z);
     return mesh;
   };
 
@@ -565,6 +585,7 @@ async function buildVehicles(world, scene) {
       // The heaviest thing on the field, and the best thing to kick: it shifts
       // and tumbles rather than flying, taking whatever it was covering with it.
       world.addProp(car, box, { mass: 4.5, radius: 2.3, kind: 'car' });
+      world.mixLayout(car.position.x, car.position.z);
     }
     return true;
   } catch (err) {
@@ -711,7 +732,7 @@ function buildSky(scene) {
   return mesh;
 }
 
-export async function createWorld(scene, renderer) {
+export async function createWorld(scene, renderer, { seed = SETTINGS.worldSeed } = {}) {
   scene.background = new THREE.Color(0x9db4c4);
   // Fog blends the edge of the walkable ground into the scanned horizon.
   scene.fog = new THREE.Fog(0x9db4c4, LANDSCAPE.enabled ? 45 : 40, LANDSCAPE.enabled ? 230 : 180);
@@ -741,7 +762,7 @@ export async function createWorld(scene, renderer) {
   ground.receiveShadow = true;
   scene.add(ground);
 
-  const world = new World(scene);
+  const world = new World(scene, seed);
   const hasLandscape = await buildLandscape(scene, renderer);
   const sky = hasLandscape ? buildSky(scene) : null;
   buildTrees(world, scene);

@@ -25,8 +25,8 @@ npm run test:honest     # same, but the officer can die, and the report says whe
 npm run test:aim        # assert the aim-trigger rule (press retargets, hold keeps)
 npm run test:kick       # assert the three kicks, the scenery and the impact feel
 npm run test:dry        # play a whole wave with no ammunition left, booting only
-npm run test:fuzz       # ten campaigns, one per seed: name any seed that cannot
-                        # finish a wave
+npm run test:fuzz       # ten campaigns, one per seed and one forest each: name
+                        # any seed that cannot finish a wave
 npm run test:probes     # both of those mechanic checks, one page load
 ```
 
@@ -76,11 +76,27 @@ it hung, what the officer had left to shoot with, and whoever was still standing
 with their health and whether they could see anyone. Each seed costs about twelve
 seconds, which is mostly reloading a 140 MB forest.
 
+Every fuzzed seed also gets a **forest of its own**. The layout is built from one
+seed (`worldSeed`, the 165 pines, the crates, the barriers, the rocks and the five
+cars all come out of the same stream), and the harness passes each seed's own value
+as `?worldSeed=N`, so a fuzz run explores terrain as well as decisions — different
+cover, different firing lines, different places to get wedged. The page reports the
+seed it was built with and a `layoutHash` folded from every placed object, so the
+report names the forest as well as the campaign, and `--world-seed=N` replays one
+of them on its own. The fuzz checks its own premise too: if two seeds ever built
+the same layout it fails outright, because that would mean it had silently stopped
+fuzzing the terrain at all.
+
 It found the dry-officer deadlock the moment it was written: with that fix
 deliberately taken back out, four of the five seeds stalled, every one of them with
 the officer at `[0 in the mag, 0 reserve]` and a lone attacker at full health,
 unwounded, in plain view. That is the shape of the whole point — the default seed's
 campaign was the one the single-run check would have reported on.
+
+With terrain in the mix the sags moved as well: across ten seeds and ten forests
+the quietest stretch of any wave runs from 11.8 s to 38.8 s, and the worst of them
+belongs to a forest no earlier run had played. Same game, same pilot — the layout
+is what changed, which is the argument for fuzzing it.
 
 `npm run test:dry` is the regression check for the first of them. It plays a
 whole wave for real — same patched step, same pilot, same wave one — with the
@@ -384,7 +400,9 @@ start pressing sooner as well as harder.
   intermission with a tagline between waves. Clear times in a simulated run: 26 s
   for wave 1, then 46 s and 48 s for waves 2 and 3.
 - **Forest.** Instanced pines, a clearing, crates, barriers, rocks and parked cars
-  used as cover — all with real collision.
+  used as cover — all with real collision, all built from one seed (`worldSeed`).
+  `?worldSeed=N` builds a different forest with the same game in it, which is how
+  the harness fuzzes terrain; with no parameter it builds the one it always did.
 - **A scanned environment.** `landscape_forest__mountains.glb` is a closed,
   canopy-textured photogrammetry dome. Standing inside it looks like a cave, so it
   is rendered once into a cubemap and used as the sky, then covered overhead by a

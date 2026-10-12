@@ -730,6 +730,10 @@ async function runCampaign(options) {
     eliminations: 0,
     bootEliminations: 0,
     lootCollected: 0,
+    // Which forest this run was played in, so a fuzz seed can be replayed: the
+    // world seed rebuilds the layout, the hash says it is the one that failed.
+    worldSeed: G.world ? G.world.seed : null,
+    layoutHash: G.world ? G.world.layoutHash : null,
     healthAtEnd: null,
     damageTaken: 0,
     instrumented,

@@ -29,6 +29,9 @@ const baselinePath = path.join(here, 'campaign-baseline.json');
 const reportPath = path.join(here, 'campaign-report.json');
 const fuzzPath = path.join(here, 'campaign-fuzz.json');
 
+/** A 32-bit layout hash, as the report writes it. */
+const hex32 = (h) => (Number(h) >>> 0).toString(16).padStart(8, '0');
+
 // ------------------------------------------------------------------ arguments
 
 function parseArgs(argv) {
@@ -49,6 +52,7 @@ function parseArgs(argv) {
     port: null,
     noServer: false,
     fuzz: 0,
+    worldSeed: 0,
   };
   for (const arg of argv) {
     const [flag, value] = arg.split('=');
@@ -59,6 +63,7 @@ function parseArgs(argv) {
       case '--max-steps': opts.maxSteps = num; break;
       case '--timeout': opts.timeoutSeconds = num; break;
       case '--seed': opts.seed = num; break;
+      case '--world-seed': opts.worldSeed = num; break;
       case '--baseline': opts.baseline = true; break;
       case '--record': opts.record = true; break;
       case '--honest': opts.honest = true; break;
@@ -89,6 +94,9 @@ function printUsage() {
   --max-steps=N    hard cap on simulated frames (default 60000)
   --timeout=S      whole-run wall-clock budget (default 420)
   --seed=N         RNG seed, for a repeatable campaign (default 20260411, 0 = real random)
+  --world-seed=N   build the forest from this seed instead of the configured layout
+  --fuzz[=N]       play N campaigns with different seeds and name every one that
+cannot finish a wave (default 5, each with its own forest)
   --baseline       compare wave and tier timings against test/campaign-baseline.json
   --record         write the timings from this run to that baseline
   --honest         play the match for real: the officer can die, and the report says where
@@ -98,8 +106,6 @@ target) instead of playing the campaign
 the campaign; pass both to run both probes)
   --check-dry      play a whole wave with the officer's ammunition taken away, and
 assert the boot alone can still end it
-  --fuzz[=N]       play N campaigns with different seeds and name every one that
-cannot finish a wave (default 5)
   --require-finish fail the run if the campaign did not reach the last wave
   --url=URL        page to load (default: served from this repo)
   --port=N         port for the bundled static server
@@ -390,12 +396,21 @@ async function main() {
     return seeds;
   }
 
+  /** The page for a given layout seed: the forest seed rides in the query string. */
+  const seedUrl = (seed) => {
+    const u = new URL(url);
+    u.searchParams.set('worldSeed', String(seed));
+    return u.toString();
+  };
+
   /** One fuzzed campaign, in the terms this check cares about. */
   function summariseSeed(seed, report) {
     const stalls = report.stalledWave || null;
     const errors = (report.consoleErrors || []).concat(report.failedRequests || []);
     return {
       seed,
+      worldSeed: report.worldSeed,
+      layoutHash: report.layoutHash,
       outcome: report.outcome,
       seconds: report.gameSeconds,
       wavesReached: report.wavesReached,
@@ -422,6 +437,7 @@ async function main() {
   const unfinished = (seed, outcome) => ({
     seed, outcome, seconds: 0, wavesReached: null, eliminations: 0, bootEliminations: 0,
     finished: false, quietestSeconds: 0, stalledWave: null, errors: consoleErrors.slice(0, 3),
+    worldSeed: seed, layoutHash: null,
   });
 
   /**
@@ -437,12 +453,14 @@ async function main() {
     for (let i = 0; i < seeds.length; i++) {
       if (i > 0) {
         // A clean slate. The game does not reset itself between campaigns, and a
-        // fuzz that reused one page would be measuring the leftovers of the last.
+        // fuzz that reused one page would be measuring the leftovers of the last —
+        // and the world is built during that load, so each seed gets its own
+        // forest by reloading with its own `?worldSeed`.
         consoleErrors.length = 0;
         consoleWarnings.length = 0;
         failedRequests.length = 0;
         seenErrors.clear();
-        await cdp.send('Page.navigate', { url });
+        await cdp.send('Page.navigate', { url: seedUrl(seeds[i]) });
         if (!(await waitForBoot())) {
           runs.push(unfinished(seeds[i], 'never-loaded'));
           break;
@@ -454,15 +472,25 @@ async function main() {
     }
     if (!opts.quiet) process.stdout.write(`\r${''.padEnd(60)}\r`);
 
-    printFuzz(runs);
+    // The premise of a fuzz run is that each seed plays a different forest. If the
+    // world seed stopped reaching the build, the campaigns would silently go back
+    // to sharing one layout, and only this count would notice.
+    const layouts = new Set(runs.map((r) => r.layoutHash).filter((h) => h !== null && h !== undefined));
+    const layoutsDiffer = runs.length < 2 || layouts.size === runs.length;
+    printFuzz(runs, layoutsDiffer);
     fs.writeFileSync(fuzzPath, `${JSON.stringify({ baseSeed: opts.seed, runs }, null, 2)}\n`);
     log(`\nfuzz report written to ${path.relative(process.cwd(), fuzzPath)}`);
-    return runs.some((r) => !r.finished) ? 1 : 0;
+    return (runs.some((r) => !r.finished) || !layoutsDiffer) ? 1 : 0;
   }
 
   // ---------------------------------------------------------------- boot the game
-  log(`loading ${url}`);
-  await cdp.send('Page.navigate', { url });
+  // A single run plays the configured forest unless one is asked for with
+  // `--world-seed`; a fuzz run gives every seed a forest of its own.
+  const bootUrl = opts.fuzz
+    ? seedUrl(fuzzSeedList(opts.fuzz)[0])
+    : (opts.worldSeed ? seedUrl(opts.worldSeed) : url);
+  log(`loading ${bootUrl}`);
+  await cdp.send('Page.navigate', { url: bootUrl });
   if (!(await waitForBoot())) return 1;
   log(opts.fuzz
     ? '\ngame loaded, fuzzing the campaign'
@@ -562,6 +590,9 @@ function assess(report) {
 
   // Dying is a difficulty datapoint rather than a defect, unless the run was
   // asked to finish the campaign. Either way the unreached waves are noted.
+  if (report.worldSeed) {
+    findings.push(`the forest was built from seed ${report.worldSeed} (layout ${hex32(report.layoutHash)})`);
+  }
   const killed = report.outcome === 'death';
   const victory = report.outcome === 'victory';
   if (victory) {
@@ -736,27 +767,36 @@ function printReport(report, passed) {
  * wave. A stall is the failure this mode exists to find, so it is named with the
  * wave, what the officer had left to shoot with, and whoever was still standing.
  */
-function printFuzz(runs) {
+function printFuzz(runs, layoutsDiffer = true) {
   const pad = (s, n) => String(s).padEnd(n);
   const bad = runs.filter((r) => !r.finished);
+  const layouts = new Set(runs.map((r) => r.layoutHash).filter((h) => h !== null && h !== undefined));
   const quietest = runs.reduce((a, r) => Math.max(a, r.quietestSeconds || 0), 0);
   console.log('');
   console.log(`Fuzzing the campaign across ${runs.length} seed(s)`);
-  console.log(`  ${pad('seed', 12)}${pad('outcome', 13)}${pad('sim', 10)}${pad('wave', 7)}${pad('eliminations', 16)}${pad('quietest', 11)}verdict`);
+  console.log(`  ${pad('seed', 12)}${pad('forest', 18)}${pad('outcome', 13)}${pad('sim', 10)}${pad('wave', 7)}${pad('eliminations', 16)}${pad('quietest', 11)}verdict`);
   for (const r of runs) {
     const verdict = r.finished
       ? 'finished every wave'
       : (r.stalledWave ? `wave ${r.stalledWave.wave} stalled` : `did not finish (${r.outcome})`);
-    console.log(`  ${pad(r.seed, 12)}${pad(r.outcome || '-', 13)}${pad(`${r.seconds}s`, 10)}`
+    const forest = r.layoutHash === null || r.layoutHash === undefined
+      ? `${r.worldSeed ?? '-'}`
+      : `${r.worldSeed}/${hex32(r.layoutHash)}`;
+    console.log(`  ${pad(r.seed, 12)}${pad(forest, 18)}${pad(r.outcome || '-', 13)}${pad(`${r.seconds}s`, 10)}`
       + `${pad(r.wavesReached ?? '-', 7)}${pad(`${r.eliminations} (${r.bootEliminations} boot)`, 16)}`
       + `${pad(`${r.quietestSeconds}s`, 11)}${verdict}`);
   }
   console.log('');
-  if (!bad.length) {
-    console.log(`PASS — all ${runs.length} seed(s) finished every wave. The quietest stretch of any wave was ${quietest}s.`);
+  console.log(`  forests: ${layouts.size} distinct layout(s) across ${runs.length} seed(s)`);
+  console.log('');
+  if (!bad.length && layoutsDiffer) {
+    console.log(`PASS — all ${runs.length} seed(s) finished every wave, in ${layouts.size} different forest(s). The quietest stretch of any wave was ${quietest}s.`);
     return;
   }
-  console.log(`FAIL — ${bad.length} of ${runs.length} seed(s) could not finish a wave:`);
+  if (!layoutsDiffer) {
+    console.log(`FAIL — ${runs.length} seed(s) built only ${layouts.size} layout(s): the forest seed is not reaching the world, so this run was not fuzzing the terrain at all.`);
+  }
+  if (bad.length) console.log(`FAIL — ${bad.length} of ${runs.length} seed(s) could not finish a wave:`);
   for (const r of bad) {
     if (r.stalledWave) {
       const s = r.stalledWave;

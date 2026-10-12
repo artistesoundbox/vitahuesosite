@@ -75,6 +75,14 @@ export class Game {
       canvas: this.renderer.domElement,
       isLocked: () => document.pointerLockElement !== null,
     });
+    // Which forest to build. `?worldSeed=N` overrides the configured default,
+    // which is what the harness uses so a fuzz run can play a different layout
+    // each time; with no parameter the game builds the forest it always did.
+    const requested = Number(new URLSearchParams(window.location.search).get('worldSeed'));
+    this.worldSeed = Number.isFinite(requested) && requested > 0
+      ? requested >>> 0
+      : SETTINGS.worldSeed;
+
     this.cameraYaw = 0;
     this.cameraPitch = -0.16;
     this.recoilPitch = 0;
@@ -135,7 +143,7 @@ export class Game {
     finish('enemyMesh');
     finish('enemyClips');
 
-    const built = await createWorld(this.scene, this.renderer);
+    const built = await createWorld(this.scene, this.renderer, { seed: this.worldSeed });
     this.world = built.world;
     this.sun = built.sun;
     finish('world');

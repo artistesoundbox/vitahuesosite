@@ -172,6 +172,10 @@ export const SETTINGS = {
   worldSize: 118,
   clearingRadius: 19,
   treeCount: 165,
+  // The forest is built from this seed — the trees, the cover and the cars all
+  // come out of one stream — so this is the layout every run has always played,
+  // and `?worldSeed=N` builds another one from it.
+  worldSeed: 1337,
 
   // Spawn ring for attackers, measured from the player. They open the fight
   // from a distance and walk in from cover.
