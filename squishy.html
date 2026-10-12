@@ -1558,7 +1558,14 @@
           };
         },
         /* the element itself, so a check can seek it rather than wait 52 s */
-        musicElement: function () { return musicEl; }
+        musicElement: function () { return musicEl; },
+        audio: function () {
+          return {
+            ctx: actx ? actx.state : null,
+            master: (master && actx) ? master.gain.value : null,
+            musicVolume: musicEl ? musicEl.volume : null
+          };
+        }
       };
     }
   </script>
