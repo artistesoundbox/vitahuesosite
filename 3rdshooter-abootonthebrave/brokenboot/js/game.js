@@ -28,11 +28,13 @@ const LOAD_TOTAL = Object.values(LOAD_WEIGHTS).reduce((a, b) => a + b, 0);
 
 const MUSIC = ['A Broken Boot On The Brave1.mp3', 'A Broken Boot On The Brave 2.mp3'];
 // The boot's own recorded sounds, beside the music in the asset folder: the yelp of
-// whoever it meets (two takes, so no two kicks land alike) and the swing itself.
+// whoever it meets (two takes, so no two kicks land alike), the swing itself, and
+// the sting for taking somebody off the field.
 const BOOT_SOUNDS = {
   ouch: 'ouch.mp3',
   oua: 'oua.mp3',
   bsh: 'bsh.mp3',
+  bootpower: 'bootpower.mp3',
 };
 const TAGLINES = [
   'One Man. One Forest. One Broken Boot.',
@@ -664,6 +666,7 @@ export class Game {
     const damage = boot.meleeDamage * kick.damageScale;
     if (charged) this.player.consumeCharge();
     let routed = 0;
+    let downed = 0;
     for (let i = 0; i < inArc.length; i++) {
       const { enemy } = inArc[i];
       enemy.knock.addScaledVector(forward, knockback);
@@ -675,7 +678,10 @@ export class Game {
       // The boot only sends a limited number running; the rest take the hit.
       // Better boots hurt far harder, so a wounded attacker left standing is
       // usually finished by the next kick.
-      if (enemy.takeDamage(damage)) this.onEnemyDown(enemy);
+      if (enemy.takeDamage(damage)) {
+        downed += 1;
+        this.onEnemyDown(enemy);
+      }
     }
 
     // The same boot, into the scenery. A crate is worth a kick; a car is worth a
@@ -733,6 +739,10 @@ export class Game {
       this.audio.kick();
     }
     this.audio.bootSwing();
+    // Somebody off the field — running, or beaten down — is worth a sting of its
+    // own, once per kick however many it caught. A kick that only connects is not:
+    // the swing already said that.
+    if (routed > 0 || downed > 0) this.audio.bootPower();
     if (routed > 0) {
       this.hud.showBanner(
         charged ? `${boot.name.toUpperCase()}` : 'THE BOOT',

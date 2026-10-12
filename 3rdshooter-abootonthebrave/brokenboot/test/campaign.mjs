@@ -843,6 +843,17 @@ function assess(report) {
       if (k.selection.padKickControl !== 'kick') bits.push(`the control failed: the pad's kick button threw ${k.selection.padKickControl} instead of the standing kick`);
       if (!k.selection.sweepNote) bits.push('the sweep\'s own button never explained itself');
       if (k.selection.sweepNoteAgain) bits.push(`the sweep button's note came back on the next press: "${k.selection.sweepNoteAgain}"`);
+      const t = k.takes;
+      if (t) {
+        if (t.missing.length) bits.push(`the boot's recorded take(s) ${t.missing.join(', ')} never loaded, so the synthesis is playing instead`);
+        if (t.swings !== 1) bits.push(`${t.swings} swing take(s) played for one kick instead of 1`);
+        if (t.synthYelp) bits.push(`${t.synthYelp} of 40 yelps fell back to the synthesis while the takes were loaded`);
+        if (t.yelp.length < 2) bits.push(`the yelp drew on ${t.yelp.length} of its two takes (${t.yelp.join(', ') || 'none'})`);
+        if (t.stingOnRout !== 1) bits.push(`${t.stingOnRout} sting(s) played for an attacker the boot sent running instead of 1`);
+        if (t.stingOnDown !== 1) bits.push(`${t.stingOnDown} sting(s) played for an attacker the boot beat down instead of 1`);
+        if (t.stingOnHit !== 0) bits.push(`a kick that only connected still played ${t.stingOnHit} sting(s), so the sting is not the boot taking somebody off the field`);
+        if (t.randomDraws) bits.push(`the boot's sounds took ${t.randomDraws} draw(s) out of the fight's own generator, so every kick re-rolls the match after it`);
+      }
       if (!k.profilesDiffer) bits.push('the three kicks do not differ in reach, arc and power');
       if (!(k.scenery.movedMeters > 1)) bits.push(`the kicked ${k.scenery.kind} moved only ${k.scenery.movedMeters}m`);
       if (!k.scenery.tumbled) bits.push(`the kicked ${k.scenery.kind} never tumbled`);
@@ -879,16 +890,30 @@ function assess(report) {
         if (!sw.went) bits.push('the swish was still on screen after the swing had finished');
         if (!sw.reusedBuffer) bits.push('every kick builds itself a new ribbon');
         if (!(sw.offChest > 0.1)) bits.push('the chest control sits on the boot, so the clause would not name it');
-        if (k.selection.sweepNote && !k.selection.sweepNoteAgain) {
-          findings.push(`the sweep's own button explains itself once through the real pad: "${k.selection.sweepNote}", and the same press again says nothing`);
-        }
-        if (sw.typesThrown && sw.shapesOrdered && sw.went && sw.reusedBuffer) {
-          findings.push('every kick draws its own swing from the foot it was thrown with: '
-            + Object.entries(sw.profiles).map(([t, r]) => `${t} ${r.samples} points over ${r.spread} m, ${r.width} m of stroke`).join('; ')
-            + `, one ribbon reused for all four, and a stroke from the middle of him (${sw.offChest} m off the boot) is what the clause names`);
-        }
       }
       reasons.push(`kicks and scenery: ${bits.join('; ') || 'the probe did not pass'}`);
+    }
+    // What a kick run that passes has measured, said out loud: the swing every throw
+    // draws from the boot it was thrown with, the sweep's own button explaining
+    // itself once, and the boot's recorded takes.
+    if (k && k.pass) {
+      const sw = k.swish || {};
+      if (sw.typesThrown && sw.shapesOrdered && sw.went && sw.reusedBuffer) {
+        findings.push('every kick draws its own swing from the foot it was thrown with: '
+          + Object.entries(sw.profiles).map(([t, r]) => `${t} ${r.samples} points over ${r.spread} m, ${r.width} m of stroke`).join('; ')
+          + `, one ribbon reused for all four, and a stroke from the middle of him (${sw.offChest} m off the boot) is what the clause names`);
+      }
+      if (k.selection.sweepNote && !k.selection.sweepNoteAgain) {
+        findings.push(`the sweep's own button explains itself once through the real pad: "${k.selection.sweepNote}", and the same press again says nothing`);
+      }
+      const t = k.takes;
+      if (t && !t.missing.length && !t.synthYelp && t.yelp.length === 2
+        && t.stingOnRout === 1 && t.stingOnDown === 1 && t.stingOnHit === 0 && t.randomDraws === 0) {
+        findings.push(`the boot has recorded takes now, fetched while the match plays: ${t.swings === 1 ? 'one swing' : `${t.swings} swings`} `
+          + `on a kick (bsh, pitched ${t.swingPitches.join('/')}), the yelp of whoever it lands on drawn from both takes `
+          + `(${t.yelp.join('/')}) and never from the synthesis across 40 yelps, and one sting (bootpower) for an attacker sent running `
+          + `or beaten down, while a kick that only connects stays silent — and none of that variation is drawn from the fight's own generator, so a kick cannot re-roll the match`);
+      }
     }
     // The officer's own mesh file. Every clause names the part and the bone, so a
     // bad export says which edit broke it rather than only that something did.
@@ -1253,6 +1278,20 @@ function printReport(report, passed) {
       console.log(`  ${pad('control: pad A', 22)}${pad(k.selection.padKickControl, 12)}${k.selection.padKickControl === 'kick' ? 'still the boot\'s own standing kick' : 'WRONG'}`);
       console.log(`  the button explains itself once: ${k.selection.sweepNote ? `"${k.selection.sweepNote}"` : 'NEVER'}`
         + `; the same press again says ${k.selection.sweepNoteAgain ? `"${k.selection.sweepNoteAgain}" — WRONG` : 'nothing'}`);
+      if (k.takes) {
+        const t = k.takes;
+        console.log('');
+        console.log(`  the boot's own takes  ${t.loaded.length} of ${t.loaded.length + t.missing.length} loaded`
+          + `${t.missing.length ? ` — MISSING ${t.missing.join(', ')}` : ''}`);
+        console.log(`  ${pad('on every kick', 22)}${t.swings === 1 ? 'bsh once' : `${t.swings} swings — WRONG`}`
+          + `, pitched ${t.swingPitches.join(', ')}`);
+        console.log(`  ${pad('kicked by the boot', 22)}${t.yelp.length === 2 ? `${t.yelp.join(' / ')} across 40 yelps` : `${t.yelp.join(', ') || 'NEVER'} — WRONG`}`
+          + `${t.synthYelp ? `, ${t.synthYelp} fell back to the synthesis — WRONG` : ', never the synthesis'}`);
+        console.log(`  ${pad('taken off the field', 22)}sent running ${t.stingOnRout === 1 ? 'bootpower once' : `${t.stingOnRout} — WRONG`}`
+          + `, beaten down ${t.stingOnDown === 1 ? 'bootpower once' : `${t.stingOnDown} — WRONG`}`
+          + `, only hit ${t.stingOnHit === 0 ? 'silence' : `${t.stingOnHit} — WRONG`}`);
+        console.log(`  ${pad('the fight', 22)}${t.randomDraws === 0 ? 'the sounds take nothing from its generator' : `${t.randomDraws} draw(s) taken from it — WRONG`}`);
+      }
       console.log('');
       console.log(`  ${pad('kick', 10)}${pad('reach', 8)}${pad('arc', 8)}${pad('damage', 8)}${pad('prop power', 10)}`);
       for (const [key, prof] of Object.entries(k.profiles)) {

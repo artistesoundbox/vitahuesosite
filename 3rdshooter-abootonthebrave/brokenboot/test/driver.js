@@ -44,7 +44,7 @@ async function runCampaign(options) {
 
   // The boot's own recorded takes, by the names the game knows them by. They are
   // fetched as the match starts, so anything reading them has to wait for them.
-  const BOOT_TAKES = ['ouch', 'oua', 'bsh'];
+  const BOOT_TAKES = ['ouch', 'oua', 'bsh', 'bootpower'];
 
   const G = window.__brokenBoot;
   if (!G || !G.player || !G.enemyManager) return { fatal: 'game object missing' };
@@ -837,6 +837,10 @@ async function runCampaign(options) {
         yelp: [],
         yelpPitches: [],
         synthYelp: 0,
+        stingOnRout: 0,
+        stingOnDown: 0,
+        stingOnHit: 0,
+        randomDraws: 0,
       };
       const played = [];
       const synthYelps = [];
@@ -865,6 +869,44 @@ async function runCampaign(options) {
         out.takes.yelp = [...new Set(yelps.map((c) => c.name))].sort();
         out.takes.yelpPitches = [...new Set(yelps.map((c) => +c.rate.toFixed(2)))].sort();
         out.takes.synthYelp = synthYelps.length;
+
+        // The sting for taking somebody off the field. Both halves of that are
+        // measured on a body placed inside the arc — sent running, and beaten down
+        // where it stands — and the control is a body that only takes the hit: it
+        // has to stay silent, or the sound would be the swing rather than the win.
+        const stung = (behaviour) => {
+          played.length = 0;
+          standing();
+          const at = p.position.clone().add(new THREE.Vector3(0, 0, 1.6));
+          G.enemyManager.enemies = [{
+            dead: false,
+            routed: false,
+            position: at,
+            knock: new THREE.Vector3(),
+            ...behaviour,
+          }];
+          G.resolveMelee('kick');
+          G.enemyManager.enemies = [];
+          endSwing();
+          return played.filter((c) => c.name === 'bootpower').length;
+        };
+        out.takes.stingOnRout = stung({ rout: () => true, takeDamage: () => false });
+        out.takes.stingOnDown = stung({ rout: () => false, takeDamage: () => true });
+        out.takes.stingOnHit = stung({ rout: () => false, takeDamage: () => false });
+
+        // And none of that variation comes out of the fight's own generator. The
+        // campaign is seeded to the byte, so a sound that draws from `Math.random`
+        // re-rolls every attacker's fire after it — which is a design change, not a
+        // sound. A hundred plays have to take nothing.
+        const origRandom = Math.random;
+        let draws = 0;
+        Math.random = () => { draws += 1; return 0.5; };
+        try {
+          for (let i = 0; i < 50; i++) { G.audio.bootSwing(); G.audio.scream(); }
+        } finally {
+          Math.random = origRandom;
+        }
+        out.takes.randomDraws = draws;
       } finally {
         G.audio.sample = origSample;
         G.audio.blip = origBlip;
@@ -898,6 +940,13 @@ async function runCampaign(options) {
         && out.takes.swings === 1
         && out.takes.yelp.length === 2
         && out.takes.synthYelp === 0
+        // A take sent running or beaten down stings; one that only took the hit does
+        // not.
+        && out.takes.stingOnRout === 1
+        && out.takes.stingOnDown === 1
+        && out.takes.stingOnHit === 0
+        // The boot's sounds take nothing out of the fight's seeded generator.
+        && out.takes.randomDraws === 0
         && out.profilesDiffer
         && out.scenery.speedAfterKick > 1
         && out.scenery.movedMeters > 1

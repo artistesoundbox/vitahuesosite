@@ -79,6 +79,20 @@ export class GameAudio {
     // retried on every wave.
     this.samples = Object.create(null);
     this.sampleTried = new Set();
+    // The seed for the variation below. Its own generator, never the shared
+    // `Math.random`: a sound that takes a draw from the fight's stream is a design
+    // change dressed as a sound, and the campaign would no longer be the same run.
+    this._seed = 0x9e3779b9;
+  }
+
+  /** A cheap xorshift, for take and pitch variation only. */
+  rand() {
+    let s = this._seed;
+    s ^= s << 13; s >>>= 0;
+    s ^= s >>> 17;
+    s ^= s << 5; s >>>= 0;
+    this._seed = s;
+    return s / 4294967296;
   }
 
   resume() {
@@ -189,21 +203,26 @@ export class GameAudio {
    * or whiffs — the synthesis is already the feel of the kick, this is the sound of
    * it. Nothing to fall back to: `kick()` is the fallback.
    */
-  bootSwing() { this.sample('bsh', 0.8, 0.92 + Math.random() * 0.16); }
+  bootSwing() { this.sample('bsh', 0.8, 0.92 + this.rand() * 0.16); }
+  /**
+   * The boot taking somebody off the field — sent running into the trees, or beaten
+   * down where he stood. Purely the recording: there is no synthesised version of a
+   * win, and a kick that only connects has nothing to announce.
+   */
+  bootPower() { this.sample('bootpower', 0.9); }
   impact() { this.noise(0.12, 1400, 0.28); this.blip(220, 0.1, 'square', 0.12, 80); }
 
   /**
    * The scream of someone who has just met the boot: one of the recorded takes if
    * it has loaded, the synthesis if neither has. Two takes picked at random, each
    * pitched a little off the file, so a wave of kicks does not play the same yelp
-   * over and over.
+   * over and over. Nothing is laid under the take: `blip` and `noise` fill their
+   * buffers out of `Math.random`, which is the fight's own stream, and the boot is
+   * already sounding its swing over this.
    */
   scream() {
-    const take = Math.random() < 0.5 ? 'ouch' : 'oua';
-    if (this.sample(take, 0.85, 0.94 + Math.random() * 0.12)) {
-      this.noise(0.2, 1300, 0.1);   // the hit under the voice
-      return;
-    }
+    const take = this.rand() < 0.5 ? 'ouch' : 'oua';
+    if (this.sample(take, 0.85, 0.94 + this.rand() * 0.12)) return;
     this.blip(760, 0.5, 'sawtooth', 0.2, 170);
     setTimeout(() => this.blip(560, 0.42, 'square', 0.14, 130), 80);
     setTimeout(() => this.blip(380, 0.34, 'triangle', 0.1, 90), 170);

@@ -745,6 +745,17 @@ start pressing sooner as well as harder.
   gradient sky cap. Only its terrain band stays visible on the horizon.
 - **Dynamic music.** The two supplied tracks are crossfaded as beds: one for the
   lulls, one for when there are attackers alive.
+- **The boot's own recorded takes.** Four small files beside the music supply the
+  sounds the boot makes: `bsh` on every kick whether it lands or whiffs, `ouch` and
+  `oua` as the two takes of whoever it lands on (picked at random, pitched a little
+  off the file, so a wave of kicks is not one take on repeat), and `bootpower` for
+  taking somebody off the field — sent running or beaten down. A kick that only
+  connects plays no sting. They are fetched while the match plays and decoded
+  through the same master gain as the synthesis, so mute and the effects volume
+  apply; until they land, and if one is ever missing, the synthesised version
+  stands in rather than the game going quiet. Their pitch and take variation comes
+  from their own generator, never `Math.random` — a sound that draws from the
+  fight's stream re-rolls the campaign behind it.
 - **Loot.** Six drop types rolled per elimination, with ammo first so a dry
   player can never hard-stall — see *Aim tune, the boot charge and the new
   pickups* above for the table.
@@ -770,7 +781,7 @@ brokenboot/
 │   ├── enemy.js        Attackers, wounding/routing, wave and spawn manager
 │   ├── effects.js      Pooled tracers, muzzle flash, sparks, loot pickups
 │   ├── hud.js          DOM HUD and overlays
-│   ├── audio.js        Synthesised SFX and the two-track music director
+│   ├── audio.js        Synthesised SFX, the boot's recorded takes and the two-track music director
 │   └── mathx.js        Damping helpers
 ├── serve.mjs           Local static server
 └── vendor/             Three.js r186 (module + the loaders it needs)
@@ -796,6 +807,7 @@ to `three.module.js`; `vendor/addons/` keeps the relative layout the addons expe
 | `landscape_forest__mountains.glb` | Scanned environment, used as the sky cubemap. |
 | `abrokenbootonthebraveposter.jpg` | Start screen art. |
 | `A Broken Boot On The Brave*.mp3` | Music beds. |
+| `bsh / ouch / oua / bootpower.mp3` | The boot: its swing, two takes of the yelp it draws, and the sting for taking somebody off the field. |
 
 Every rig in the set uses the `mixamorig:` bone namespace, which is why clips can
 be freely cross-applied between the player and the attackers.
