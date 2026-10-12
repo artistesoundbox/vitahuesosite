@@ -53,6 +53,19 @@ export const SETTINGS = {
   fatalitySpin: 6.0,        // rad/s it tumbles at
   fatalitySkid: 3.4,        // how fast the skid after it lands dies away
   fatalityShake: 0.75,
+  // The flight is played back in slow motion, because a throw that takes four
+  // tenths of a second at full speed is a flicker: at `fatalitySlowScale` the world
+  // creeps for `fatalitySlowmo` real seconds and eases back up to full speed by the
+  // end of it, so the body is in the air long enough to be watched. Real time, not
+  // world time — the window is what the eye gets, and it is spent whichever way the
+  // world is running.
+  fatalitySlowmo: 0.55,
+  fatalitySlowScale: 0.28,
+  // Where the body comes down, and how long the mark it leaves lasts. The stain is
+  // stretched along the direction it was thrown, and drawn from the shot rather
+  // than from dice, for the same reason the throw is.
+  fatalityDecalLife: 16,    // seconds before the last of it fades
+  fatalityDecalRadius: 0.62,// metres across, before the stretch
   headshotMultiplier: 2.2,
   bulletRange: 140,
   spread: 0.012,

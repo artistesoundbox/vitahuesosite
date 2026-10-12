@@ -151,6 +151,9 @@ export class Enemy {
             this.object.position.y = 0;
             this.landed = true;
             this.throwVel.y = 0;          // the ground takes the rest of the drop
+            // Told while the skid is still ahead of it, so whatever marks the landing
+            // can be drawn along the way the body is still travelling.
+            if (ctx.onLand) ctx.onLand(this);
           }
         } else if (this.deathTimer <= 1.2) {
           // The skid: it keeps going on the ground for a moment and then stops where

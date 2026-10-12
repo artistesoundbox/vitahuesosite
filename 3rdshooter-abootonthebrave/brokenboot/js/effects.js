@@ -32,6 +32,10 @@ const PICKUP_LOOK = {
 const PARTICLE_LIFE = 0.5;
 const MAX_TRACERS = 24;
 const MAX_PARTICLES = 90;
+// The stains a fatality leaves where the body came down. A pool, because a wave can
+// throw a dozen of them: the oldest is recycled rather than growing the scene.
+const MAX_DECALS = 10;
+const DECAL_SEGMENTS = 18;
 
 export class Effects {
   constructor(scene) {
@@ -40,6 +44,7 @@ export class Effects {
     this.particles = [];
     this.pickups = [];
     this.waves = [];
+    this.decals = [];
     this.time = 0;
     this._pull = new THREE.Vector3();
 
@@ -63,6 +68,21 @@ export class Effects {
       mesh.visible = false;
       scene.add(mesh);
       this.particles.push({ mesh, life: 0, vel: new THREE.Vector3() });
+    }
+
+    // One disc of geometry, shared by the whole pool: every stain is the same mesh
+    // scaled and turned, so twelve of them cost one circle rather than twelve.
+    const decalGeo = new THREE.CircleGeometry(1, DECAL_SEGMENTS);
+    decalGeo.rotateX(-Math.PI / 2);
+    for (let i = 0; i < MAX_DECALS; i++) {
+      const mesh = new THREE.Mesh(decalGeo, new THREE.MeshBasicMaterial({
+        color: 0x5c1113, transparent: true, opacity: 0, depthWrite: false,
+      }));
+      mesh.rotation.order = 'YXZ';
+      mesh.visible = false;
+      mesh.renderOrder = 1;
+      scene.add(mesh);
+      this.decals.push({ mesh, life: 0, max: 1 });
     }
 
     this.flash = new THREE.PointLight(0xffd08a, 0, 9, 2);
@@ -232,6 +252,38 @@ export class Effects {
     this.muzzleMesh.scale.setScalar(0.8 + Math.random() * 0.6);
   }
 
+  /**
+   * A spray that goes where it was sent, without dice.
+   *
+   * `burst` scatters in every direction off `Math.random()`, which is what a spark
+   * off scenery wants. A fatality does not: it is drawn after the fight is over, and
+   * every draw it takes from the shared generator is one the campaign's attackers no
+   * longer get. So the fan is built from the shot's own direction — a cone of fixed
+   * offsets around it — and a fatality costs the campaign nothing.
+   */
+  burstAlong(point, count, color, direction) {
+    const flat = direction ? direction.clone().setY(0) : new THREE.Vector3(0, 0, 1);
+    if (flat.lengthSq() < 1e-6) flat.set(0, 0, 1);
+    flat.normalize();
+    const side = new THREE.Vector3(flat.z, 0, -flat.x);
+    let spawned = 0;
+    for (const p of this.particles) {
+      if (p.life > 0) continue;
+      const k = spawned;
+      const spread = ((k % 5) - 2) * 0.16;
+      const lift = 0.7 + Math.floor(k / 5) * 0.55;
+      p.mesh.position.copy(point);
+      p.mesh.material.color.setHex(color);
+      p.mesh.material.opacity = 1;
+      p.mesh.visible = true;
+      p.vel.copy(flat).multiplyScalar(2.1 + (k % 3) * 0.5)
+        .addScaledVector(side, spread * 4.2)
+        .setY(lift + ((k % 4) - 1.5) * 0.35);
+      p.life = PARTICLE_LIFE * (0.7 + (k % 4) * 0.1);
+      if (++spawned >= count) break;
+    }
+  }
+
   burst(point, count = 7, color = 0xffca7a) {
     let spawned = 0;
     for (const p of this.particles) {
@@ -248,6 +300,35 @@ export class Effects {
       p.life = PARTICLE_LIFE * (0.6 + Math.random() * 0.7);
       if (++spawned >= count) break;
     }
+  }
+
+  /**
+   * Mark the ground where a thrown body landed.
+   *
+   * Every number here comes from the throw: how far it is stretched, and which way,
+   * are the direction the body was travelling. A decal is spawned the moment one is
+   * needed, so nothing about it may be drawn from `Math.random()` — the campaign's own
+   * draws would shift every time a body was thrown (the fatality's usual spray already
+   * has this problem; this does not add to it).
+   */
+  decal(position, direction, life = 16, radius = 0.62) {
+    const slot = this.decals.find((d) => d.life <= 0)
+      || this.decals.reduce((a, b) => (a.life <= b.life ? a : b));
+    const flat = direction ? direction.clone().setY(0) : new THREE.Vector3(0, 0, 1);
+    if (flat.lengthSq() < 1e-6) flat.set(0, 0, 1);
+    flat.normalize();
+    const m = slot.mesh;
+    // Blood thrown forward is blood that smears forward: long along the throw, and
+    // its own width across it.
+    const stretch = 1.45;
+    m.position.set(position.x, 0.02, position.z);
+    m.rotation.y = Math.atan2(flat.x, flat.z);
+    m.scale.set(radius, 1, radius * stretch);
+    m.material.opacity = 0;
+    m.visible = true;
+    slot.life = life;
+    slot.max = life;
+    return slot;
   }
 
   spawnPickup(position, type) {
@@ -327,6 +408,16 @@ export class Effects {
       if (p.life <= 0) p.mesh.visible = false;
     }
 
+    // A stain holds its colour for a while and then goes, rather than blinking out:
+    // the last third of its life is the fade.
+    for (const d of this.decals) {
+      if (d.life <= 0) continue;
+      d.life -= dt;
+      const t = d.max > 0 ? d.life / d.max : 0;
+      d.mesh.material.opacity = d.life <= 0 ? 0 : 0.62 * Math.min(1, Math.max(0, t / 0.34));
+      if (d.life <= 0) d.mesh.visible = false;
+    }
+
     // The swish is only ever alive during a kick and a fifth of a second after
     // it, so this is one opacity write on the frames a kick is being thrown.
     if (this.stroke.life > 0) {
@@ -377,6 +468,7 @@ export class Effects {
     for (const p of this.particles) { p.life = 0; p.mesh.visible = false; }
     for (const p of this.pickups) this.scene.remove(p.mesh);
     this.pickups.length = 0;
+    for (const d of this.decals) { d.life = 0; d.mesh.visible = false; d.mesh.material.opacity = 0; }
     this.flash.visible = false;
     this.muzzleMesh.visible = false;
   }

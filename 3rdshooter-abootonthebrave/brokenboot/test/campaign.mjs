@@ -1052,6 +1052,26 @@ function assess(report) {
           if (!h.corpseWasATargetWhileAlive) {
             bits.push('the cast the corpse clause uses never found a living attacker on that line, so it names nothing');
           }
+          if (!(h.slowSeconds > 0)) bits.push('the throw was not slowed down at all');
+          else if (!(h.slowScaleAtDowning <= fc.limits.slowMax)) {
+            bits.push(`slow motion opened at \u00d7${h.slowScaleAtDowning} of real time instead of \u00d7${fc.limits.slowMax} or slower`);
+          }
+          if (h.slowSeconds > 0 && h.slowScaleAfter !== 1) {
+            bits.push(`the world was still running at \u00d7${h.slowScaleAfter} when the slow-motion window ran out`);
+          }
+          if (h.decalsLeft !== 1) {
+            bits.push(`${h.decalsLeft} stain(s) were left where the body landed instead of 1`);
+          } else {
+            // Only worth reading once there is a stain to read.
+            if (h.decalOffLanding > fc.limits.decalOffLanding) {
+              bits.push(`the stain sits ${h.decalOffLanding} m from where the body came down`);
+            }
+            if (h.decalSmearedOff === null || h.decalSmearedOff > fc.limits.decalSmeared) {
+              bits.push(`the stain is smeared ${h.decalSmearedOff}\u00b0 off the way the body was travelling`);
+            }
+            if (h.decalOnGround === null || h.decalOnGround > 0.05) bits.push(`the stain sits at ${h.decalOnGround} m, not on the grass`);
+            if (!(h.decalLifeLeft > 0)) bits.push('the stain was gone the moment it was drawn');
+          }
           if (!/FATALITY/.test(h.banner)) bits.push(`the head downing announced "${h.banner}" rather than a FATALITY`);
         } else {
           if (h.threwTheBody) bits.push('a finishing round through the chest threw the body too');
@@ -1059,6 +1079,8 @@ function assess(report) {
             bits.push(`a chest downing moved the body ${h.travelledMetres} m, so the measurement does not name the throw`);
           }
           if (/FATALITY/.test(h.banner)) bits.push('a chest downing was announced as a FATALITY');
+          if (h.slowSeconds > 0) bits.push('a chest downing slowed the world down');
+          if (h.decalsLeft !== 0) bits.push(`a chest downing left ${h.decalsLeft} stain(s) on the grass`);
         }
         if (h.eliminations !== 1) bits.push(`the ${label} downing counted ${h.eliminations} elimination(s)`);
       }
@@ -1082,6 +1104,10 @@ function assess(report) {
         + `as the thing measured rather than the death`);
       findings.push(`the fatality is only how the body goes down: both halves paid ${h.creditPaid} of a tier point `
         + `(the gunfire weight, ${fcPass.weight}) for ${h.eliminations} elimination(s) each, so the boot is still the way to the next tier`);
+      findings.push(`the throw is watchable rather than a flicker: the world runs at \u00d7${h.slowScaleAtDowning} of real time when the body leaves, for ${h.slowSeconds}s of real time, `
+        + `and hands itself back at full speed when the window runs out (\u00d7${h.slowScaleAfter})`);
+      findings.push(`it leaves its mark where it lands: one stain ${h.decalOffLanding} m from the landing point, on the grass at ${h.decalOnGround} m, `
+        + `smeared ${h.decalSmearedOff}\u00b0 off the way the body was still travelling, with ${h.decalLifeLeft}s of it left to fade`);
       findings.push(`the flung body is not cover: the cast that finds a living attacker on that line finds only the ground where this one is lying`);
     }
     if (report.failedRequests?.length) reasons.push(`${report.failedRequests.length} failed request(s): ${report.failedRequests[0]}`);
@@ -1381,6 +1407,11 @@ function printReport(report, passed) {
         }
         console.log(`  ${pad('', 18)}${h.corpseWasATargetWhileAlive ? 'the line finds a living attacker' : 'THE LINE NEVER FOUND A LIVING ATTACKER'}, `
           + `${h.corpseIsNotATarget ? 'and finds only the ground once he is down' : 'AND STILL FINDS HIS FLUNG BODY'}`);
+        console.log(`  ${pad('slow motion', 18)}${h.slowSeconds > 0 ? `\u00d7${h.slowScaleAtDowning} of real time at the downing, for ${h.slowSeconds}s, back to \u00d7${h.slowScaleAfter} when it runs out` : 'NONE'}`);
+        const stainLine = h.decalsLeft === 1
+          ? `one, ${h.decalOffLanding} m from the landing point, ${h.decalSmearedOff}\u00b0 off the way it was going, on the grass at ${h.decalOnGround} m, ${h.decalLifeLeft}s left`
+          : (label === 'through the chest' && h.decalsLeft === 0 ? 'none, which is the point' : `${h.decalsLeft} of them — WRONG`);
+        console.log(`  ${pad('the stain', 18)}${stainLine}`);
         console.log(`  ${pad('', 18)}announced "${h.banner}"`);
       }
       if (fat.weight !== undefined) {
@@ -1445,7 +1476,7 @@ function printReport(report, passed) {
       }
     }
     if (passed.ok) {
-      console.log(`\nPASS — ${[c && 'a press retargets to the attacker nearest the crosshair and a held trigger keeps its target', k && 'the three kicks differ, the scenery they launch settles where it lands, and the impact feels as heavy as the mass it hit', cc && "the officer's own mesh file is fully weighted, nothing is welded to a bone it does not sit on, he is drawn standing on the ground in every state he can be posed in, and he is holding his rifle rather than wearing it", d && 'a wave can be won with no ammunition left, by closing and booting', sweep && 'every forest audited is one a wave can actually be fought in'].filter(Boolean).join('; ')}.`);
+      console.log(`\nPASS — ${[c && 'a press retargets to the attacker nearest the crosshair and a held trigger keeps its target', k && 'the three kicks differ, the scenery they launch settles where it lands, and the impact feels as heavy as the mass it hit', cc && "the officer's own mesh file is fully weighted, nothing is welded to a bone it does not sit on, he is drawn standing on the ground in every state he can be posed in, and he is holding his rifle rather than wearing it", fat && 'a finishing round through the head throws the body — in slow motion, leaving a stain where it lands — while one through the chest does not, and the two pay exactly the same tier credit', d && 'a wave can be won with no ammunition left, by closing and booting', sweep && 'every forest audited is one a wave can actually be fought in'].filter(Boolean).join('; ')}.`);
     } else {
       console.log('\nFAIL');
       for (const reason of passed.reasons) console.log(`  - ${reason}`);

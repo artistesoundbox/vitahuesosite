@@ -95,6 +95,11 @@ export class Game {
     this.kickback = 0;
     this.kickRoll = 0;
     this.hitStop = 0;
+    // Slow motion: a longer, gentler window than a hit-stop, armed by a fatality so
+    // the throw can be watched. It is spent in real seconds and eases back to full
+    // speed by the end, rather than snapping back the way a connect does.
+    this.slowmo = 0;
+    this.slowmoTotal = 0;
 
     this.state = 'loading'; // loading | ready | playing | over
     this.wave = 0;
@@ -417,11 +422,30 @@ export class Game {
    * none of this can reach back into the fight that produced it.
    */
   fatality(enemy, direction) {
-    this.effects.burst(enemy.headPosition, 20, 0xc2402c);
-    this.effects.burst(enemy.position.clone().setY(1.15), 11, 0x8e2b1c);
+    // Sent along the shot, so the spray goes where the body is going and costs the
+    // campaign's own generator nothing (see burstAlong).
+    this.effects.burstAlong(enemy.headPosition, 20, 0xc2402c, direction);
+    this.effects.burstAlong(enemy.position.clone().setY(1.15), 11, 0x8e2b1c, direction);
     enemy.fatality(direction);
     this.addShake(SETTINGS.fatalityShake);
+    // The flight is the beat the whole thing is for, so the world slows down to show
+    // it: a body crossing three metres in a third of a second reads as a glitch.
+    this.slowMotion(SETTINGS.fatalitySlowmo);
     this.hud.showBanner('FATALITY', enemy.elite ? 'ELITE HEADSHOT' : 'HEADSHOT', 1.2);
+  }
+
+  /**
+   * A body thrown by a fatality has come down. It leaves the mark it earned: a stain
+   * where it landed, smeared along the way it was travelling, plus the spray of the
+   * landing itself.
+   */
+  onBodyLand(enemy) {
+    const heading = enemy.throwVel.lengthSq() > 1e-6
+      ? enemy.throwVel
+      : new THREE.Vector3(Math.sin(enemy.yaw), 0, Math.cos(enemy.yaw));
+    this.effects.decal(enemy.position, heading, SETTINGS.fatalityDecalLife, SETTINGS.fatalityDecalRadius);
+    this.effects.burstAlong(enemy.position.clone().setY(0.25), 9, 0x7d1c18, heading);
+    this.addShake(0.25);
   }
 
   /** Send an attacker running, count it, and leave loot behind. */
@@ -513,9 +537,33 @@ export class Game {
    * keeps the harness's own timings honest.
    */
   frameTime(realDt) {
-    if (this.hitStop <= 0) return realDt;
-    this.hitStop = Math.max(0, this.hitStop - realDt);
-    return realDt * SETTINGS.kickStopScale;
+    let scale = 1;
+    if (this.hitStop > 0) {
+      this.hitStop = Math.max(0, this.hitStop - realDt);
+      scale = Math.min(scale, SETTINGS.kickStopScale);
+    }
+    if (this.slowmo > 0) {
+      this.slowmo = Math.max(0, this.slowmo - realDt);
+      // Slowest as it opens and full speed as it runs out, so the throw is given its
+      // own moment and the world then takes itself back.
+      const left = this.slowmoTotal > 0 ? this.slowmo / this.slowmoTotal : 0;
+      const eased = SETTINGS.fatalitySlowScale + (1 - SETTINGS.fatalitySlowScale) * (1 - left);
+      scale = Math.min(scale, eased);
+    }
+    return realDt * scale;
+  }
+
+  /**
+   * Run the world in slow motion for `seconds` of real time. The window is real, not
+   * world time, so a long window is not stretched further by the slow motion inside
+   * it — and `step()` is untouched, which keeps the harness's timings honest (it
+   * feeds its own dt and never asks this for one).
+   */
+  slowMotion(seconds) {
+    if (!(seconds > 0)) return 0;
+    this.slowmo = Math.max(this.slowmo, seconds);
+    this.slowmoTotal = Math.max(this.slowmoTotal, this.slowmo);
+    return this.slowmo;
   }
 
   /**
@@ -995,6 +1043,7 @@ export class Game {
       player: this.player,
       onFire: (enemy, dist, wounded, suppressed) => this.enemyFire(enemy, dist, wounded, suppressed),
       onDown: (enemy) => this.onEnemyDown(enemy),
+      onLand: (enemy) => this.onBodyLand(enemy),
       onFlush: (lastStand, announce) => this.onFlush(lastStand, announce),
     });
     this.effects.update(dt, this.player, (type) => this.onPickup(type));

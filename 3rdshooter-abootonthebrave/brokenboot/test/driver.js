@@ -882,6 +882,9 @@ async function runCampaign(options) {
       launchMax: 8,         // and the most it may leave at
       stillMax: 0.05,       // m the body-shot control is allowed to move
       offShotMax: 15,       // degrees the throw may diverge from the shot itself
+      slowMax: 0.4,         // world time at the downing, as a fraction of real time
+      decalOffLanding: 0.6, // m the stain may sit from where the body came down
+      decalSmeared: 12,     // degrees the stain may be turned off the way it was going
     };
     const out = { distance: LIMITS.distance, limits: LIMITS, pass: false };
     const savedEnemies = G.enemyManager.enemies.slice();
@@ -1075,6 +1078,15 @@ async function runCampaign(options) {
           const thrown = subject.thrown;
           const diedAt = subject.position.clone();
           const yawAtDeath = subject.model.rotation.y;
+          // The slow motion, read off the frame clock the game itself uses. It has to
+          // open at its slowest and hand the world back at full speed by the end of
+          // the window, and the window has to be spent in real time.
+          const slowSeconds = +G.slowmo.toFixed(2);
+          const slowScaleAtDowning = +(G.frameTime(FRAME) / FRAME).toFixed(2);
+          let spent = 0;
+          while (G.slowmo > 0 && spent < 600) { G.frameTime(FRAME); spent += 1; }
+          const slowScaleAfter = +(G.frameTime(FRAME) / FRAME).toFixed(2);
+          const decalsBefore = G.effects.decals.filter((d) => d.life > 0).length;
           const spinSign = downingDirection ? (downingDirection.x >= 0 ? -1 : 1) : null;
           // A flung body must not soak rounds meant for the living. He was found on
           // this line a moment ago, while he was alive; the same cast now finds the
@@ -1094,6 +1106,7 @@ async function runCampaign(options) {
           let launchTravel = 0;
           let turn = 0;
           let turnAtLanding = null;
+          let landingAt = null;
           let launchDir = null;
           const horizontal = () => new THREE.Vector3(
             subject.position.x - diedAt.x, 0, subject.position.z - diedAt.z,
@@ -1106,12 +1119,28 @@ async function runCampaign(options) {
             const far = horizontal().length();
             if (!subject.landed) travel = far;
             turn = Math.abs(subject.model.rotation.y - yawAtDeath) * 180 / Math.PI;
-            if (turnAtLanding === null && subject.landed) turnAtLanding = turn;
+            if (turnAtLanding === null && subject.landed) {
+              turnAtLanding = turn;
+              landingAt = subject.position.clone();
+            }
             if (i === launchFrames - 1) {
               launchTravel = far;
               launchDir = horizontal();
             }
           }
+          // Where it came down, and what it left there: one stain, on the grass at the
+          // landing point, smeared the way the body was still travelling.
+          const stains = G.effects.decals.filter((d) => d.life > 0);
+          const stain = stains[0] || null;
+          const smear = stain ? new THREE.Vector3(Math.sin(stain.mesh.rotation.y), 0, Math.cos(stain.mesh.rotation.y)) : null;
+          const landedFlat = landingAt || subject.position.clone();
+          const byLanding = landedFlat.clone().sub(diedAt).setY(0);
+          const decalOffLanding = stain
+            ? +Math.hypot(stain.mesh.position.x - landedFlat.x, stain.mesh.position.z - landedFlat.z).toFixed(2)
+            : null;
+          const decalSmearedOff = stain && byLanding.length() > 1e-3
+            ? +(Math.acos(Math.max(-1, Math.min(1, smear.clone().normalize().dot(byLanding.clone().normalize())))) * 180 / Math.PI).toFixed(1)
+            : null;
           const launchSpeed = +(launchTravel / (launchFrames * FRAME)).toFixed(2);
           const offShot = launchDir && launchDir.length() > 1e-3 && downingDirection
             ? Math.acos(Math.max(-1, Math.min(1, launchDir.clone().normalize().dot(
@@ -1132,6 +1161,14 @@ async function runCampaign(options) {
               : Math.sign(subject.model.rotation.y - yawAtDeath) === spinSign,
             corpseIsNotATarget,
             corpseWasATargetWhileAlive: foundWhileAlive,
+            slowSeconds,
+            slowScaleAtDowning,
+            slowScaleAfter,
+            decalsLeft: stains.length - decalsBefore,
+            decalOffLanding,
+            decalSmearedOff,
+            decalOnGround: stain ? +stain.mesh.position.y.toFixed(2) : null,
+            decalLifeLeft: stain ? +stain.life.toFixed(1) : null,
             banner,
             creditPaid: +(p.tierCredit - creditBefore).toFixed(3),
             eliminations: G.enemiesKilledTotal - killedBefore,
@@ -1180,6 +1217,17 @@ async function runCampaign(options) {
       && head.spinFromTheShotsSide === true
       && head.corpseIsNotATarget && control.corpseIsNotATarget
       && head.corpseWasATargetWhileAlive && control.corpseWasATargetWhileAlive
+      // The throw has to be watchable (slow motion) and it has to leave its mark
+      // (a stain at the landing) — and the chest downing has to do neither, or the
+      // two halves are not telling anything apart.
+      && head.slowSeconds > 0
+      && head.slowScaleAtDowning <= LIMITS.slowMax
+      && head.slowScaleAfter === 1
+      && head.decalsLeft === 1
+      && head.decalOffLanding <= LIMITS.decalOffLanding
+      && head.decalSmearedOff !== null && head.decalSmearedOff <= LIMITS.decalSmeared
+      && head.decalOnGround <= 0.05 && head.decalLifeLeft > 0
+      && control.slowSeconds === 0 && control.decalsLeft === 0
       && out.sameCredit && head.creditPaid === SETTINGS.bulletKillWeight
       && head.eliminations === 1 && control.eliminations === 1
       && /FATALITY/.test(head.banner) && !/FATALITY/.test(control.banner));
