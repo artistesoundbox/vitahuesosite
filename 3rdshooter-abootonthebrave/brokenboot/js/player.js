@@ -4,6 +4,9 @@ import { AnimController, findBone, attachToBone, gltfLoader } from './assets.js'
 import { dampAngle, clamp } from './mathx.js';
 
 const MODEL_YAW_OFFSET = 0; // Mixamo characters face +Z, matching atan2(x, z).
+// An unskinned part further than this from every bone is scenery the character
+// happens to stand next to, not gear worn on it.
+const RIGID_PART_RANGE = 0.4;
 
 export class Player {
   constructor(template) {
@@ -11,6 +14,12 @@ export class Player {
     this.model = template.instantiate();
     this.object.add(this.model);
     this.anim = new AnimController(this.model, template.clips);
+    // Parts the file models but never skins — its own big boot, a holster, a weapon
+    // placed in the hand — would be left standing in place by the first clip that
+    // plays, so they are rigged before anything animates.
+    this.ownBoots = [];
+    this.rigidParts = [];
+    this.bindRigidParts();
 
     this.velocity = new THREE.Vector3();
     this.velocityY = 0;
@@ -282,6 +291,53 @@ export class Player {
     return this.refreshBootTier();
   }
 
+  /**
+   * Bind the character's unskinned parts to the rig.
+   *
+   * A mesh file can carry a prop as a separate object instead of skinning it: the
+   * officer's own big boot, gear, a weapon positioned in the hand. None of it is
+   * weighted to the skeleton, so the moment a clip plays the rig walks out of them.
+   * Each such part belongs to the bone it is sitting on, so it is attached to the
+   * nearest bone. `attach` preserves the world transform, so nothing moves, snaps
+   * or rescales — the part rides the rig exactly where it was modelled. The bones
+   * left unchanged are the skeleton's own; only props are re-parented.
+   *
+   * The parts that land on a foot are the officer's own boots, which a tier's boot
+   * replaces rather than stacks on top of.
+   */
+  bindRigidParts() {
+    const bones = [];
+    this.model.traverse((o) => { if (o.isBone) bones.push(o); });
+    if (!bones.length) return; // a static mesh: there is no rig to ride
+
+    const loose = [];
+    this.model.traverse((o) => {
+      if (!o.isMesh || o.isSkinnedMesh) return; // skinned: the skeleton drives it
+      for (let p = o.parent; p; p = p.parent) if (p.isBone) return; // already rigged
+      loose.push(o);
+    });
+
+    const centre = new THREE.Vector3();
+    const at = new THREE.Vector3();
+    for (const mesh of loose) {
+      const box = new THREE.Box3().setFromObject(mesh);
+      if (box.isEmpty()) continue;
+      box.getCenter(centre);
+      let bone = null;
+      let nearest = Infinity;
+      for (const candidate of bones) {
+        const distance = candidate.getWorldPosition(at).distanceTo(centre);
+        if (distance < nearest) { nearest = distance; bone = candidate; }
+      }
+      if (!bone || nearest > RIGID_PART_RANGE) continue;
+      bone.attach(mesh);
+      this.rigidParts.push({ mesh, bone: bone.name, metres: nearest });
+    }
+    this.ownBoots = this.rigidParts
+      .filter((part) => /toe|foot|ankle/i.test(part.bone))
+      .map((part) => part.mesh);
+  }
+
   refreshBootTier() {
     let next = 0;
     for (let i = 0; i < BOOT_TIERS.length; i++) {
@@ -299,6 +355,9 @@ export class Player {
   /** Lazily load and socket the boot model for the current tier. */
   async equipBootModel() {
     const tier = this.boot;
+    // The officer's own boot is part of the character; a tier's boot takes its
+    // place rather than being worn inside it.
+    for (const boot of this.ownBoots || []) boot.visible = !tier.model;
     if (!tier.model) return;
     if (this.loadedBootModel === tier.model) return;
     this.loadedBootModel = tier.model;

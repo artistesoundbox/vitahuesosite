@@ -12,15 +12,36 @@ export function loadFBX(url, onProgress) {
   });
 }
 
+/**
+ * The bounds of the character itself.
+ *
+ * A mesh file can model more than the body: a boot, a holster or a weapon placed
+ * alongside it. Those props are not part of the figure, and one that reaches above
+ * the head or below the feet would otherwise decide the scale — the officer would
+ * be sized to whatever reaches furthest. So the body is what is measured, and the
+ * everything-included box is only the fallback for a file with nothing skinned.
+ */
+function characterBox(root) {
+  const box = new THREE.Box3();
+  let skinned = 0;
+  root.traverse((o) => {
+    if (!o.isSkinnedMesh) return;
+    skinned++;
+    box.expandByObject(o);
+  });
+  if (skinned) return box;
+  return box.setFromObject(root);
+}
+
 /** Mixamo exports are in centimetres and are not authored at metre scale. */
 export function normalizeCharacter(root, targetHeight) {
   root.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(root);
+  const box = characterBox(root);
   const size = box.getSize(new THREE.Vector3());
   const scale = targetHeight / (size.y || 1);
   root.scale.multiplyScalar(scale);
   root.updateMatrixWorld(true);
-  const box2 = new THREE.Box3().setFromObject(root);
+  const box2 = characterBox(root);
   root.position.y -= box2.min.y;
   root.traverse((o) => {
     if (o.isMesh || o.isSkinnedMesh) {
