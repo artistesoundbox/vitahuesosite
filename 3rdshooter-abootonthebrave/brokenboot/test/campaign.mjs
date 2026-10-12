@@ -838,6 +838,9 @@ function assess(report) {
       if (k.selection.airborne !== 'high') bits.push(`being in the air gives ${k.selection.airborne} instead of the high kick`);
       if (k.selection.standingStandardBoot !== 'kick') bits.push(`the standard boot stands with ${k.selection.standingStandardBoot}`);
       if (k.selection.standingTopBoot !== 'stomp') bits.push(`the top boot stands with ${k.selection.standingTopBoot}`);
+      if (k.selection.padSweep !== 'sweep') bits.push(`the pad's sweep button throws ${k.selection.padSweep} from a standing start`);
+      if (k.selection.keySweep !== 'sweep') bits.push(`X on the keyboard throws ${k.selection.keySweep} from a standing start`);
+      if (k.selection.padKickControl !== 'kick') bits.push(`the control failed: the pad's kick button threw ${k.selection.padKickControl} instead of the standing kick`);
       if (!k.profilesDiffer) bits.push('the three kicks do not differ in reach, arc and power');
       if (!(k.scenery.movedMeters > 1)) bits.push(`the kicked ${k.scenery.kind} moved only ${k.scenery.movedMeters}m`);
       if (!k.scenery.tumbled) bits.push(`the kicked ${k.scenery.kind} never tumbled`);
@@ -1234,6 +1237,9 @@ function printReport(report, passed) {
       console.log(`  ${pad('standing, standard', 22)}${pad(k.selection.standingStandardBoot, 12)}`);
       console.log(`  ${pad('standing, silver', 22)}${pad(k.selection.standingSilverBoot, 12)}`);
       console.log(`  ${pad('standing, spiked +', 22)}${pad(k.selection.standingTopBoot, 12)}${k.selection.standingTopBoot === 'stomp' ? 'everything around, at once' : 'WRONG'}`);
+      console.log(`  ${pad('pad X', 22)}${pad(k.selection.padSweep, 12)}${k.selection.padSweep === 'sweep' ? 'the low sweep from a standing start' : 'WRONG'}`);
+      console.log(`  ${pad('keyboard X', 22)}${pad(k.selection.keySweep, 12)}${k.selection.keySweep === 'sweep' ? 'the same, off the key map' : 'WRONG'}`);
+      console.log(`  ${pad('control: pad A', 22)}${pad(k.selection.padKickControl, 12)}${k.selection.padKickControl === 'kick' ? 'still the boot\'s own standing kick' : 'WRONG'}`);
       console.log('');
       console.log(`  ${pad('kick', 10)}${pad('reach', 8)}${pad('arc', 8)}${pad('damage', 8)}${pad('prop power', 10)}`);
       for (const [key, prof] of Object.entries(k.profiles)) {

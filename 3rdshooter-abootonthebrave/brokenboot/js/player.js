@@ -263,9 +263,16 @@ export class Player {
     return this.bootIndex >= 2 ? 'high' : 'kick';
   }
 
-  melee() {
+  /**
+   * Throw a kick. `ask` names one outright where the stance does not decide it —
+   * the pad's own sweep button asks for the low sweep from a standing start, which
+   * is the one kick that otherwise costs two presses (crouch, then kick). Asking for
+   * a kick the stance already gives changes nothing, so a crouched officer pressing
+   * it gets the sweep they were about to throw anyway.
+   */
+  melee(ask = null) {
     if (!this.canMelee()) return false;
-    const type = this.kickType();
+    const type = ask && KICKS[ask] ? ask : this.kickType();
     const kick = KICKS[type] || KICKS.kick;
     // A clip the rig does not carry falls back to the plain kick rather than
     // costing the player their attack.

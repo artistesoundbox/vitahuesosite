@@ -265,6 +265,9 @@ export class Game {
 
     for (const action of manager.takeActions()) {
       if (action === 'kick') this.player.melee();
+      // The pad's own sweep button: the low sweep from wherever the officer is, so the
+      // crouched kick does not cost a crouch first.
+      else if (action === 'sweep') this.player.melee('sweep');
       else if (action === 'jump') this.player.jump();
       else if (action === 'reload') this.player.beginReload();
       else if (action === 'crouch') this.player.toggleCrouch();
@@ -659,7 +662,7 @@ export class Game {
     if (!this.kicksTaught.has(type)) {
       this.kicksTaught.add(type);
       const hint = {
-        sweep: 'Crouch and kick: low, wide, and it takes the legs out',
+        sweep: 'Crouch and kick (or X on a pad): low, wide, and it takes the legs out',
         high: 'Kick from the air: the longest reach and the hardest landing',
         stomp: 'The boot is heavy enough to stomp: everything around, at once',
       }[type];

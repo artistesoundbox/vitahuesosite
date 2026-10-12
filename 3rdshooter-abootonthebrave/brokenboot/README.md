@@ -384,7 +384,8 @@ and asset fetches over `file://`.
 | Left mouse (hold) | Fire |
 | Right mouse (hold) / `Q` | Aim tune — glide the view onto the attacker nearest the reticle |
 | `R` | Reload |
-| `F` | Boot kick |
+| `F` | Boot kick (the kick the stance gives — see below) |
+| `X` | Low sweep, from anywhere |
 | `C` | Crouch (toggle) |
 | `M` | Mute |
 | `Esc` | Release the cursor (pauses) |
@@ -399,11 +400,12 @@ and asset fetches over `file://`.
 | Right stick | Aim |
 | `RT` | Fire |
 | `LT` | Aim tune — glide the view onto the attacker nearest the reticle |
-| `A` | Boot kick |
+| `A` | Boot kick (the kick the stance gives — see below) |
+| `X` | Low sweep, from anywhere |
 | `B` | Reload |
 | `Y` | Jump |
 | Right stick click | Crouch (toggle) |
-| `X` | Mute |
+| `View` / `Back` | Mute |
 | `Menu` | Release the cursor |
 
 **Touch / phone**
@@ -429,11 +431,18 @@ This is the heart of the design, and it is deliberately unusual:
   over by the time it lands. It comes down two and a half metres downrange, skids
   (`fatalitySkid`), then sinks. A round through the chest — or a bleed-out that runs
   out between rounds — folds them where they stand, which is the other banner.
-  Nothing else changes: the credit, the loot roll and the wave pacing are a
-  downing's, so the boot is still the way to the next tier. The throw is worked out
-  from the shot itself (its direction, and which side it came from) rather than from
-  dice, because a campaign that drew different numbers from something that happens
-  after the fight is over is no longer the same campaign.
+  The flight is played back in slow motion (`fatalitySlowmo`, 0.55 s of real time at
+  `fatalitySlowScale`, 0.28, easing back to full speed), because three metres in a
+  third of a second is a flicker rather than a fatality; and where the body lands it
+  leaves a stain (`fatalityDecalLife`, `fatalityDecalRadius`), smeared along the way
+  it was still travelling. Nothing else changes: the credit, the loot roll and the
+  wave pacing are a downing's, so the boot is still the way to the next tier. The
+  throw, the spray and the stain are all worked out from the shot itself (its
+  direction, and which side it came from) rather than from dice, because a campaign
+  that drew different numbers from something that happens after the fight is over is
+  no longer the same campaign — and the particle spray is built as a fan along the
+  shot (`burstAlong`) rather than off `Math.random()`, so a fatality costs the
+  campaign's own generator nothing at all.
 - **Keep firing and they eventually bleed out.** Once an attacker is driven to
   the floor it starts a bleed-out timer (`bleedoutTime`, 15 s). Every extra hit
   takes `bleedoutHitPush` (0.8 s) off it, so putting one down with the rifle takes
@@ -503,10 +512,17 @@ and power against scenery, all in `KICKS` in `config.js`:
 
 The arc is the half-angle either side of the kick, so the sweep covers nearly the
 whole front at almost no reach and the stomp's π takes everything around the
-officer on the spot. Because the kick is chosen by *where the officer is* rather
-than by a separate button, all three are always available — crouch for the sweep,
-jump and kick in the air for the flying high kick — and the equipped tier decides
-what the standing kick becomes. The tier's damage and knockback are still scaled
+officer on the spot. The kick is chosen by *where the officer is*: the boot's own
+button (`F`, or `A` on a pad) throws the sweep crouched, the flying high kick in
+the air, and the equipped tier's signature kick standing. The low sweep also has a
+button of its own — `X` on the keyboard and `X` on a pad, the same letter in both
+legends — because it is the one kick the stance does not reach in a single press
+otherwise: it was two (crouch, then kick), which is a poor deal on a thumbstick.
+Asking for a kick the stance already gives changes nothing, so a crouched officer
+pressing `X` gets the sweep they were about to throw anyway. `npm run test:kick`
+measures both routes through the real `InputManager` — the pad's button and the
+key map — and presses the boot's own button as the control, because a clause that
+only asserts a button does *something* asserts nothing. The tier's damage and knockback are still scaled
 by the kick, so an upgrade is felt in every one, and it remains visible in the
 animation. The HUD names whatever is available from where the officer is standing
 (`kick · Low Sweep`) and shows it change as they crouch and land, and the first

@@ -4,7 +4,7 @@
 //   move   { forward, strafe, sprint }   -1..1
 //   firing boolean
 //   look   pixel-equivalent deltas, consumed once per frame
-//   actions  edge-triggered ('kick' | 'reload' | 'mute' | 'pause')
+//   actions  edge-triggered ('kick' | 'sweep' | 'reload' | 'mute' | 'pause')
 
 const STICK_DEADZONE = 0.18;
 const TRIGGER_THRESHOLD = 0.4;
@@ -107,6 +107,9 @@ export class InputManager {
       if (e.code === 'BracketRight') this._push('flush-longer');
       if (e.code === 'Backslash') this._push('flush-reset');
       if (e.code === 'KeyF') this._push('kick');
+      // X throws the low sweep outright, matching the pad's own X: it is the one kick
+      // the stance does not reach in a single press otherwise (see Player.melee).
+      if (e.code === 'KeyX') this._push('sweep');
       if (e.code === 'Space') this._push('jump');
       if (e.code === 'KeyM') this._push('mute');
       if (e.code === 'Escape') this._push('pause');
@@ -235,10 +238,16 @@ export class InputManager {
       if (now && !this._padButtons[i]) this._push(action);
       this._padButtons[i] = now;
     };
+    // A is the kick the stance gives (see Player.kickType): standing is the boot's
+    // signature, crouched is the sweep, airborne is the flying high kick. X throws the
+    // low sweep outright, because the one kick with no button of its own is the one
+    // that costs two presses to reach on a pad — crouch, then kick. Mute moved to
+    // View/Back, which was free, so nothing lost its binding.
     edge(0, 'kick');    // A
     edge(1, 'reload');  // B
-    edge(2, 'mute');    // X
+    edge(2, 'sweep');   // X
     edge(3, 'jump');    // Y
+    edge(8, 'mute');    // View / Back
     edge(11, 'crouch'); // Right stick click
     edge(9, 'pause');   // Menu
   }

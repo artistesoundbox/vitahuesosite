@@ -709,6 +709,59 @@ async function runCampaign(options) {
         p.tierCredit = savedSwish.credit;
       }
 
+      // 5. And the low sweep has a button of its own. It is the one kick the stance
+      //    does not reach in a single press — crouch, then kick — so the pad's X and
+      //    the keyboard's X throw it outright, from a standing start. Measured through
+      //    the real InputManager and the real action queue, with the pad's own A as the
+      //    control: the same press there has to give the boot's standing kick, or this
+      //    clause would only be measuring that buttons do something.
+      const standing = () => {
+        p.crouching = false;
+        p.grounded = true;
+        p.bootIndex = 0;
+        p.kickCooldown = 0;
+        p.pendingKick = null;
+        p.anim.oneShot = null;         // a clip left running would block the next throw
+        p.lastKick = null;
+      };
+      const endSwing = () => {
+        p.pendingKick = null;
+        p.kickCooldown = 0;
+        p.anim.mixer.stopAllAction();
+        p.anim.oneShot = null;
+        p.anim.name = null;
+      };
+      const pressPad = (index) => {
+        const release = () => {
+          pad.buttons[index] = { pressed: false, value: 0 };
+          G.inputManager.update(FRAME);
+        };
+        release();                     // an earlier probe may have left the button held
+        pad.buttons[index] = { pressed: true, value: 1 };
+        G.inputManager.update(FRAME);
+        G.applyInput(FRAME);
+        release();
+      };
+      const tapKey = (code) => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true }));
+        G.inputManager.update(FRAME);
+        G.applyInput(FRAME);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true }));
+      };
+      const throws = (send) => {
+        standing();
+        send();
+        const threw = p.lastKick;
+        endSwing();
+        return threw;
+      };
+      standing();
+      out.selection.standingKick = p.kickType();   // what the boot's own button gives
+      out.selection.padSweep = throws(() => pressPad(2));
+      out.selection.keySweep = throws(() => tapKey('KeyX'));
+      out.selection.padKickControl = throws(() => pressPad(0));
+      endSwing();
+
       const f = out.feel;
       f.bodyMass = SETTINGS.bodyMass;
       f.bootColour = p.boot.color;
@@ -722,6 +775,11 @@ async function runCampaign(options) {
         && out.selection.airborne === 'high'
         && out.selection.standingStandardBoot === 'kick'
         && out.selection.standingTopBoot === 'stomp'
+        // A standing officer pressing the sweep's own button gets the sweep, and the
+        // same press on the kick button still gets the kick.
+        && out.selection.padSweep === 'sweep'
+        && out.selection.keySweep === 'sweep'
+        && out.selection.padKickControl === 'kick'
         && out.profilesDiffer
         && out.scenery.speedAfterKick > 1
         && out.scenery.movedMeters > 1
