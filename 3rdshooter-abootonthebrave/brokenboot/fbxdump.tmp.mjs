@@ -1,7 +1,7 @@
 // Temporary: dump what each officer FBX actually contains, using the same
 // loader the game uses. Delete after reading.
 import { readFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+
 import * as THREE from './node_modules/three/build/three.module.js';
 
 globalThis.self = globalThis;
