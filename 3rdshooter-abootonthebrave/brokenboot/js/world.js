@@ -582,9 +582,13 @@ async function buildVehicles(world, scene) {
       car.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(car);
       world.addBox(box);
-      // The heaviest thing on the field, and the best thing to kick: it shifts
-      // and tumbles rather than flying, taking whatever it was covering with it.
-      world.addProp(car, box, { mass: 4.5, radius: 2.3, kind: 'car' });
+      // The heaviest thing on the field, and the best thing to kick. Light enough
+      // that the boot sends it rolling away rather than just shifting it: the kick's
+      // whole impulse is divided by this, so at 3 the same boot gives a car half
+      // again the shove it gave at 4.5, and it still takes whatever it was covering
+      // with it. It stays well clear of the rock's 2.6, so a car is still the
+      // heaviest thing the boot can meet.
+      world.addProp(car, box, { mass: 3, radius: 2.3, kind: 'car' });
       world.mixLayout(car.position.x, car.position.z);
     }
     return true;

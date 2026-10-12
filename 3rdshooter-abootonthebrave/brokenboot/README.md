@@ -478,10 +478,13 @@ list to read.
 The boot does not stop at people. Crates, barriers, rocks and the **cars** are
 kicked with the same reach and arc as the attackers. The impulse is the kick's
 `propPower`, and `propLift` upward, divided by the prop's `mass` — 1 for a crate,
-1.5 a barrier, 2.6 a rock and **4.5 for a car** — so a crate flies and a car
-shifts, tumbles and keeps rolling. `propDrag`, `propSpinDrag`,
-`propRestitution` and ground friction settle it, and it goes to sleep once it is
-slow enough that simulating it would be wasted work.
+1.5 a barrier, 2.6 a rock and **3 for a car** — so a crate flies and a car rolls
+away instead of merely shifting. Measured through the harness, a car caught by a
+stomp leaves the boot at 6.29 m/s and travels **6.43 m** before it settles, where the
+4.5 it used to weigh managed 4.67 m. That lightening is the whole of it: 3 is still
+clear of the rock's 2.6, so a car is still the heaviest thing the boot can meet.
+`propDrag`, `propSpinDrag`, `propRestitution` and ground friction settle it, and it
+goes to sleep once it is slow enough that simulating it would be wasted work.
 
 What makes it more than a particle effect is that a prop's collision box is the
 very box the rest of the world already consults: it blocks bullets, line of sight
@@ -489,7 +492,13 @@ and movement. A car booted out of the way genuinely stops being cover, and one
 left lying in a new spot becomes cover there instead — for the player and the
 attackers alike, because both use the same box. A prop still travelling at
 `propHitSpeed` (4.5 m/s) that catches an attacker floors them, and since it was the
-boot that did it, that rout still pays full boot credit toward the next tier.
+boot that did it, that rout still pays full boot credit toward the next tier. At the
+car's 3 that gate is inside the boot's own reach: a stomp leaves the car travelling
+6.29 m/s, past the 4.5 the gate asks for, so a car booted into a knot of attackers
+now bowls them over by itself. At 4.5 the same stomp left it at 4.19 m/s, so only a
+charged kick (×1.6, 6.71 m/s) could. Those are the impulse figures themselves —
+`propPower` and `propLift` over the mass, vertical included — and a plain kick still
+cannot reach the gate at either mass (3.53 m/s now, 2.35 before).
 
 `npm run test:kick` asserts the lot: that the three kicks differ in reach, arc and
 power, that crouching and being airborne select the sweep and the high kick, that
@@ -500,17 +509,17 @@ and that the boot *feels* as heavy as the mass it met.
 
 Above everything else this needed weight, so the whole impact reads off a single
 figure: the mass the boot met. An attacker body counts as `bodyMass` (2.0), a
-crate as 1, a barrier 1.5, a rock 2.6 and a car **4.5**, and the heaviest thing in
+crate as 1, a barrier 1.5, a rock 2.6 and a car **3**, and the heaviest thing in
 the arc sets it. Measured through the harness:
 
 | What it met | Mass | Camera shake | Eye kicked back | Frame roll | Hit-stop |
 | --- | --- | --- | --- | --- | --- |
 | empty air | — | 0.3 | — | — | — |
 | a body | 2.0 | 0.9 | 0.32 m | 3.2° | 0.06 s |
-| a car | 4.5 | 2.0 | 0.72 m | 7.2° | 0.135 s |
+| a car | 3.0 | 1.35 | 0.48 m | 4.8° | 0.09 s |
 
 - **Shake** rattles the frame, as before, but scaled: a kick that meets nothing at
-  all gets only the swing (`kickWhiffShake` 0.3) and a car is 2.0. That gap is the
+  all gets only the swing (`kickWhiffShake` 0.3) and a car is 1.35. That gap is the
   point — a connect has to feel different from a miss, or neither reads.
 - **Kickback** shoves the eye back along the aim (`kickbackPerMass` 0.16 m per
   unit, capped at 0.9), decaying in about a third of a second rather than
@@ -533,7 +542,9 @@ the arc sets it. Measured through the harness:
 
 A charged kick multiplies the whole thing by `chargedKnockbackScale` (1.6×), so a
 full meter into a car is the heaviest thing in the game: capped shake, capped
-push-back, capped hit-stop and a full screen-edge flare.
+hit-stop and a full screen-edge flare, and the largest push-back the game ever asks
+for — 0.77 m, under the 0.9 m where it would start to clip. With the car at 3 no
+kick reaches `kickbackMax`, so that cap is headroom rather than a limit.
 
 ## Aim tune, the boot charge and the new pickups
 

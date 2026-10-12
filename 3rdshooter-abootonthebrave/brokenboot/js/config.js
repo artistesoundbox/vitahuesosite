@@ -63,7 +63,7 @@ export const SETTINGS = {
 
   // What the boot feels like when it connects. Every figure below scales off one
   // mass: an attacker body counts as `bodyMass`, a kicked crate, barrier, rock or
-  // car as its own mass (1, 1.5, 2.6, 4.5), and the heaviest thing the boot met
+  // car as its own mass (1, 1.5, 2.6, 3), and the heaviest thing the boot met
   // decides. So a crate barely rattles the frame, a rock is a shove and a car is a
   // car. A kick into empty air meets no mass at all and gets none of it, which is
   // what makes a connect read as a connect.
@@ -81,7 +81,7 @@ export const SETTINGS = {
   kickStopPerMass: 0.03,        // seconds the world hitch-slides for
   kickStopMax: 0.14,
   kickStopScale: 0.12,          // world time runs at this fraction during one
-  kickFlashMass: 4.5,           // the mass that fills the screen-edge flash
+  kickFlashMass: 3,             // the mass that fills the screen-edge flash: a car
   propHitShakePerMass: 0.16,    // a car rolling through a line, per unit mass
   shakeMax: 2.4,
 

@@ -1,6 +1,6 @@
 {
   "seed": 20260411,
-  "startedAt": "2026-10-12T06:29:54.579Z",
+  "startedAt": "2026-10-12T06:55:03.176Z",
   "gameSeconds": 0.61,
   "steps": 13,
   "waves": [],
@@ -132,13 +132,13 @@
         },
         "aim": {
           "degOff": 13,
-          "inFront": 0.6,
+          "inFront": 0.61,
           "magazineY": -0.95,
           "pass": true
         },
         "crouch": {
           "degOff": 39,
-          "inFront": 0.54,
+          "inFront": 0.53,
           "magazineY": -0.79,
           "pass": true
         }
@@ -152,9 +152,9 @@
       ],
       "flash": {
         "shown": true,
-        "toBarrel": 0.005,
-        "tracerFromBarrel": 0.005,
-        "standInOffBarrel": 0.649
+        "toBarrel": 0.002,
+        "tracerFromBarrel": 0.002,
+        "standInOffBarrel": 0.648
       },
       "flashOk": true,
       "flashControlNamesIt": true,
@@ -182,8 +182,120 @@
       "groundFloat": 0.35
     }
   },
+  "lockCheck": {
+    "cone": 0.22,
+    "distance": 26,
+    "pass": true,
+    "baseHeadingRadians": 0,
+    "anglesRadians": {
+      "near": 0.055,
+      "far": 0.132
+    },
+    "firstPress": "near",
+    "anglesAtPress": {
+      "near": 0.057,
+      "far": 0.133
+    },
+    "swingRadians": 0.11,
+    "heldDuringSwing": "near",
+    "anglesAfterSwing": {
+      "near": 0.146,
+      "far": 0.046
+    },
+    "farVisible": true,
+    "swungOnTarget": true,
+    "afterRelease": "near",
+    "freshPress": "far"
+  },
+  "kickCheck": {
+    "selection": {
+      "crouched": "sweep",
+      "airborne": "high",
+      "standingStandardBoot": "kick",
+      "standingSilverBoot": "high",
+      "standingTopBoot": "stomp"
+    },
+    "profiles": {
+      "kick": {
+        "name": "Kick",
+        "range": 3.6,
+        "arcDegrees": 108,
+        "damageScale": 1,
+        "propPower": 10
+      },
+      "sweep": {
+        "name": "Low Sweep",
+        "range": 2.7,
+        "arcDegrees": 144,
+        "damageScale": 0.7,
+        "propPower": 7
+      },
+      "high": {
+        "name": "High Kick",
+        "range": 4.3,
+        "arcDegrees": 76,
+        "damageScale": 1.15,
+        "propPower": 13
+      },
+      "stomp": {
+        "name": "Stomp",
+        "range": 3.3,
+        "arcDegrees": 180,
+        "damageScale": 1.4,
+        "propPower": 16
+      }
+    },
+    "scenery": {
+      "kind": "car",
+      "mass": 3,
+      "speedAfterKick": 6.29,
+      "peakSpeed": 8.27,
+      "movedMeters": 6.43,
+      "tumbled": true,
+      "settleSeconds": 1.2,
+      "settled": true,
+      "boxFollowed": 7.02
+    },
+    "profilesDiffer": true,
+    "feel": {
+      "whiff": {
+        "shake": 0.3,
+        "kickback": 0,
+        "roll": 0,
+        "hitStop": 0
+      },
+      "body": {
+        "shake": 0.9,
+        "kickback": 0.32,
+        "roll": 3.2,
+        "hitStop": 0.06
+      },
+      "car": {
+        "shake": 1.35,
+        "kickback": 0.48,
+        "roll": 4.8,
+        "hitStop": 0.09
+      },
+      "carRoll": 4.8,
+      "openSightline": true,
+      "cameraPushBack": 0.107,
+      "frameRollDegrees": 4.2,
+      "carLeftRoll": -4.8,
+      "rollFollowsSide": true,
+      "hitStopFromBody": 0.06,
+      "worldTimeDuringStop": 0.002,
+      "stopScale": 0.12,
+      "stopFrames": 3,
+      "worldTimeAfterStop": 0.01667,
+      "edgeFlashOpacity": 0.931,
+      "bodyMass": 2,
+      "whiffShake": 0.3,
+      "feelScaledByMass": true
+    },
+    "pass": true
+  },
   "wavesReached": 1,
-  "wallClockSeconds": 3.9,
+  "wallClockSeconds": 3.8,
   "consoleErrors": [],
   "consoleWarnings": [
     "console.warn: THREE.FBXLoader: %s map is not supported in three.js, skipping texture. ShininessExponent",

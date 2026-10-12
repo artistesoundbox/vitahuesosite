@@ -502,6 +502,13 @@ async function runCampaign(options) {
         car.vel.set(0, 0, 0);
         car.spin.set(0, 0, 0);
         car.mesh.position.set(x, car.baseY, z);
+        // A parked car sits on its wheels. The tumble the previous kick left it in
+        // has to go with the velocity, because the box below is fitted to the mesh:
+        // a car left lying on its side carries a box the size of its roll, wide
+        // enough to reach behind the player, where it would absorb the very arm the
+        // camera pushes back along. That is how a heavier boot quietly stopped
+        // measuring as a shove.
+        car.mesh.rotation.set(0, car.mesh.rotation.y, 0);
         // Keep the collision box with it: a parked car whose box is still at the
         // old pitch would block bullets and sight lines from thin air.
         car.box.setFromObject(car.mesh).expandByScalar(-0.05);
@@ -554,8 +561,12 @@ async function runCampaign(options) {
       const restUp = upAt();
 
       // A car lands dead ahead: the eye is shoved back and the frame rolls away.
+      // It goes far enough ahead that its own box stays clear of the space behind
+      // the player that the camera arm reaches back through — a shove the car
+      // itself absorbs is not a shove — and still well inside the kick's reach,
+      // which is its 3.6 m range plus the car's 2.3 m radius.
       clearFeel();
-      parkCar(fwd.x * 2.2, fwd.z * 2.2);
+      parkCar(fwd.x * 3.4, fwd.z * 3.4);
       bootAt(yaw);
       G.shake = 0;                    // the rattle is random; measure the shove
       G.updateCamera(1 / 60);
@@ -1749,7 +1760,13 @@ async function runCampaign(options) {
         p.ammo = Math.max(p.ammo, 1);
         G.camera.lookAt(G.camera.position.x, G.camera.position.y + 10, G.camera.position.z);
         G.camera.updateMatrixWorld(true);
+        // Which tracer is this round's. Asking for the longest-lived one is not
+        // enough: without a frame between them, an earlier shot's tracer still sits
+        // at full life, and a tie hands the question to whichever slot comes first.
+        // The trace that matters is the one whose life this shot raised.
+        const tracerLives = G.effects.tracers.map((t) => t.life);
         G.tryShoot();
+        const laid = G.effects.tracers.find((t, i) => t.life > tracerLives[i]) || null;
         const flashAt = G.effects.muzzleMesh.position.clone();
         const barrelAt = shape.muzzleAt.clone().applyMatrix4(hand.matrixWorld);
         const standIn = p.position.clone().add(new THREE.Vector3(0, 1.35, 0))
@@ -1757,11 +1774,10 @@ async function runCampaign(options) {
         // The tracer is a line laid from the same point: its own start is the mesh's
         // position, which says whether the round's visible path leaves the barrel too
         // or only the flash does.
-        const tracer = G.effects.tracers.reduce((best, t) => (t.life > (best ? best.life : 0) ? t : best), null);
         out.rifle.flash = {
           shown: G.effects.muzzleMesh.visible,
           toBarrel: +flashAt.distanceTo(barrelAt).toFixed(3),
-          tracerFromBarrel: tracer ? +tracer.mesh.position.distanceTo(barrelAt).toFixed(3) : null,
+          tracerFromBarrel: laid ? +laid.mesh.position.distanceTo(barrelAt).toFixed(3) : null,
           standInOffBarrel: +standIn.distanceTo(barrelAt).toFixed(3),
         };
       } finally {
