@@ -359,7 +359,7 @@ export class Game {
     this.effects.tracer(muzzle, end, 0xffe6a8);
 
     if (hit && hit.enemy) {
-      this.damageEnemy(hit.enemy, SETTINGS.bulletDamage * hit.multiplier, hit.part);
+      this.damageEnemy(hit.enemy, SETTINGS.bulletDamage * hit.multiplier, hit.part, direction);
     } else if (hit) {
       this.effects.burst(hit.point, 5, 0xd8cfa8);
       this.audio.impact();
@@ -373,7 +373,7 @@ export class Game {
    * Gunfire wounds, and sustained fire slowly bleeds an attacker down. It is
    * far slower than the boot and only credits a fraction of a tier point.
    */
-  damageEnemy(enemy, amount, part) {
+  damageEnemy(enemy, amount, part, direction = null) {
     const wasWounded = enemy.wounded;
     const wasBleeding = enemy.bleeding;
     const downed = enemy.takeDamage(amount);
@@ -381,14 +381,19 @@ export class Game {
     this.hud.flashHit(false);
     if (!wasWounded && enemy.wounded) this.audio.wounded();
     if (!wasBleeding && enemy.bleeding) this.hud.toast('WOUNDED', 'Bleeding out — the boot is quicker');
-    if (downed) this.onEnemyDown(enemy);
+    // A round that finishes an attacker through the head is a fatality. The
+    // accounting is the same downing either way — see onEnemyDown — so this only
+    // decides how the body goes down.
+    if (downed) this.onEnemyDown(enemy, part === 'head' && direction ? direction : null);
   }
 
   /**
    * A bullet downing. It counts as an elimination but is never the fast option:
-   * the boot routs on contact and pays a full tier point, this pays a quarter.
+   * the boot routs on contact and pays a full tier point, this pays a quarter — and
+   * that is true of a fatality too, which is a finishing move rather than a faster
+   * kill: the same credit, the same loot odds, the same wave pacing.
    */
-  onEnemyDown(enemy) {
+  onEnemyDown(enemy, fatalityDirection = null) {
     this.audio.downed();
     this.effects.burst(enemy.position.clone().setY(0.9), 6, 0xc2402c);
     this.enemiesKilledTotal += 1;
@@ -397,8 +402,23 @@ export class Game {
     this.player.addCharge(SETTINGS.chargePerGunfireDown);
     // A downing drops less than a booting: the boot is the way to earn loot.
     this.dropLoot(enemy.position, 0.5);
-    this.hud.showBanner('BLEEDING OUT', 'GUNFIRE ELIMINATION', 0.9);
+    if (fatalityDirection) this.fatality(enemy, fatalityDirection);
+    else this.hud.showBanner('BLEEDING OUT', 'GUNFIRE ELIMINATION', 0.9);
     this.checkAchievements();
+  }
+
+  /**
+   * The fatality itself: the spray, the sting, the camera, and the body leaving the
+   * ground. The throw is handed to the enemy, which owns it for the rest of its short
+   * life — a corpse is skipped by targeting, by bullet casts and by separation, so
+   * none of this can reach back into the fight that produced it.
+   */
+  fatality(enemy, direction) {
+    this.effects.burst(enemy.headPosition, 20, 0xc2402c);
+    this.effects.burst(enemy.position.clone().setY(1.15), 11, 0x8e2b1c);
+    enemy.fatality(direction);
+    this.addShake(SETTINGS.fatalityShake);
+    this.hud.showBanner('FATALITY', enemy.elite ? 'ELITE HEADSHOT' : 'HEADSHOT', 1.2);
   }
 
   /** Send an attacker running, count it, and leave loot behind. */

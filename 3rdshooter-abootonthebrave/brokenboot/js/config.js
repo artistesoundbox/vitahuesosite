@@ -37,6 +37,22 @@ export const SETTINGS = {
   bleedoutEliteScale: 1.6,
   // A bullet downing only credits this fraction of a boot rout toward tiers.
   bulletKillWeight: 0.25,
+
+  // A round through the head that finishes an attacker is a fatality: the body comes
+  // off its feet and goes where the shot sent it, instead of folding up where it
+  // stood. It is a finishing move, not a faster kill — the elimination, the credit
+  // and the loot are exactly what any other downing pays — so the boot stays the way
+  // to the next tier. The throw is worked out from the shot itself rather than from
+  // dice, because a campaign that draws different numbers from an explosion that
+  // happens after the fight is over is no longer the same campaign. The numbers are
+  // set so the body plainly leaves the ground: at `fatalityLift` it peaks about half
+  // a metre up and hangs for four tenths of a second, which puts the landing most of
+  // three metres downrange, and `fatalitySpin` turns it most of the way over.
+  fatalityThrow: 6.4,       // m/s the body leaves at
+  fatalityLift: 4.2,        // m/s of it upward
+  fatalitySpin: 6.0,        // rad/s it tumbles at
+  fatalitySkid: 3.4,        // how fast the skid after it lands dies away
+  fatalityShake: 0.75,
   headshotMultiplier: 2.2,
   bulletRange: 140,
   spread: 0.012,
@@ -369,14 +385,14 @@ export const BOOT_BONE_AXES = { sole: [0.046, -0.592, 0.804], toe: [0.006, 0.976
 // joint and sits near the back of a foot. Centring a boot on the bone alone hangs it
 // off the heel, so every tier carries a forward offset as well as a lift.
 export const BOOT_SOCKETS = {
-  standard:   { size: 0.52, lift: 0.023, forward: 0 },
-  reinforced: { size: 0.56, lift: 0.035, forward: 0 },
-  silver:     { size: 0.60, lift: 0.047, forward: 0 },
-  gold:       { size: 0.66, lift: 0.066, forward: 0 },
-  goldSpiked: { size: 0.72, lift: 0.084, forward: 0 },
-  doom:       { size: 0.80, lift: 0.108, forward: 0 },
-  legendary:  { size: 0.90, lift: 0.139, forward: 0 },
-  diamond:    { size: 1.00, lift: 0.170, forward: 0 },
+  standard:   { size: 0.52, lift: 0.023, forward: 0.057 },
+  reinforced: { size: 0.56, lift: 0.035, forward: 0.057 },
+  silver:     { size: 0.60, lift: 0.047, forward: 0.057 },
+  gold:       { size: 0.66, lift: 0.066, forward: 0.057 },
+  goldSpiked: { size: 0.72, lift: 0.084, forward: 0.057 },
+  doom:       { size: 0.80, lift: 0.108, forward: 0.057 },
+  legendary:  { size: 0.90, lift: 0.139, forward: 0.057 },
+  diamond:    { size: 1.00, lift: 0.170, forward: 0.057 },
 };
 // The kicks the officer knows, and how a kick is chosen:
 //

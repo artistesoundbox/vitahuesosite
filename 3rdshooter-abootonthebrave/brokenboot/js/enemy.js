@@ -32,6 +32,11 @@ export class Enemy {
     this.dead = false;
     this.deathTimer = 0;
     this.removeMe = false;
+    // A body thrown by a fatality: its own little flight, and the spin it tumbles at.
+    this.thrown = false;
+    this.throwVel = new THREE.Vector3();
+    this.throwSpin = 0;
+    this.landed = false;
     // Gunfire only ever wounds to start with. Attacker health floors out at
     // `bulletMinHealth`; the boot sends them running outright, and it is the
     // boot that earns tiers. Keep shooting a floored attacker and the bleed-out
@@ -97,6 +102,26 @@ export class Enemy {
     return true;
   }
 
+  /**
+   * A round through the head, and the body leaves the ground.
+   *
+   * Everything about the throw comes from the shot: its direction, and the side the
+   * round came from decides which way the body turns over. That is deliberate — a
+   * fatality is a finishing move on a body that is already dead, and a body that drew
+   * its tumble from `Math.random()` would change every later draw in the campaign it
+   * happened in.
+   */
+  fatality(direction) {
+    if (!this.dead) return false;
+    this.thrown = true;
+    this.landed = false;
+    this.throwVel.copy(direction).setY(0).normalize()
+      .multiplyScalar(SETTINGS.fatalityThrow)
+      .setY(SETTINGS.fatalityLift);
+    this.throwSpin = SETTINGS.fatalitySpin * (direction.x >= 0 ? -1 : 1);
+    return true;
+  }
+
   /** The boot: send them screaming into the trees. This is the only removal. */
   rout(direction, force) {
     if (this.dead || this.routed) return false;
@@ -113,6 +138,34 @@ export class Enemy {
       this.deathTimer += dt;
       const tip = Math.min(Math.PI / 2, this.deathTimer * 3.6);
       this.model.rotation.x = -tip;
+      if (this.thrown) {
+        // Thrown by a fatality: it flies, lands, skids, and only then sinks. The
+        // flight is its own — a corpse is skipped by every system that picks targets
+        // or casts rounds, so none of this can change who wins anything.
+        if (!this.landed) {
+          this.object.position.addScaledVector(this.throwVel, dt);
+          this.throwVel.y += SETTINGS.gravity * dt;   // gravity is negative here, as it is for the officer
+          this.model.rotation.y += this.throwSpin * dt;
+          if (this.world && this.world.resolveCircle) this.world.resolveCircle(this.object.position, 0.5);
+          if (this.object.position.y <= 0) {
+            this.object.position.y = 0;
+            this.landed = true;
+            this.throwVel.y = 0;          // the ground takes the rest of the drop
+          }
+        } else if (this.deathTimer <= 1.2) {
+          // The skid: it keeps going on the ground for a moment and then stops where
+          // it ran out, instead of freezing at the point of impact.
+          this.object.position.addScaledVector(this.throwVel, dt);
+          this.throwVel.multiplyScalar(Math.max(0, 1 - SETTINGS.fatalitySkid * dt));
+          this.model.rotation.y += this.throwSpin * dt * 0.35;
+          if (this.world && this.world.resolveCircle) this.world.resolveCircle(this.object.position, 0.5);
+        } else {
+          this.object.position.y -= dt * 1.4;
+        }
+        if (this.deathTimer > 3.8) this.removeMe = true;
+        this.anim.update(dt);
+        return;
+      }
       if (this.deathTimer > 2.2) {
         this.object.position.y -= dt * 1.4;
       }
