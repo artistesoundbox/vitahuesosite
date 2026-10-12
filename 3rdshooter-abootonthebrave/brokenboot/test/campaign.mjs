@@ -883,6 +883,7 @@ function assess(report) {
           + `nothing unweighted, no more than ${(cc.weldShare * 100).toFixed(1)}% of a mesh riding one distant bone, and `
           + `all ${(cc.boots || []).length} tiers wear a boot that covers his foot (${cc.footPoints} sampled vertices on his right foot) `
           + `with its sole on the ground at ${cc.boots.map((b) => b.sole).join(', ')} m`);
+        findings.push(`every tier's boot sits centred on the foot rather than on the ankle bone, within ${Math.max(...cc.boots.map((b) => Math.abs(b.centreGap)))} m of its centre`);
         findings.push(`every tier's boot is seated on the foot it was socketed onto: its sole lies within ${Math.max(...cc.boots.map((b) => b.soleTilt))}\u00b0 of level `
           + `and its toe points within ${Math.max(...cc.boots.map((b) => b.toeDeg ?? 0))}\u00b0 of the rig's own toe bone, `
           + `where a boot rolled ${cc.seatControls.sole.rolledBy}\u00b0 reads ${cc.seatControls.sole.tilt}\u00b0 off level and one yawed ${cc.seatControls.toe.yawedBy}\u00b0 reads ${cc.seatControls.toe.toe}\u00b0 off the foot, both named`);
@@ -940,6 +941,9 @@ function assess(report) {
           }
           if (!(b.sole >= -0.06 && b.sole <= 0.1)) {
             bits.push(`the ${b.tier} boot's sole sits at ${b.sole} m — ${b.sole > 0.1 ? 'floating above the ground' : 'through it'}`);
+          }
+          if (!b.centred) {
+            bits.push(`the ${b.tier} boot sits ${Math.abs(b.centreGap)} m ${b.centreGap > 0 ? 'too far forward' : 'too far back'} along the foot`);
           }
           if (!b.sitsRight) {
             const why = [];
@@ -1218,7 +1222,12 @@ function printReport(report, passed) {
           const toeLimit = cc.seatLimits ? cc.seatLimits.toe : 25;
           const level = `${b.soleTilt}\u00b0${b.soleTilt > tiltLimit ? ' TILTED' : ' level'}`;
           const toe = b.toeDeg === null ? '—' : `${b.toeDeg}\u00b0${b.toeDeg > toeLimit ? ' AWAY' : ' on'}`;
-          console.log(`  ${pad(b.tier, 22)}${pad(b.model || 'NONE', 18)}${pad(`${b.span} m`, 8)}${pad(`${b.sole} m`, 9)}${pad(level, 10)}${pad(toe, 10)}${b.socketed ? covers : 'NEVER SOCKETED'}`);
+          const along = b.centred ? '' : ` — ${b.centreGap > 0 ? 'too far forward' : 'hanging off the heel'} by ${Math.abs(b.centreGap)} m`;
+          console.log(`  ${pad(b.tier, 22)}${pad(b.model || 'NONE', 18)}${pad(`${b.span} m`, 8)}${pad(`${b.sole} m`, 9)}${pad(level, 10)}${pad(toe, 10)}${b.socketed ? covers : 'NEVER SOCKETED'}${along}`);
+        }
+        if (cc.centreControl && cc.centreControl.measured) {
+          console.log(`  ${pad('along control', 22)}the ${cc.centreControl.tier} slid ${cc.centreControl.movedBack} m back along the foot reads ${cc.centreControl.gap} m off centre — `
+            + (cc.centreControl.namesIt ? 'named' : 'NOT NAMED'));
         }
         if (cc.seatControls && cc.seatControls.sole && cc.seatControls.sole.measured) {
           console.log(`  ${pad('seat control', 22)}rolled ${cc.seatControls.sole.rolledBy}\u00b0 the ${cc.seatControls.sole.tier} reads ${cc.seatControls.sole.tilt}\u00b0 off the ground — `

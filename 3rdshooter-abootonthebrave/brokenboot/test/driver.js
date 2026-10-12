@@ -1621,7 +1621,13 @@ async function runCampaign(options) {
     // foot's, the foot's coming from the rig's own toe bone rather than from a guess.
     const SOLE_TILT_LIMIT = 8;
     const TOE_ANGLE_LIMIT = 25;
-    const modelAxes = await import(new URL('js/config.js', location.href).href).then((m) => m.BOOT_MODEL_AXES);
+    const BOOT_CENTRE_LIMIT = 0.05;
+    const bootCfg = await import(new URL('js/config.js', location.href).href);
+    const modelAxes = bootCfg.BOOT_MODEL_AXES;
+    const forwardInBone = new THREE.Vector3().fromArray(bootCfg.BOOT_BONE_AXES.toe).normalize();
+    const upInBone = new THREE.Vector3().fromArray(bootCfg.BOOT_BONE_AXES.sole).normalize();
+    const forwardFlat = forwardInBone.clone()
+      .addScaledVector(upInBone, -forwardInBone.dot(upInBone)).normalize();
     const rigToeBone = (await import(new URL('js/assets.js', location.href).href).then((m) => m.findBone))
       (p.model, ['RightToeBase', 'RightToe_End']);
     const det3 = (a, b, c, d, e, f, g, h, i) => a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
@@ -1677,6 +1683,8 @@ async function runCampaign(options) {
     out.seatLimits = { soleTilt: SOLE_TILT_LIMIT, toe: TOE_ANGLE_LIMIT };
     out.seatControls = { sole: { measured: false, namesIt: false }, toe: { measured: false, namesIt: false } };
     out.sameAsSpawn = { measured: false, namesIt: false };
+    out.centreControl = { measured: false, namesIt: false };
+    out.bootCentreLimit = BOOT_CENTRE_LIMIT;
 
     // The boot he is wearing right now, before anything is forced. This is the clause
     // the first version of this probe could not see: it moved every tier itself, and
@@ -1764,6 +1772,31 @@ async function runCampaign(options) {
           };
           rec.coveredShare = footLocal.length ? +(inside / footLocal.length).toFixed(3) : 0;
           rec.coversFoot = footLocal.length > 0 && local.containsBox(footBoxLocal);
+          // Where the boot sits *along* the foot, which containment cannot see: a boot
+          // centred on the ankle bone hangs off the heel while still covering the whole
+          // foot. The gap is measured between the two boxes' centres along the foot's own
+          // forward axis, in metres.
+          const gap = local.getCenter(new THREE.Vector3())
+            .sub(footBoxLocal.getCenter(new THREE.Vector3()))
+            .dot(forwardFlat) * boneUnit;
+          rec.centreGap = +gap.toFixed(3);
+          rec.centred = Math.abs(gap) <= BOOT_CENTRE_LIMIT;
+          if (!out.centreControl.measured) {
+            const at = p.bootModel.position.clone();
+            p.bootModel.position.addScaledVector(forwardFlat, -0.2 / boneUnit);
+            p.object.updateMatrixWorld(true);
+            const back = boxInBoneFrame(p.bootModel);
+            const backGap = back.getCenter(new THREE.Vector3())
+              .sub(footBoxLocal.getCenter(new THREE.Vector3()))
+              .dot(forwardFlat) * boneUnit;
+            out.centreControl = {
+              measured: true, tier: tier.name, movedBack: 0.2,
+              gap: +backGap.toFixed(3),
+              namesIt: Math.abs(backGap) > BOOT_CENTRE_LIMIT,
+            };
+            p.bootModel.position.copy(at);
+            p.object.updateMatrixWorld(true);
+          }
           rec.opensUnderFoot = local.max.y <= footBoxLocal.max.y;   // the foot stands out of the top
           Object.assign(rec, seated(p.bootModel));
           rec.sitsRight = sitsRight(rec);
@@ -1837,6 +1870,7 @@ async function runCampaign(options) {
       out.tierBootCoversFoot = out.boots.every((b) => b.coversFoot);
       out.tierBootSoleOnGround = out.boots.every((b) => b.sole >= -0.06 && b.sole <= 0.1);
       out.tierBootSitsRight = out.boots.every((b) => b.sitsRight);
+      out.tiersCentred = out.boots.every((b) => b.centred);
     } finally {
       if (p.bootModel && p.bootModel.parent) p.bootModel.parent.remove(p.bootModel);
       p.tierCredit = saved.credit;
@@ -2254,6 +2288,8 @@ async function runCampaign(options) {
       && out.initialBoot.soleOnGround
       && out.initialBoot.sitsRight
       && out.tierBootSitsRight
+      && out.tiersCentred
+      && (!out.centreControl.measured || out.centreControl.namesIt)
       && (!out.seatControls.sole.measured || out.seatControls.sole.namesIt)
       && (!out.seatControls.toe.measured || out.seatControls.toe.namesIt)
       // The same tier, socketed twice in two different poses, has to land in the same
