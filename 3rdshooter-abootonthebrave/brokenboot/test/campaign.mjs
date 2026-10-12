@@ -853,6 +853,29 @@ function assess(report) {
         if (t.stingOnDown !== 1) bits.push(`${t.stingOnDown} sting(s) played for an attacker the boot beat down instead of 1`);
         if (t.stingOnHit !== 0) bits.push(`a kick that only connected still played ${t.stingOnHit} sting(s), so the sting is not the boot taking somebody off the field`);
         if (t.randomDraws) bits.push(`the boot's sounds took ${t.randomDraws} draw(s) out of the fight's own generator, so every kick re-rolls the match after it`);
+        if (t.tiers.some((x) => !x.name)) {
+          bits.push(`${t.tiers.filter((x) => !x.name).map((x) => x.socket).join(', ')} kicked in silence: no take was played at all`);
+        }
+        if (t.distinctVoices !== t.tiers.length) {
+          bits.push(`only ${t.distinctVoices} of the ${t.tiers.length} boot tiers have a voice of their own, so upgrading is something you can count but not hear`);
+        }
+        for (const tier of t.tiers) {
+          if (tier.name && tier.onVoice === false) {
+            bits.push(`the ${tier.socket} kicked at \u00d7${tier.rate} / ${tier.gain} where its voice is \u00d7${tier.voiceRate} / ${tier.voiceGain}`);
+          }
+        }
+        if (!(t.ownTake && t.ownTake.name === 'silver-bsh')) {
+          bits.push(`a tier listed as shipping its own recording played ${t.ownTake ? `\u201c${t.ownTake.name}\u201d` : 'nothing'} instead of \u201csilver-bsh\u201d`);
+        }
+        if (!(t.fallbackTake && t.fallbackTake.name === 'bsh')) {
+          bits.push(`a tier with no recording of its own played ${t.fallbackTake ? `\u201c${t.fallbackTake.name}\u201d` : 'nothing'} instead of the shared take`);
+        }
+        if (!t.ownTakePlaysTrue) {
+          bits.push(`a tier's own recording was played at \u00d7${t.ownTake && t.ownTake.rate} / ${t.ownTake && t.ownTake.gain} rather than as recorded (\u00d71 / ${t.ownTake && t.ownTake.gain})`);
+        }
+        if (!t.stingPlaysTheVoice) {
+          bits.push(`the sting played at \u00d7${t.stingVoice && t.stingVoice.rate} / ${t.stingVoice && t.stingVoice.gain} rather than the tier's own voice, so it carries the swing's jitter or the wrong tier`);
+        }
       }
       if (!k.profilesDiffer) bits.push('the three kicks do not differ in reach, arc and power');
       if (!(k.scenery.movedMeters > 1)) bits.push(`the kicked ${k.scenery.kind} moved only ${k.scenery.movedMeters}m`);
@@ -908,11 +931,15 @@ function assess(report) {
       }
       const t = k.takes;
       if (t && !t.missing.length && !t.synthYelp && t.yelp.length === 2
-        && t.stingOnRout === 1 && t.stingOnDown === 1 && t.stingOnHit === 0 && t.randomDraws === 0) {
+        && t.stingOnRout === 1 && t.stingOnDown === 1 && t.stingOnHit === 0 && t.randomDraws === 0
+        && t.tiers.length && t.distinctVoices === t.tiers.length && t.stingPlaysTheVoice) {
         findings.push(`the boot has recorded takes now, fetched while the match plays: ${t.swings === 1 ? 'one swing' : `${t.swings} swings`} `
           + `on a kick (bsh, pitched ${t.swingPitches.join('/')}), the yelp of whoever it lands on drawn from both takes `
           + `(${t.yelp.join('/')}) and never from the synthesis across 40 yelps, and one sting (bootpower) for an attacker sent running `
           + `or beaten down, while a kick that only connects stays silent — and none of that variation is drawn from the fight's own generator, so a kick cannot re-roll the match`);
+        findings.push(`every boot tier has a voice of its own, so upgrading is audible and not only countable: `
+          + t.tiers.map((tier) => `${tier.socket} \u00d7${tier.voiceRate.toFixed(2)}/${tier.voiceGain}`).join(', ')
+          + ` — and a tier that ships its own pair of recordings plays those as recorded, with only the gain from its voice, while a tier without one still falls back to the shared take in its own pitch`);
       }
     }
     // The officer's own mesh file. Every clause names the part and the bone, so a
@@ -1291,6 +1318,19 @@ function printReport(report, passed) {
           + `, beaten down ${t.stingOnDown === 1 ? 'bootpower once' : `${t.stingOnDown} — WRONG`}`
           + `, only hit ${t.stingOnHit === 0 ? 'silence' : `${t.stingOnHit} — WRONG`}`);
         console.log(`  ${pad('the fight', 22)}${t.randomDraws === 0 ? 'the sounds take nothing from its generator' : `${t.randomDraws} draw(s) taken from it — WRONG`}`);
+        console.log('');
+        console.log(`  the boot's voice  ${pad('take', 14)}${pad('voice', 10)}${pad('played', 10)}gain`);
+        for (const tier of t.tiers) {
+          const voice = tier.voiceRate === undefined ? '—' : `\u00d7${tier.voiceRate.toFixed(2)}`;
+          console.log(`  ${pad(tier.socket, 17)}${pad(tier.name || 'NOTHING — WRONG', 14)}${pad(voice, 10)}`
+            + `${pad(tier.rate === null ? '—' : `\u00d7${tier.rate.toFixed(2)}`, 10)}${tier.gain === null ? '—' : tier.gain}`
+            + `${tier.name && tier.onVoice === false ? ' — WRONG VOICE' : ''}`);
+        }
+        console.log(`  a tier with its own recording: silver (listed) plays \u201c${t.ownTake ? t.ownTake.name : 'NOTHING — WRONG'}\u201d`
+          + ` at \u00d7${t.ownTake ? t.ownTake.rate : '—'} (${t.ownTakePlaysTrue ? 'as recorded' : 'NOT as recorded — WRONG'}),`
+          + ` while gold (not listed) still plays \u201c${t.fallbackTake ? t.fallbackTake.name : 'NOTHING — WRONG'}\u201d`);
+        console.log(`  the sting for the top boot plays its voice exactly: ${t.stingVoice ? `\u00d7${t.stingVoice.rate} / ${t.stingVoice.gain}` : 'NOTHING — WRONG'}`
+          + `, ${t.stingPlaysTheVoice ? 'not the swing\'s jitter' : 'but that is not its voice — WRONG'}`);
       }
       console.log('');
       console.log(`  ${pad('kick', 10)}${pad('reach', 8)}${pad('arc', 8)}${pad('damage', 8)}${pad('prop power', 10)}`);

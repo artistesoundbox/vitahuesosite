@@ -844,6 +844,7 @@ async function runCampaign(options) {
         distinctVoices: 0,
         ownTake: null,
         fallbackTake: null,
+        ownTakePlaysTrue: false,
         stingVoice: null,
         stingPlaysTheVoice: false,
         randomDraws: 0,
@@ -909,18 +910,31 @@ async function runCampaign(options) {
           p.bootIndex = index;
           G.resolveMelee('kick');
           endSwing();
-          return played.find((c) => /bsh$/.test(c.name)) || null;
+          const swing = played.find((c) => /bsh$/.test(c.name));
+          return swing ? { name: swing.name, rate: +swing.rate.toFixed(3), gain: swing.gain } : null;
         };
+        // The bound the swing's own variation may move a play by — `bootTake`'s
+        // default spread in audio.js. Loose enough to let the variation through,
+        // tight enough that a tier played in another tier's voice is named.
+        const VOICE_SPREAD = 0.08 + 0.002;
         out.takes.tiers = BOOT_TIERS.map((tier, i) => {
           const swing = swingAt(i);
+          const voice = BOOT_VOICES[tier.socket];
           return {
             socket: tier.socket,
             name: swing ? swing.name : null,
-            rate: swing ? +swing.rate.toFixed(3) : null,
+            rate: swing ? swing.rate : null,
             gain: swing ? swing.gain : null,
+            voiceRate: voice.rate,
+            voiceGain: voice.gain,
+            onVoice: Boolean(swing
+              && Math.abs(swing.rate - voice.rate) <= voice.rate * VOICE_SPREAD
+              && swing.gain === voice.gain),
           };
         });
-        out.takes.distinctVoices = new Set(out.takes.tiers.map((t) => `${t.rate}/${t.gain}`)).size;
+        // Counted off the voices rather than off the plays: one play of each carries
+        // the variation, which is the next clause's business, not this one's.
+        out.takes.distinctVoices = new Set(out.takes.tiers.map((t) => `${t.voiceRate}/${t.voiceGain}`)).size;
 
         // And a tier that ships its own pair plays that instead, while a tier left
         // out of the list goes on playing the shared take — the control that says
@@ -932,6 +946,11 @@ async function runCampaign(options) {
         try {
           out.takes.ownTake = swingAt(2);          // Silver, listed
           out.takes.fallbackTake = swingAt(3);     // Gold, not listed
+          // A recording of its own is played as recorded, not pushed further down by
+          // the voice that exists to make the shared take sound like that tier.
+          out.takes.ownTakePlaysTrue = Boolean(out.takes.ownTake
+            && Math.abs(out.takes.ownTake.rate - 1) <= VOICE_SPREAD
+            && out.takes.ownTake.gain === BOOT_VOICES.silver.gain);
         } finally {
           SETTINGS.bootRecordedTiers = savedRecorded;
           delete G.audio.samples['silver-bsh'];
@@ -1018,9 +1037,12 @@ async function runCampaign(options) {
         // while a tier that does not falls back, and the sting is the voice exactly.
         && out.takes.tiers.length === BOOT_TIERS.length
         && out.takes.tiers.every((t) => t.name)
+        // Each kick landed in its own tier's voice, not merely in any voice.
+        && out.takes.tiers.every((t) => t.onVoice)
         && out.takes.distinctVoices === BOOT_TIERS.length
         && Boolean(out.takes.ownTake && out.takes.ownTake.name === 'silver-bsh')
         && Boolean(out.takes.fallbackTake && out.takes.fallbackTake.name === 'bsh')
+        && out.takes.ownTakePlaysTrue
         && out.takes.stingPlaysTheVoice
         // The boot's sounds take nothing out of the fight's seeded generator.
         && out.takes.randomDraws === 0

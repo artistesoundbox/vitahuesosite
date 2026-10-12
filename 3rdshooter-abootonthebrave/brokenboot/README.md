@@ -756,6 +756,18 @@ start pressing sooner as well as harder.
   stands in rather than the game going quiet. Their pitch and take variation comes
   from their own generator, never `Math.random` — a sound that draws from the
   fight's stream re-rolls the campaign behind it.
+- **Every boot tier has a voice.** `BOOT_VOICES` gives each tier a playback rate and
+  a gain — a heavier boot lands lower and louder, `diamond` at ×0.70 where `standard`
+  is ×1.00 — so upgrading is something you can hear and not only count. A tier may
+  also ship its own pair of recordings beside the shared ones (`silver-bsh.mp3`,
+  `doom-bootpower.mp3`, named by the tier's `socket` slug), and a tier so listed in
+  `SETTINGS.bootRecordedTiers` plays those instead. Nothing is fetched speculatively,
+  so an unlisted tier goes on using the shared take in its own voice rather than 404ing
+  at build-up. The sting for a kill plays the tier's voice exactly, with none of the
+  swing's variation, so it lands the same every time; the swing itself varies ±8%
+  around the voice so a wave of kicks is not one file on repeat. The voice is read
+  off the foot he threw the kick with, because taking somebody off the field pays tier
+  credit and can change the boot mid-swing.
 - **Loot.** Six drop types rolled per elimination, with ammo first so a dry
   player can never hard-stall — see *Aim tune, the boot charge and the new
   pickups* above for the table.
@@ -808,6 +820,7 @@ to `three.module.js`; `vendor/addons/` keeps the relative layout the addons expe
 | `abrokenbootonthebraveposter.jpg` | Start screen art. |
 | `A Broken Boot On The Brave*.mp3` | Music beds. |
 | `bsh / ouch / oua / bootpower.mp3` | The boot: its swing, two takes of the yelp it draws, and the sting for taking somebody off the field. |
+| `<socket>-bsh / <socket>-bootpower.mp3` | Optional per-tier takes (`silver-bsh.mp3`, `doom-bootpower.mp3`); a tier without one uses the shared take in its own voice. |
 
 Every rig in the set uses the `mixamorig:` bone namespace, which is why clips can
 be freely cross-applied between the player and the attackers.

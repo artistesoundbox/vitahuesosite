@@ -332,11 +332,16 @@ export class Game {
   bootTake(kind) {
     const tier = BOOT_TIERS[this.player.bootIndex] || BOOT_TIERS[0];
     const socket = tier.socket;
-    const own = SETTINGS.bootRecordedTiers.includes(socket);
-    return {
-      name: own ? `${socket}-${kind}` : kind,
-      voice: BOOT_VOICES[socket] || BOOT_VOICES.standard,
-    };
+    const voice = BOOT_VOICES[socket] || BOOT_VOICES.standard;
+    // A tier with its own recording is played as recorded — its own pitch is the
+    // sound somebody made for it — and only takes the tier's gain, so the ladder of
+    // loudness still rises with the boot. The pitch shaping is what the shared take
+    // is played through, which is how a tier without a recording still sounds like
+    // itself.
+    if (SETTINGS.bootRecordedTiers.includes(socket)) {
+      return { name: `${socket}-${kind}`, voice: { rate: 1, gain: voice.gain } };
+    }
+    return { name: kind, voice };
   }
 
   /**
@@ -675,6 +680,12 @@ export class Game {
   resolveMelee(type = this.player.lastKick) {
     const boot = this.player.boot;
     const kick = KICKS[type] || KICKS.kick;
+    // The boot's recorded voice, read off the foot he threw it with. Here rather than
+    // down where it plays, because a kick that takes somebody off the field pays tier
+    // credit — which can change the boot in the middle of this call, and the sound
+    // belongs to the boot that landed, not to the one that was just earned.
+    const swing = this.bootTake('bsh');
+    const sting = this.bootTake('bootpower');
     const origin = this.player.position;
     const forward = new THREE.Vector3(Math.sin(this.player.yaw), 0, Math.cos(this.player.yaw));
 
@@ -775,16 +786,12 @@ export class Game {
       this.audio.kick();
     }
     // The boot in this tier's voice, from this tier's own recording if it has one.
-    const swing = this.bootTake('bsh');
     this.audio.bootTake(swing.name, swing.voice);
     // Somebody off the field — running, or beaten down — is worth a sting of its
     // own, once per kick however many it caught, and played true rather than with
     // the swing's variation so it lands the same every time. A kick that only
     // connects is not: the swing already said that.
-    if (routed > 0 || downed > 0) {
-      const sting = this.bootTake('bootpower');
-      this.audio.bootTake(sting.name, sting.voice, 0);
-    }
+    if (routed > 0 || downed > 0) this.audio.bootTake(sting.name, sting.voice, 0);
     if (routed > 0) {
       this.hud.showBanner(
         charged ? `${boot.name.toUpperCase()}` : 'THE BOOT',
