@@ -1,0 +1,566 @@
+{
+  "baseSeed": 20260411,
+  "cell": 0.25,
+  "played": {
+    "seed": 1337,
+    "layoutHash": "820b292e"
+  },
+  "matchesPlayed": true,
+  "control": {
+    "openFair": true,
+    "sealedUnfair": true,
+    "sealedReasons": [
+      "100.0% of the open attacker spawn ring cannot reach the clearing",
+      "1 pocket(s) of open ground are sealed off from the officer, the largest 9399 m², nearest 23 m out — trunks alone seal it, so no kick can open the way in",
+      "the fighting ground is cramped: a point between the clearing and the spawn ring has only 0 m of clear space around it on average, so attackers get wedged instead of closing",
+      "only 853 m² of connected ground to fight over"
+    ],
+    "pass": true
+  },
+  "forests": [
+    {
+      "seed": 1337,
+      "layoutHash": "820b292e",
+      "pass": true,
+      "reasons": [],
+      "originBlocked": false,
+      "reachableArea": 10364.9,
+      "openRadius": 10.15,
+      "fieldRoom": 3.3,
+      "fieldReachFraction": 0.962,
+      "clearingArea": 1135.5,
+      "clearingOpenFraction": 0.81,
+      "bandCells": 36598,
+      "bandReachFraction": 1,
+      "bandPocketFraction": 0,
+      "pockets": {
+        "count": 0,
+        "largestArea": 0,
+        "nearest": null,
+        "sealedArea": 0
+      },
+      "trees": 165,
+      "props": 30,
+      "trunksOnly": {
+        "pockets": {
+          "count": 0,
+          "largestArea": 0,
+          "nearest": null,
+          "sealedArea": 0
+        },
+        "reachableArea": 10698.6,
+        "bandReachFraction": 1
+      }
+    },
+    {
+      "seed": 20260411,
+      "layoutHash": "41ab6b94",
+      "pass": true,
+      "reasons": [],
+      "originBlocked": false,
+      "reachableArea": 10386.6,
+      "openRadius": 9.05,
+      "fieldRoom": 2.98,
+      "fieldReachFraction": 0.959,
+      "clearingArea": 1135.5,
+      "clearingOpenFraction": 0.813,
+      "bandCells": 36779,
+      "bandReachFraction": 1,
+      "bandPocketFraction": 0,
+      "pockets": {
+        "count": 0,
+        "largestArea": 0,
+        "nearest": null,
+        "sealedArea": 0
+      },
+      "trees": 165,
+      "props": 30,
+      "trunksOnly": {
+        "pockets": {
+          "count": 0,
+          "largestArea": 0,
+          "nearest": null,
+          "sealedArea": 0
+        },
+        "reachableArea": 10718.8,
+        "bandReachFraction": 1
+      }
+    },
+    {
+      "seed": 20268330,
+      "layoutHash": "163e6ddb",
+      "pass": true,
+      "reasons": [],
+      "originBlocked": false,
+      "reachableArea": 10345.3,
+      "openRadius": 9.18,
+      "fieldRoom": 2.75,
+      "fieldReachFraction": 0.955,
+      "clearingArea": 1135.5,
+      "clearingOpenFraction": 0.821,
+      "bandCells": 36514,
+      "bandReachFraction": 1,
+      "bandPocketFraction": 0,
+      "pockets": {
+        "count": 0,
+        "largestArea": 0,
+        "nearest": null,
+        "sealedArea": 0
+      },
+      "trees": 165,
+      "props": 30,
+      "trunksOnly": {
+        "pockets": {
+          "count": 0,
+          "largestArea": 0,
+          "nearest": null,
+          "sealedArea": 0
+        },
+        "reachableArea": 10681.9,
+        "bandReachFraction": 1
+      }
+    },
+    {
+      "seed": 20276249,
+      "layoutHash": "34184687",
+      "pass": true,
+      "reasons": [],
+      "originBlocked": false,
+      "reachableArea": 10354,
+      "openRadius": 9.77,
+      "fieldRoom": 2.8,
+      "fieldReachFraction": 0.965,
+      "clearingArea": 1135.5,
+      "clearingOpenFraction": 0.83,
+      "bandCells": 35934,
+      "bandReachFraction": 1,
+      "bandPocketFraction": 0,
+      "pockets": {
+        "count": 0,
+        "largestArea": 0,
+        "nearest": null,
+        "sealedArea": 0.1875
+      },
+      "trees": 165,
+      "props": 30,
+      "trunksOnly": {
+        "pockets": {
+          "count": 0,
+          "largestArea": 0,
+          "nearest": null,
+          "sealedArea": 0.1875
+        },
+        "reachableArea": 10669.5,
+        "bandReachFraction": 1
+      }
+    },
+    {
+      "seed": 20284168,
+      "layoutHash": "a0fca860",
+      "pass": true,
+      "reasons": [],
+      "originBlocked": false,
+      "reachableArea": 10377.7,
+      "openRadius": 9.66,
+      "fieldRoom": 3.03,
+      "fieldReachFraction": 0.965,
+      "clearingArea": 1135.5,
+      "clearingOpenFraction": 0.791,
+      "bandCells": 36550,
+      "bandReachFraction": 1,
+      "bandPocketFraction": 0,
+      "pockets": {
+        "count": 0,
+        "largestArea": 0,
+        "nearest": null,
+        "sealedArea": 0
+      },
+      "trees": 165,
+      "props": 30,
+      "trunksOnly": {
+        "pockets": {
+          "count": 0,
+          "largestArea": 0,
+          "nearest": null,
+          "sealedArea": 0
+        },
+        "reachableArea": 10706,
+        "bandReachFraction": 1
+      }
+    },
+    {
+      "seed": 20292087,
+      "layoutHash": "bb1e79c7",
+      "pass": true,
+      "reasons": [],
+      "originBlocked": false,
+      "reachableArea": 10354,
+      "openRadius": 9.82,
+      "fieldRoom": 2.98,
+      "fieldReachFraction": 0.98,
+      "clearingArea": 1135.5,
+      "clearingOpenFraction": 0.745,
+      "bandCells": 36385,
+      "bandReachFraction": 1,
+      "bandPocketFraction": 0,
+      "pockets": {
+        "count": 0,
+        "largestArea": 0,
+        "nearest": null,
+        "sealedArea": 0
+      },
+      "trees": 165,
+      "props": 30,
+      "trunksOnly": {
+        "pockets": {
+          "count": 0,
+          "largestArea": 0,
+          "nearest": null,
+          "sealedArea": 0
+        },
+        "reachableArea": 10697,
+        "bandReachFraction": 1
+      }
+    },
+    {
+      "seed": 20300006,
+      "layoutHash": "519ee22f",
+      "pass": true,
+      "reasons": [],
+      "originBlocked": false,
+      "reachableArea": 10352.2,
+      "openRadius": 9.97,
+      "fieldRoom": 2.84,
+      "fieldReachFraction": 0.958,
+      "clearingArea": 1135.5,
+      "clearingOpenFraction": 0.799,
+      "bandCells": 36294,
+      "bandReachFraction": 1,
+      "bandPocketFraction": 0,
+      "pockets": {
+        "count": 0,
+        "largestArea": 0,
+        "nearest": null,
+        "sealedArea": 0
+      },
+      "trees": 165,
+      "props": 30,
+      "trunksOnly": {
+        "pockets": {
+          "count": 0,
+          "largestArea": 0,
+          "nearest": null,
+          "sealedArea": 0
+        },
+        "reachableArea": 10689,
+        "bandReachFraction": 1
+      }
+    },
+    {
+      "seed": 20307925,
+      "layoutHash": "a6df7c07",
+      "pass": true,
+      "reasons": [],
+      "originBlocked": false,
+      "reachableArea": 10339.5,
+      "openRadius": 9.7,
+      "fieldRoom": 2.81,
+      "fieldReachFraction": 0.952,
+      "clearingArea": 1135.5,
+      "clearingOpenFraction": 0.805,
+      "bandCells": 36563,
+      "bandReachFraction": 1,
+      "bandPocketFraction": 0,
+      "pockets": {
+        "count": 0,
+        "largestArea": 0,
+        "nearest": null,
+        "sealedArea": 0
+      },
+      "trees": 165,
+      "props": 30,
+      "trunksOnly": {
+        "pockets": {
+          "count": 0,
+          "largestArea": 0,
+          "nearest": null,
+          "sealedArea": 0
+        },
+        "reachableArea": 10701.4,
+        "bandReachFraction": 1
+      }
+    },
+    {
+      "seed": 20315844,
+      "layoutHash": "bc68efb9",
+      "pass": true,
+      "reasons": [],
+      "originBlocked": false,
+      "reachableArea": 10376.5,
+      "openRadius": 11.3,
+      "fieldRoom": 2.91,
+      "fieldReachFraction": 0.956,
+      "clearingArea": 1135.5,
+      "clearingOpenFraction": 0.808,
+      "bandCells": 36650,
+      "bandReachFraction": 1,
+      "bandPocketFraction": 0,
+      "pockets": {
+        "count": 0,
+        "largestArea": 0,
+        "nearest": null,
+        "sealedArea": 0
+      },
+      "trees": 165,
+      "props": 30,
+      "trunksOnly": {
+        "pockets": {
+          "count": 0,
+          "largestArea": 0,
+          "nearest": null,
+          "sealedArea": 0
+        },
+        "reachableArea": 10703.1,
+        "bandReachFraction": 1
+      }
+    },
+    {
+      "seed": 20323763,
+      "layoutHash": "17b96906",
+      "pass": true,
+      "reasons": [],
+      "originBlocked": false,
+      "reachableArea": 10364.1,
+      "openRadius": 8.63,
+      "fieldRoom": 2.92,
+      "fieldReachFraction": 0.97,
+      "clearingArea": 1135.5,
+      "clearingOpenFraction": 0.77,
+      "bandCells": 36662,
+      "bandReachFraction": 1,
+      "bandPocketFraction": 0,
+      "pockets": {
+        "count": 0,
+        "largestArea": 0,
+        "nearest": null,
+        "sealedArea": 0
+      },
+      "trees": 165,
+      "props": 30,
+      "trunksOnly": {
+        "pockets": {
+          "count": 0,
+          "largestArea": 0,
+          "nearest": null,
+          "sealedArea": 0
+        },
+        "reachableArea": 10688,
+        "bandReachFraction": 1
+      }
+    },
+    {
+      "seed": 20331682,
+      "layoutHash": "9d894906",
+      "pass": true,
+      "reasons": [],
+      "originBlocked": false,
+      "reachableArea": 10340.4,
+      "openRadius": 9.41,
+      "fieldRoom": 2.97,
+      "fieldReachFraction": 0.968,
+      "clearingArea": 1135.5,
+      "clearingOpenFraction": 0.789,
+      "bandCells": 36480,
+      "bandReachFraction": 1,
+      "bandPocketFraction": 0,
+      "pockets": {
+        "count": 0,
+        "largestArea": 0,
+        "nearest": null,
+        "sealedArea": 0
+      },
+      "trees": 165,
+      "props": 30,
+      "trunksOnly": {
+        "pockets": {
+          "count": 0,
+          "largestArea": 0,
+          "nearest": null,
+          "sealedArea": 0
+        },
+        "reachableArea": 10693.4,
+        "bandReachFraction": 1
+      }
+    },
+    {
+      "seed": 20339601,
+      "layoutHash": "bfe5fd05",
+      "pass": true,
+      "reasons": [],
+      "originBlocked": false,
+      "reachableArea": 10339.1,
+      "openRadius": 8.18,
+      "fieldRoom": 2.82,
+      "fieldReachFraction": 0.969,
+      "clearingArea": 1135.5,
+      "clearingOpenFraction": 0.774,
+      "bandCells": 36313,
+      "bandReachFraction": 1,
+      "bandPocketFraction": 0,
+      "pockets": {
+        "count": 0,
+        "largestArea": 0,
+        "nearest": null,
+        "sealedArea": 0
+      },
+      "trees": 165,
+      "props": 30,
+      "trunksOnly": {
+        "pockets": {
+          "count": 0,
+          "largestArea": 0,
+          "nearest": null,
+          "sealedArea": 0
+        },
+        "reachableArea": 10677.9,
+        "bandReachFraction": 1
+      }
+    },
+    {
+      "seed": 20347520,
+      "layoutHash": "6d4de472",
+      "pass": true,
+      "reasons": [],
+      "originBlocked": false,
+      "reachableArea": 10384,
+      "openRadius": 9.05,
+      "fieldRoom": 3.16,
+      "fieldReachFraction": 0.961,
+      "clearingArea": 1135.5,
+      "clearingOpenFraction": 0.806,
+      "bandCells": 36800,
+      "bandReachFraction": 1,
+      "bandPocketFraction": 0,
+      "pockets": {
+        "count": 0,
+        "largestArea": 0,
+        "nearest": null,
+        "sealedArea": 0
+      },
+      "trees": 165,
+      "props": 30,
+      "trunksOnly": {
+        "pockets": {
+          "count": 0,
+          "largestArea": 0,
+          "nearest": null,
+          "sealedArea": 0
+        },
+        "reachableArea": 10711.6,
+        "bandReachFraction": 1
+      }
+    },
+    {
+      "seed": 20355439,
+      "layoutHash": "c2ca1b7d",
+      "pass": true,
+      "reasons": [],
+      "originBlocked": false,
+      "reachableArea": 10398.1,
+      "openRadius": 12.84,
+      "fieldRoom": 2.96,
+      "fieldReachFraction": 0.956,
+      "clearingArea": 1135.5,
+      "clearingOpenFraction": 0.811,
+      "bandCells": 36547,
+      "bandReachFraction": 1,
+      "bandPocketFraction": 0,
+      "pockets": {
+        "count": 0,
+        "largestArea": 0,
+        "nearest": null,
+        "sealedArea": 0
+      },
+      "trees": 165,
+      "props": 30,
+      "trunksOnly": {
+        "pockets": {
+          "count": 0,
+          "largestArea": 0,
+          "nearest": null,
+          "sealedArea": 0
+        },
+        "reachableArea": 10716.5,
+        "bandReachFraction": 1
+      }
+    },
+    {
+      "seed": 20363358,
+      "layoutHash": "f945f330",
+      "pass": true,
+      "reasons": [],
+      "originBlocked": false,
+      "reachableArea": 10355.3,
+      "openRadius": 9.12,
+      "fieldRoom": 2.67,
+      "fieldReachFraction": 0.957,
+      "clearingArea": 1135.5,
+      "clearingOpenFraction": 0.824,
+      "bandCells": 36256,
+      "bandReachFraction": 1,
+      "bandPocketFraction": 0,
+      "pockets": {
+        "count": 0,
+        "largestArea": 0,
+        "nearest": null,
+        "sealedArea": 0
+      },
+      "trees": 165,
+      "props": 30,
+      "trunksOnly": {
+        "pockets": {
+          "count": 0,
+          "largestArea": 0,
+          "nearest": null,
+          "sealedArea": 0
+        },
+        "reachableArea": 10682.3,
+        "bandReachFraction": 1
+      }
+    },
+    {
+      "seed": 20371277,
+      "layoutHash": "1a9c3d22",
+      "pass": true,
+      "reasons": [],
+      "originBlocked": false,
+      "reachableArea": 10320.3,
+      "openRadius": 8.74,
+      "fieldRoom": 2.93,
+      "fieldReachFraction": 0.953,
+      "clearingArea": 1135.5,
+      "clearingOpenFraction": 0.819,
+      "bandCells": 36266,
+      "bandReachFraction": 1,
+      "bandPocketFraction": 0,
+      "pockets": {
+        "count": 0,
+        "largestArea": 0,
+        "nearest": null,
+        "sealedArea": 0
+      },
+      "trees": 165,
+      "props": 30,
+      "trunksOnly": {
+        "pockets": {
+          "count": 0,
+          "largestArea": 0,
+          "nearest": null,
+          "sealedArea": 0
+        },
+        "reachableArea": 10665.1,
+        "bandReachFraction": 1
+      }
+    }
+  ]
+}

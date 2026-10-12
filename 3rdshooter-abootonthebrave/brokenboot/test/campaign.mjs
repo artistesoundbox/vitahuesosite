@@ -7,6 +7,7 @@
 //   node test/campaign.mjs                 full ten-wave run
 //   node test/campaign.mjs --waves=3       quick pacing check
 //   node test/campaign.mjs --headed        watch it play (debugging)
+//   node test/campaign.mjs --check-forest  audit many forests without playing them
 //   node test/campaign.mjs --baseline      compare against test/campaign-baseline.json
 //   node test/campaign.mjs --record        write that baseline
 //
@@ -28,6 +29,7 @@ const driverSource = fs.readFileSync(path.join(here, 'driver.js'), 'utf8');
 const baselinePath = path.join(here, 'campaign-baseline.json');
 const reportPath = path.join(here, 'campaign-report.json');
 const fuzzPath = path.join(here, 'campaign-fuzz.json');
+const forestPath = path.join(here, 'campaign-forest.json');
 
 /** A 32-bit layout hash, as the report writes it. */
 const hex32 = (h) => (Number(h) >>> 0).toString(16).padStart(8, '0');
@@ -53,6 +55,7 @@ function parseArgs(argv) {
     noServer: false,
     fuzz: 0,
     worldSeed: 0,
+    checkForest: 0,
   };
   for (const arg of argv) {
     const [flag, value] = arg.split('=');
@@ -72,6 +75,8 @@ function parseArgs(argv) {
       case '--check-dry': opts.checkDry = true; break;
       // Bare `--fuzz` is five campaigns; `--fuzz=12` is twelve.
       case '--fuzz': opts.fuzz = Number.isFinite(num) ? Math.max(1, Math.floor(num)) : 5; break;
+      // Bare `--check-forest` is fifteen forests, plus the one the page plays.
+      case '--check-forest': opts.checkForest = Number.isFinite(num) ? Math.max(1, Math.floor(num)) : 15; break;
       case '--require-finish': opts.requireFinish = true; break;
       case '--headed': opts.headed = true; break;
       case '--keep-open': opts.keepOpen = true; break;
@@ -97,6 +102,10 @@ function printUsage() {
   --world-seed=N   build the forest from this seed instead of the configured layout
   --fuzz[=N]       play N campaigns with different seeds and name every one that
 cannot finish a wave (default 5, each with its own forest)
+  --check-forest[=N]
+                   rebuild N forests (plus the one the page plays) and audit each
+one instead of playing: is the clearing reachable, and is there open ground to
+fight in? Combine with --world-seed=N to audit that one forest only
   --baseline       compare wave and tier timings against test/campaign-baseline.json
   --record         write the timings from this run to that baseline
   --honest         play the match for real: the officer can die, and the report says where
@@ -212,8 +221,12 @@ let profileDir = null;
 let exitCode = 0;
 
 async function main() {
-  if (opts.fuzz && (opts.checkLock || opts.checkKick || opts.checkDry || opts.baseline || opts.record)) {
-    console.error('--fuzz plays whole campaigns, so it does not combine with the mechanic probes or with --baseline/--record.');
+  if (opts.fuzz && (opts.checkLock || opts.checkKick || opts.checkDry || opts.checkForest || opts.baseline || opts.record)) {
+    console.error('--fuzz plays whole campaigns, so it does not combine with the mechanic probes, with --check-forest, or with --baseline/--record.');
+    return 2;
+  }
+  if (opts.checkForest && (opts.baseline || opts.record)) {
+    console.error('--check-forest audits terrain without playing a campaign, so it has no wave timings to compare or record.');
     return 2;
   }
 
@@ -360,6 +373,8 @@ async function main() {
       checkLock: opts.checkLock || false,
       checkKick: opts.checkKick || false,
       checkDry: opts.checkDry || false,
+      // An empty list is a sweep of the one forest the page is already playing.
+      forestSeeds: opts.checkForest ? (opts.worldSeed ? [] : fuzzSeedList(opts.checkForest)) : null,
     })}); })()`;
 
     const startedAt = Date.now();
@@ -411,6 +426,10 @@ async function main() {
       seed,
       worldSeed: report.worldSeed,
       layoutHash: report.layoutHash,
+      // Whether the terrain could be fought in at all. A fuzz names the seeds that
+      // stalled; this says which of them had a forest that left no choice.
+      fair: report.forest ? report.forest.pass : null,
+      forestReasons: report.forest ? report.forest.reasons : [],
       outcome: report.outcome,
       seconds: report.gameSeconds,
       wavesReached: report.wavesReached,
@@ -437,7 +456,7 @@ async function main() {
   const unfinished = (seed, outcome) => ({
     seed, outcome, seconds: 0, wavesReached: null, eliminations: 0, bootEliminations: 0,
     finished: false, quietestSeconds: 0, stalledWave: null, errors: consoleErrors.slice(0, 3),
-    worldSeed: seed, layoutHash: null,
+    worldSeed: seed, layoutHash: null, fair: null, forestReasons: [],
   });
 
   /**
@@ -480,7 +499,7 @@ async function main() {
     printFuzz(runs, layoutsDiffer);
     fs.writeFileSync(fuzzPath, `${JSON.stringify({ baseSeed: opts.seed, runs }, null, 2)}\n`);
     log(`\nfuzz report written to ${path.relative(process.cwd(), fuzzPath)}`);
-    return (runs.some((r) => !r.finished) || !layoutsDiffer) ? 1 : 0;
+    return (runs.some((r) => !r.finished) || !layoutsDiffer || runs.some((r) => r.fair === false)) ? 1 : 0;
   }
 
   // ---------------------------------------------------------------- boot the game
@@ -494,10 +513,37 @@ async function main() {
   if (!(await waitForBoot())) return 1;
   log(opts.fuzz
     ? '\ngame loaded, fuzzing the campaign'
-    : '\ngame loaded, playing the campaign');
+    : opts.checkForest ? '\ngame loaded, auditing forests' : '\ngame loaded, playing the campaign');
 
   // -------------------------------------------------------------- fuzz the seeds
   if (opts.fuzz) return await fuzzSeeds();
+
+  // ---------------------------------------------------------------- audit the terrain
+  // `--check-forest` never plays the campaign: it boots the page for the layout it
+  // plays — so the report can name a forest honestly — and then rebuilds a spread
+  // of others inside that same page, asking of each whether a wave could be fought
+  // in it. The one it is playing is audited too, and must rebuild to itself.
+  if (opts.checkForest) {
+    const seeds = opts.worldSeed ? [] : fuzzSeedList(opts.checkForest);
+    log(`\nbuilding ${seeds.length + 1} forest(s) and auditing each`);
+    const report = await playSeed(opts.seed);
+    if (!report) return 1;
+    const audit = report.forestSweep;
+    const passed = assess(report);
+    printReport(report, passed);
+    if (audit) {
+      fs.writeFileSync(forestPath, `${JSON.stringify({
+        baseSeed: opts.seed,
+        cell: audit.cell,
+        played: { seed: audit.playedSeed, layoutHash: hex32(audit.playedLayoutHash) },
+        matchesPlayed: audit.matchesPlayed,
+        control: audit.control,
+        forests: audit.seeds.map((f) => ({ ...f, layoutHash: hex32(f.layoutHash) })),
+      }, null, 2)}\n`);
+      log(`\nforest report written to ${path.relative(process.cwd(), forestPath)}`);
+    }
+    return passed.ok ? 0 : 1;
+  }
 
   // ---------------------------------------------------------------- play it
   const report = await playSeed(opts.seed);
@@ -528,8 +574,15 @@ function assess(report) {
   const reasons = [];
   const findings = [];
 
+  // The terrain the run happened in. A forest a wave cannot be fought in fails
+  // here rather than being blamed on whoever played it — and in a sweep the
+  // played forest is one of the audited seeds, so it is named there instead.
+  if (report.forest && !report.forest.pass && !report.forestSweep) {
+    reasons.push(`the forest this run was played in cannot be fought in (seed ${report.worldSeed}, layout ${hex32(report.layoutHash)}): ${report.forest.reasons.join('; ')}`);
+  }
+
   // The probes are single assertions about one mechanic, not a campaign.
-  if (report.lockCheck || report.kickCheck || report.dryCheck) {
+  if (report.lockCheck || report.kickCheck || report.dryCheck || report.forestSweep) {
     const l = report.lockCheck;
     const k = report.kickCheck;
     const d = report.dryCheck;
@@ -579,6 +632,22 @@ function assess(report) {
       reasons.push(`kicks and scenery: ${bits.join('; ') || 'the probe did not pass'}`);
     }
     if (report.failedRequests?.length) reasons.push(`${report.failedRequests.length} failed request(s): ${report.failedRequests[0]}`);
+    // The forest sweep: every layout it rebuilt, and the two ways the sweep
+    // itself could be lying — a rebuilt forest that is not the one being played,
+    // or an audit that cannot tell a sealed clearing from an open field.
+    const sweep = report.forestSweep;
+    if (sweep) {
+      if (!sweep.matchesPlayed) {
+        const rebuilt = hex32(sweep.seeds.find((f) => f.seed === sweep.playedSeed)?.layoutHash ?? 0);
+        reasons.push(`the forest rebuilt from seed ${sweep.playedSeed} hashes to ${rebuilt} while the page is playing ${hex32(sweep.playedLayoutHash)}, so this sweep is not auditing the forests the game builds`);
+      }
+      if (!sweep.control.pass) {
+        reasons.push(`the audit cannot tell a fair forest from a sealed one (an empty field: ${sweep.control.openFair ? 'fair' : 'UNFAIR'}, a trunk wall round the clearing: ${sweep.control.sealedUnfair ? 'unfair' : 'FAIR'}), so its verdicts are worth nothing`);
+      }
+      for (const f of sweep.seeds) {
+        if (!f.pass) reasons.push(`forest ${f.seed} (layout ${hex32(f.layoutHash)}) cannot be fought in: ${f.reasons.join('; ')}`);
+      }
+    }
     return { ok: reasons.length === 0, reasons, findings, good: [], baselineDelta: null, errors: [] };
   }
   const errors = [...(report.errors || []), ...(report.consoleErrors || [])];
@@ -647,10 +716,11 @@ function printReport(report, passed) {
   console.log('');
 
   // The mechanic probes: one assertion each, no campaign.
-  if (report.lockCheck || report.kickCheck || report.dryCheck) {
+  if (report.lockCheck || report.kickCheck || report.dryCheck || report.forestSweep) {
     const c = report.lockCheck;
     const k = report.kickCheck;
     const d = report.dryCheck;
+    const sweep = report.forestSweep;
     if (c) {
       console.log('Aim trigger (left trigger / right mouse / Q)');
       console.log(`  lock cone ${c.cone} rad, probe attackers: near ${c.anglesRadians?.near} rad off the crosshair, far ${c.anglesRadians?.far}`);
@@ -701,8 +771,32 @@ function printReport(report, passed) {
         console.log(`  left standing: ${JSON.stringify(d.leftover)}`);
       }
     }
+    if (sweep) {
+      if (c || k || d) console.log('');
+      const control = sweep.control;
+      console.log('Forest fairness');
+      console.log(`  control: an empty field is ${control.openFair ? 'fair' : 'UNFAIR'}, and a trunk wall round the clearing is ${control.sealedUnfair ? 'unfair' : 'FAIR'} — ${control.pass ? 'the audit can tell them apart' : 'IT CANNOT TELL THEM APART'}`);
+      console.log(`    the wall was rejected because: ${(control.sealedReasons || []).join('; ') || '(no reason given)'}`);
+      console.log(`  ${pad('seed', 12)}${pad('layout', 11)}${pad('trees', 7)}${pad('props', 7)}${pad('ground', 9)}${pad('room', 7)}${pad('open', 8)}${pad('clearing', 10)}${pad('ring', 8)}${pad('pockets', 9)}verdict`);
+      for (const f of sweep.seeds) {
+        console.log(`  ${pad(f.seed, 12)}${pad(hex32(f.layoutHash), 11)}${pad(f.trees, 7)}${pad(f.props, 7)}`
+          + `${pad(`${Math.round(f.reachableArea)}m²`, 9)}${pad(`${f.fieldRoom}m`, 7)}${pad(`${(f.openRadius * 2).toFixed(1)}m`, 8)}`
+          + `${pad(`${Math.round(f.clearingOpenFraction * 100)}%`, 10)}${pad(`${Math.round(f.bandReachFraction * 100)}%`, 8)}`
+          + `${pad(f.pockets.count, 9)}${f.pass ? 'fair' : 'NOT FAIR'}`);
+      }
+      console.log('  ground: m² of connected ground the officer and attackers can both stand on;');
+      console.log('  room: mean clear space around a point on the fighting ground — the ring from the clearing edge out to the');
+      console.log('  far side of the spawn ring; open: diameter of the widest clear circle there; clearing: share of the clearing');
+      console.log('  that is standable; ring: share of the 26-38 m attacker spawn ring that can reach the officer; pockets: sealed-off ground.');
+      for (const f of sweep.seeds) {
+        for (const r of f.reasons) console.log(`  seed ${f.seed}: ${r}`);
+      }
+      if (!sweep.matchesPlayed) {
+        console.log(`  the seed the page is playing (${sweep.playedSeed}) rebuilt to layout ${hex32(sweep.seeds.find((f) => f.seed === sweep.playedSeed)?.layoutHash ?? 0)} instead of ${hex32(sweep.playedLayoutHash)}`);
+      }
+    }
     if (passed.ok) {
-      console.log(`\nPASS — ${[c && 'a press retargets to the attacker nearest the crosshair and a held trigger keeps its target', k && 'the three kicks differ, the scenery they launch settles where it lands, and the impact feels as heavy as the mass it hit', d && 'a wave can be won with no ammunition left, by closing and booting'].filter(Boolean).join('; ')}.`);
+      console.log(`\nPASS — ${[c && 'a press retargets to the attacker nearest the crosshair and a held trigger keeps its target', k && 'the three kicks differ, the scenery they launch settles where it lands, and the impact feels as heavy as the mass it hit', d && 'a wave can be won with no ammunition left, by closing and booting', sweep && 'every forest audited is one a wave can actually be fought in'].filter(Boolean).join('; ')}.`);
     } else {
       console.log('\nFAIL');
       for (const reason of passed.reasons) console.log(`  - ${reason}`);
@@ -745,6 +839,16 @@ function printReport(report, passed) {
     }
   }
 
+  if (report.forest) {
+    const f = report.forest;
+    console.log('');
+    console.log(`Forest seed ${report.worldSeed} (layout ${hex32(report.layoutHash)}): ${f.trees} trees and ${f.props} props, `
+      + `${Math.round(f.reachableArea)} m² of connected ground, `
+      + `${f.fieldRoom} m of elbow room on the fighting ground, `
+      + `${Math.round(f.clearingOpenFraction * 100)}% of the clearing standable, `
+      + `${Math.round(f.bandReachFraction * 100)}% of the attacker spawn ring reachable — `
+      + (f.pass ? 'fair to fight in.' : `NOT FAIR: ${f.reasons.join('; ')}.`));
+  }
   if (report.consoleWarnings?.length) {
     console.log(`\n${report.consoleWarnings.length} console warning(s), first: ${report.consoleWarnings[0]}`);
   }
@@ -770,11 +874,12 @@ function printReport(report, passed) {
 function printFuzz(runs, layoutsDiffer = true) {
   const pad = (s, n) => String(s).padEnd(n);
   const bad = runs.filter((r) => !r.finished);
+  const unfair = runs.filter((r) => r.fair === false);
   const layouts = new Set(runs.map((r) => r.layoutHash).filter((h) => h !== null && h !== undefined));
   const quietest = runs.reduce((a, r) => Math.max(a, r.quietestSeconds || 0), 0);
   console.log('');
   console.log(`Fuzzing the campaign across ${runs.length} seed(s)`);
-  console.log(`  ${pad('seed', 12)}${pad('forest', 18)}${pad('outcome', 13)}${pad('sim', 10)}${pad('wave', 7)}${pad('eliminations', 16)}${pad('quietest', 11)}verdict`);
+  console.log(`  ${pad('seed', 12)}${pad('forest', 18)}${pad('outcome', 13)}${pad('sim', 10)}${pad('wave', 7)}${pad('eliminations', 16)}${pad('quietest', 11)}${pad('terrain', 10)}verdict`);
   for (const r of runs) {
     const verdict = r.finished
       ? 'finished every wave'
@@ -784,13 +889,13 @@ function printFuzz(runs, layoutsDiffer = true) {
       : `${r.worldSeed}/${hex32(r.layoutHash)}`;
     console.log(`  ${pad(r.seed, 12)}${pad(forest, 18)}${pad(r.outcome || '-', 13)}${pad(`${r.seconds}s`, 10)}`
       + `${pad(r.wavesReached ?? '-', 7)}${pad(`${r.eliminations} (${r.bootEliminations} boot)`, 16)}`
-      + `${pad(`${r.quietestSeconds}s`, 11)}${verdict}`);
+      + `${pad(`${r.quietestSeconds}s`, 11)}${pad(r.fair === true ? 'fair' : r.fair === false ? 'NOT FAIR' : '-', 10)}${verdict}`);
   }
   console.log('');
   console.log(`  forests: ${layouts.size} distinct layout(s) across ${runs.length} seed(s)`);
   console.log('');
-  if (!bad.length && layoutsDiffer) {
-    console.log(`PASS — all ${runs.length} seed(s) finished every wave, in ${layouts.size} different forest(s). The quietest stretch of any wave was ${quietest}s.`);
+  if (!bad.length && !unfair.length && layoutsDiffer) {
+    console.log(`PASS — all ${runs.length} seed(s) finished every wave, in ${layouts.size} different forest(s), every one of them fair to fight in. The quietest stretch of any wave was ${quietest}s.`);
     return;
   }
   if (!layoutsDiffer) {
@@ -807,6 +912,13 @@ function printFuzz(runs, layoutsDiffer = true) {
       console.log(`  seed ${r.seed}: ${r.outcome} after ${r.seconds}s, reached wave ${r.wavesReached}`);
     }
     for (const e of r.errors.slice(0, 3)) console.log(`      ${e}`);
+  }
+  if (unfair.length) {
+    console.log(`FAIL — ${unfair.length} of ${runs.length} seed(s) played a forest no wave could be fought in, so a stall there would not have been the pilot's fault:`);
+    for (const r of unfair) {
+      const forest = r.layoutHash === null || r.layoutHash === undefined ? `${r.seed}` : `${r.seed}/${hex32(r.layoutHash)}`;
+      console.log(`  seed ${forest}: ${r.forestReasons.join('; ')}`);
+    }
   }
 }
 

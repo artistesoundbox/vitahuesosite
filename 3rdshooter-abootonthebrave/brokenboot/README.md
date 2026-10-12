@@ -27,6 +27,8 @@ npm run test:kick       # assert the three kicks, the scenery and the impact fee
 npm run test:dry        # play a whole wave with no ammunition left, booting only
 npm run test:fuzz       # ten campaigns, one per seed and one forest each: name
                         # any seed that cannot finish a wave
+npm run test:forest     # fifteen forests, audited without playing: could a wave
+                        # be fought in each one?
 npm run test:probes     # both of those mechanic checks, one page load
 ```
 
@@ -43,8 +45,8 @@ What it treats as a failure: a wave that cannot finish (a stall watchdog on
 eliminations, which snapshots whoever is left, whether they can see the player
 and whether the pilot is even firing), an error or a failed request from the
 page, a frame cap reached mid-campaign, pacing that has moved more than 40%
-against a recorded baseline, and — when one is asked for — any mechanic probe
-whose own assertion does not hold. A death is a datapoint, not a failure, unless
+against a recorded baseline, a forest that a wave could not be fought in, and —
+when one is asked for — any mechanic probe whose own assertion does not hold. A death is a datapoint, not a failure, unless
 `--require-finish` is passed — and since victory and death are the same terminal
 state on screen, the end-screen title is what decides which one it was.
 
@@ -97,6 +99,56 @@ With terrain in the mix the sags moved as well: across ten seeds and ten forests
 the quietest stretch of any wave runs from 11.8 s to 38.8 s, and the worst of them
 belongs to a forest no earlier run had played. Same game, same pilot — the layout
 is what changed, which is the argument for fuzzing it.
+
+`npm run test:forest` asks the terrain question on its own, without playing
+anything. `--check-forest[=N]` rebuilds N forests (the spread of seeds a fuzz would
+play, plus the one the page booted with) and asks of each: is the ground an officer
+and an attacker could both stand on **connected**? Attackers appear in a ring 26-38 m
+out and from then on only steer at the officer, sliding along whatever they bump
+into, so a spawn ring walled off from the clearing is a wave that cannot end however
+well it is played — and a stall report cannot tell that apart from a slow pilot.
+The audit samples the collision geometry the game itself moves and shoots against
+(`world.cylinders`, `world.boxes`) on a 25 cm grid, with a cell standable only if a
+0.55 m body fits clear of every blocker, then floods outward from the officer's own
+spawn point. Five things have to hold, with the whole spread of real forests well
+inside each one:
+
+| what | floor | the real forests |
+| --- | --- | --- |
+| ground the officer and attackers can both reach | 6,000 m² | 10,320-10,398 m² |
+| clear space around a point on the fighting ground | 1.5 m | 2.7-3.3 m |
+| standable share of the clearing | 60% | 75-83% |
+| reachable share of the 26-38 m attacker spawn ring | 90% | 100% |
+| sealed-off ground the size of a hiding place (9 m²) | none | none at all |
+
+The fighting ground is the ring from the edge of the clearing out to the far side
+of the spawn ring, and its mean clearance is the number that catches a cramped
+forest. The widest clear circle is no use for that: the clearing is empty by
+construction, so it always holds a large one.
+
+Two things keep the audit from being a number that only ever agrees. Inside every
+sweep it is first run on an empty field and on a clearing sealed by a wall of
+trunks, and it has to call one fair and the other unfair — otherwise the report
+says so and the run fails. And the sweep checks its own premise: the seed the page
+is booted with is rebuilt and must hash to the layout the page is playing, or the
+whole sweep is auditing forests nobody fights in.
+
+The audit is not confined to this command: `npm test`, the fuzz and the mechanic
+probes each report the forest they played, and a fuzz run grows a `terrain` column
+beside every seed.
+
+The check was falsified against the real generator, twice. Sealing the clearing
+with a wall of barriers moved the spawn ring's reachable share to 0%, left an
+8,789 m² pocket behind it and cut the ground to 1,196 m² — `test:forest` named both
+forests and exited 1. The first attempt only put 140 barriers in the wall, at
+random angles, and the audit called it fair: the gaps left were wider than a body,
+and attackers really could walk in — the forest was fair, and the audit said so.
+The second falsification was density rather than a wall: raising `treeCount` from
+165 to 900 (676 placed before the sampler ran out of attempts) took the mean room
+on the fighting ground from 3.3 m to 1.01 m, and that alone was enough to fail it.
+Both sweeps keep their evidence: `test/campaign-forest.json` holds every audited
+forest with its metrics, its verdict and the control's, and `test/campaign-fuzz.json`
+carries each seed's `terrain` verdict beside its campaign.
 
 `npm run test:dry` is the regression check for the first of them. It plays a
 whole wave for real — same patched step, same pilot, same wave one — with the

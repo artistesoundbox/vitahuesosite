@@ -25,6 +25,9 @@ async function runCampaign(options) {
     checkKick: false,
     // Play a whole wave with the officer's ammunition taken away.
     checkDry: false,
+    // Audit these forest seeds instead of playing the campaign (the forest the
+    // page is already playing is always audited too).
+    forestSeeds: null,
   }, options || {});
   const instrumented = opts.instrument === 'alive';
   // The ceiling has to move with the pool: a field dressing heals via
@@ -718,6 +721,345 @@ async function runCampaign(options) {
     return out;
   }
 
+  // ------------------------------------------------------------- forest fairness
+  // What a forest has to have before a wave can be fought in it. These are round
+  // numbers with room under every layout the generator actually produces (the
+  // measured spread is in test/campaign-forest.json): they are here to catch a
+  // forest that is *broken*, not to grade one that is merely tight.
+  const FOREST_LIMITS = {
+    bandReachMin: 0.9,        // of the open ground in the 26-38 m attacker spawn ring
+    clearingOpenMin: 0.6,     // of the clearing, standable and connected
+    reachableAreaMin: 6000,   // m² of ground the officer and attackers can both reach
+    // The fighting ground is the ring from the edge of the clearing out to the far
+    // side of the spawn ring, and this is the mean clear space a point out there
+    // has, in metres. Under it, attackers — who only ever steer straight at the
+    // officer and slide along what they hit — spend the wave wedged against trunks
+    // instead of closing. The widest circle anywhere is no use for this: the
+    // clearing is empty by construction, so it always holds one.
+    fieldRoomMin: 1.5,
+    // Ground the size of a hiding place that is walled off is ground an attacker
+    // can be spawned into and never walk out of, so nothing this big may be cut
+    // off at all. (The forests the generator actually makes have none.)
+    pocketArea: 9,            // m²
+  };
+
+  /**
+   * Whether a wave can be fought at all in this forest.
+   *
+   * The fuzz can name the seed when a wave stalls, but a stall has two possible
+   * authors: the pilot ran out of ideas, or the terrain never allowed the fight in
+   * the first place. This measures the terrain half, on the collision geometry the
+   * game itself moves and shoots against — the trunks in `world.cylinders` and the
+   * crates, barriers, rocks and cars in `world.boxes` — with no randomness of its
+   * own, so one forest always gets one answer.
+   *
+   * The question is whether the ground an officer and an attacker could both stand
+   * on is *connected*. Attackers appear in a ring 26-38 m out and from then on only
+   * steer at the officer, sliding along whatever they bump into (see
+   * Enemy.update), so a spawn point walled off by trunks and crates is an attacker
+   * that can never arrive — a wave that cannot end however well it is played. That
+   * is the hostile seed, and it is exactly what a stall report cannot tell apart
+   * from a slow pilot.
+   *
+   * Everything is sampled on a grid of `cell` metres. A cell counts as standable
+   * only if a body of `body` radius fits clear of every blocker, using the radii
+   * actors are really pushed out with (the officer is 0.55, attackers 0.5; the
+   * officer's is used, since the officer has to close for the boot either way).
+   */
+  function auditForest(world, { cell = 0.25, body = 0.55 } = {}) {
+    const half = SETTINGS.worldSize / 2 - 6;   // the band findSpawn() will place anyone in
+    const n = Math.ceil((half * 2) / cell);
+    const at = (i) => -half + (i + 0.5) * cell;
+    const firstCell = (v) => Math.ceil((v + half) / cell - 0.5);
+    const lastCell = (v) => Math.floor((v + half) / cell - 0.5);
+    const clampCell = (i) => Math.min(n - 1, Math.max(0, i));
+    const DIAG = cell * Math.SQRT2;
+
+    /**
+     * The cells a standing body cannot occupy. `props: false` leaves the crates,
+     * barriers, rocks and cars out, so a pocket can be blamed on the right thing:
+     * trunks are permanent, props at least move when they are kicked.
+     */
+    const rasterise = ({ props = true } = {}) => {
+      const blocked = new Uint8Array(n * n);
+      for (const c of world.cylinders) {
+        const pad = c.r + body;
+        const i0 = Math.max(0, Math.floor((c.x - pad + half) / cell));
+        const i1 = Math.min(n - 1, Math.ceil((c.x + pad + half) / cell));
+        const j0 = Math.max(0, Math.floor((c.z - pad + half) / cell));
+        const j1 = Math.min(n - 1, Math.ceil((c.z + pad + half) / cell));
+        for (let j = j0; j <= j1; j++) {
+          const dz = at(j) - c.z;
+          for (let i = i0; i <= i1; i++) {
+            const dx = at(i) - c.x;
+            if (dx * dx + dz * dz < pad * pad) blocked[j * n + i] = 1;
+          }
+        }
+      }
+      if (props) {
+        // Movement is stopped by every box whatever its height —
+        // World.resolveCircle() never looks at one — so a rock is as impassable
+        // as a car here, and the box is the thing to map.
+        for (const box of world.boxes) {
+          const i0 = Math.max(0, firstCell(box.min.x - body));
+          const i1 = Math.min(n - 1, lastCell(box.max.x + body));
+          const j0 = Math.max(0, firstCell(box.min.z - body));
+          const j1 = Math.min(n - 1, lastCell(box.max.z + body));
+          if (i0 > i1 || j0 > j1) continue;
+          for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) blocked[j * n + i] = 1;
+        }
+      }
+      // The edge of the mapped band counts as wall, so clearance is finite
+      // everywhere and a forest is never called open just because the grid stops.
+      for (let i = 0; i < n; i++) {
+        blocked[i] = 1; blocked[(n - 1) * n + i] = 1;
+        blocked[i * n] = 1; blocked[i * n + n - 1] = 1;
+      }
+      return blocked;
+    };
+
+    /** Everything one set of blockers can be asked about. */
+    const measure = (blocked) => {
+      // Clearance: the distance to the nearest blocker, for every cell, by the
+      // usual two-pass 3×3 chamfer. Its maximum over reachable ground is the
+      // radius of the widest circle a firefight could happen in.
+      const dist = new Float32Array(n * n);
+      for (let b = 0; b < blocked.length; b++) dist[b] = blocked[b] ? 0 : Infinity;
+      for (let j = 0; j < n; j++) {
+        for (let i = 0; i < n; i++) {
+          const b = j * n + i;
+          if (dist[b] === 0) continue;
+          let d = dist[b];
+          if (i > 0) d = Math.min(d, dist[b - 1] + cell);
+          if (j > 0) d = Math.min(d, dist[b - n] + cell);
+          if (i > 0 && j > 0) d = Math.min(d, dist[b - n - 1] + DIAG);
+          if (i < n - 1 && j > 0) d = Math.min(d, dist[b - n + 1] + DIAG);
+          dist[b] = d;
+        }
+      }
+      for (let j = n - 1; j >= 0; j--) {
+        for (let i = n - 1; i >= 0; i--) {
+          const b = j * n + i;
+          if (dist[b] === 0) continue;
+          let d = dist[b];
+          if (i < n - 1) d = Math.min(d, dist[b + 1] + cell);
+          if (j < n - 1) d = Math.min(d, dist[b + n] + cell);
+          if (i < n - 1 && j < n - 1) d = Math.min(d, dist[b + n + 1] + DIAG);
+          if (i > 0 && j < n - 1) d = Math.min(d, dist[b + n - 1] + DIAG);
+          dist[b] = d;
+        }
+      }
+
+      // Connectivity: what the officer's own spawn point can walk to.
+      const reach = new Uint8Array(n * n);
+      const queue = new Int32Array(n * n);
+      const mid = clampCell(Math.floor(half / cell));     // the cell holding (0, 0)
+      const origin = mid * n + mid;
+      let head = 0, tail = 0, reachableCells = 0;
+      if (!blocked[origin]) {
+        reach[origin] = 1; queue[tail++] = origin; reachableCells = 1;
+        while (head < tail) {
+          const cur = queue[head++];
+          const j = (cur / n) | 0;
+          const i = cur - j * n;
+          const jEnd = Math.min(n - 1, j + 1);
+          const iEnd = Math.min(n - 1, i + 1);
+          for (let jj = Math.max(0, j - 1); jj <= jEnd; jj++) {
+            for (let ii = Math.max(0, i - 1); ii <= iEnd; ii++) {
+              const nb = jj * n + ii;
+              if (blocked[nb] || reach[nb]) continue;
+              reach[nb] = 1; queue[tail++] = nb; reachableCells++;
+            }
+          }
+        }
+      }
+
+      let clearingCells = 0, clearingReach = 0;
+      let bandCells = 0, bandReach = 0, bandPockets = 0;
+      let fieldCells = 0, fieldReach = 0, fieldSum = 0, openRadius = 0;
+      const clearingRadius = SETTINGS.clearingRadius;
+      const fieldOuter = SETTINGS.spawnMaxRadius;
+      for (let j = 0; j < n; j++) {
+        for (let i = 0; i < n; i++) {
+          const b = j * n + i;
+          const r = Math.hypot(at(i), at(j));
+          if (r <= clearingRadius) {
+            clearingCells++;
+            if (reach[b]) clearingReach++;
+          }
+          if (r >= SETTINGS.spawnMinRadius && r <= fieldOuter) {
+            if (blocked[b]) continue;
+            bandCells++;
+            if (reach[b]) bandReach++; else bandPockets++;
+          }
+          if (r > clearingRadius && r <= fieldOuter) {
+            fieldCells++;
+            if (reach[b]) {
+              fieldReach++;
+              fieldSum += dist[b];
+              if (dist[b] > openRadius) openRadius = dist[b];
+            }
+          }
+        }
+      }
+
+      // Pockets: standable ground sealed off from the officer. Small ones are
+      // crannies behind a single crate; anything the size of a firefight is a
+      // place an attacker can be spawned and never leave.
+      const seen = new Uint8Array(n * n);
+      const pockets = { count: 0, largestArea: 0, nearest: null, sealedArea: 0 };
+      for (let start = 0; start < blocked.length; start++) {
+        if (blocked[start] || reach[start] || seen[start]) continue;
+        head = 0; tail = 0;
+        queue[tail++] = start; seen[start] = 1;
+        let size = 0, nearest = Infinity;
+        while (head < tail) {
+          const cur = queue[head++];
+          const j = (cur / n) | 0;
+          const i = cur - j * n;
+          size++;
+          const d = Math.hypot(at(i), at(j));
+          if (d < nearest) nearest = d;
+          const jEnd = Math.min(n - 1, j + 1);
+          const iEnd = Math.min(n - 1, i + 1);
+          for (let jj = Math.max(0, j - 1); jj <= jEnd; jj++) {
+            for (let ii = Math.max(0, i - 1); ii <= iEnd; ii++) {
+              const nb = jj * n + ii;
+              if (blocked[nb] || reach[nb] || seen[nb]) continue;
+              seen[nb] = 1; queue[tail++] = nb;
+            }
+          }
+        }
+        const area = size * cell * cell;
+        pockets.sealedArea += area;
+        if (area < FOREST_LIMITS.pocketArea) continue;
+        pockets.count++;
+        if (area > pockets.largestArea) { pockets.largestArea = area; pockets.nearest = nearest; }
+      }
+
+      return {
+        originBlocked: Boolean(blocked[origin]),
+        reachableArea: +(reachableCells * cell * cell).toFixed(1),
+        openRadius: +openRadius.toFixed(2),
+        fieldRoom: fieldReach ? +(fieldSum / fieldReach).toFixed(2) : 0,
+        fieldReachFraction: fieldCells ? +(fieldReach / fieldCells).toFixed(3) : 0,
+        clearingArea: +(clearingCells * cell * cell).toFixed(1),
+        clearingOpenFraction: clearingCells ? +(clearingReach / clearingCells).toFixed(3) : 0,
+        bandCells,
+        bandReachFraction: bandCells ? +(bandReach / bandCells).toFixed(3) : 0,
+        bandPocketFraction: bandCells ? +(bandPockets / bandCells).toFixed(3) : 0,
+        pockets,
+      };
+    };
+
+    const all = measure(rasterise({ props: true }));
+    const trunks = measure(rasterise({ props: false }));
+    const pct = (v) => `${(v * 100).toFixed(1)}%`;
+    const reasons = [];
+
+    if (all.originBlocked) reasons.push("the officer's own spawn point is inside a blocker");
+    if (all.bandCells === 0) {
+      reasons.push('there is no open ground at all in the attacker spawn ring');
+    } else if (all.bandReachFraction < FOREST_LIMITS.bandReachMin) {
+      reasons.push(`${pct(1 - all.bandReachFraction)} of the open attacker spawn ring cannot reach the clearing`);
+    }
+    if (all.pockets.count > 0) {
+      const treesOnly = trunks.pockets.count > 0;
+      reasons.push(`${all.pockets.count} pocket(s) of open ground are sealed off from the officer, `
+        + `the largest ${Math.round(all.pockets.largestArea)} m², nearest ${all.pockets.nearest.toFixed(0)} m out`
+        + (treesOnly
+          ? ' — trunks alone seal it, so no kick can open the way in'
+          : ' (crates, barriers and cars, which at least move when they are kicked)'));
+    }
+    if (all.clearingOpenFraction < FOREST_LIMITS.clearingOpenMin) {
+      reasons.push(`only ${pct(all.clearingOpenFraction)} of the clearing is standable and connected`);
+    }
+    if (all.fieldRoom < FOREST_LIMITS.fieldRoomMin) {
+      reasons.push(`the fighting ground is cramped: a point between the clearing and the spawn ring has only ${all.fieldRoom} m of clear space around it on average, so attackers get wedged instead of closing`);
+    }
+    if (all.reachableArea < FOREST_LIMITS.reachableAreaMin) {
+      reasons.push(`only ${Math.round(all.reachableArea)} m² of connected ground to fight over`);
+    }
+
+    return {
+      pass: reasons.length === 0,
+      reasons,
+      ...all,
+      trees: world.cylinders.length,
+      props: world.props.length,
+      // How big the worst pocket is if props are ignored: a pocket that survives
+      // without the crates is the one no amount of kicking can open.
+      trunksOnly: { pockets: trunks.pockets, reachableArea: trunks.reachableArea, bandReachFraction: trunks.bandReachFraction },
+    };
+  }
+
+  /**
+   * What the audit can be falsified with: two forests the answer is known for.
+   * A ring of trunks that seals the clearing must be called unfair, and an empty
+   * field must be called fair — otherwise a forest audit that always passes is
+   * just a number that looks like a check.
+   */
+  function forestAuditControl() {
+    const field = new (G.world.constructor)(new THREE.Scene(), 1);
+    const open = auditForest(field);
+    // A wall of trunks at 20 m, well outside the clearing the generator keeps and
+    // far enough inside the spawn ring that nothing can walk past it.
+    for (let a = 0; a < 360; a += 6) {
+      const rad = (a * Math.PI) / 180;
+      field.addCylinder(Math.cos(rad) * 20, Math.sin(rad) * 20, 3, 9);
+    }
+    const sealed = auditForest(field);
+    return {
+      openFair: open.pass,
+      sealedUnfair: !sealed.pass,
+      sealedReasons: sealed.reasons,
+      pass: open.pass && !sealed.pass,
+    };
+  }
+
+  /**
+   * Rebuild forests from a list of seeds and audit each one. This runs the same
+   * generation code the page runs at load, in the same order, so the trees,
+   * crates and cars come out of the same stream and are the real thing — but the
+   * scanned landscape, the sky and the cubemap are left out (they contribute no
+   * collision), which is what makes a dozen forests affordable in one page. The
+   * seed the page is already playing is always audited first, and the layout it
+   * rebuilds to must hash to the layout the page is playing: otherwise the sweep
+   * is auditing forests nobody fights in, and everything below it is worthless.
+   */
+  async function probeForestSweep(seeds) {
+    const { createWorld } = await import('./js/world.js');
+    const { LANDSCAPE } = await import('./js/config.js');
+    const live = { seed: G.world.seed, layoutHash: G.world.layoutHash };
+    const list = [live.seed, ...seeds.filter((s) => s !== live.seed)];
+    const savedLandscape = LANDSCAPE.enabled;
+    const out = {
+      cell: 0.25,
+      playedSeed: live.seed,
+      playedLayoutHash: live.layoutHash,
+      matchesPlayed: false,
+      control: forestAuditControl(),
+      seeds: [],
+    };
+
+    LANDSCAPE.enabled = false;      // layout only: no scanned dome, no cubemap
+    try {
+      for (const seed of list) {
+        const scene = new THREE.Scene();
+        const built = await createWorld(scene, null, { seed });
+        out.seeds.push(Object.assign({ seed, layoutHash: built.world.layoutHash }, auditForest(built.world)));
+        scene.clear();
+      }
+    } finally {
+      LANDSCAPE.enabled = savedLandscape;
+    }
+
+    const played = out.seeds.find((s) => s.seed === live.seed);
+    out.matchesPlayed = Boolean(played && played.layoutHash === live.layoutHash);
+    out.pass = out.matchesPlayed && out.control.pass && out.seeds.every((s) => s.pass);
+    return out;
+  }
+
   // ------------------------------------------------------------------ bookkeeping
   const report = {
     seed: opts.seed,
@@ -734,6 +1076,10 @@ async function runCampaign(options) {
     // world seed rebuilds the layout, the hash says it is the one that failed.
     worldSeed: G.world ? G.world.seed : null,
     layoutHash: G.world ? G.world.layoutHash : null,
+    // Whether this forest can be fought in at all, measured before a shot is
+    // fired: the props are still where the generator put them and nothing the
+    // pilot does can change the answer.
+    forest: G.world ? auditForest(G.world) : null,
     healthAtEnd: null,
     damageTaken: 0,
     instrumented,
@@ -905,14 +1251,18 @@ async function runCampaign(options) {
   if (startButton) startButton.click();
   if (G.state !== 'playing') G.start();
   if (G.state !== 'playing') return { fatal: `game did not start (state ${G.state})` };
-  if (opts.checkLock || opts.checkKick || opts.checkDry) {
+  if (opts.checkLock || opts.checkKick || opts.checkDry || opts.forestSeeds) {
     if (opts.checkLock) report.lockCheck = probeLockRetarget();
     if (opts.checkKick) report.kickCheck = probeKicks();
     // Last, because unlike the others it plays a real wave and moves the officer.
     if (opts.checkDry) report.dryCheck = probeDryWave();
+    // The sweep rebuilds its own forests rather than playing one, so it goes
+    // after everything that touches this page's world.
+    if (opts.forestSeeds) report.forestSweep = await probeForestSweep(opts.forestSeeds);
     const pass = (!report.lockCheck || report.lockCheck.pass)
       && (!report.kickCheck || report.kickCheck.pass)
-      && (!report.dryCheck || report.dryCheck.pass);
+      && (!report.dryCheck || report.dryCheck.pass)
+      && (!report.forestSweep || report.forestSweep.pass);
     report.gameSeconds = +report.gameSeconds.toFixed(2);
     report.wavesReached = G.wave;
     report.outcome = pass ? 'probes-passed' : 'probe-failed';
