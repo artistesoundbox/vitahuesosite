@@ -64,7 +64,7 @@ async function runCampaign(options) {
   }
 
   const THREE = await import('three');
-  const { SETTINGS, KICKS, BOOT_TIERS } = await import('./js/config.js');
+  const { SETTINGS, KICKS, BOOT_TIERS, BOOT_VOICES } = await import('./js/config.js');
   const SENS = SETTINGS.mouseSensitivity;
   const errors = [];
   window.addEventListener('error', (e) => errors.push(`window.onerror: ${e.message}`));
@@ -840,6 +840,12 @@ async function runCampaign(options) {
         stingOnRout: 0,
         stingOnDown: 0,
         stingOnHit: 0,
+        tiers: [],
+        distinctVoices: 0,
+        ownTake: null,
+        fallbackTake: null,
+        stingVoice: null,
+        stingPlaysTheVoice: false,
         randomDraws: 0,
       };
       const played = [];
@@ -894,6 +900,69 @@ async function runCampaign(options) {
         out.takes.stingOnDown = stung({ rout: () => false, takeDamage: () => true });
         out.takes.stingOnHit = stung({ rout: () => false, takeDamage: () => false });
 
+        // The tier is in the voice, so upgrading is something you can hear and not
+        // only something you can count. One kick is resolved per tier, through the
+        // real path with that boot equipped, and the eight asks have to differ.
+        const swingAt = (index) => {
+          played.length = 0;
+          standing();
+          p.bootIndex = index;
+          G.resolveMelee('kick');
+          endSwing();
+          return played.find((c) => /bsh$/.test(c.name)) || null;
+        };
+        out.takes.tiers = BOOT_TIERS.map((tier, i) => {
+          const swing = swingAt(i);
+          return {
+            socket: tier.socket,
+            name: swing ? swing.name : null,
+            rate: swing ? +swing.rate.toFixed(3) : null,
+            gain: swing ? swing.gain : null,
+          };
+        });
+        out.takes.distinctVoices = new Set(out.takes.tiers.map((t) => `${t.rate}/${t.gain}`)).size;
+
+        // And a tier that ships its own pair plays that instead, while a tier left
+        // out of the list goes on playing the shared take — the control that says
+        // the name is chosen per tier rather than always the same. The recording
+        // itself is stood in for by the shared buffer, which is a real decoded one.
+        const savedRecorded = SETTINGS.bootRecordedTiers.slice();
+        G.audio.samples['silver-bsh'] = G.audio.samples.bsh;
+        SETTINGS.bootRecordedTiers = ['silver'];
+        try {
+          out.takes.ownTake = swingAt(2);          // Silver, listed
+          out.takes.fallbackTake = swingAt(3);     // Gold, not listed
+        } finally {
+          SETTINGS.bootRecordedTiers = savedRecorded;
+          delete G.audio.samples['silver-bsh'];
+          p.bootIndex = 0;
+        }
+
+        // The sting plays the tier's voice true rather than with the swing's
+        // variation, so the top boot's sting is its voice exactly.
+        const topTier = BOOT_TIERS.length - 1;
+        const topSting = (() => {
+          played.length = 0;
+          standing();
+          p.bootIndex = topTier;
+          const at = p.position.clone().add(new THREE.Vector3(0, 0, 1.6));
+          G.enemyManager.enemies = [{
+            dead: false, routed: false, position: at, knock: new THREE.Vector3(),
+            rout: () => false, takeDamage: () => true,
+          }];
+          G.resolveMelee('kick');
+          G.enemyManager.enemies = [];
+          endSwing();
+          p.bootIndex = 0;
+          return played.find((c) => /bootpower$/.test(c.name)) || null;
+        })();
+        out.takes.stingVoice = topSting
+          ? { name: topSting.name, rate: +topSting.rate.toFixed(3), gain: topSting.gain }
+          : null;
+        out.takes.stingPlaysTheVoice = Boolean(topSting
+          && topSting.rate === BOOT_VOICES[BOOT_TIERS[topTier].socket].rate
+          && topSting.gain === BOOT_VOICES[BOOT_TIERS[topTier].socket].gain);
+
         // And none of that variation comes out of the fight's own generator. The
         // campaign is seeded to the byte, so a sound that draws from `Math.random`
         // re-rolls every attacker's fire after it — which is a design change, not a
@@ -902,7 +971,7 @@ async function runCampaign(options) {
         let draws = 0;
         Math.random = () => { draws += 1; return 0.5; };
         try {
-          for (let i = 0; i < 50; i++) { G.audio.bootSwing(); G.audio.scream(); }
+          for (let i = 0; i < 50; i++) { G.audio.bootTake('bsh', BOOT_VOICES.standard); G.audio.scream(); }
         } finally {
           Math.random = origRandom;
         }
@@ -945,6 +1014,14 @@ async function runCampaign(options) {
         && out.takes.stingOnRout === 1
         && out.takes.stingOnDown === 1
         && out.takes.stingOnHit === 0
+        // Every tier has a voice of its own, a tier that ships a recording plays it
+        // while a tier that does not falls back, and the sting is the voice exactly.
+        && out.takes.tiers.length === BOOT_TIERS.length
+        && out.takes.tiers.every((t) => t.name)
+        && out.takes.distinctVoices === BOOT_TIERS.length
+        && Boolean(out.takes.ownTake && out.takes.ownTake.name === 'silver-bsh')
+        && Boolean(out.takes.fallbackTake && out.takes.fallbackTake.name === 'bsh')
+        && out.takes.stingPlaysTheVoice
         // The boot's sounds take nothing out of the fight's seeded generator.
         && out.takes.randomDraws === 0
         && out.profilesDiffer

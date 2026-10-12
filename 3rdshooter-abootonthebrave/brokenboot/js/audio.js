@@ -203,13 +203,18 @@ export class GameAudio {
    * or whiffs — the synthesis is already the feel of the kick, this is the sound of
    * it. Nothing to fall back to: `kick()` is the fallback.
    */
-  bootSwing() { this.sample('bsh', 0.8, 0.92 + this.rand() * 0.16); }
   /**
-   * The boot taking somebody off the field — sent running into the trees, or beaten
-   * down where he stood. Purely the recording: there is no synthesised version of a
-   * win, and a kick that only connects has nothing to announce.
+   * A boot take: the named recording played through the tier's voice — its playback
+   * rate and gain — with a little variation on top, so a wave of kicks is not one
+   * file on repeat. `spread` of 0 plays it true, which is what the sting for taking
+   * somebody off the field wants. Nothing is synthesised when the file is missing:
+   * there is no `bootpower` the synthesis could stand in for, and the swing already
+   * has `kick()` behind it.
    */
-  bootPower() { this.sample('bootpower', 0.9); }
+  bootTake(name, voice, spread = 0.08) {
+    const jitter = 1 + (this.rand() * 2 - 1) * spread;
+    return this.sample(name, voice.gain, voice.rate * jitter);
+  }
   impact() { this.noise(0.12, 1400, 0.28); this.blip(220, 0.1, 'square', 0.12, 80); }
 
   /**

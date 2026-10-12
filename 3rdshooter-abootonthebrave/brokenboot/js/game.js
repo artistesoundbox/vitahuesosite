@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
-  SETTINGS, PLAYER_SOURCE, ENEMY_SOURCE, ASSET_BASE, ACHIEVEMENTS, BOOT_TIERS, KICKS, waveRamp,
+  SETTINGS, PLAYER_SOURCE, ENEMY_SOURCE, ASSET_BASE, ACHIEVEMENTS, BOOT_TIERS, KICKS,
+  BOOT_VOICES, waveRamp,
 } from './config.js';
 import { buildCharacter } from './assets.js';
 import { createWorld } from './world.js';
@@ -29,13 +30,31 @@ const LOAD_TOTAL = Object.values(LOAD_WEIGHTS).reduce((a, b) => a + b, 0);
 const MUSIC = ['A Broken Boot On The Brave1.mp3', 'A Broken Boot On The Brave 2.mp3'];
 // The boot's own recorded sounds, beside the music in the asset folder: the yelp of
 // whoever it meets (two takes, so no two kicks land alike), the swing itself, and
-// the sting for taking somebody off the field.
-const BOOT_SOUNDS = {
+// the sting for taking somebody off the field. Every tier may also ship its own pair
+// under its socket slug — `silver-bsh.mp3`, `doom-bootpower.mp3` — listed in
+// `SETTINGS.bootRecordedTiers`; a tier without one plays the shared take through its
+// own voice, so upgrading changes the boot's sound either way (see BOOT_VOICES).
+const SHARED_BOOT_SOUNDS = {
   ouch: 'ouch.mp3',
   oua: 'oua.mp3',
   bsh: 'bsh.mp3',
   bootpower: 'bootpower.mp3',
 };
+
+/**
+ * The files to fetch for the boot: the shared takes, and the pair belonging to each
+ * tier that ships its own. Only what is listed is asked for — a speculative fetch of
+ * a recording that is not there yet would be a console error in the player's face
+ * and a failing request in the harness.
+ */
+function bootSoundFiles(recordedTiers) {
+  const files = Object.entries(SHARED_BOOT_SOUNDS);
+  for (const socket of recordedTiers) {
+    files.push([`${socket}-bsh`, `${socket}-bsh.mp3`]);
+    files.push([`${socket}-bootpower`, `${socket}-bootpower.mp3`]);
+  }
+  return files;
+}
 const TAGLINES = [
   'One Man. One Forest. One Broken Boot.',
   "I'm Not Trapped Here With You. You're Trapped Here With Me.",
@@ -211,7 +230,8 @@ export class Game {
     this.audio.playMusic(MUSIC.map((track) => `${ASSET_BASE}${track}`));
     // Fetched while the first wave is already under way; until they land the boot
     // keeps its synthesised voice.
-    this.audio.loadSamples(Object.entries(BOOT_SOUNDS).map(([name, file]) => [name, `${ASSET_BASE}${file}`]));
+    this.audio.loadSamples(bootSoundFiles(SETTINGS.bootRecordedTiers)
+      .map(([name, file]) => [name, `${ASSET_BASE}${file}`]));
     this.startWave(1);
     // Pose the officer and put the camera behind him before the first frame the
     // player sees. Without mouse capture the world is paused, and a paused frame
@@ -301,6 +321,22 @@ export class Game {
   toggleMute() {
     this.audio.setMuted(!this.audio.muted);
     this.hud.toast('Audio', this.audio.muted ? 'Muted' : 'Unmuted');
+  }
+
+  /**
+   * Which take the boot makes right now, for one of its two sounds: this tier's own
+   * recording if it ships one, and the shared take either way, played through the
+   * tier's voice. Asked at the moment it plays rather than cached, so a tier whose
+   * recording is listed and loaded starts using it without anything being rebuilt.
+   */
+  bootTake(kind) {
+    const tier = BOOT_TIERS[this.player.bootIndex] || BOOT_TIERS[0];
+    const socket = tier.socket;
+    const own = SETTINGS.bootRecordedTiers.includes(socket);
+    return {
+      name: own ? `${socket}-${kind}` : kind,
+      voice: BOOT_VOICES[socket] || BOOT_VOICES.standard,
+    };
   }
 
   /**
@@ -738,11 +774,17 @@ export class Game {
     } else {
       this.audio.kick();
     }
-    this.audio.bootSwing();
+    // The boot in this tier's voice, from this tier's own recording if it has one.
+    const swing = this.bootTake('bsh');
+    this.audio.bootTake(swing.name, swing.voice);
     // Somebody off the field — running, or beaten down — is worth a sting of its
-    // own, once per kick however many it caught. A kick that only connects is not:
-    // the swing already said that.
-    if (routed > 0 || downed > 0) this.audio.bootPower();
+    // own, once per kick however many it caught, and played true rather than with
+    // the swing's variation so it lands the same every time. A kick that only
+    // connects is not: the swing already said that.
+    if (routed > 0 || downed > 0) {
+      const sting = this.bootTake('bootpower');
+      this.audio.bootTake(sting.name, sting.voice, 0);
+    }
     if (routed > 0) {
       this.hud.showBanner(
         charged ? `${boot.name.toUpperCase()}` : 'THE BOOT',

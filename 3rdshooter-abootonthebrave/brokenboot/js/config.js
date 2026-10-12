@@ -38,6 +38,15 @@ export const SETTINGS = {
   // A bullet downing only credits this fraction of a boot rout toward tiers.
   bulletKillWeight: 0.25,
 
+  // The boot tiers that ship their own recorded takes, by `socket` slug. A listed
+  // tier plays `<socket>-bsh.mp3` and `<socket>-bootpower.mp3` from the asset folder
+  // instead of the shared pair, through its own voice (BOOT_VOICES) like any other.
+  // Empty is the honest state: nothing is fetched speculatively, because a missing
+  // file is a console error for a player and a failing request in the harness, so a
+  // new pair of recordings is added here on the day it is made. Every tier still
+  // sounds like itself without this — see BOOT_VOICES.
+  bootRecordedTiers: [],
+
   // A round through the head that finishes an attacker is a fatality: the body comes
   // off its feet and goes where the shot sent it, instead of folding up where it
   // stood. It is a finishing move, not a faster kill — the elimination, the credit
@@ -372,13 +381,6 @@ export const BOOT_TIERS = [
   { name: 'Mythical Diamond Boot', kills: 116, meleeDamage: 220, knockback: 44, speedBonus: 0.18, model: 'diamondboot.glb', color: '#7fe6e0', socket: 'diamond' },
 ];
 
-// The socket helper centres a boot model on the right-foot bone, so each size
-// needs its own fit. `size` is the model's longest axis in world units — the boot
-// he starts in is 0.52 m and the Diamond is 1.00 m, both bigger than the 0.385 ×
-// 0.491 × 0.517 m boot his own mesh used to carry, so every tier swallows the foot
-// rather than perching on it. `lift` raises the model (also world units) until its
-// sole sits on the ground under a standing foot; these are measured, not guessed
-// (see `npm run test:character`, which reports the sole and the coverage).
 // Which way a boot's own axes point, measured off the four models that ship: the
 // author made them all the same way, so this is a property of the boots and not of
 // a tier — the sole faces +Y and the toe runs along +Z. Each model's own sole is
@@ -397,6 +399,34 @@ export const BOOT_BONE_AXES = { sole: [0.046, -0.592, 0.804], toe: [0.006, 0.976
 // the foot's; both start from the bone the boot is socketed onto, which is the ankle
 // joint and sits near the back of a foot. Centring a boot on the bone alone hangs it
 // off the heel, so every tier carries a forward offset as well as a lift.
+//
+// How each tier sounds. A heavier boot lands lower and louder, so upgrading changes
+// the boot's voice as well as its numbers — which is what a tier without its own
+// recording gets, and the voice a tier with one is played through on top of its own
+// file. See SETTINGS.bootRecordedTiers for the tiers that ship one.
+//
+// `rate` is playback speed (pitch and length together, as a tape would do it) and
+// `gain` is multiplied by the effects volume, so the eight tiers are eight distinct
+// sounds from one pair of recordings. Keyed by `socket`, so the file names and the
+// voices cannot drift apart.
+export const BOOT_VOICES = {
+  standard:   { rate: 1.00, gain: 0.70 },
+  reinforced: { rate: 0.97, gain: 0.75 },
+  silver:     { rate: 0.94, gain: 0.79 },
+  gold:       { rate: 0.90, gain: 0.83 },
+  goldSpiked: { rate: 0.86, gain: 0.87 },
+  doom:       { rate: 0.81, gain: 0.92 },
+  legendary:  { rate: 0.76, gain: 0.96 },
+  diamond:    { rate: 0.70, gain: 1.00 },
+};
+
+// The socket helper centres a boot model on the right-foot bone, so each size
+// needs its own fit. `size` is the model's longest axis in world units — the boot
+// he starts in is 0.52 m and the Diamond is 1.00 m, both bigger than the 0.385 ×
+// 0.491 × 0.517 m boot his own mesh used to carry, so every tier swallows the foot
+// rather than perching on it. `lift` raises the model (also world units) until its
+// sole sits on the ground under a standing foot; these are measured, not guessed
+// (see `npm run test:character`, which reports the sole and the coverage).
 export const BOOT_SOCKETS = {
   standard:   { size: 0.52, lift: 0.023, forward: 0.057 },
   reinforced: { size: 0.56, lift: 0.035, forward: 0.057 },
