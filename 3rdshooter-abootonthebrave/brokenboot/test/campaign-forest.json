@@ -1,6 +1,13 @@
 {
   "baseSeed": 20260411,
   "cell": 0.25,
+  "limits": {
+    "bandReachMin": 0.9,
+    "clearingOpenMin": 0.6,
+    "reachableAreaMin": 6000,
+    "fieldRoomMin": 1.5,
+    "pocketArea": 9
+  },
   "played": {
     "seed": 1337,
     "layoutHash": "820b292e"
@@ -16,6 +23,79 @@
       "only 853 m² of connected ground to fight over"
     ],
     "pass": true
+  },
+  "drift": {
+    "recordedAt": "2026-10-12T01:54:39.992Z",
+    "tolerance": 0.1,
+    "compared": 16,
+    "notes": [],
+    "metrics": [
+      {
+        "key": "reachableArea",
+        "label": "connected ground",
+        "unit": " m²",
+        "wasMin": 10320,
+        "wasMean": 10359,
+        "nowMin": 10320,
+        "nowMean": 10359,
+        "changePercent": 0,
+        "moved": false,
+        "tightened": false
+      },
+      {
+        "key": "fieldRoom",
+        "label": "elbow room",
+        "unit": " m",
+        "wasMin": 2.67,
+        "wasMean": 2.93,
+        "nowMin": 2.67,
+        "nowMean": 2.93,
+        "changePercent": 0,
+        "moved": false,
+        "tightened": false
+      },
+      {
+        "key": "clearingOpenFraction",
+        "label": "clearing standable",
+        "unit": "%",
+        "wasMin": 75,
+        "wasMean": 80,
+        "nowMin": 75,
+        "nowMean": 80,
+        "changePercent": 0,
+        "moved": false,
+        "tightened": false
+      },
+      {
+        "key": "bandReachFraction",
+        "label": "spawn ring reachable",
+        "unit": "%",
+        "wasMin": 100,
+        "wasMean": 100,
+        "nowMin": 100,
+        "nowMean": 100,
+        "changePercent": 0,
+        "moved": false,
+        "tightened": false
+      },
+      {
+        "key": "openRadius",
+        "label": "widest clear circle",
+        "unit": " m",
+        "wasMin": 16.36,
+        "wasMean": 19.32,
+        "nowMin": 16.36,
+        "nowMean": 19.32,
+        "changePercent": 0,
+        "moved": false,
+        "tightened": false
+      }
+    ],
+    "forests": [],
+    "metricsMoved": 0,
+    "metricsTighter": 0,
+    "seedsMoved": 0,
+    "seedsTighter": 0
   },
   "forests": [
     {

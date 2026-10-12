@@ -28,7 +28,10 @@ npm run test:dry        # play a whole wave with no ammunition left, booting onl
 npm run test:fuzz       # ten campaigns, one per seed and one forest each: name
                         # any seed that cannot finish a wave
 npm run test:forest     # fifteen forests, audited without playing: could a wave
-                        # be fought in each one?
+                        # be fought in each one? Reports what has moved since the
+                        # recorded spread of the same metrics
+npm run test:forest-record  # the same sweep, recorded as the spread later sweeps
+                            # are compared against for having got tighter
 npm run test:probes     # both of those mechanic checks, one page load
 ```
 
@@ -146,9 +149,35 @@ and attackers really could walk in — the forest was fair, and the audit said s
 The second falsification was density rather than a wall: raising `treeCount` from
 165 to 900 (676 placed before the sampler ran out of attempts) took the mean room
 on the fighting ground from 3.3 m to 1.01 m, and that alone was enough to fail it.
+The floors answer "could a wave be fought in this forest at all?", which leaves a
+gap: a forest that stays above every one of them while getting noticeably **tighter**
+is the state that precedes one falling through a floor, and its verdict is still
+`fair`. So the metrics themselves are recorded. `npm run test:forest-record` (or
+`--check-forest --record-forest`) writes every audited forest's numbers, the floors
+in force and the control's verdict to `test/campaign-forest-baseline.json`, and from
+then on every sweep prints what moved against it: per metric the spread's minimum and
+mean (min / mean), and per forest every metric that moved by more than ten percent —
+as `tighter` or `looser` — with the layout hash whenever the generator itself moved
+and the tree and prop counts as the usual cause. Ten percent is the noise floor: the
+audit is deterministic, so two sweeps of one generator agree exactly, while a change
+of density moves a healthy forest by tens of percent. A baseline also serves as a
+record of the floors, so a floor that moves is named as well.
+
+Drift is reported rather than failed. A generator change is sometimes deliberate, and
+the forests may all still be fair — it is the trend that has to be visible, not the
+verdict, and `--record-forest` accepts it. Falsified both ways against the real
+generator. Raising `treeCount` from 165 to 240 took the mean room on the fighting
+ground from 2.93 m to 2.33 m and the widest clear circle from 19.3 m to 15.8 m while
+every forest stayed above every floor: the sweep passed, and reported `elbow room
+2.67 / 2.93 m → 2.06 / 2.33 m, -20.3% TIGHTER` with all 16 forests named. Dropping it
+to 100 reported `+30.2% looser` and nothing tighter. Both were reverted, and the
+recorded baseline is the 165-tree spread.
+
 Both sweeps keep their evidence: `test/campaign-forest.json` holds every audited
-forest with its metrics, its verdict and the control's, and `test/campaign-fuzz.json`
-carries each seed's `terrain` verdict beside its campaign.
+forest with its metrics, its verdict, the control's and the drift against the
+baseline, `test/campaign-forest-baseline.json` is the spread those sweeps are
+compared against, and `test/campaign-fuzz.json` carries each seed's `terrain` verdict
+beside its campaign.
 
 `npm run test:dry` is the regression check for the first of them. It plays a
 whole wave for real — same patched step, same pilot, same wave one — with the

@@ -1,559 +1,14 @@
 {
   "seed": 20260411,
-  "startedAt": "2026-10-12T01:10:39.883Z",
-  "gameSeconds": 424.58,
-  "steps": 25475,
-  "waves": [
-    {
-      "wave": 1,
-      "startSeconds": 0,
-      "clearSeconds": 21.78,
-      "durationSeconds": 21.78,
-      "hostilesAtStart": 5,
-      "eliminations": 5,
-      "damageTaken": 45,
-      "damagePerSecond": 2.07,
-      "longestGapSeconds": 6.4
-    },
-    {
-      "wave": 2,
-      "startSeconds": 21.78,
-      "clearSeconds": 69.4,
-      "durationSeconds": 47.62,
-      "hostilesAtStart": 7,
-      "eliminations": 7,
-      "damageTaken": 18,
-      "damagePerSecond": 0.38,
-      "longestGapSeconds": 12.4
-    },
-    {
-      "wave": 3,
-      "startSeconds": 69.4,
-      "clearSeconds": 101.42,
-      "durationSeconds": 32.02,
-      "hostilesAtStart": 8,
-      "eliminations": 8,
-      "damageTaken": 9,
-      "damagePerSecond": 0.28,
-      "longestGapSeconds": 12
-    },
-    {
-      "wave": 4,
-      "startSeconds": 101.42,
-      "clearSeconds": 143.05,
-      "durationSeconds": 41.63,
-      "hostilesAtStart": 10,
-      "eliminations": 10,
-      "damageTaken": 32.8,
-      "damagePerSecond": 0.79,
-      "longestGapSeconds": 15.2
-    },
-    {
-      "wave": 5,
-      "startSeconds": 143.05,
-      "clearSeconds": 186.88,
-      "durationSeconds": 43.83,
-      "hostilesAtStart": 11,
-      "eliminations": 11,
-      "damageTaken": 31.9,
-      "damagePerSecond": 0.73,
-      "longestGapSeconds": 10.2
-    },
-    {
-      "wave": 6,
-      "startSeconds": 186.88,
-      "clearSeconds": 221.42,
-      "durationSeconds": 34.54,
-      "hostilesAtStart": 12,
-      "eliminations": 12,
-      "damageTaken": 45,
-      "damagePerSecond": 1.3,
-      "longestGapSeconds": 9.6
-    },
-    {
-      "wave": 7,
-      "startSeconds": 221.42,
-      "clearSeconds": 260.73,
-      "durationSeconds": 39.31,
-      "hostilesAtStart": 14,
-      "eliminations": 14,
-      "damageTaken": 76.5,
-      "damagePerSecond": 1.95,
-      "longestGapSeconds": 9
-    },
-    {
-      "wave": 8,
-      "startSeconds": 260.73,
-      "clearSeconds": 307.42,
-      "durationSeconds": 46.69,
-      "hostilesAtStart": 15,
-      "eliminations": 15,
-      "damageTaken": 117,
-      "damagePerSecond": 2.51,
-      "longestGapSeconds": 10.8
-    },
-    {
-      "wave": 9,
-      "startSeconds": 307.42,
-      "clearSeconds": 380.78,
-      "durationSeconds": 73.36,
-      "hostilesAtStart": 17,
-      "eliminations": 17,
-      "damageTaken": 76.5,
-      "damagePerSecond": 1.04,
-      "longestGapSeconds": 30
-    },
-    {
-      "wave": 10,
-      "startSeconds": 380.78,
-      "clearSeconds": 424.58,
-      "durationSeconds": 43.8,
-      "hostilesAtStart": 18,
-      "eliminations": 18,
-      "damageTaken": 207,
-      "damagePerSecond": 4.73,
-      "longestGapSeconds": 11.1,
-      "closedByHarness": false,
-      "endedByVictory": true
-    }
-  ],
-  "tiers": [
-    {
-      "tier": "Standard Boot",
-      "atSeconds": 0.02,
-      "credit": 0
-    },
-    {
-      "tier": "Reinforced Boot",
-      "atSeconds": 75.45,
-      "credit": 10.75
-    },
-    {
-      "tier": "Silver Boot",
-      "atSeconds": 137.65,
-      "credit": 24.75
-    },
-    {
-      "tier": "Gold Boot",
-      "atSeconds": 216.42,
-      "credit": 44.5
-    },
-    {
-      "tier": "Spiked Gold Boot",
-      "atSeconds": 285.4,
-      "credit": 63.75
-    },
-    {
-      "tier": "Tactical Doom Boot",
-      "atSeconds": 376.77,
-      "credit": 82.5
-    }
-  ],
-  "banners": [
-    {
-      "text": "WAVE 1",
-      "atSeconds": 0.02
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 6.47
-    },
-    {
-      "text": "LAST STAND",
-      "atSeconds": 10.03
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 10.55
-    },
-    {
-      "text": "WAVE CLEARED",
-      "atSeconds": 15.55
-    },
-    {
-      "text": "WAVE 2",
-      "atSeconds": 21.78
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 25.88
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 28.83
-    },
-    {
-      "text": "THEY’RE MOVING",
-      "atSeconds": 45.68
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 47.03
-    },
-    {
-      "text": "STANDARD BOOT",
-      "atSeconds": 49.63
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 53.1
-    },
-    {
-      "text": "WAVE CLEARED",
-      "atSeconds": 63.45
-    },
-    {
-      "text": "WAVE 3",
-      "atSeconds": 69.4
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 75.45
-    },
-    {
-      "text": "LAST STAND",
-      "atSeconds": 84.37
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 87.02
-    },
-    {
-      "text": "WAVE CLEARED",
-      "atSeconds": 95.73
-    },
-    {
-      "text": "WAVE 4",
-      "atSeconds": 101.42
-    },
-    {
-      "text": "THEY’RE MOVING",
-      "atSeconds": 110.58
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 110.97
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 111.05
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 118.65
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 119.03
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 119.25
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 123.05
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 124.12
-    },
-    {
-      "text": "LAST STAND",
-      "atSeconds": 124.13
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 124.3
-    },
-    {
-      "text": "WAVE CLEARED",
-      "atSeconds": 137.65
-    },
-    {
-      "text": "WAVE 5",
-      "atSeconds": 143.05
-    },
-    {
-      "text": "SILVER BOOT",
-      "atSeconds": 147.87
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 151.3
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 162.87
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 163.03
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 163.37
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 169.67
-    },
-    {
-      "text": "LAST STAND",
-      "atSeconds": 171.75
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 173.83
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 175.48
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 175.92
-    },
-    {
-      "text": "WAVE CLEARED",
-      "atSeconds": 181.77
-    },
-    {
-      "text": "BOOT CHARGED",
-      "atSeconds": 181.83
-    },
-    {
-      "text": "WAVE 6",
-      "atSeconds": 186.88
-    },
-    {
-      "text": "SILVER BOOT",
-      "atSeconds": 191.35
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 195.9
-    },
-    {
-      "text": "BOOT CHARGED",
-      "atSeconds": 214.9
-    },
-    {
-      "text": "LAST STAND",
-      "atSeconds": 216.42
-    },
-    {
-      "text": "WAVE CLEARED",
-      "atSeconds": 216.57
-    },
-    {
-      "text": "WAVE 7",
-      "atSeconds": 221.42
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 225.58
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 237.95
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 240.5
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 242.1
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 244.35
-    },
-    {
-      "text": "LAST STAND",
-      "atSeconds": 248.6
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 251.07
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 253.38
-    },
-    {
-      "text": "WAVE CLEARED",
-      "atSeconds": 256.17
-    },
-    {
-      "text": "BOOT CHARGED",
-      "atSeconds": 256.35
-    },
-    {
-      "text": "WAVE 8",
-      "atSeconds": 260.73
-    },
-    {
-      "text": "THEY’RE MOVING",
-      "atSeconds": 266.13
-    },
-    {
-      "text": "GOLD BOOT",
-      "atSeconds": 267
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 269.35
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 274.62
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 276.97
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 282.83
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 285.4
-    },
-    {
-      "text": "BOOT CHARGED",
-      "atSeconds": 287.48
-    },
-    {
-      "text": "SPIKED GOLD BOOT",
-      "atSeconds": 289.57
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 295.02
-    },
-    {
-      "text": "LAST STAND",
-      "atSeconds": 295.98
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 298.07
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 301.05
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 302.23
-    },
-    {
-      "text": "WAVE CLEARED",
-      "atSeconds": 303.13
-    },
-    {
-      "text": "WAVE 9",
-      "atSeconds": 307.42
-    },
-    {
-      "text": "THEY’RE MOVING",
-      "atSeconds": 311.87
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 314.1
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 317.12
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 318.27
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 318.92
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 322.53
-    },
-    {
-      "text": "SPIKED GOLD BOOT",
-      "atSeconds": 326.08
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 331.33
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 332.47
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 335.87
-    },
-    {
-      "text": "LAST STAND",
-      "atSeconds": 340.52
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 344.73
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 346.77
-    },
-    {
-      "text": "WAVE CLEARED",
-      "atSeconds": 376.77
-    },
-    {
-      "text": "WAVE 10",
-      "atSeconds": 380.78
-    },
-    {
-      "text": "THEY’RE MOVING",
-      "atSeconds": 384.3
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 387.92
-    },
-    {
-      "text": "TACTICAL DOOM BOOT",
-      "atSeconds": 404.48
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 406.53
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 413.83
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 417.55
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 420.08
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 424.58
-    }
-  ],
-  "eliminations": 117,
-  "bootEliminations": 92,
-  "lootCollected": 75,
+  "startedAt": "2026-10-12T01:59:43.525Z",
+  "gameSeconds": 0,
+  "steps": 0,
+  "waves": [],
+  "tiers": [],
+  "banners": [],
+  "eliminations": 0,
+  "bootEliminations": 0,
+  "lootCollected": 0,
   "worldSeed": 1337,
   "layoutHash": -2113197778,
   "forest": {
@@ -589,14 +44,124 @@
     }
   },
   "healthAtEnd": null,
-  "damageTaken": 658.7999999998137,
+  "damageTaken": 0,
   "instrumented": true,
-  "outcome": "victory",
+  "outcome": "probes-passed",
   "errors": [],
-  "endTitle": "ONE-MAN ARMY",
-  "wavesReached": 10,
-  "stalledWave": null,
-  "wallClockSeconds": 8.4,
+  "lockCheck": {
+    "cone": 0.22,
+    "distance": 26,
+    "pass": true,
+    "baseHeadingRadians": 0,
+    "anglesRadians": {
+      "near": 0.055,
+      "far": 0.132
+    },
+    "firstPress": "near",
+    "anglesAtPress": {
+      "near": 0.169,
+      "far": 0.207
+    },
+    "swingRadians": 0.11,
+    "heldDuringSwing": "near",
+    "anglesAfterSwing": {
+      "near": 0.216,
+      "far": 0.165
+    },
+    "farVisible": true,
+    "swungOnTarget": true,
+    "afterRelease": "near",
+    "freshPress": "far"
+  },
+  "kickCheck": {
+    "selection": {
+      "crouched": "sweep",
+      "airborne": "high",
+      "standingStandardBoot": "kick",
+      "standingSilverBoot": "high",
+      "standingTopBoot": "stomp"
+    },
+    "profiles": {
+      "kick": {
+        "name": "Kick",
+        "range": 3.6,
+        "arcDegrees": 108,
+        "damageScale": 1,
+        "propPower": 10
+      },
+      "sweep": {
+        "name": "Low Sweep",
+        "range": 2.7,
+        "arcDegrees": 144,
+        "damageScale": 0.7,
+        "propPower": 7
+      },
+      "high": {
+        "name": "High Kick",
+        "range": 4.3,
+        "arcDegrees": 76,
+        "damageScale": 1.15,
+        "propPower": 13
+      },
+      "stomp": {
+        "name": "Stomp",
+        "range": 3.3,
+        "arcDegrees": 180,
+        "damageScale": 1.4,
+        "propPower": 16
+      }
+    },
+    "scenery": {
+      "kind": "car",
+      "mass": 4.5,
+      "speedAfterKick": 4.19,
+      "peakSpeed": 5.9,
+      "movedMeters": 4.67,
+      "tumbled": true,
+      "settleSeconds": 1,
+      "settled": true,
+      "boxFollowed": 5.08
+    },
+    "profilesDiffer": true,
+    "feel": {
+      "whiff": {
+        "shake": 0.3,
+        "kickback": 0,
+        "roll": 0,
+        "hitStop": 0
+      },
+      "body": {
+        "shake": 0.9,
+        "kickback": 0.32,
+        "roll": 3.2,
+        "hitStop": 0.06
+      },
+      "car": {
+        "shake": 2,
+        "kickback": 0.72,
+        "roll": 7.2,
+        "hitStop": 0.135
+      },
+      "carRoll": 7.2,
+      "openSightline": true,
+      "cameraPushBack": 0.161,
+      "frameRollDegrees": 6.3,
+      "carLeftRoll": -7.2,
+      "rollFollowsSide": true,
+      "hitStopFromBody": 0.06,
+      "worldTimeDuringStop": 0.002,
+      "stopScale": 0.12,
+      "stopFrames": 3,
+      "worldTimeAfterStop": 0.01667,
+      "edgeFlashOpacity": 0.931,
+      "bodyMass": 2,
+      "whiffShake": 0.3,
+      "feelScaledByMass": true
+    },
+    "pass": true
+  },
+  "wavesReached": 1,
+  "wallClockSeconds": 0.7,
   "consoleErrors": [],
   "consoleWarnings": [
     "console.warn: THREE.FBXLoader: %s map is not supported in three.js, skipping texture. ShininessExponent",

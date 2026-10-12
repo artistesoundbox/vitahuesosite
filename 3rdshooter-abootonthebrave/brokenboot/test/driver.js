@@ -1035,6 +1035,9 @@ async function runCampaign(options) {
     const savedLandscape = LANDSCAPE.enabled;
     const out = {
       cell: 0.25,
+      // The floors that were in force, so a recorded baseline can say whether the
+      // yardstick itself moved as well as the forests it was pointed at.
+      limits: { ...FOREST_LIMITS },
       playedSeed: live.seed,
       playedLayoutHash: live.layoutHash,
       matchesPlayed: false,

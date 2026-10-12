@@ -12,6 +12,7 @@
     "test:dry": "node test/campaign.mjs --check-dry",
     "test:probes": "node test/campaign.mjs --check-lock --check-kick",
     "test:forest": "node test/campaign.mjs --check-forest=15",
+    "test:forest-record": "node test/campaign.mjs --check-forest=15 --record-forest",
     "test:fuzz": "node test/campaign.mjs --fuzz=10"
   },
   "keywords": [],

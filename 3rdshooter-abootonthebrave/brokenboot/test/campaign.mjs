@@ -30,9 +30,42 @@ const baselinePath = path.join(here, 'campaign-baseline.json');
 const reportPath = path.join(here, 'campaign-report.json');
 const fuzzPath = path.join(here, 'campaign-fuzz.json');
 const forestPath = path.join(here, 'campaign-forest.json');
+const forestBaselinePath = path.join(here, 'campaign-forest-baseline.json');
 
 /** A 32-bit layout hash, as the report writes it. */
 const hex32 = (h) => (Number(h) >>> 0).toString(16).padStart(8, '0');
+
+// ----------------------------------------------------------------- forest drift
+// The floors answer "can a wave be fought in this forest at all?". They say
+// nothing about a forest that is still above every one of them but has become
+// noticeably tighter, which is exactly what a generator change looks like on the
+// way to a forest that is no longer fair. So the metrics themselves are recorded,
+// and a later sweep says what moved.
+//
+// The audit is deterministic, so two sweeps of the same generator agree to the
+// cell and any movement is real. Ten percent is the noise floor: the 25 cm grid
+// and the seed-to-seed spread move a healthy forest by a couple of points, while
+// a change of density moves it by tens.
+const FOREST_DRIFT_TOLERANCE = 0.10;
+
+/**
+ * What the drift check compares, and which way is worse. Every one of these reads
+ * "bigger is better": less connected ground, less clear space to fight in, a
+ * smaller standable share of the clearing, a less reachable spawn ring or a
+ * narrower clear circle all mean a forest that has got tighter.
+ *
+ * `scale` is the arithmetic the table uses (fractions as percentages, a radius as
+ * the diameter it is reported as), so a baseline is readable without decoding it.
+ */
+const FOREST_DRIFT_METRICS = [
+  { key: 'reachableArea', label: 'connected ground', unit: ' m²', digits: 0, scale: 1 },
+  { key: 'fieldRoom', label: 'elbow room', unit: ' m', digits: 2, scale: 1 },
+  { key: 'clearingOpenFraction', label: 'clearing standable', unit: '%', digits: 0, scale: 100 },
+  { key: 'bandReachFraction', label: 'spawn ring reachable', unit: '%', digits: 0, scale: 100 },
+  { key: 'openRadius', label: 'widest clear circle', unit: ' m', digits: 2, scale: 2 },
+];
+
+const driftValue = (metric, forest) => Number(forest[metric.key]) * metric.scale;
 
 // ------------------------------------------------------------------ arguments
 
@@ -56,6 +89,7 @@ function parseArgs(argv) {
     fuzz: 0,
     worldSeed: 0,
     checkForest: 0,
+    recordForest: false,
   };
   for (const arg of argv) {
     const [flag, value] = arg.split('=');
@@ -77,6 +111,7 @@ function parseArgs(argv) {
       case '--fuzz': opts.fuzz = Number.isFinite(num) ? Math.max(1, Math.floor(num)) : 5; break;
       // Bare `--check-forest` is fifteen forests, plus the one the page plays.
       case '--check-forest': opts.checkForest = Number.isFinite(num) ? Math.max(1, Math.floor(num)) : 15; break;
+      case '--record-forest': opts.recordForest = true; break;
       case '--require-finish': opts.requireFinish = true; break;
       case '--headed': opts.headed = true; break;
       case '--keep-open': opts.keepOpen = true; break;
@@ -108,6 +143,11 @@ one instead of playing: is the clearing reachable, and is there open ground to
 fight in? Combine with --world-seed=N to audit that one forest only
   --baseline       compare wave and tier timings against test/campaign-baseline.json
   --record         write the timings from this run to that baseline
+  --record-forest  after --check-forest, write the metrics it measured to
+                   test/campaign-forest-baseline.json, the spread later sweeps are
+                   compared against for having got tighter
+  (with a forest baseline recorded, every --check-forest sweep reports what moved
+   since it, and by how much, even where every forest is still above the floors)
   --honest         play the match for real: the officer can die, and the report says where
   --check-lock     assert the aim trigger rule (fresh press retargets, held keeps its
 target) instead of playing the campaign
@@ -221,12 +261,20 @@ let profileDir = null;
 let exitCode = 0;
 
 async function main() {
-  if (opts.fuzz && (opts.checkLock || opts.checkKick || opts.checkDry || opts.checkForest || opts.baseline || opts.record)) {
-    console.error('--fuzz plays whole campaigns, so it does not combine with the mechanic probes, with --check-forest, or with --baseline/--record.');
+  if (opts.fuzz && (opts.checkLock || opts.checkKick || opts.checkDry || opts.checkForest || opts.baseline || opts.record || opts.recordForest)) {
+    console.error('--fuzz plays whole campaigns, so it does not combine with the mechanic probes, with --check-forest, or with --baseline/--record/--record-forest.');
     return 2;
   }
   if (opts.checkForest && (opts.baseline || opts.record)) {
     console.error('--check-forest audits terrain without playing a campaign, so it has no wave timings to compare or record.');
+    return 2;
+  }
+  if (opts.recordForest && !opts.checkForest) {
+    console.error('--record-forest records the metrics --check-forest measures, so it needs --check-forest as well.');
+    return 2;
+  }
+  if (opts.recordForest && opts.worldSeed) {
+    console.error('--record-forest records the whole spread of forests; --world-seed audits a single one, and a baseline of one is not what a later sweep should be judged against.');
     return 2;
   }
 
@@ -529,18 +577,35 @@ async function main() {
     const report = await playSeed(opts.seed);
     if (!report) return 1;
     const audit = report.forestSweep;
+    if (audit && fs.existsSync(forestBaselinePath)) {
+      try {
+        const recorded = JSON.parse(fs.readFileSync(forestBaselinePath, 'utf8'));
+        report.forestDrift = compareForests(recorded, audit);
+        // Recording accepts this sweep as the new spread, so what moved is shown
+        // as what is being accepted rather than as something wrong with it.
+        if (opts.recordForest) report.forestDrift.accepted = true;
+      } catch (err) {
+        log(`\nthe forest baseline could not be read (${err.message}); this sweep is not compared against it`);
+      }
+    }
     const passed = assess(report);
     printReport(report, passed);
     if (audit) {
       fs.writeFileSync(forestPath, `${JSON.stringify({
         baseSeed: opts.seed,
         cell: audit.cell,
+        limits: audit.limits || null,
         played: { seed: audit.playedSeed, layoutHash: hex32(audit.playedLayoutHash) },
         matchesPlayed: audit.matchesPlayed,
         control: audit.control,
+        drift: report.forestDrift || null,
         forests: audit.seeds.map((f) => ({ ...f, layoutHash: hex32(f.layoutHash) })),
       }, null, 2)}\n`);
       log(`\nforest report written to ${path.relative(process.cwd(), forestPath)}`);
+    }
+    if (audit && opts.recordForest) {
+      fs.writeFileSync(forestBaselinePath, `${JSON.stringify(forestBaselineRecord(audit), null, 2)}\n`);
+      log(`forest baseline written to ${path.relative(process.cwd(), forestBaselinePath)}`);
     }
     return passed.ok ? 0 : 1;
   }
@@ -567,6 +632,149 @@ async function main() {
   }
 
   return passed.ok ? 0 : 1;
+}
+
+/**
+ * What a sweep measures against the recorded baseline: per metric, the spread
+ * across the whole sweep, and per forest, whatever moved by more than the
+ * tolerance.
+ *
+ * Movement is reported rather than failed. A generator change is sometimes
+ * deliberate, and a forest that is still inside every floor is still a forest a
+ * wave can be fought in — but the numbers behind that verdict are what says
+ * whether the next change will push it through one, so they are named.
+ */
+function compareForests(baseline, sweep) {
+  const drift = {
+    recordedAt: baseline.recordedAt || null,
+    tolerance: FOREST_DRIFT_TOLERANCE,
+    compared: 0,
+    notes: [],
+    metrics: [],
+    forests: [],
+  };
+  if (!Array.isArray(baseline.forests) || !baseline.forests.length) {
+    drift.notes.push('the recorded baseline holds no forests, so there is nothing to compare against');
+    return drift;
+  }
+  if (baseline.cell !== sweep.cell) {
+    drift.notes.push(`the baseline was measured on a ${baseline.cell} m grid and this sweep on ${sweep.cell} m, so the two are not comparable`);
+    return drift;
+  }
+  if (JSON.stringify(baseline.limits) !== JSON.stringify(sweep.limits)) {
+    drift.notes.push('the floors themselves have changed since the baseline, so its spread is no longer the one they were measured against');
+  }
+
+  const spread = (forests, metric) => {
+    const values = forests.map((f) => driftValue(metric, f)).filter((v) => Number.isFinite(v));
+    if (!values.length) return null;
+    return { min: Math.min(...values), mean: values.reduce((a, b) => a + b, 0) / values.length };
+  };
+
+  for (const metric of FOREST_DRIFT_METRICS) {
+    const was = spread(baseline.forests, metric);
+    const now = spread(sweep.seeds, metric);
+    if (!was || !now) continue;
+    const change = (now.mean - was.mean) / (Math.abs(was.mean) || 1);
+    drift.metrics.push({
+      key: metric.key,
+      label: metric.label,
+      unit: metric.unit,
+      wasMin: +was.min.toFixed(metric.digits),
+      wasMean: +was.mean.toFixed(metric.digits),
+      nowMin: +now.min.toFixed(metric.digits),
+      nowMean: +now.mean.toFixed(metric.digits),
+      changePercent: +(change * 100).toFixed(1),
+      moved: Math.abs(change) >= FOREST_DRIFT_TOLERANCE,
+      tightened: change <= -FOREST_DRIFT_TOLERANCE,
+    });
+  }
+
+  for (const was of baseline.forests) {
+    const now = sweep.seeds.find((s) => s.seed === was.seed);
+    if (!now) {
+      drift.forests.push({ seed: was.seed, missing: true });
+      continue;
+    }
+    drift.compared += 1;
+    const moved = [];
+    for (const metric of FOREST_DRIFT_METRICS) {
+      const before = driftValue(metric, was);
+      const after = driftValue(metric, now);
+      if (!Number.isFinite(before) || !Number.isFinite(after) || before === 0) continue;
+      const change = (after - before) / before;
+      if (Math.abs(change) < FOREST_DRIFT_TOLERANCE) continue;
+      moved.push({
+        key: metric.key,
+        label: metric.label,
+        unit: metric.unit,
+        was: +before.toFixed(metric.digits),
+        now: +after.toFixed(metric.digits),
+        changePercent: +(change * 100).toFixed(1),
+        tightened: change < 0,
+      });
+    }
+    // The counts are context rather than a verdict: raising the tree count is the
+    // usual way the ground gets tighter, and it is the first thing worth seeing.
+    const counts = [];
+    if (Number(was.trees) !== Number(now.trees)) counts.push(`trees ${was.trees} → ${now.trees}`);
+    if (Number(was.props) !== Number(now.props)) counts.push(`props ${was.props} → ${now.props}`);
+    // A layout hash that moved is the generator itself changing, which is worth
+    // naming even when every metric lands where it did before.
+    const layoutNow = hex32(now.layoutHash);
+    const layoutMoved = was.layoutHash !== layoutNow;
+    if (!moved.length && !counts.length && !layoutMoved) continue;
+    drift.forests.push({ seed: was.seed, layoutWas: was.layoutHash, layoutNow, layoutMoved, moved, counts });
+  }
+
+  drift.metricsMoved = drift.metrics.filter((m) => m.moved).length;
+  drift.metricsTighter = drift.metrics.filter((m) => m.tightened).length;
+  drift.seedsMoved = drift.forests.filter((f) => !f.missing).length;
+  drift.seedsTighter = drift.forests.filter((f) => (f.moved || []).some((m) => m.tightened)).length;
+  return drift;
+}
+
+/**
+ * One forest's drift as prose: the layout if it moved, then every metric that did.
+ */
+function driftSeedBits(forest) {
+  const bits = [];
+  if (forest.layoutMoved) bits.push(`layout ${forest.layoutWas} → ${forest.layoutNow}`);
+  for (const m of forest.moved || []) {
+    bits.push(`${m.label} ${m.was} → ${m.now}${m.unit} (${m.changePercent}%, ${m.tightened ? 'tighter' : 'looser'})`);
+  }
+  for (const c of forest.counts || []) bits.push(c);
+  return bits;
+}
+
+/**
+ * What a `--record-forest` run writes: each forest's metrics, the floors that
+ * were in force, and the control's verdict — enough for a later sweep to say
+ * whether the generator moved, not only whether the result still passes.
+ */
+function forestBaselineRecord(sweep) {
+  return {
+    recordedAt: new Date().toISOString(),
+    baseSeed: opts.seed,
+    cell: sweep.cell,
+    limits: sweep.limits || null,
+    matchesPlayed: sweep.matchesPlayed,
+    control: sweep.control ? { pass: sweep.control.pass, sealedReasons: sweep.control.sealedReasons } : null,
+    forests: sweep.seeds.map((f) => ({
+      seed: f.seed,
+      layoutHash: hex32(f.layoutHash),
+      fair: f.pass,
+      trees: f.trees,
+      props: f.props,
+      reachableArea: f.reachableArea,
+      fieldRoom: f.fieldRoom,
+      openRadius: f.openRadius,
+      clearingOpenFraction: f.clearingOpenFraction,
+      bandReachFraction: f.bandReachFraction,
+      pockets: f.pockets ? f.pockets.count : null,
+      largestPocketArea: f.pockets ? f.pockets.largestArea : null,
+    })),
+  };
 }
 
 /** Everything that makes a run a failure, rather than an interesting number. */
@@ -646,6 +854,21 @@ function assess(report) {
       }
       for (const f of sweep.seeds) {
         if (!f.pass) reasons.push(`forest ${f.seed} (layout ${hex32(f.layoutHash)}) cannot be fought in: ${f.reasons.join('; ')}`);
+      }
+    }
+    // Drift is a finding rather than a failure: the forests may still all be fair,
+    // and a deliberate generator change has to be recordable. What it must not do
+    // is pass unmentioned, since a spread that has got tighter is the state that
+    // precedes a forest falling through a floor.
+    const drift = report.forestDrift;
+    if (drift) {
+      // The headline only: the drift table above PASS names every forest and
+      // metric, so the findings say what it amounts to rather than repeating it.
+      for (const note of drift.notes || []) findings.push(`forest drift: ${note}`);
+      if (drift.accepted) {
+        findings.push(`the forest baseline was re-recorded from this sweep (${drift.compared} forest(s) compared against the old one)`);
+      } else if (drift.metricsMoved) {
+        findings.push(`forest drift since the recorded baseline: ${drift.metricsTighter} of ${drift.metrics.length} metric(s) measurably tighter and ${drift.metricsMoved - drift.metricsTighter} looser, ${drift.seedsTighter} of ${drift.compared} forest(s) tighter (tolerance ${Math.round(drift.tolerance * 100)}%)`);
       }
     }
     return { ok: reasons.length === 0, reasons, findings, good: [], baselineDelta: null, errors: [] };
@@ -794,12 +1017,41 @@ function printReport(report, passed) {
       if (!sweep.matchesPlayed) {
         console.log(`  the seed the page is playing (${sweep.playedSeed}) rebuilt to layout ${hex32(sweep.seeds.find((f) => f.seed === sweep.playedSeed)?.layoutHash ?? 0)} instead of ${hex32(sweep.playedLayoutHash)}`);
       }
+      const drift = report.forestDrift;
+      if (drift) {
+        console.log('');
+        const when = drift.recordedAt ? `, recorded ${drift.recordedAt}` : '';
+        console.log(`  drift since ${path.basename(forestBaselinePath)}${when}, tolerance ${Math.round(drift.tolerance * 100)}%`
+          + (drift.accepted ? ' — accepted, this sweep is the new baseline' : ''));
+        for (const note of drift.notes || []) console.log(`    ${note}`);
+        if (drift.metrics.length) {
+          console.log(`    ${pad('metric', 24)}${pad('was (min / mean)', 22)}${pad('now (min / mean)', 22)}moved`);
+          for (const m of drift.metrics) {
+            const was = `${m.wasMin} / ${m.wasMean}${m.unit}`;
+            const now = `${m.nowMin} / ${m.nowMean}${m.unit}`;
+            const verdict = m.moved ? `${m.changePercent > 0 ? '+' : ''}${m.changePercent}% ${m.tightened ? 'TIGHTER' : 'looser'}` : '—';
+            console.log(`    ${pad(m.label, 24)}${pad(was, 22)}${pad(now, 22)}${verdict}`);
+          }
+        }
+        for (const f of drift.forests || []) {
+          if (f.missing) console.log(`    seed ${f.seed}: in the baseline but not audited this run`);
+          else console.log(`    seed ${f.seed}: ${driftSeedBits(f).join('; ')}`);
+        }
+        console.log(`    ${drift.compared} forest(s) compared, and ${drift.forests.length} moved by more than the tolerance.`);
+      }
     }
     if (passed.ok) {
       console.log(`\nPASS — ${[c && 'a press retargets to the attacker nearest the crosshair and a held trigger keeps its target', k && 'the three kicks differ, the scenery they launch settles where it lands, and the impact feels as heavy as the mass it hit', d && 'a wave can be won with no ammunition left, by closing and booting', sweep && 'every forest audited is one a wave can actually be fought in'].filter(Boolean).join('; ')}.`);
     } else {
       console.log('\nFAIL');
       for (const reason of passed.reasons) console.log(`  - ${reason}`);
+    }
+    // A probe can still have something worth knowing that is not a failure — a
+    // forest that has got tighter, most of all — and the campaign path is not the
+    // only one that should hear it.
+    if (passed.findings?.length) {
+      console.log('\nWorth knowing');
+      for (const finding of passed.findings) console.log(`  - ${finding}`);
     }
     return;
   }
