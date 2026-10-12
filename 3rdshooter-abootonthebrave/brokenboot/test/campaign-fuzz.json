@@ -1,0 +1,125 @@
+{
+  "baseSeed": 20260411,
+  "runs": [
+    {
+      "seed": 20260411,
+      "outcome": "victory",
+      "seconds": 424.58,
+      "wavesReached": 10,
+      "eliminations": 117,
+      "bootEliminations": 92,
+      "finished": true,
+      "quietestSeconds": 30,
+      "stalledWave": null,
+      "errors": []
+    },
+    {
+      "seed": 20268330,
+      "outcome": "victory",
+      "seconds": 358.17,
+      "wavesReached": 10,
+      "eliminations": 117,
+      "bootEliminations": 98,
+      "finished": true,
+      "quietestSeconds": 13.7,
+      "stalledWave": null,
+      "errors": []
+    },
+    {
+      "seed": 20276249,
+      "outcome": "victory",
+      "seconds": 398.27,
+      "wavesReached": 10,
+      "eliminations": 117,
+      "bootEliminations": 96,
+      "finished": true,
+      "quietestSeconds": 13.9,
+      "stalledWave": null,
+      "errors": []
+    },
+    {
+      "seed": 20284168,
+      "outcome": "victory",
+      "seconds": 377.95,
+      "wavesReached": 10,
+      "eliminations": 117,
+      "bootEliminations": 92,
+      "finished": true,
+      "quietestSeconds": 16.5,
+      "stalledWave": null,
+      "errors": []
+    },
+    {
+      "seed": 20292087,
+      "outcome": "victory",
+      "seconds": 398.73,
+      "wavesReached": 10,
+      "eliminations": 117,
+      "bootEliminations": 98,
+      "finished": true,
+      "quietestSeconds": 12.7,
+      "stalledWave": null,
+      "errors": []
+    },
+    {
+      "seed": 20300006,
+      "outcome": "victory",
+      "seconds": 390,
+      "wavesReached": 10,
+      "eliminations": 117,
+      "bootEliminations": 96,
+      "finished": true,
+      "quietestSeconds": 14.6,
+      "stalledWave": null,
+      "errors": []
+    },
+    {
+      "seed": 20307925,
+      "outcome": "victory",
+      "seconds": 379.7,
+      "wavesReached": 10,
+      "eliminations": 117,
+      "bootEliminations": 94,
+      "finished": true,
+      "quietestSeconds": 13.6,
+      "stalledWave": null,
+      "errors": []
+    },
+    {
+      "seed": 20315844,
+      "outcome": "victory",
+      "seconds": 422.92,
+      "wavesReached": 10,
+      "eliminations": 117,
+      "bootEliminations": 105,
+      "finished": true,
+      "quietestSeconds": 13.2,
+      "stalledWave": null,
+      "errors": []
+    },
+    {
+      "seed": 20323763,
+      "outcome": "victory",
+      "seconds": 390.88,
+      "wavesReached": 10,
+      "eliminations": 117,
+      "bootEliminations": 98,
+      "finished": true,
+      "quietestSeconds": 15.1,
+      "stalledWave": null,
+      "errors": []
+    },
+    {
+      "seed": 20331682,
+      "outcome": "victory",
+      "seconds": 386.58,
+      "wavesReached": 10,
+      "eliminations": 117,
+      "bootEliminations": 91,
+      "finished": true,
+      "quietestSeconds": 15.6,
+      "stalledWave": null,
+      "errors": []
+    }
+  ]
+}

@@ -25,6 +25,8 @@ npm run test:honest     # same, but the officer can die, and the report says whe
 npm run test:aim        # assert the aim-trigger rule (press retargets, hold keeps)
 npm run test:kick       # assert the three kicks, the scenery and the impact feel
 npm run test:dry        # play a whole wave with no ammunition left, booting only
+npm run test:fuzz       # ten campaigns, one per seed: name any seed that cannot
+                        # finish a wave
 npm run test:probes     # both of those mechanic checks, one page load
 ```
 
@@ -62,6 +64,23 @@ attacker is actually on it: a hurt pilot backing away from someone eighty metres
 off with no line of sight to anyone just walks the map and never finishes the
 wave. Neither changes the game, only the scripted player — which is the point,
 since the pilot is standing in for someone who wants to win.
+
+`npm run test:fuzz` is the check that neither of those mistakes can hide again.
+The campaign is deterministic per seed, which is what makes runs comparable — and
+also what lets a deadlock hide: one draw can come out clean while the next ends in
+a wave that never closes. So `--fuzz[=N]` plays the campaign once per seed (the base
+seed, then a spread of others), reloading the page between them, because the game
+does not reset itself and a fuzz that reused one page would be measuring the
+leftovers of the last. It names every seed that failed and why — the wave, how long
+it hung, what the officer had left to shoot with, and whoever was still standing
+with their health and whether they could see anyone. Each seed costs about twelve
+seconds, which is mostly reloading a 140 MB forest.
+
+It found the dry-officer deadlock the moment it was written: with that fix
+deliberately taken back out, four of the five seeds stalled, every one of them with
+the officer at `[0 in the mag, 0 reserve]` and a lone attacker at full health,
+unwounded, in plain view. That is the shape of the whole point — the default seed's
+campaign was the one the single-run check would have reported on.
 
 `npm run test:dry` is the regression check for the first of them. It plays a
 whole wave for real — same patched step, same pilot, same wave one — with the

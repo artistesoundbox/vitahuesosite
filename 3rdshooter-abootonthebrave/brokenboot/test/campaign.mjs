@@ -27,6 +27,7 @@ const repoRoot = path.resolve(projectRoot, '..');       // the served root
 const driverSource = fs.readFileSync(path.join(here, 'driver.js'), 'utf8');
 const baselinePath = path.join(here, 'campaign-baseline.json');
 const reportPath = path.join(here, 'campaign-report.json');
+const fuzzPath = path.join(here, 'campaign-fuzz.json');
 
 // ------------------------------------------------------------------ arguments
 
@@ -47,6 +48,7 @@ function parseArgs(argv) {
     url: null,
     port: null,
     noServer: false,
+    fuzz: 0,
   };
   for (const arg of argv) {
     const [flag, value] = arg.split('=');
@@ -63,6 +65,8 @@ function parseArgs(argv) {
       case '--check-lock': opts.checkLock = true; break;
       case '--check-kick': opts.checkKick = true; break;
       case '--check-dry': opts.checkDry = true; break;
+      // Bare `--fuzz` is five campaigns; `--fuzz=12` is twelve.
+      case '--fuzz': opts.fuzz = Number.isFinite(num) ? Math.max(1, Math.floor(num)) : 5; break;
       case '--require-finish': opts.requireFinish = true; break;
       case '--headed': opts.headed = true; break;
       case '--keep-open': opts.keepOpen = true; break;
@@ -94,6 +98,8 @@ target) instead of playing the campaign
 the campaign; pass both to run both probes)
   --check-dry      play a whole wave with the officer's ammunition taken away, and
 assert the boot alone can still end it
+  --fuzz[=N]       play N campaigns with different seeds and name every one that
+cannot finish a wave (default 5)
   --require-finish fail the run if the campaign did not reach the last wave
   --url=URL        page to load (default: served from this repo)
   --port=N         port for the bundled static server
@@ -200,6 +206,11 @@ let profileDir = null;
 let exitCode = 0;
 
 async function main() {
+  if (opts.fuzz && (opts.checkLock || opts.checkKick || opts.checkDry || opts.baseline || opts.record)) {
+    console.error('--fuzz plays whole campaigns, so it does not combine with the mechanic probes or with --baseline/--record.');
+    return 2;
+  }
+
   const browserPath = findBrowser();
   if (!browserPath) {
     console.error('No Chromium-based browser found. Set CHROME_PATH to chrome/msedge/chromium.');
@@ -308,61 +319,161 @@ async function main() {
   log(`loading ${url}`);
   await cdp.send('Page.navigate', { url });
 
-  const bootDeadline = Date.now() + 180000;
-  let booted = false;
-  while (Date.now() < bootDeadline) {
-    const { result } = await cdp.send('Runtime.evaluate', {
-      expression: 'Boolean(window.__brokenBoot && document.getElementById("screen-start") && !document.getElementById("screen-start").classList.contains("hidden"))',
-      returnByValue: true,
-    });
-    if (result.value === true) { booted = true; break; }
-    const ready = await cdp.send('Runtime.evaluate', {
-      expression: 'document.getElementById("load-text") ? document.getElementById("load-text").textContent : ""',
-      returnByValue: true,
-    });
-    if (!opts.quiet) process.stdout.write(`\rwaiting for the forest… ${ready.result.value}`.padEnd(60));
-    await new Promise((r) => setTimeout(r, 2000));
-  }
-  if (!booted) {
+  /**
+   * Wait for the game to reach its start screen. A fuzz run reloads the page
+   * between seeds, so the wait has to be reusable rather than inline.
+   */
+  async function waitForBoot() {
+    const bootDeadline = Date.now() + 180000;
+    while (Date.now() < bootDeadline) {
+      const { result } = await cdp.send('Runtime.evaluate', {
+        expression: 'Boolean(window.__brokenBoot && document.getElementById("screen-start") && !document.getElementById("screen-start").classList.contains("hidden"))',
+        returnByValue: true,
+      });
+      if (result.value === true) return true;
+      const ready = await cdp.send('Runtime.evaluate', {
+        expression: 'document.getElementById("load-text") ? document.getElementById("load-text").textContent : ""',
+        returnByValue: true,
+      });
+      if (!opts.quiet) process.stdout.write(`\rwaiting for the forest… ${ready.result.value}`.padEnd(60));
+      await new Promise((r) => setTimeout(r, 2000));
+    }
     console.error('\nThe game never reached the start screen.');
     for (const e of consoleErrors.slice(0, 10)) console.error(`  ${e}`);
-    return 1;
+    return false;
   }
-  log('\ngame loaded, playing the campaign');
+
+  /** Hand the driver its options for one seed and bring back the report. */
+  async function playSeed(seed) {
+    const expression = `(async () => { ${driverSource}\n; return await runCampaign(${JSON.stringify({
+      waves: opts.waves,
+      waveLimitSeconds: opts.waveLimitSeconds,
+      maxSteps: opts.maxSteps,
+      seed,
+      instrument: opts.honest ? 'none' : 'alive',
+      checkLock: opts.checkLock || false,
+      checkKick: opts.checkKick || false,
+      checkDry: opts.checkDry || false,
+    })}); })()`;
+
+    const startedAt = Date.now();
+    const { result, exceptionDetails } = await cdp.send('Runtime.evaluate', {
+      expression,
+      awaitPromise: true,
+      returnByValue: true,
+      timeout: opts.timeoutSeconds * 1000,
+    }, opts.timeoutSeconds * 1000 + 10000);
+
+    if (exceptionDetails) {
+      console.error(`\nThe campaign driver threw: ${exceptionDetails.exception?.description || exceptionDetails.text}`);
+      return null;
+    }
+    const report = result.value;
+    if (!report || report.fatal) {
+      console.error(`\nCampaign could not run: ${report ? report.fatal : 'no report returned'}`);
+      return null;
+    }
+    report.wallClockSeconds = +((Date.now() - startedAt) / 1000).toFixed(1);
+    report.consoleErrors = consoleErrors.slice();
+    report.consoleWarnings = consoleWarnings.slice();
+    report.failedRequests = failedRequests.slice();
+    return report;
+  }
+
+  /**
+   * The seeds a fuzz run plays. The base seed first, then a spread of others, so
+   * the campaigns are not neighbouring draws from one generator.
+   */
+  function fuzzSeedList(count) {
+    const seeds = [];
+    for (let i = 0; i < count; i++) seeds.push((((opts.seed + i * 7919) >>> 0) || 1));
+    return seeds;
+  }
+
+  /** One fuzzed campaign, in the terms this check cares about. */
+  function summariseSeed(seed, report) {
+    const stalls = report.stalledWave || null;
+    const errors = (report.consoleErrors || []).concat(report.failedRequests || []);
+    return {
+      seed,
+      outcome: report.outcome,
+      seconds: report.gameSeconds,
+      wavesReached: report.wavesReached,
+      eliminations: report.eliminations,
+      bootEliminations: report.bootEliminations,
+      // A campaign that reached victory or death on its own finished; one that ran
+      // into the frame cap, or left a wave unable to end, did not.
+      finished: !stalls
+        && (report.outcome === 'victory' || report.outcome === 'death')
+        && errors.length === 0,
+      quietestSeconds: +Math.max(0, ...(report.waves || []).map((w) => w.longestGapSeconds || 0)).toFixed(1),
+      stalledWave: stalls && {
+        wave: stalls.wave,
+        stalledFor: stalls.stalledFor,
+        hostiles: stalls.hostiles,
+        playerAmmo: stalls.playerAmmo || null,
+        leftovers: (stalls.leftovers || []).map((l) => `${l.distance}m, health ${l.health}, ${l.bleeding ? 'bleeding' : 'not bleeding'}, ${l.inCover ? 'in cover' : 'no cover'}, ${l.lineOfSightToPlayer ? 'sees the officer' : 'no line of sight'}`),
+      },
+      errors,
+    };
+  }
+
+  /** A seed that never got as far as a report — the browser or the driver failed. */
+  const unfinished = (seed, outcome) => ({
+    seed, outcome, seconds: 0, wavesReached: null, eliminations: 0, bootEliminations: 0,
+    finished: false, quietestSeconds: 0, stalledWave: null, errors: consoleErrors.slice(0, 3),
+  });
+
+  /**
+   * Play the campaign once per seed and name every seed where a wave cannot
+   * finish. This is the check that a pilot deadlock cannot hide behind: one seed
+   * of the campaign can come out clean while the next ends in a wave that never
+   * closes, and the difference between them is nothing but the draw.
+   */
+  async function fuzzSeeds() {
+    const seeds = fuzzSeedList(opts.fuzz);
+    log(`\nfuzzing ${seeds.length} seed(s), a whole campaign each, reloading between them`);
+    const runs = [];
+    for (let i = 0; i < seeds.length; i++) {
+      if (i > 0) {
+        // A clean slate. The game does not reset itself between campaigns, and a
+        // fuzz that reused one page would be measuring the leftovers of the last.
+        consoleErrors.length = 0;
+        consoleWarnings.length = 0;
+        failedRequests.length = 0;
+        seenErrors.clear();
+        await cdp.send('Page.navigate', { url });
+        if (!(await waitForBoot())) {
+          runs.push(unfinished(seeds[i], 'never-loaded'));
+          break;
+        }
+      }
+      if (!opts.quiet) process.stdout.write(`\r  seed ${seeds[i]} playing…`.padEnd(60));
+      const report = await playSeed(seeds[i]);
+      runs.push(report ? summariseSeed(seeds[i], report) : unfinished(seeds[i], 'driver-failed'));
+    }
+    if (!opts.quiet) process.stdout.write(`\r${''.padEnd(60)}\r`);
+
+    printFuzz(runs);
+    fs.writeFileSync(fuzzPath, `${JSON.stringify({ baseSeed: opts.seed, runs }, null, 2)}\n`);
+    log(`\nfuzz report written to ${path.relative(process.cwd(), fuzzPath)}`);
+    return runs.some((r) => !r.finished) ? 1 : 0;
+  }
+
+  // ---------------------------------------------------------------- boot the game
+  log(`loading ${url}`);
+  await cdp.send('Page.navigate', { url });
+  if (!(await waitForBoot())) return 1;
+  log(opts.fuzz
+    ? '\ngame loaded, fuzzing the campaign'
+    : '\ngame loaded, playing the campaign');
+
+  // -------------------------------------------------------------- fuzz the seeds
+  if (opts.fuzz) return await fuzzSeeds();
 
   // ---------------------------------------------------------------- play it
-  const expression = `(async () => { ${driverSource}\n; return await runCampaign(${JSON.stringify({
-    waves: opts.waves,
-    waveLimitSeconds: opts.waveLimitSeconds,
-    maxSteps: opts.maxSteps,
-    seed: opts.seed,
-    instrument: opts.honest ? 'none' : 'alive',
-    checkLock: opts.checkLock || false,
-    checkKick: opts.checkKick || false,
-    checkDry: opts.checkDry || false,
-  })}); })()`;
-
-  const startedAt = Date.now();
-  const { result, exceptionDetails } = await cdp.send('Runtime.evaluate', {
-    expression,
-    awaitPromise: true,
-    returnByValue: true,
-    timeout: opts.timeoutSeconds * 1000,
-  }, opts.timeoutSeconds * 1000 + 10000);
-
-  if (exceptionDetails) {
-    console.error(`\nThe campaign driver threw: ${exceptionDetails.exception?.description || exceptionDetails.text}`);
-    return 1;
-  }
-  const report = result.value;
-  if (!report || report.fatal) {
-    console.error(`\nCampaign could not run: ${report ? report.fatal : 'no report returned'}`);
-    return 1;
-  }
-  report.wallClockSeconds = +((Date.now() - startedAt) / 1000).toFixed(1);
-  report.consoleErrors = consoleErrors;
-  report.consoleWarnings = consoleWarnings;
-  report.failedRequests = failedRequests;
+  const report = await playSeed(opts.seed);
+  if (!report) return 1;
 
   // ---------------------------------------------------------------- report
   const passed = assess(report);
@@ -619,6 +730,45 @@ function printReport(report, passed) {
 }
 
 // ------------------------------------------------------------------ lifecycle
+
+/**
+ * The fuzz summary: every seed it played, and every seed that could not finish a
+ * wave. A stall is the failure this mode exists to find, so it is named with the
+ * wave, what the officer had left to shoot with, and whoever was still standing.
+ */
+function printFuzz(runs) {
+  const pad = (s, n) => String(s).padEnd(n);
+  const bad = runs.filter((r) => !r.finished);
+  const quietest = runs.reduce((a, r) => Math.max(a, r.quietestSeconds || 0), 0);
+  console.log('');
+  console.log(`Fuzzing the campaign across ${runs.length} seed(s)`);
+  console.log(`  ${pad('seed', 12)}${pad('outcome', 13)}${pad('sim', 10)}${pad('wave', 7)}${pad('eliminations', 16)}${pad('quietest', 11)}verdict`);
+  for (const r of runs) {
+    const verdict = r.finished
+      ? 'finished every wave'
+      : (r.stalledWave ? `wave ${r.stalledWave.wave} stalled` : `did not finish (${r.outcome})`);
+    console.log(`  ${pad(r.seed, 12)}${pad(r.outcome || '-', 13)}${pad(`${r.seconds}s`, 10)}`
+      + `${pad(r.wavesReached ?? '-', 7)}${pad(`${r.eliminations} (${r.bootEliminations} boot)`, 16)}`
+      + `${pad(`${r.quietestSeconds}s`, 11)}${verdict}`);
+  }
+  console.log('');
+  if (!bad.length) {
+    console.log(`PASS — all ${runs.length} seed(s) finished every wave. The quietest stretch of any wave was ${quietest}s.`);
+    return;
+  }
+  console.log(`FAIL — ${bad.length} of ${runs.length} seed(s) could not finish a wave:`);
+  for (const r of bad) {
+    if (r.stalledWave) {
+      const s = r.stalledWave;
+      console.log(`  seed ${r.seed}: wave ${s.wave} stalled for ${s.stalledFor}s with ${s.hostiles} attacker(s) left`
+        + `${s.playerAmmo ? `, officer's ammo [${s.playerAmmo[0]} in the mag, ${s.playerAmmo[1]} reserve]` : ''}`);
+      for (const l of s.leftovers) console.log(`      left standing: ${l}`);
+    } else {
+      console.log(`  seed ${r.seed}: ${r.outcome} after ${r.seconds}s, reached wave ${r.wavesReached}`);
+    }
+    for (const e of r.errors.slice(0, 3)) console.log(`      ${e}`);
+  }
+}
 
 function cleanup() {
   try { if (browser && !opts.keepOpen) browser.kill(); } catch { /* already gone */ }
