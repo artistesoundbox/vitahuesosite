@@ -817,6 +817,58 @@ async function runCampaign(options) {
         endSwing();
       }
 
+      // 7. And the boot has recorded takes of its own now: the swing it makes every
+      //    time he kicks, and the yelp of whoever it lands on. They are fetched from
+      //    the asset folder while the match is already playing, so this waits for them
+      //    rather than assuming — a file that never arrives leaves the synthesis in
+      //    place, and that has to show up here rather than be papered over. The pitch
+      //    each take is played at has to move, or every kick is one file on repeat.
+      const takes = ['ouch', 'oua', 'bsh'];
+      for (let i = 0; i < 60 && takes.some((n) => !G.audio.samples[n]); i++) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      out.takes = {
+        loaded: takes.filter((n) => G.audio.samples[n]),
+        missing: takes.filter((n) => !G.audio.samples[n]),
+        swings: 0,
+        swingPitches: [],
+        yelp: [],
+        yelpPitches: [],
+        synthYelp: 0,
+      };
+      const played = [];
+      const synthYelps = [];
+      const origSample = G.audio.sample.bind(G.audio);
+      const origBlip = G.audio.blip.bind(G.audio);
+      G.audio.sample = (name, gain, rate) => { played.push({ name, gain, rate }); return origSample(name, gain, rate); };
+      // The yelp's own fallback, watched from below: if the takes are loaded this has
+      // to stay silent, and if neither take ever loads it has to be the thing heard.
+      G.audio.blip = (...args) => { synthYelps.push(args[0]); return origBlip(...args); };
+      try {
+        // One real kick through the pad, taken all the way to the connect.
+        standing();
+        pressPad(0);
+        for (let i = 0; i < 40; i++) G.step(1 / 60);
+        const swings = played.filter((c) => c.name === 'bsh');
+        out.takes.swings = swings.length;
+        out.takes.swingPitches = swings.map((c) => +c.rate.toFixed(3));
+
+        // Forty yelps' worth: both takes have to be drawn on, and never the
+        // synthesis — the one run in 549 that picks a single take is not the thing
+        // being measured, the variation is.
+        played.length = 0;
+        synthYelps.length = 0;
+        for (let i = 0; i < 40; i++) G.audio.scream();
+        const yelps = played.filter((c) => c.name !== 'bsh');
+        out.takes.yelp = [...new Set(yelps.map((c) => c.name))].sort();
+        out.takes.yelpPitches = [...new Set(yelps.map((c) => +c.rate.toFixed(2)))].sort();
+        out.takes.synthYelp = synthYelps.length;
+      } finally {
+        G.audio.sample = origSample;
+        G.audio.blip = origBlip;
+        endSwing();
+      }
+
       const f = out.feel;
       f.bodyMass = SETTINGS.bodyMass;
       f.bootColour = p.boot.color;
@@ -838,6 +890,12 @@ async function runCampaign(options) {
         // The sweep's button explains itself once, and only once.
         && Boolean(out.selection.sweepNote)
         && out.selection.sweepNoteAgain === null
+        // The boot's own takes: all three fetched and decoded, the swing on every
+        // kick, and the yelp drawn from both takes rather than the synthesis.
+        && out.takes.missing.length === 0
+        && out.takes.swings === 1
+        && out.takes.yelp.length === 2
+        && out.takes.synthYelp === 0
         && out.profilesDiffer
         && out.scenery.speedAfterKick > 1
         && out.scenery.movedMeters > 1
