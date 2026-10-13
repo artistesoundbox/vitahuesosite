@@ -270,15 +270,26 @@ async function runCampaign(options) {
           if (G.player.position.y < islands[i].top - 0.2) { rung = islands[i]; break; }
         }
         const flat = Math.hypot(rung.x - G.player.position.x, rung.z - G.player.position.z);
-        forward = flat > 1.0 ? 1 : 0;
+        // A cap catches him anywhere inside its own disc — the caps overlap by design, so
+        // the step up is measured off the cap's own reach rather than off a metre around
+        // its centre (which is the probe's rule too). Walking to the centre is not merely
+        // unnecessary: a prop the boot has thrown under a cap blocks the walk there, and
+        // an officer insisting on the centre walks into it for the rest of the wave.
+        const jumpReach = Math.max(0.6, (rung.radius || 1.4) - 0.15);
+        forward = flat > jumpReach ? 1 : 0;
         strafe = 0;
         sprint = flat > 9;
-        // Over the cap with the surface below his feet: jump. `jump()` is a no-op in the
+        // Under the cap with the surface below his feet: jump. `jump()` is a no-op in the
         // air and while a kick is running, so asking every frame is a jump the moment he
         // is able to make one.
-        if (flat <= 1.0 && G.player.position.y < rung.top - 0.2) G.player.jump();
+        if (flat <= jumpReach && G.player.position.y < rung.top - 0.2) G.player.jump();
       }
     }
+    // The climb does not cancel the wedge recovery. The perch block above commands its
+    // own movement every frame, which would override the back-off — and a prop kicked
+    // under a cap is a wall the officer can only get past by stepping round it, which is
+    // what the recovery is for.
+    if (pivotSeconds > 0) { forward = -0.9; strafe = pivotSign; sprint = false; }
     setMove(forward, strafe, sprint);
     if (G.player.ammo <= 0 && G.player.reloading <= 0) G.player.beginReload();
   }
