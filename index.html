@@ -28,9 +28,9 @@
     </script>
     <style>
         /* Icon grid: 3 per row, left to right (banner above, labels under each).
-           Ten tiles at three across is four rows rather than five, so the stack
-           is shorter than it was — which the fit-to-screen rules at the bottom
-           of this block like. */
+           Eleven icons plus the music chip is twelve at three across — exactly
+           four full rows rather than five, so the stack stays shorter than it was
+           — which the fit-to-screen rules at the bottom of this block like. */
         .button-container {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -148,6 +148,23 @@
             box-shadow: 0 0 26px rgba(255, 130, 175, 0.6);
         }
 
+        /* A BROKEN BOOT ON THE BRAVE art button — warm amber glow, to match the
+           game's tracers and its boot banner. The icon is the game's own, kept
+           where the game lives rather than copied to the root */
+        #bb-art-img {
+            display: block;
+            max-width: 215px;
+            width: 100%;
+            height: auto;
+            margin: 0 auto;
+            border-radius: 18px;
+            box-shadow: 0 0 22px rgba(255, 176, 96, 0.32);
+            transition: box-shadow 0.25s ease;
+        }
+        .ca-art-link:hover #bb-art-img {
+            box-shadow: 0 0 26px rgba(255, 205, 140, 0.6);
+        }
+
         /* MY MUSIC link — chip under the buttons (BandLab albums page) */
         .music-link {
             pointer-events: auto;
@@ -221,7 +238,7 @@
         .button-container { gap: 30px 26px; }
         .music-link { width: auto; margin: 0; }
         #site-banner-img { width: min(330px, 60vw); }
-        #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #sq-art-img, #gp-art-img, #music-img {
+        #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #sq-art-img, #gp-art-img, #bb-art-img, #music-img {
             display: block;
             margin: 0 auto;   /* keep the chip centered under the column */
             width: auto;
@@ -252,7 +269,7 @@
                 gap: 22px 10px;
                 max-width: 560px;
             }
-            #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #sq-art-img, #gp-art-img, #music-img {
+            #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #sq-art-img, #gp-art-img, #bb-art-img, #music-img {
                 max-width: min(100%, 210px);
                 max-height: clamp(110px, 19vh, 190px);
             }
@@ -337,6 +354,14 @@
                 <a href="racegame.html" class="ca-art-link" id="gp-button" aria-label="City Grand Prix – five aircraft race a generated city circuit">
                     <img src="racericon.png" alt="City Grand Prix – race the generated city" id="gp-art-img" />
                     <span class="art-label">City Grand Prix</span>
+                </a>
+
+            <!-- A Broken Boot On The Brave — the forest shooter: hold the clearing,
+                 boot the attackers off the floating climb -->
+
+                <a href="3rdshooter-abootonthebrave/brokenboot/index.html" class="ca-art-link" id="bb-button" aria-label="A Broken Boot On The Brave – hold the clearing and boot the attackers off the floating climb">
+                    <img src="3rdshooter-abootonthebrave/abrookenbootonthebraveicon.png" alt="A Broken Boot On The Brave" id="bb-art-img" />
+                    <span class="art-label">A Broken Boot</span>
                 </a>
 
         <!-- MY MUSIC — the fivetilogy on BandLab -->
