@@ -1,8 +1,8 @@
 {
   "seed": 20307925,
-  "startedAt": "2026-10-13T04:35:06.964Z",
-  "gameSeconds": 233.95,
-  "steps": 14037,
+  "startedAt": "2026-10-13T04:39:35.284Z",
+  "gameSeconds": 88.67,
+  "steps": 5320,
   "waves": [
     {
       "wave": 1,
@@ -18,26 +18,24 @@
     {
       "wave": 2,
       "startSeconds": 22.63,
-      "clearSeconds": 54.95,
-      "durationSeconds": 32.32,
+      "clearSeconds": 55.28,
+      "durationSeconds": 32.65,
       "hostilesAtStart": 8,
       "eliminations": 8,
-      "damageTaken": 52.2,
-      "damagePerSecond": 1.62,
+      "damageTaken": 61.2,
+      "damagePerSecond": 1.87,
       "longestGapSeconds": 9.1
     },
     {
       "wave": 3,
-      "startSeconds": 54.95,
-      "clearSeconds": 233.95,
-      "durationSeconds": 179,
+      "startSeconds": 55.28,
+      "clearSeconds": 88.67,
+      "durationSeconds": 33.39,
       "hostilesAtStart": 9,
-      "eliminations": 8,
-      "damageTaken": 410.4,
-      "damagePerSecond": 2.29,
-      "longestGapSeconds": 150,
-      "closedByHarness": true,
-      "endedByVictory": false
+      "eliminations": 9,
+      "damageTaken": 45,
+      "damagePerSecond": 1.35,
+      "longestGapSeconds": 8.7
     }
   ],
   "tiers": [
@@ -48,8 +46,8 @@
     },
     {
       "tier": "Reinforced Boot",
-      "atSeconds": 63.75,
-      "credit": 10.25
+      "atSeconds": 63.83,
+      "credit": 10.5
     }
   ],
   "banners": [
@@ -83,64 +81,72 @@
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 25.52
+      "atSeconds": 25.48
     },
     {
       "text": "BLEEDING OUT",
-      "atSeconds": 27.4
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 38.6
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 39.42
+      "atSeconds": 28.45
     },
     {
       "text": "LAST STAND",
-      "atSeconds": 39.43
+      "atSeconds": 41.62
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 44.22
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 42.67
+      "atSeconds": 45.58
     },
     {
       "text": "WAVE CLEARED",
-      "atSeconds": 49
+      "atSeconds": 49.33
     },
     {
       "text": "WAVE 3",
-      "atSeconds": 54.95
+      "atSeconds": 55.28
     },
     {
       "text": "MARKSMAN POSTED",
-      "atSeconds": 56.55
+      "atSeconds": 56.88
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 63.75
+      "atSeconds": 58
+    },
+    {
+      "text": "BLEEDING OUT",
+      "atSeconds": 67.43
     },
     {
       "text": "REINFORCED BOOT",
-      "atSeconds": 69.8
+      "atSeconds": 69.62
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 75.25
+      "atSeconds": 74.47
     },
     {
       "text": "LAST STAND",
-      "atSeconds": 75.27
+      "atSeconds": 76.43
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 78.95
+      "atSeconds": 78.98
+    },
+    {
+      "text": "WAVE CLEARED",
+      "atSeconds": 82.98
+    },
+    {
+      "text": "WAVE 4",
+      "atSeconds": 88.67
     }
   ],
-  "eliminations": 21,
-  "bootEliminations": 16,
-  "lootCollected": 19,
+  "eliminations": 22,
+  "bootEliminations": 15,
+  "lootCollected": 8,
   "worldSeed": 20307925,
   "layoutHash": -2086185278,
   "dressing": {
@@ -250,341 +256,19 @@
     }
   },
   "healthAtEnd": null,
-  "damageTaken": 480.599999998929,
+  "damageTaken": 124.19999999995343,
   "instrumented": true,
-  "outcome": "step-cap",
+  "outcome": "reached-wave-cap",
   "errors": [],
   "endTitle": "YOU ARE DOWN",
-  "wavesReached": 3,
-  "stalledWave": {
-    "wave": 3,
-    "stalledFor": 150,
-    "hostiles": 1,
-    "flushing": false,
-    "playerAmmo": [
-      0,
-      0
-    ],
-    "playerPosition": [
-      -3.9,
-      -9.3
-    ],
-    "playerHeight": 0,
-    "playerGrounded": true,
-    "leftovers": [
-      {
-        "distance": 1.6,
-        "position": [
-          -2.8,
-          -9.9
-        ],
-        "height": 0.95,
-        "health": 100,
-        "bleeding": false,
-        "perched": true,
-        "inCover": false,
-        "detouring": false,
-        "inAssault": false,
-        "lineOfSightToPlayer": true
-      }
-    ],
-    "pilot": {
-      "aliveCount": 1,
-      "queue": 0,
-      "perched": true,
-      "padAxes": [
-        0,
-        -1
-      ],
-      "padTrigger": true,
-      "playerY": 0,
-      "grounded": true,
-      "busy": false,
-      "lock": true,
-      "inputForward": 1,
-      "inputStrafe": 0,
-      "velocity": [
-        7.8,
-        0
-      ],
-      "moving": true,
-      "speedMultiplier": 1,
-      "crouching": false,
-      "pendingKick": null,
-      "state": "playing",
-      "resolvePush": [
-        0,
-        0
-      ],
-      "boxesNear": [
-        {
-          "min": [
-            -3.35,
-            -1.5,
-            -10.8
-          ],
-          "max": [
-            -1.38,
-            0.82,
-            -8.37
-          ]
-        },
-        {
-          "min": [
-            -4.24,
-            -0.99,
-            -8.68
-          ],
-          "max": [
-            -3.09,
-            0.38,
-            -7.24
-          ]
-        }
-      ],
-      "cylindersNear": []
-    },
-    "samples": [
-      {
-        "atSeconds": 88.5,
-        "distance": 1.6,
-        "enemyHealth": 100,
-        "lockEngaged": true,
-        "reticleOnAttacker": true,
-        "aimErrorRadians": 0,
-        "cameraYaw": 7.856,
-        "bearingToAttacker": 1.573,
-        "targetingHeld": true,
-        "triggerHeld": true,
-        "ammo": 0,
-        "reserve": 0,
-        "reloading": false,
-        "triggerFramesSinceLastSample": 801,
-        "playerHealth": 1000000,
-        "playerPosition": [
-          -3.9,
-          -9.3
-        ],
-        "enemyPosition": [
-          -2.8,
-          -9.9
-        ],
-        "enemyMoving": false,
-        "enemyStuckSeconds": 0,
-        "enemyDetourSeconds": 0,
-        "enemyInAssault": false
-      },
-      {
-        "atSeconds": 90,
-        "distance": 1.6,
-        "enemyHealth": 100,
-        "lockEngaged": true,
-        "reticleOnAttacker": true,
-        "aimErrorRadians": 0,
-        "cameraYaw": 7.854,
-        "bearingToAttacker": 1.571,
-        "targetingHeld": true,
-        "triggerHeld": true,
-        "ammo": 0,
-        "reserve": 0,
-        "reloading": false,
-        "triggerFramesSinceLastSample": 90,
-        "playerHealth": 1000000,
-        "playerPosition": [
-          -3.9,
-          -9.3
-        ],
-        "enemyPosition": [
-          -2.8,
-          -9.9
-        ],
-        "enemyMoving": false,
-        "enemyStuckSeconds": 0,
-        "enemyDetourSeconds": 0,
-        "enemyInAssault": false
-      },
-      {
-        "atSeconds": 91.5,
-        "distance": 1.6,
-        "enemyHealth": 100,
-        "lockEngaged": true,
-        "reticleOnAttacker": true,
-        "aimErrorRadians": 0,
-        "cameraYaw": 7.854,
-        "bearingToAttacker": 1.571,
-        "targetingHeld": true,
-        "triggerHeld": true,
-        "ammo": 0,
-        "reserve": 0,
-        "reloading": false,
-        "triggerFramesSinceLastSample": 90,
-        "playerHealth": 1000000,
-        "playerPosition": [
-          -3.9,
-          -9.3
-        ],
-        "enemyPosition": [
-          -2.8,
-          -9.9
-        ],
-        "enemyMoving": false,
-        "enemyStuckSeconds": 0,
-        "enemyDetourSeconds": 0,
-        "enemyInAssault": false
-      },
-      {
-        "atSeconds": 93,
-        "distance": 1.6,
-        "enemyHealth": 100,
-        "lockEngaged": true,
-        "reticleOnAttacker": true,
-        "aimErrorRadians": 0,
-        "cameraYaw": 7.854,
-        "bearingToAttacker": 1.571,
-        "targetingHeld": true,
-        "triggerHeld": true,
-        "ammo": 0,
-        "reserve": 0,
-        "reloading": false,
-        "triggerFramesSinceLastSample": 90,
-        "playerHealth": 1000000,
-        "playerPosition": [
-          -3.9,
-          -9.3
-        ],
-        "enemyPosition": [
-          -2.8,
-          -9.9
-        ],
-        "enemyMoving": false,
-        "enemyStuckSeconds": 0,
-        "enemyDetourSeconds": 0,
-        "enemyInAssault": false
-      },
-      {
-        "atSeconds": 94.5,
-        "distance": 1.6,
-        "enemyHealth": 100,
-        "lockEngaged": true,
-        "reticleOnAttacker": true,
-        "aimErrorRadians": 0,
-        "cameraYaw": 7.854,
-        "bearingToAttacker": 1.571,
-        "targetingHeld": true,
-        "triggerHeld": true,
-        "ammo": 0,
-        "reserve": 0,
-        "reloading": false,
-        "triggerFramesSinceLastSample": 90,
-        "playerHealth": 1000000,
-        "playerPosition": [
-          -3.9,
-          -9.3
-        ],
-        "enemyPosition": [
-          -2.8,
-          -9.9
-        ],
-        "enemyMoving": false,
-        "enemyStuckSeconds": 0,
-        "enemyDetourSeconds": 0,
-        "enemyInAssault": false
-      },
-      {
-        "atSeconds": 96,
-        "distance": 1.6,
-        "enemyHealth": 100,
-        "lockEngaged": true,
-        "reticleOnAttacker": true,
-        "aimErrorRadians": 0,
-        "cameraYaw": 7.854,
-        "bearingToAttacker": 1.571,
-        "targetingHeld": true,
-        "triggerHeld": true,
-        "ammo": 0,
-        "reserve": 0,
-        "reloading": false,
-        "triggerFramesSinceLastSample": 90,
-        "playerHealth": 1000000,
-        "playerPosition": [
-          -3.9,
-          -9.3
-        ],
-        "enemyPosition": [
-          -2.8,
-          -9.9
-        ],
-        "enemyMoving": false,
-        "enemyStuckSeconds": 0,
-        "enemyDetourSeconds": 0,
-        "enemyInAssault": false
-      },
-      {
-        "atSeconds": 97.5,
-        "distance": 1.6,
-        "enemyHealth": 100,
-        "lockEngaged": true,
-        "reticleOnAttacker": true,
-        "aimErrorRadians": 0,
-        "cameraYaw": 7.854,
-        "bearingToAttacker": 1.571,
-        "targetingHeld": true,
-        "triggerHeld": true,
-        "ammo": 0,
-        "reserve": 0,
-        "reloading": false,
-        "triggerFramesSinceLastSample": 90,
-        "playerHealth": 1000000,
-        "playerPosition": [
-          -3.9,
-          -9.3
-        ],
-        "enemyPosition": [
-          -2.8,
-          -9.9
-        ],
-        "enemyMoving": false,
-        "enemyStuckSeconds": 0,
-        "enemyDetourSeconds": 0,
-        "enemyInAssault": false
-      },
-      {
-        "atSeconds": 99,
-        "distance": 1.6,
-        "enemyHealth": 100,
-        "lockEngaged": true,
-        "reticleOnAttacker": true,
-        "aimErrorRadians": 0,
-        "cameraYaw": 7.854,
-        "bearingToAttacker": 1.571,
-        "targetingHeld": true,
-        "triggerHeld": true,
-        "ammo": 0,
-        "reserve": 0,
-        "reloading": false,
-        "triggerFramesSinceLastSample": 90,
-        "playerHealth": 1000000,
-        "playerPosition": [
-          -3.9,
-          -9.3
-        ],
-        "enemyPosition": [
-          -2.8,
-          -9.9
-        ],
-        "enemyMoving": false,
-        "enemyStuckSeconds": 0,
-        "enemyDetourSeconds": 0,
-        "enemyInAssault": false
-      }
-    ]
-  },
+  "wavesReached": 4,
+  "stalledWave": null,
   "marksmen": {
     "posted": 2,
-    "bootedOff": 1,
+    "bootedOff": 2,
     "firstWave": 2
   },
-  "wallClockSeconds": 2.4,
+  "wallClockSeconds": 1.8,
   "consoleErrors": [],
   "consoleWarnings": [
     "console.warn: THREE.FBXLoader: %s map is not supported in three.js, skipping texture. ShininessExponent",
