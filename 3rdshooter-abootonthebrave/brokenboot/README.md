@@ -993,17 +993,23 @@ therefore tracked with **Git LFS**:
 3rdshooter-abootonthebrave/3rdpersonidle.fbx filter=lfs diff=lfs merge=lfs -text
 ```
 
-The commit stores a 134-byte pointer, and the real payload lives in LFS storage.
-Two consequences worth knowing:
+The commit stores a 134-byte pointer and the real payload lives in LFS storage, so
+a clone needs `git lfs install` once or the model arrives as a pointer. The
+committed blob is 134 bytes.
 
-- Anyone cloning needs `git lfs install` once, or the model arrives as a pointer.
-- **GitHub Pages does not serve LFS content.** On the published site that path
-  returns the pointer text, so the player model would fail to load.
+**The published site does not see the pointer.** `.github/workflows/deploy-pages.yml`
+checks out with `lfs: true` and uploads the whole tree as a Pages artifact, so what
+it publishes is the materialised payload rather than what the repository stores.
+Measured on the live site: that path answers 200 with `content-length` 115526016,
+the first bytes read `Kaydara FBX Binary`, and the running game there has its player
+model loaded. The old branch build is what would have returned the pointer; this one
+does not, and the LFS pull is a per-deploy cost on the runner rather than a
+per-player one.
 
-The fix for the live site is to convert the character (and the 12 MB attacker) to
-optimised GLB with downscaled textures and commit those normally — a few MB each,
-well inside the limit and perfectly servable. That also removes the long first
-download, which is the single biggest remaining improvement.
+Converting the character (and the 12 MB attacker) to optimised GLB with downscaled
+textures and committing those normally is therefore an optimisation rather than a
+repair: it removes the 115 MB first download, which is still the single biggest
+remaining improvement.
 
 `tactical_transport_truck_baked_pbr.glb` (~56 MB) is deliberately unused.
 
