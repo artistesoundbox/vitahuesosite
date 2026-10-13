@@ -30,10 +30,14 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(here, '..');
 
+/* label is what the worker sets as self.PACK_GUARD_LABEL, which is what the
+   shared guard prefixes its refusals with. */
 const WORKERS = [
-  { file: 'seblerskers/site-sw.js', label: 'seblerskers/site-sw.js' },
-  { file: 'game/sw-pack.js', label: 'game/sw-pack.js' }
+  { file: 'seblerskers/site-sw.js', label: 'seblerskers/site-sw.js', says: 'seblerskers' },
+  { file: 'game/sw-pack.js', label: 'game/sw-pack.js', says: 'over the ice' }
 ];
+
+const GUARD_FILE = 'pack-guard.js';
 
 const POINTER = 'version https://git-lfs.github.com/spec/v1\n' +
   'oid sha256:' + 'c'.repeat(64) + '\nsize 561704920\n';
@@ -48,7 +52,10 @@ function check(name, ok, detail) {
   if (!ok) failures++;
 }
 
-/* Load a worker file in a context with the globals it expects, and nothing else. */
+/* Load a worker file in a context with the globals it expects, and nothing else.
+   importScripts is the one piece of the worker environment that has to be
+   provided: it reads the URL off disk, resolved against the worker's own path,
+   exactly as the browser resolves it against the worker's own URL. */
 function loadWorker(relPath) {
   const code = fs.readFileSync(path.join(ROOT, relPath), 'utf8');
   const sandbox = {
@@ -71,6 +78,15 @@ function loadWorker(relPath) {
     Headers, Response, Request, ReadableStream, TextDecoder, TextEncoder,
     Uint8Array, ArrayBuffer, DataView, URL, URLSearchParams, setTimeout, clearTimeout
   };
+  const imported = [];
+  sandbox.importScripts = function () {
+    for (const url of arguments) {
+      const resolved = path.resolve(path.dirname(path.join(ROOT, relPath)), String(url));
+      imported.push(String(url));
+      vm.runInContext(fs.readFileSync(resolved, 'utf8'), sandbox, { filename: String(url) });
+    }
+  };
+  sandbox.__imported = imported;
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: relPath });
@@ -105,6 +121,12 @@ function textResponse(text, status = 200, headers = {}) {
   });
 }
 
+/* What a guard says about a pointer body, as {status, text}. */
+async function ptrText(body, guardFn) {
+  const res = await guardFn(textResponse(body, 200, { 'content-length': String(body.length) }), true);
+  return { status: res.status, text: await res.text() };
+}
+
 async function readBytes(res) {
   return new Uint8Array(await res.arrayBuffer());
 }
@@ -117,21 +139,33 @@ function sameBytes(a, b) {
   return null;
 }
 
-for (const { file, label } of WORKERS) {
+for (const { file, label, says } of WORKERS) {
   console.log('\n=== ' + label + ' ===');
   const worker = loadWorker(file);
   const { guardPack, stubByLength, stubResponse, stubReason } = worker;
+  const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
 
-  check(label + ': the guard functions are exported by the file',
+  check(label + ': loads the one shared guard instead of carrying its own copy',
+    /importScripts\(["']\.\.\/pack-guard\.js["']\)/.test(source) &&
+    !/function guardPack/.test(source),
+    'importScripts present: ' + /importScripts\(/.test(source) +
+    ', inline guardPack still defined: ' + /function guardPack/.test(source));
+  check(label + ': the guard arrived from ' + GUARD_FILE,
+    worker.__imported.length === 1 && worker.__imported[0] === '../pack-guard.js',
+    'imported ' + JSON.stringify(worker.__imported));
+  check(label + ': the guard functions are on the worker global',
     typeof guardPack === 'function' && typeof stubByLength === 'function' &&
     typeof stubReason === 'function' && typeof stubResponse === 'function',
     'guardPack=' + typeof guardPack + ' stubByLength=' + typeof stubByLength);
 
-  // 1. the LFS pointer, at a whole-pack URL
-  const ptr = await guardPack(textResponse(POINTER, 200, { 'content-length': String(POINTER.length) }), true);
+  // 1. the LFS pointer, at a whole-pack URL — and the refusal says which worker
+  const ptrBody = await ptrText(POINTER, guardPack);
   check(label + ': an LFS pointer at the pack URL is refused',
-    ptr.status === 502 && /Git LFS pointer/.test(await ptr.clone().text()),
-    'status ' + ptr.status + ', body ' + JSON.stringify((await ptr.clone().text()).slice(0, 80)));
+    ptrBody.status === 502 && /Git LFS pointer/.test(ptrBody.text),
+    'status ' + ptrBody.status + ', body ' + JSON.stringify(ptrBody.text.slice(0, 80)));
+  check(label + ': the refusal is prefixed with "' + says + '"',
+    ptrBody.text.indexOf(says + ': ') === 0,
+    'body was ' + JSON.stringify(ptrBody.text.slice(0, 60)));
 
   // 2. the pointer at a chunk URL — the magic cannot be checked there, so the
   //    pointer has to be caught by its own shape
@@ -204,13 +238,17 @@ for (const { file, label } of WORKERS) {
     'status ' + ranged.status + ', content-range ' + ranged.headers.get('content-range'));
 }
 
-/* The block is duplicated between the two workers on purpose — two service
-   workers in two scopes cannot share a file without a network fetch — and both
-   comments promise the copies stay in step. What that means is not identical
-   text: each file keeps its own quote style and words its own messages. It
-   means the same constants and the same verdicts, because a ceiling or a magic
-   changed in one worker and not the other is the drift that would cost a pack. */
-console.log('\n=== the two copies agree ===');
+/* Both workers import the same file, so there is exactly one copy of the guard to
+   drift and nothing left to compare between them — what is left to check is that
+   neither of them quietly kept a copy of its own, and that one implementation
+   reaches the same verdict through both. */
+console.log('\n=== one guard, both workers ===');
+check('the guard lives in ' + GUARD_FILE + ' and nowhere else in these two workers',
+  /function guardPack/.test(fs.readFileSync(path.join(ROOT, GUARD_FILE), 'utf8')) &&
+  !WORKERS.some((w) => /function guardPack|function stubReason|function stubByLength/
+    .test(fs.readFileSync(path.join(ROOT, w.file), 'utf8'))),
+  'a worker still defines one of the guard functions inline');
+
 const loaded = WORKERS.map((w) => ({ label: w.label, ctx: loadWorker(w.file) }));
 const consts = loaded.map(({ ctx }) => vm.runInContext(
   'globalThis.__guard = { POINTER_PREFIX: POINTER_PREFIX, PACK_MAGIC: PACK_MAGIC,' +

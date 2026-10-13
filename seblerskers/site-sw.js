@@ -20,6 +20,14 @@
  * make things faster, never broken.
  */
 
+/* The stub guard, shared with game/sw-pack.js so the two copies of a check this
+   load-bearing cannot drift. Relative to this worker's own URL, so it resolves
+   to the site root from /seblerskers/ and from /game/ alike. If it cannot be
+   loaded the worker throws here and the browser keeps the previous one — a
+   worker running without the guard would play a 134-byte pointer as a pack. */
+self.PACK_GUARD_LABEL = "seblerskers";
+importScripts("../pack-guard.js");
+
 const CACHE = "seb-pack-v1";
 const VERSION = "2026-09-23.1"; // pull-based pack stream (mobile OOM fix) + engine purge + pinned revalidate
 
@@ -184,100 +192,6 @@ function cachedLength(resp) {
    engine. */
 const PACK_ORIGIN = "https://artistesoundbox.github.io";
 const CHUNK_SIZE = 8 * 1024 * 1024;
-
-/* ---- a stub is not a pack ------------------------------------------------
- * Everything this worker answers a pack URL with goes straight into the engine,
- * and a stub is an ordinary-looking 200: the 134-byte Git LFS *pointer* the
- * commit stores, which is what a host built without `lfs: true` publishes for a
- * large asset, or an error page from an edge that has lost the object. Nothing
- * downstream can tell either from a pack until Godot has parsed it and died —
- * and the cache then keeps the stub for the next visit. That is not
- * hypothetical: the game/ worker over the pack had to rename its cache once to
- * shed pointer-poisoned entries. So the opening bytes are checked HERE, before
- * a response is handed over or stored.
- *
- * game/sw-pack.js carries the same block — two workers in two scopes cannot
- * share one file without a network fetch, so it is duplicated deliberately and
- * the two want to be kept in step.
- */
-const POINTER_PREFIX = "version https://git-lfs.github.com/spec/";
-const PACK_MAGIC = "GDPC";
-/* A chunk is 8 MB and a whole pack is hundreds; a pointer is 134 bytes. Body
-   this small is a stub by inspection, where reading one to be certain would
-   cost a whole chunk. */
-const STUB_CEILING = 512;
-
-function stubResponse(reason) {
-  return new Response("seblerskers: " + reason, {
-    status: 502,
-    statusText: "Bad Gateway",
-    headers: { "Content-Type": "text/plain; charset=utf-8" },
-  });
-}
-
-/* What came back, described — or null when it looks like pack bytes. */
-function stubReason(head) {
-  const text = new TextDecoder().decode(head.slice(0, 64));
-  if (text.indexOf(POINTER_PREFIX) === 0) {
-    return "the host is serving the Git LFS pointer for the pack, not the pack";
-  }
-  if (text.charAt(0) === "<" || text.charAt(0) === "{") {
-    return "the pack URL returned a page, not a pack (" +
-      text.slice(0, 24).replace(/[\r\n\t]+/g, " ") + ")";
-  }
-  return null;
-}
-
-/* The cheap check, for a response already in the cache: no chunk-sized read. */
-function stubByLength(resp) {
-  const len = Number((resp && resp.headers.get("content-length")) || 0);
-  if (len > 0 && len <= STUB_CEILING) {
-    return stubResponse("a cached part is " + len +
-      " bytes, too small to be pack data");
-  }
-  return null;
-}
-
-/* Pass pack bytes through untouched, but only once the opening bytes are clear.
-   `needMagic` is for the whole pack, whose first four bytes are always GDPC; a
-   chunk further in carries no magic of its own and is checked for being a stub
-   instead. One chunk is read and handed on exactly as it arrived. */
-async function guardPack(resp, needMagic) {
-  if (!resp.ok || !resp.body) return resp;  // HTTP failures are the caller's business
-  const reader = resp.body.getReader();
-  const first = await reader.read();
-  const head = first.value || new Uint8Array(0);
-  const text = new TextDecoder().decode(head.slice(0, 64));
-  let reason = stubReason(head);
-  if (!reason && needMagic && text.slice(0, 4) !== PACK_MAGIC) {
-    reason = "the pack URL is not a Godot pack (it starts with \"" +
-      text.slice(0, 16).replace(/[\r\n\t]+/g, " ") + "\")";
-  }
-  if (reason) {
-    try { await reader.cancel(); } catch (e) { /* already gone */ }
-    return stubResponse(reason);
-  }
-  const headers = new Headers();
-  ["content-type", "content-length", "content-range", "accept-ranges"]
-    .forEach(function (h) {
-      const v = resp.headers.get(h);
-      if (v) headers.set(h, v);
-    });
-  const stream = new ReadableStream({
-    start(controller) { if (head.length) controller.enqueue(head); },
-    pull(controller) {
-      return reader.read().then(function (r) {
-        if (r.done) controller.close(); else controller.enqueue(r.value);
-      });
-    },
-    cancel(why) { return reader.cancel(why); },
-  });
-  return new Response(stream, {
-    status: resp.status,
-    statusText: resp.statusText,
-    headers: headers,
-  });
-}
 
 function packUrl(size, idx) {
   return PACK_ORIGIN + "/seblerskers/index.pck?s=" + size + "&c=" + idx + "&r=1";

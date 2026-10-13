@@ -33,6 +33,11 @@
  * means to. A pooled keep-alive socket left open by an early exit crashes the
  * runtime on Windows and reports 127 instead of the failure.
  *
+ * The workers themselves are checked too, because the pack guard is a file they
+ * import (pack-guard.js) and a worker deployed without it does not install at all:
+ * a whole-body fetch of each script, capped, asserts the marker that proves the
+ * deployed copy is the guarded one rather than the one that shipped before it.
+ *
  * The dotfile probe at the end is a hint, not a verdict: only an artifact built from
  * a full checkout carries dotfiles, so a 200 there means the Actions artifact is what
  * the host is currently serving, and a 404 means the branch build has won again. It
@@ -63,6 +68,24 @@ const ASSETS = [
 
 /* The one path whose presence distinguishes the two publishing pipelines. */
 const PIPELINE_HINT = '3rdshooter-abootonthebrave/brokenboot/.gitignore';
+
+/* Files the pack workers cannot run without. A missing or stale one is not a
+   broken pack — both workers throw while installing and the browser keeps the
+   worker it already had — but it does mean the guard is not what is deployed,
+   and a worker from before the guard serves a 134-byte pointer happily. So the
+   marker is checked, not just the status: it is what distinguishes the guarded
+   worker from the one that shipped before it. */
+const SCRIPTS = [
+  { path: 'pack-guard.js', floor: 1024, marker: 'function guardPack',
+    what: 'the shared stub guard both pack workers import' },
+  { path: 'seblerskers/site-sw.js', floor: 4096,
+    marker: 'importScripts("../pack-guard.js")',
+    what: 'the portal pack worker, importing that guard' },
+  { path: 'game/sw-pack.js', floor: 4096,
+    marker: "importScripts('../pack-guard.js')",
+    what: "Over The Ice's pack worker, importing that guard" }
+];
+const MAX_SCRIPT_BYTES = 262144;
 
 function parseArgs(argv) {
   const opts = { base: SITE, wait: 0 };
@@ -98,8 +121,11 @@ function totalSize(headers) {
   return Number.isFinite(len) ? len : 0;
 }
 
-function probe(url, redirects) {
+function probe(url, redirects, opts) {
   const hops = redirects || 0;
+  const options = opts || {};
+  const wholeBody = options.range === false;
+  const maxBytes = options.maxBytes || 0;
   return new Promise(function (resolve) {
     let done = false;
     const settle = function (result) {
@@ -109,30 +135,34 @@ function probe(url, redirects) {
     };
     const target = new URL(url);
     const lib = target.protocol === 'https:' ? https : http;
+    const headers = {};
+    if (!wholeBody) headers.Range = 'bytes=0-255';
     const req = lib.request(target, {
       method: 'GET',
-      headers: { Range: 'bytes=0-255' },
+      headers: headers,
       agent: false,
       timeout: TIMEOUT_MS
     }, function (res) {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && hops < MAX_REDIRECTS) {
         res.resume();
         const next = new URL(res.headers.location, target).toString();
-        return settle(probe(next, hops + 1));
+        return settle(probe(next, hops + 1, options));
       }
-      let head = Buffer.alloc(0);
+      const parts = [];
+      let size = 0;
       res.on('data', function (chunk) {
-        if (!head.length) {
-          head = Buffer.from(chunk);
-          res.destroy();   // the first chunk is all this check needs, whatever the size asked for
-        }
+        parts.push(Buffer.from(chunk));
+        size += chunk.length;
+        // A ranged request needs only its first chunk. A whole-body request — a
+        // script whose marker could be anywhere in it — is capped, so a wrong
+        // URL cannot pull a pack through this check.
+        if (!wholeBody || size > maxBytes) res.destroy();
       });
-      res.on('end', function () {
-        settle({ status: res.statusCode, total: totalSize(res.headers), head: head });
-      });
-      res.on('close', function () {
-        settle({ status: res.statusCode, total: totalSize(res.headers), head: head });
-      });
+      const finish = function () {
+        settle({ status: res.statusCode, total: totalSize(res.headers), head: Buffer.concat(parts) });
+      };
+      res.on('end', finish);
+      res.on('close', finish);
     });
     req.on('timeout', function () { req.destroy(new Error('timed out after ' + TIMEOUT_MS + 'ms')); });
     req.on('error', function (err) {
@@ -140,6 +170,34 @@ function probe(url, redirects) {
     });
     req.end();
   });
+}
+
+/* The guard itself, and the two workers that must be importing it. */
+async function checkScripts(base) {
+  const results = [];
+  for (const script of SCRIPTS) {
+    const res = await probe(base + '/' + script.path, 0,
+      { range: false, maxBytes: MAX_SCRIPT_BYTES });
+    const asset = { path: script.path, what: script.what };
+    if (res.error) {
+      results.push({ asset: asset, ok: false, why: 'request failed: ' + res.error });
+    } else if (res.status === 404) {
+      results.push({ asset: asset, ok: false, why: 'not on the site (404)' });
+    } else if (res.status !== 200) {
+      results.push({ asset: asset, ok: false, why: 'answered HTTP ' + res.status });
+    } else if (res.total && res.total < script.floor) {
+      results.push({ asset: asset, ok: false, why: 'only ' + res.total + ' bytes' });
+    } else if (res.head.toString('utf8').indexOf(script.marker) < 0) {
+      results.push({ asset: asset, ok: false,
+        why: 'is served, but without ' + JSON.stringify(script.marker) +
+          ' in it \u2014 the deployed copy is not the guarded one' });
+    } else {
+      const size = res.total ? (res.total / 1024).toFixed(1) + ' KB' : 'size not reported';
+      results.push({ asset: asset, ok: true,
+        why: size + ', carries ' + script.marker });
+    }
+  }
+  return results;
 }
 
 function classify(asset, res) {
@@ -196,15 +254,18 @@ async function main() {
       const verdict = classify(asset, await probe(opts.base + '/' + asset.path, 0));
       results.push({ asset: asset, ok: verdict.ok, why: verdict.why });
     }
+    results.push(...await checkScripts(opts.base));
     const failed = results.filter(function (r) { return !r.ok; });
     if (!failed.length || Date.now() >= deadline) {
       const bad = report(opts.base, results);
       console.log('  ' + await probePipeline(opts.base));
       if (bad.length) {
-        console.log('\nThe site is serving something other than the payload. A pointer means the');
-        console.log('deployed tree was built without `lfs: true` — or that Pages is sourcing the');
-        console.log('branch build instead of the Actions artifact (Settings -> Pages -> Build and');
-        console.log('deployment -> Source: GitHub Actions).');
+        console.log('\nThe site is not serving what it should. A pointer means the deployed tree');
+        console.log('was built without `lfs: true` — or that Pages is sourcing the branch build');
+        console.log('instead of the Actions artifact (Settings -> Pages -> Build and deployment ->');
+        console.log('Source: GitHub Actions). A worker served without its guard import means the');
+        console.log('deployed copy predates that change, and until it lands those workers answer a');
+        console.log('pack URL with whatever the host returns — a pointer included.');
         process.exitCode = 1;
       }
       return;
