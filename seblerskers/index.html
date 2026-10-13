@@ -621,12 +621,31 @@ const GODOT_THREADS_ENABLED = false;
         throw new Error("the CDN refused a range request — cannot size the pack");
       }
       return r.arrayBuffer().then(function (buf) {
-        if (new TextDecoder().decode(buf.slice(0, 4)) !== "GDPC") {
+        var head = new TextDecoder().decode(buf.slice(0, 64));
+        if (head.slice(0, 4) !== "GDPC") {
+          /* Name the stub. A 134-byte Git LFS pointer under the pack's URL is
+             what a host built without `lfs: true` publishes for a large asset,
+             and until it is named the player reads "not a Godot pack" and has
+             no idea that the file they downloaded is four lines of text. */
+          if (head.indexOf("version https://git-lfs.github.com/spec/") === 0) {
+            throw new Error("the pack URL is answering with the Git LFS pointer " +
+              "for the pack, not the pack — the host was published without the " +
+              "real file, so there is nothing here to load");
+          }
           throw new Error("the CDN object is not a Godot pack — refusing to load it");
         }
         return { size: total, ok: true, ranges: "bytes" };
       });
     });
+  }
+
+  /* The two fallbacks in the click handler below point the ENGINE at CDN_BASE
+     and let its own fetch be the first thing to see those bytes: the pack-size
+     probe has already run by then, but a deploy can land between the probe and
+     the engine's first read. Re-probe the head, so no path can hand the engine
+     a URL that is answering with a stub. */
+  function gateCdnPack() {
+    return trueSizeOnce().then(function () { });
   }
   function stableHead(round) {
     return trueSizeOnce().then(function (first) {
@@ -884,11 +903,15 @@ const GODOT_THREADS_ENABLED = false;
            assembled pack is unreachable — stream from the CDN directly rather
            than 404-ing a file the origin does not host */
         slog("startGame", "no SW control \u2014 CDN single-stream fallback");
-        return engine.startGame({ mainPack: CDN_BASE }).then(begun, fail);
+        return gateCdnPack().then(function () {
+          return engine.startGame({ mainPack: CDN_BASE }).then(begun, fail);
+        }, fail);
       }
       // CDN refused ranges (rare): stream the whole pack straight from it
       slog("startGame", "mainPack=CDN_BASE (no ranges)");
-      return engine.startGame({ mainPack: CDN_BASE }).then(begun, fail);
+      return gateCdnPack().then(function () {
+        return engine.startGame({ mainPack: CDN_BASE }).then(begun, fail);
+      }, fail);
     }).catch(fail);
   });
 })();

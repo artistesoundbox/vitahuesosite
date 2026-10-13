@@ -23,6 +23,97 @@ const PACK_UNCACHEABLE = /index\.pck\?/;
 const BIG_FILE = /index\.pck|index\.wasm(\.gz)?$|index\.side\.wasm/;
 const SMALL_FILE = /\.(js|png|ico|worklet\.js)$|index\.audio\./;
 
+/* ---- a stub is not a pack ------------------------------------------------
+ * The shell decides which URL to hand the engine, and it validates that URL
+ * with a HEAD before it does; this worker is what actually answers the engine's
+ * request, and it used to answer with whatever came back. A stub is an
+ * ordinary-looking 200 — the 134-byte Git LFS *pointer* the commit stores, which
+ * is what a host built without `lfs: true` publishes for a 328 MB pack, or an
+ * error page from an edge that has lost the object — and once this worker had
+ * cached one it served the stub in place of the game on every visit, which is
+ * why the cache name above was bumped to shed pointer-poisoned entries. A new
+ * one could still be stored and served, so the opening bytes are checked HERE,
+ * before a response is handed over or kept.
+ *
+ * seblerskers/site-sw.js carries the same block — two workers in two scopes
+ * cannot share one file without a network fetch, so it is duplicated
+ * deliberately and the two want to be kept in step.
+ */
+const POINTER_PREFIX = 'version https://git-lfs.github.com/spec/';
+const PACK_MAGIC = 'GDPC';
+/* A pack is hundreds of MB; a pointer is 134 bytes. Body this small is a stub by
+   inspection, where reading one to be certain would cost the whole pack. */
+const STUB_CEILING = 512;
+
+function stubResponse(reason) {
+  return new Response('over the ice: ' + reason, {
+    status: 502,
+    statusText: 'Bad Gateway',
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+  });
+}
+
+/* What came back, described — or null when it looks like pack bytes. */
+function stubReason(head) {
+  const text = new TextDecoder().decode(head.slice(0, 64));
+  if (text.indexOf(POINTER_PREFIX) === 0) {
+    return 'the host is serving the Git LFS pointer for the pack, not the pack';
+  }
+  if (text.charAt(0) === '<' || text.charAt(0) === '{') {
+    return 'the pack URL returned a page, not a pack (' +
+      text.slice(0, 24).replace(/[\r\n\t]+/g, ' ') + ')';
+  }
+  return null;
+}
+
+/* The cheap check, for a response already in the cache: no pack-sized read. */
+function stubByLength(resp) {
+  const len = Number((resp && resp.headers.get('content-length')) || 0);
+  if (len > 0 && len <= STUB_CEILING) {
+    return stubResponse('a cached pack is ' + len + ' bytes, too small to be the game');
+  }
+  return null;
+}
+
+/* Pass pack bytes through untouched, but only once the opening bytes are clear.
+   One chunk is read and handed on exactly as it arrived. */
+async function guardPack(resp, needMagic) {
+  if (!resp.ok || !resp.body) return resp;  // HTTP failures are the caller's business
+  const reader = resp.body.getReader();
+  const first = await reader.read();
+  const head = first.value || new Uint8Array(0);
+  const text = new TextDecoder().decode(head.slice(0, 64));
+  let reason = stubReason(head);
+  if (!reason && needMagic && text.slice(0, 4) !== PACK_MAGIC) {
+    reason = 'the pack URL is not a Godot pack (it starts with "' +
+      text.slice(0, 16).replace(/[\r\n\t]+/g, ' ') + '")';
+  }
+  if (reason) {
+    try { await reader.cancel(); } catch (e) { /* already gone */ }
+    return stubResponse(reason);
+  }
+  const headers = new Headers();
+  ['content-type', 'content-length', 'content-range', 'accept-ranges']
+    .forEach(function (h) {
+      const v = resp.headers.get(h);
+      if (v) headers.set(h, v);
+    });
+  const stream = new ReadableStream({
+    start(controller) { if (head.length) controller.enqueue(head); },
+    pull(controller) {
+      return reader.read().then(function (r) {
+        if (r.done) controller.close(); else controller.enqueue(r.value);
+      });
+    },
+    cancel(why) { return reader.cancel(why); },
+  });
+  return new Response(stream, {
+    status: resp.status,
+    statusText: resp.statusText,
+    headers: headers,
+  });
+}
+
 self.addEventListener('install', function () {
   self.skipWaiting();
 });
@@ -81,11 +172,28 @@ async function cacheFirst(req, isPack) {
   try { cached = await cache.match(req); } catch (e) { /* ignore */ }
 
   if (cached) {
+    if (isPack) {
+      /* A stub already under this key is dropped rather than served: returning
+         it is how a poisoned entry reached the engine before the background
+         revalidate could replace it, and the revalidate only fixes the NEXT
+         visit. */
+      const stubbed = stubByLength(cached);
+      if (stubbed) {
+        try { await cache.delete(req); } catch (e) { /* best effort */ }
+        return stubbed;
+      }
+    }
     revalidate(req, cache, isPack);   // background, non-blocking
     return cached;
   }
 
-  const fresh = await fetch(req);
+  /* The head of the pack is always GDPC. A request for part of it is not, so
+     only a fetch that starts at the beginning is checked for the magic; either
+     way a stub is refused by name and never stored. */
+  const partial = req.headers.has('range') &&
+    !/^bytes=0-/.test(req.headers.get('range') || '');
+  const fresh = isPack ? await guardPack(await fetch(req), !partial) : await fetch(req);
+  if (isPack && fresh.status === 502) return fresh;
   // stream to the page AND keep a copy for next time
   try { await cache.put(req, fresh.clone()); } catch (e) { /* quota */ }
   return fresh;

@@ -117,6 +117,16 @@ async function cacheFirstEngine(req, event, isPack) {
   try { cached = await cache.match(req, { ignoreSearch: false }); } catch (e) { }
 
   if (cached) {
+    if (isPack) {
+      /* A stub already under this key (a pointer, or an error page cached by an
+         earlier build) is dropped rather than served. Serving it is how a
+         poisoned entry reached the engine before anything could revalidate it. */
+      const stubbed = stubByLength(cached);
+      if (stubbed) {
+        try { await cache.delete(req); } catch (e) { /* best effort */ }
+        return stubbed;
+      }
+    }
     if (isPack === false || isPack === undefined) {
       const p = revalidateEngine(req, cache);
       if (event) event.waitUntil(p); // outlive the page that triggered us
@@ -124,7 +134,14 @@ async function cacheFirstEngine(req, event, isPack) {
     return cached;
   }
 
-  const fresh = await fetch(req);
+  /* Chunk 0 is the head of the pack and carries its magic; the rest carry no
+     magic of their own, so they are only checked for being stubs. Either way a
+     stub is answered with a named failure and never stored. */
+  const range = req.headers.get("range") || "";
+  const isHead = /[?&]c=0(&|$)/.test(new URL(req.url).search) &&
+    (!range || /^bytes=0-/.test(range));
+  const fresh = isPack ? await guardPack(await fetch(req), isHead) : await fetch(req);
+  if (isPack && fresh.status === 502) return fresh;
   try { await cache.put(req, fresh.clone()); } catch (e) { /* quota */ }
   return fresh;
 }
@@ -168,6 +185,100 @@ function cachedLength(resp) {
 const PACK_ORIGIN = "https://artistesoundbox.github.io";
 const CHUNK_SIZE = 8 * 1024 * 1024;
 
+/* ---- a stub is not a pack ------------------------------------------------
+ * Everything this worker answers a pack URL with goes straight into the engine,
+ * and a stub is an ordinary-looking 200: the 134-byte Git LFS *pointer* the
+ * commit stores, which is what a host built without `lfs: true` publishes for a
+ * large asset, or an error page from an edge that has lost the object. Nothing
+ * downstream can tell either from a pack until Godot has parsed it and died —
+ * and the cache then keeps the stub for the next visit. That is not
+ * hypothetical: the game/ worker over the pack had to rename its cache once to
+ * shed pointer-poisoned entries. So the opening bytes are checked HERE, before
+ * a response is handed over or stored.
+ *
+ * game/sw-pack.js carries the same block — two workers in two scopes cannot
+ * share one file without a network fetch, so it is duplicated deliberately and
+ * the two want to be kept in step.
+ */
+const POINTER_PREFIX = "version https://git-lfs.github.com/spec/";
+const PACK_MAGIC = "GDPC";
+/* A chunk is 8 MB and a whole pack is hundreds; a pointer is 134 bytes. Body
+   this small is a stub by inspection, where reading one to be certain would
+   cost a whole chunk. */
+const STUB_CEILING = 512;
+
+function stubResponse(reason) {
+  return new Response("seblerskers: " + reason, {
+    status: 502,
+    statusText: "Bad Gateway",
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
+}
+
+/* What came back, described — or null when it looks like pack bytes. */
+function stubReason(head) {
+  const text = new TextDecoder().decode(head.slice(0, 64));
+  if (text.indexOf(POINTER_PREFIX) === 0) {
+    return "the host is serving the Git LFS pointer for the pack, not the pack";
+  }
+  if (text.charAt(0) === "<" || text.charAt(0) === "{") {
+    return "the pack URL returned a page, not a pack (" +
+      text.slice(0, 24).replace(/[\r\n\t]+/g, " ") + ")";
+  }
+  return null;
+}
+
+/* The cheap check, for a response already in the cache: no chunk-sized read. */
+function stubByLength(resp) {
+  const len = Number((resp && resp.headers.get("content-length")) || 0);
+  if (len > 0 && len <= STUB_CEILING) {
+    return stubResponse("a cached part is " + len +
+      " bytes, too small to be pack data");
+  }
+  return null;
+}
+
+/* Pass pack bytes through untouched, but only once the opening bytes are clear.
+   `needMagic` is for the whole pack, whose first four bytes are always GDPC; a
+   chunk further in carries no magic of its own and is checked for being a stub
+   instead. One chunk is read and handed on exactly as it arrived. */
+async function guardPack(resp, needMagic) {
+  if (!resp.ok || !resp.body) return resp;  // HTTP failures are the caller's business
+  const reader = resp.body.getReader();
+  const first = await reader.read();
+  const head = first.value || new Uint8Array(0);
+  const text = new TextDecoder().decode(head.slice(0, 64));
+  let reason = stubReason(head);
+  if (!reason && needMagic && text.slice(0, 4) !== PACK_MAGIC) {
+    reason = "the pack URL is not a Godot pack (it starts with \"" +
+      text.slice(0, 16).replace(/[\r\n\t]+/g, " ") + "\")";
+  }
+  if (reason) {
+    try { await reader.cancel(); } catch (e) { /* already gone */ }
+    return stubResponse(reason);
+  }
+  const headers = new Headers();
+  ["content-type", "content-length", "content-range", "accept-ranges"]
+    .forEach(function (h) {
+      const v = resp.headers.get(h);
+      if (v) headers.set(h, v);
+    });
+  const stream = new ReadableStream({
+    start(controller) { if (head.length) controller.enqueue(head); },
+    pull(controller) {
+      return reader.read().then(function (r) {
+        if (r.done) controller.close(); else controller.enqueue(r.value);
+      });
+    },
+    cancel(why) { return reader.cancel(why); },
+  });
+  return new Response(stream, {
+    status: resp.status,
+    statusText: resp.statusText,
+    headers: headers,
+  });
+}
+
 function packUrl(size, idx) {
   return PACK_ORIGIN + "/seblerskers/index.pck?s=" + size + "&c=" + idx + "&r=1";
 }
@@ -204,7 +315,9 @@ async function servePack(req) {
   }
 
   if (!size) {
-    return fetch(cdn, { mode: "cors", cache: "no-store" });
+    /* nothing cached at all: the CDN's own response is what the engine gets,
+       so it is checked before it is handed over */
+    return guardPack(await fetch(cdn, { mode: "cors", cache: "no-store" }), true);
   }
 
   const chunks = Math.ceil(size / CHUNK_SIZE);
@@ -213,7 +326,7 @@ async function servePack(req) {
     if (!bySize[size][i]) { complete = false; break; }
   }
   if (!complete) {
-    return fetch(cdn, { mode: "cors", cache: "no-store" });
+    return guardPack(await fetch(cdn, { mode: "cors", cache: "no-store" }), true);
   }
 
   /* pull()-based flow control: the consumer (the engine's loader) asks for
@@ -228,6 +341,14 @@ async function servePack(req) {
       if (next >= chunks) { controller.close(); return; }
       const resp = await cache.match(packUrl(size, next++));
       if (!resp) { controller.error(new Error("chunk " + (next - 1) + " vanished mid-stream")); return; }
+      /* a stub that got into the cache under a chunk key would be stitched into
+         the pack as if it were 8 MB of game; refuse the stream instead */
+      const stubbed = stubByLength(resp);
+      if (stubbed) {
+        controller.error(new Error("cached part " + (next - 1) + " is " +
+          (resp.headers.get("content-length") || "?") + " bytes, not a chunk"));
+        return;
+      }
       controller.enqueue(new Uint8Array(await resp.arrayBuffer()));
     },
   });
