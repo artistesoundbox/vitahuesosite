@@ -951,6 +951,13 @@ function assess(report) {
       if (!k.scenery.tumbled) bits.push(`the kicked ${k.scenery.kind} never tumbled`);
       if (!k.scenery.settled) bits.push(`the kicked ${k.scenery.kind} never came to rest (${k.scenery.settleSeconds}s)`);
       if (!(k.scenery.boxFollowed > 0.5)) bits.push('the moved scenery left its collision box behind');
+      const a = k.anchored;
+      if (a) {
+        if (a.count === 0) bits.push('nothing anchored was on the field, so the boot was never measured against scenery it must not move');
+        if (!(a.moved < 0.05)) bits.push(`the anchored ${a.kinds.join('/')} was shifted ${a.moved}m by the boot`);
+        if (a.spun) bits.push(`the anchored ${a.kinds.join('/')} was tipped over by the boot`);
+        if (!(a.boxMoved < 0.05)) bits.push(`the anchored ${a.kinds.join('/')}'s collision box slid ${a.boxMoved}m on its own`);
+      }
       const f = k.feel || {};
       if (f.whiff && !(f.whiff.shake > 0)) bits.push('a kick into empty air did not even move the frame');
       if (f.whiff && (f.whiff.kickback !== 0 || f.whiff.hitStop !== 0 || f.whiff.roll !== 0)) {
@@ -997,6 +1004,10 @@ function assess(report) {
       }
       if (k.selection.sweepNote && !k.selection.sweepNoteAgain) {
         findings.push(`the sweep's own button explains itself once through the real pad: "${k.selection.sweepNote}", and the same press again says nothing`);
+      }
+      const an = k.anchored;
+      if (an && an.count && an.moved < 0.05 && !an.spun && an.boxMoved < 0.05) {
+        findings.push(`the one thing out here the boot cannot move is measured against the same swing that throws the heaviest prop: the anchored ${an.kinds.join('/')} takes it without shifting (${an.moved} m), tipping (${an.spun}) or dragging its collision box along (${an.boxMoved} m)`);
       }
       const t = k.takes;
       const sp = k.space;
@@ -1071,6 +1082,15 @@ function assess(report) {
         const above = po.fromTheCap || {};
         if (!above.kicked) bits.push('the boot thrown from his own cap did not take the marksman off it');
         else if (above.landedAt !== 0) bits.push(`the marksman kicked off his cap never reached the ground (${above.seconds}s)`);
+        // And why the climb is worth making rather than only required: the post pays.
+        const k = po.kit || {};
+        if (!k.offTheRock) bits.push('the second marksman was not put off his cap, so the climb\'s pay was never measured');
+        else if (!k.collected) {
+          bits.push(`a marksman put off his rock left nothing behind, with the drop roll pinned to ${k.pinnedRoll} (which is the roll that drops nothing), so the post pays no better than any other elimination`);
+        } else if (k.before === k.after) {
+          bits.push(`the ${k.collected} his rock paid never reached the officer standing on it (${k.before} before, ${k.after} after)`);
+        }
+        if (!k.achievement) bits.push('putting a marksman off his rock unlocked no achievement, so the first one is not counted');
       }
       reasons.push(`the floating islands: ${bits.join('; ') || 'the probe did not pass'}`);
     }
@@ -1096,6 +1116,11 @@ function assess(report) {
         findings.push(`the boot is what takes him off the rock, and only from up there: thrown from the ground under his cap it does nothing `
           + `(he stands ${post.fromBelow.rise} m above the officer against a ${post.reachUp} m reach, unmoved), and thrown from the cap itself it sends him off it, `
           + `${post.fromTheCap.fellFrom} m down and ${post.fromTheCap.moved} m out, on the ground after ${post.fromTheCap.seconds}s of falling rather than walking away at cap height`);
+        if (post.kit && post.kit.collected) {
+          findings.push(`and the climb pays, so going up after him is worth doing rather than only demanded: a marksman put off his rock leaves his kit on the cap — `
+            + `a ${post.kit.collected} pickup even with the drop roll pinned to ${post.kit.pinnedRoll}, past the end of the table where an ordinary elimination rolls nothing — `
+            + `and the officer standing there takes it through the game's own pickup handler (${post.kit.before} to ${post.kit.after}), with the first one over the edge unlocking off_the_rock`);
+        }
       }
     }
     // The officer's own mesh file. Every clause names the part and the bone, so a

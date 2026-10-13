@@ -39,8 +39,10 @@ npm run test:fatality   # shoot an attacker down through the head and then throu
                         # the chest: only the head throws the body, and both pay the
                         # same tier credit
 npm run test:platforms  # climb the floating islands: every rung jumped and none
-                        # walked up, the war blind to them, and their crates out of
-                        # reach from the ground
+                        # walked up, the war blind to them, their crates out of reach
+                        # from the ground, and the marksman on the low cap — seen from
+                        # the clearing, unkillable by gunfire, booted off only from up
+                        # there, and paying for it with his kit
 npm run test:probes     # those mechanic checks and both audits, one page load
 ```
 
@@ -117,11 +119,20 @@ unwounded, in plain view. That is the shape of the whole point — the default s
 campaign was the one the single-run check would have reported on.
 
 With terrain in the mix the sags moved as well: across ten seeds and ten forests the
-quietest stretch of any wave runs from 12.6 s to 18.7 s, every campaign of the ten
-cleared (356.9 s to 427.0 s), and the saggiest of them is the default seed's own
-forest — the one a plain `npm test` plays, so the run that gets looked at most is not
-the most forgiving of the ten. Same game, same pilot — the layout is what changed,
-which is the argument for fuzzing it.
+quietest stretch of any wave runs from 11 s to 19 s, every campaign of the ten cleared
+(386.9 s to 444.2 s), and no one of them is visibly the most forgiving — same game,
+same pilot, so the layout is what changed, which is the argument for fuzzing it.
+
+The fuzz is also where the last two pilot deadlocks were found rather than guessed at.
+The posts gave it a new one: an officer with no rounds anywhere walking at a marksman
+he has no sight of, wedged against the same trunk inside the tree line, reversing for
+1.8 s, running straight back into it, and doing that until the watchdog called the
+wave stalled — on two seeds, with the marksman unharmed at full health 20-odd metres
+away. The pilot learns now: a wedge at the same spot buys a longer reversal and then a
+stretch of walking *round* rather than at what stopped it, which is what a player does
+the second time they bounce off the same tree. Two more seeds exposed the climb itself,
+where the post carried no radius and the pilot's 1.4 m fallback guess sent it at a cap
+1.55 m wide; all ten seeds now finish every wave, in ten different forests.
 
 `npm run test:forest` asks the terrain question on its own, without playing
 anything. `--check-forest[=N]` rebuilds N forests (the spread of seeds a fuzz would
@@ -184,11 +195,11 @@ of density moves a healthy forest by tens of percent. A baseline also serves as 
 record of the floors, so a floor that moves is named as well — and as a record of the
 dressing every forest in it was built with, named on both sides above the drift
 table, so a spread measured on one field is never compared against another one
-silently. What the recorded spread is now, after the dressing swap and the placement
-bug that swap exposed (see the note at the end of this file): `connected ground
-10269 / 10314 m²`, `elbow room 2.65 / 2.93 m`, `clearing standable 71 / 77%`, `spawn
-ring reachable 100 / 100%`, `widest clear circle 16.36 / 19.37 m`, all sixteen forests
-`fair`, on 165 trees and 28 props. The spread before it — thirty props, layouts
+silently. What the recorded spread is now, after the dressing swap, the cabin and the
+marksman (see the note at the end of this file): `connected ground 10209 / 10253 m²`,
+`elbow room 2.60 / 2.89 m`, `clearing standable 71 / 77%`, `spawn ring reachable
+100 / 100%`, `widest clear circle 16.36 / 19.36 m`, all sixteen forests `fair`, on 165
+trees and 29 props. The spread before it — thirty props, layouts
 `820b292e`…`1a9c3d22` — is gone rather than kept: three of its sixteen forests could
 not be fought in at all, and it carried no dressing record either, which is why the
 harness now reads one.
@@ -558,6 +569,49 @@ animation. The HUD names whatever is available from where the officer is standin
 time each kick is thrown it explains itself in a toast, since there is no move
 list to read.
 
+## The marksman on the rock
+
+The islands are not only loot. From wave 2 every wave posts one attacker on the
+climb: the **lowest cap that can actually see the fighting ground** (the sample
+points are the clearing at chest height, and a post has to see
+`MARKSMAN.sightNeeded` of them), asked through the world rather than assumed,
+because a tank or a trunk between the two would make the post a man shooting at
+cover. He is put there by `World.marksmanPerch()` and
+`EnemyManager.queueWave`, not walked there: nothing else in the fight can hand
+somebody a cap.
+
+He is the one attacker the rifle cannot remove, and that is the whole of him:
+
+- **Gunfire floors him and stops.** Sixty rounds through the real damage path
+  leave him wounded at `bulletMinHealth` 6 — floored, not bleeding, still up there
+  — with the same rounds bleeding a walking attacker out in 23 (`npm run test:platforms`
+  measures both, and the walking control is what makes it a rule about the rock
+  rather than about damage).
+- **He is a firing line in both directions.** On the default forest his cap has a
+  line to six of the nine points sampled in the clearing, and a round cast from the
+  clearing finds him at chest height, so he can shoot down into the fight and be
+  shot back at — he is just not removable that way.
+- **The boot cannot reach him from the ground.** `bootReachUp` is 0.6 m above the
+  officer's own feet, and the first rung floats `firstRise` 0.95 m. Kicked from
+  underneath his cap he does not move at all; kicked from the cap itself he goes
+  off it — 0.95 m down and 7.0 m out, on the ground after 0.63 s of falling rather
+  than walking away at cap height. **The climb is the price of him.**
+- **And the climb pays.** A marksman put off his rock leaves his kit on the cap —
+  the game's own drop table, but drawn inside the table's weights instead of across
+  the whole of `[0, 1)`, so it never rolls the nothing an ordinary elimination can
+  roll — and the officer standing on the cap collects it through the same pickup
+  handler the island crates pay out through. The first one over the edge unlocks
+  `off_the_rock`.
+
+The harness measures all four, and falsifies the last one: with `MARKSMAN.kitDrop`
+turned off, the same kick — thrown with the drop roll pinned to 0.999, past the end
+of the table — leaves nothing behind, and the platform probe fails by name. An
+earlier version of the same run also caught the post being unreachable in a way the
+probe could not: the pilot insists on standing *over* a cap before jumping, and the
+post it was climbing for carried no radius, so it used a 1.4 m guess against a cap
+1.55 m wide and pressed against the rim for the rest of the wave. The post carries
+its cap's radius now.
+
 ## Kicking the scenery
 
 The boot does not stop at people. Crates, barrels, sandbags, rocks and the **tanks** are
@@ -772,22 +826,36 @@ start pressing sooner as well as harder.
   used as cover — all with real collision, all built from one seed (`worldSeed`).
   `?worldSeed=N` builds a different forest with the same game in it, which is how
   the harness fuzzes terrain; with no parameter it builds the one it always did.
-- **Floating islands you climb for the loot.** Ten little inverted mountains hang
-  over the forest on a wandering bearing (`PLATFORMS`), each one `rise` above the
-  last: the officer's jump clears `jumpSpeed² / (2 · |gravity|)` ≈ 0.99 m against a
-  0.70 m step, so every rung is cleared by jumping and by nothing else — the cap's
+- **Floating islands you climb for the loot.** Ten flat rock slabs hang over the
+  forest on a wandering bearing (`PLATFORMS`), each cap `rise` above the last: the
+  officer's jump clears `jumpSpeed² / (2 · |gravity|)` ≈ 0.99 m against a 0.70 m
+  step, so every rung is cleared by jumping and by nothing else — the cap's
   tolerance (0.15 m) is deliberately narrower than a step, which is what stops the
-  climb from being a ramp he can walk up. Every other island carries a **supply
-  crate**: block-modelled olive planks with a stencil plate and the asset itself on
-  the open lid (a belt of rounds, a med kit with its cross, a radio, a drum
-  magazine, a folded plate carrier), anchored on its cap and never expiring. Loot
-  is collected by whoever is at its own level or above it, so a crate on a top
+  climb from being a ramp he can walk up. Each slab is one cylinder `depth` (0.8 m)
+  thick with turf on the face he lands on and rock on the rim below it, its
+  underside cut back facet by facet so no two are the same shape, and a few stones
+  broken off the rim hanging under it for silhouette. Every other island carries a
+  **supply crate**: block-modelled olive planks with a stencil plate and the asset
+  itself on the open lid (a belt of rounds, a med kit with its cross, a radio, a
+  drum magazine, a folded plate carrier), anchored on its cap and never expiring.
+  Loot is collected by whoever is at its own level or above it, so a crate on a top
   cannot be vacuumed by jumping under it: the climb is what pays. The islands are
   **not** in the world's cylinders or boxes, so bullets, sight lines, attacker
   pathing and the kick's prop pass are all blind to them — the ground fight is
   exactly what it was, which is what `--check-platforms` measures, and the layout
   also keeps the climb's ground clear of trunks and props (a tank under a cap is
   still a wall to his feet, so it is laid out around).
+- **A marksman posted on the low cap.** One rung of the climb — the lowest one that
+  can see the fighting ground — is held by a shooter who never walks, never takes
+  cover, and **cannot be shot off it**: gunfire drives him to the floor (health 6)
+  and stops, he does not bleed out, and he keeps firing down into the clearing at
+  `MARKSMAN.fireInterval` 2.9 s and ×1.8 damage with his own hit bonus, so range
+  costs him far less than it costs a walking attacker. The boot reaches only
+  `bootReachUp` 0.6 m above the officer's own feet, so he cannot be kicked from the
+  ground: **the climb is the price of him**, and it pays — his kit stays on the cap
+  he was put off (a guaranteed pickup, where an ordinary elimination can roll
+  nothing at all) and the first one over the edge is the `off_the_rock`
+  achievement. See *The marksman on the rock* below.
 - **A scanned environment.** `landscape_forest__mountains.glb` is a closed,
   canopy-textured photogrammetry dome. Standing inside it looks like a cave, so it
   is rendered once into a cubemap and used as the sky, then covered overhead by a

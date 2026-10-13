@@ -385,6 +385,13 @@ export const PROPS = {
   // it is scaled by height and only three are laid: it is cover first, and a wall the
   // length of a bus makes cover the fight can use without sealing the clearing.
   barrier: { model: 'sandbags.dae',    by: 'height', size: 1.05, mass: 1.5, radius: 1.4,  count: 3,  colour: 0x7d7a66 },
+  // The cabin: one, on the ground the attackers walk in over, between the clearing's
+  // edge and the spawn ring — far enough out to be the landmark the fight happens in
+  // front of rather than an obstacle inside it, and close enough to be read from the
+  // clearing. Its own export is a shed (1.61 × 1.99 × 0.85 m), so it is fitted by height
+  // to cabin size, and its own texture is kept: everything else out here is block-coloured
+  // off-scene dressing, and this is the one building.
+  cabin:   { model: 'cabin.glb',       by: 'height', size: 2.8,  mass: 6,   radius: 3.2,  count: 1,  colour: null },
 };
 
 // Gradient sky cap drawn over the scanned horizon.
@@ -440,9 +447,11 @@ export const BOOT_BONE_AXES = { sole: [0.046, -0.592, 0.804], toe: [0.006, 0.976
 // joint and sits near the back of a foot. Centring a boot on the bone alone hangs it
 // off the heel, so every tier carries a forward offset as well as a lift.
 //
-// The floating islands: little inverted mountains in the air over the fight, stepped
+// The floating islands: flat slabs of rock hanging in the air over the fight, stepped
 // so they can be climbed by jumping and far enough apart to be a route rather than a
-// staircase. Three numbers decide whether they are a climb or a ramp:
+// staircase. Each one is a disc of turf on a rim of bare rock, `depth` thick, with the
+// face he lands on at exactly `top`. Three numbers decide whether they are a climb or
+// a ramp:
 //
 //   `rise`          0.70 m against a jump apex of `jumpSpeed² / (2 · |gravity|)` ≈ 0.99 m,
 //                   so every step is clear of him by a third of a metre
@@ -467,7 +476,7 @@ export const PLATFORMS = {
   gapMax: 2.55,
   wander: 1.15,     // rad the climb is allowed to curve by, per step
   radius: 1.55,     // m of top the officer can stand on
-  depth: 2.6,       // m the inverted peak hangs below its top
+  depth: 0.8,       // m of slab below the top face: the rock the cap is cut out of
   spread: 9,        // m the first island is laid out from the clearing centre
   crates: ['ammo', 'health', 'charge', 'rapid', 'armor'],
   firstCrate: 2,    // the island the first crate sits on, and every other one after
@@ -483,6 +492,11 @@ export const PLATFORMS = {
 // He is posted rather than walked there: the perch is a cap, and nothing in the fight
 // can hand him one, so `world.marksmanPerch()` picks it and `EnemyManager.queueWave`
 // puts him on it before the walking line steps off.
+//
+// And the climb pays, so that going up after him is something the officer wants rather
+// than only something the wave demands: a marksman put off his rock leaves his kit
+// behind on the cap — a guaranteed pickup, where an ordinary elimination can roll
+// nothing at all — and the first one over the edge is the `off_the_rock` achievement.
 export const MARKSMAN = {
   firstWave: 2,       // waves before this are the walking line alone
   maxTop: 1.65,       // m: a LOW cap — the first rung (0.95) or one step above it
@@ -494,6 +508,7 @@ export const MARKSMAN = {
   damageScale: 1.8,   // multiplies `SETTINGS.enemyDamage`
   hitBonus: 0.18,     // added to the hit chance, so range costs him far less than it costs them
   maxRange: 60,       // m he will shoot to
+  kitDrop: true,      // the boot off his rock leaves a pickup on the cap, never a miss
 };
 
 // How a sound behaves in space: how fast it falls away, how dull it gets, and how
@@ -604,4 +619,5 @@ export const ACHIEVEMENTS = [
   { id: 'surrounded',   label: 'Surrounded',                desc: 'Become surrounded by six or more attackers.' },
   { id: 'one_man_army', label: 'One-Man Army',              desc: 'Complete every wave.' },
   { id: 'tank_kicker',  label: 'Boot Versus Armour',        desc: 'Kick a tank off its mark.' },
+  { id: 'off_the_rock', label: 'Off The Rock',              desc: 'Climb the islands and boot a marksman off his cap.' },
 ];

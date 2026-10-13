@@ -314,9 +314,10 @@ export class World {
           const nz = z + Math.cos(turn) * gap;
           const limit = SETTINGS.worldSize / 2 - 8;
           if (Math.abs(nx) > limit || Math.abs(nz) > limit) continue;
-          // The peak hangs `depth` below the top, so the body of the island has to
-          // clear the trunks too, not only the top. A crown is a cone rather than a
-          // cylinder, so the check is generous rather than exact.
+          // The slab is `depth` thick under the face he stands on, and the body of it
+          // has to clear the trunks as well as the top does — the officer's feet are
+          // pushed out of anything solid at *any* height, so a slab hanging in a crown
+          // of branches is a cap he cannot stand on.
           let clear = true;
           for (const c of this.cylinders) {
             for (const below of [0, PLATFORMS.depth * 0.5, PLATFORMS.depth]) {
@@ -341,32 +342,80 @@ export class World {
     return this.islands;
   }
 
-  /** The rocks themselves: a peak hanging point-down under a cap he can stand on. */
+  /**
+   * The rocks themselves: flat slabs stepped up the sky — a disc of turf on a rim of
+   * bare rock, like the stepping stones the climb is meant to be, rather than a mountain
+   * standing on its head.
+   *
+   * `PLATFORMS.depth` is the slab's thickness, and the top face sits at exactly
+   * `island.top`: that face *is* the floor the officer lands on (`islandFloor`), so the
+   * mesh and the rule have to agree on the same disc, or he stands on ground that is not
+   * drawn. The sides taper inwards underneath, and a few stones hang off the rim below
+   * the cap — below it deliberately, so nothing pokes up through the ground he walks on.
+   *
+   * The silhouette is drawn from the island's own stream: the same world seed builds the
+   * same rocks, and the heights, gaps and radii the layout decided are untouched by it.
+   */
   buildIslandMeshes(scene, rand) {
-    const peak = new THREE.MeshStandardMaterial({ color: 0x6b6f63, roughness: 1, flatShading: true });
-    const cap = new THREE.MeshStandardMaterial({ color: 0x4f6b39, roughness: 1, flatShading: true });
+    const rock = new THREE.MeshStandardMaterial({ color: 0x6b6f63, roughness: 1, flatShading: true });
+    const turf = new THREE.MeshStandardMaterial({ color: 0x4f6b39, roughness: 1, flatShading: true });
+    const stoneGeo = new THREE.DodecahedronGeometry(1, 0);
+    const SIDES = 9;
     for (const island of this.islands) {
-      const body = new THREE.Mesh(
-        new THREE.ConeGeometry(island.radius * 0.86, PLATFORMS.depth, 7, 1),
-        peak,
+      const r = island.radius;
+      const thickness = PLATFORMS.depth;
+      const group = new THREE.Group();
+      group.position.set(island.x, 0, island.z);
+      group.rotation.y = rand() * Math.PI * 2;   // the cut of the facets, not the disc
+      // One cylinder carries the whole slab: its material groups are side, top, bottom,
+      // which is what puts turf on the face he stands on and rock on the rim below it.
+      const slab = new THREE.Mesh(
+        new THREE.CylinderGeometry(r, r * 0.78, thickness, SIDES, 1),
+        [rock, turf, rock],
       );
-      body.position.set(island.x, island.top - PLATFORMS.depth / 2, island.z);
-      body.rotation.x = Math.PI;          // apex down: an upside-down mountain
-      body.rotation.y = rand() * Math.PI * 2;
-      body.castShadow = true;
-      body.receiveShadow = true;
-      scene.add(body);
-      // The cap is the floor he lands on, so it is wider than the cone's own base and
-      // sits with its top face at exactly `island.top`.
-      const crown = new THREE.Mesh(
-        new THREE.CylinderGeometry(island.radius, island.radius * 0.94, 0.3, 7, 1),
-        cap,
-      );
-      crown.position.set(island.x, island.top - 0.15, island.z);
-      crown.rotation.y = rand() * Math.PI * 2;
-      crown.receiveShadow = true;
-      scene.add(crown);
-      island.meshes = [body, crown];
+      slab.position.y = island.top - thickness / 2;
+      // The underside is cut back facet by facet so no two slabs are the same shape. Only
+      // the *lower* ring moves: the top ring is the disc the layout measured and the floor
+      // the officer lands on, and it stays exactly `island.radius`.
+      const cut = [];
+      for (let i = 0; i < SIDES; i++) cut.push(0.72 + rand() * 0.36);
+      const pos = slab.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        if (pos.getY(i) > -thickness / 2 + 1e-4) continue;   // the top ring and the cap
+        const vx = pos.getX(i);
+        const vz = pos.getZ(i);
+        const d = Math.hypot(vx, vz);
+        if (d < 1e-4) continue;
+        const a = Math.atan2(vz, vx);
+        const facet = Math.round(((a + Math.PI) / (Math.PI * 2)) * SIDES) % SIDES;
+        const k = cut[Math.min(SIDES - 1, Math.max(0, facet))];
+        pos.setX(i, vx * k);
+        pos.setZ(i, vz * k);
+      }
+      pos.needsUpdate = true;
+      slab.geometry.computeVertexNormals();
+      slab.castShadow = true;
+      slab.receiveShadow = true;
+      group.add(slab);
+      // Stones broken off the rim, hanging below the cap: silhouette from the side, and
+      // nothing standing up in the ground he lands on.
+      const stones = 3 + Math.floor(rand() * 3);
+      for (let i = 0; i < stones; i++) {
+        const a = rand() * Math.PI * 2;
+        const stone = new THREE.Mesh(stoneGeo, rock);
+        stone.scale.setScalar(0.2 + rand() * 0.2);
+        const sr = r * (0.66 + rand() * 0.34);
+        stone.position.set(
+          Math.cos(a) * sr,
+          island.top - thickness * (0.75 + rand() * 0.5),
+          Math.sin(a) * sr,
+        );
+        stone.rotation.set(rand() * Math.PI, rand() * Math.PI, rand() * Math.PI);
+        stone.castShadow = true;
+        group.add(stone);
+      }
+      scene.add(group);
+      island.meshes = [group];
     }
   }
 
@@ -430,6 +479,11 @@ export class World {
           x: candidate.island.x,
           z: candidate.island.z,
           top: candidate.island.top,
+          // The cap's own radius travels with the post, because the climb up to it is
+          // read off it: a caller that only knew the height would have to guess how far
+          // out the cap still catches a jump (see the pilot's climb, which jumps from the
+          // rim when it is pressed there).
+          radius: candidate.island.radius,
           sight,
           points: points.length,
         };
@@ -441,11 +495,14 @@ export class World {
   /**
    * Register a piece of scenery as something the boot can move. `mass` decides
    * how much of a kick it takes: a crate flies, a tank shoves. `kind` is only for
-   * reporting.
+   * reporting. `anchored` is for the one thing out here a boot cannot move at all —
+   * the cabin. It is scenery all the same (it blocks bullets, sight and movement, and
+   * the climb is laid out around it), but a building that slides across the field when
+   * it is kicked reads as a bug rather than as weight.
    */
-  addProp(mesh, box, { mass = 1, radius = 1, kind = 'scenery' } = {}) {
+  addProp(mesh, box, { mass = 1, radius = 1, kind = 'scenery', anchored = false } = {}) {
     const prop = {
-      mesh, box, mass, radius, kind,
+      mesh, box, mass, radius, kind, anchored,
       baseY: mesh.position.y,          // the height it sits at on the ground
       vel: new THREE.Vector3(),
       spin: new THREE.Vector3(),
@@ -465,6 +522,7 @@ export class World {
   kickProps(origin, forward, kick, powerScale = 1) {
     const hit = [];
     for (const p of this.props) {
+      if (p.anchored) continue;
       const to = this._tmp.set(
         p.mesh.position.x - origin.x, 0, p.mesh.position.z - origin.z,
       );
@@ -716,7 +774,9 @@ function buildTrees(world, scene) {
  * for rather than the size the pack used, seated on the ground rather than wherever
  * its origin happened to be, and painted with the game's own flat colours instead of
  * the pack's textures — the scenery is block-coloured by design, and importing a
- * megabyte of PNG per crate to sit in a shadow does not pay for itself.
+ * megabyte of PNG per crate to sit in a shadow does not pay for itself. Passing no
+ * colour keeps the model's own materials, which is what the one textured thing out
+ * here — the cabin — asks for.
  */
 async function dressModel(url, { by = 'length', size }, colour, roughness = 0.95) {
   const loaded = await loadPropModel(`${ASSET_BASE}${url}`);
@@ -753,8 +813,15 @@ async function dressModel(url, { by = 'length', size }, colour, roughness = 0.95
   // audit found it. `fit.origin` is what the model's own root was off by, in units.
   model.position.x -= centre.x;
   model.position.z -= centre.z;
-  const material = new THREE.MeshStandardMaterial({ color: colour, roughness, flatShading: true });
-  proto.traverse((o) => { if (o.isMesh) { o.material = material; o.castShadow = true; o.receiveShadow = true; } });
+  const material = colour === null || colour === undefined
+    ? null
+    : new THREE.MeshStandardMaterial({ color: colour, roughness, flatShading: true });
+  proto.traverse((o) => {
+    if (!o.isMesh) return;
+    if (material) o.material = material;
+    o.castShadow = true;
+    o.receiveShadow = true;
+  });
   // What the fit measured and what it scaled to, kept on the model: a pack in its own
   // units is only ever right by this arithmetic, so it is worth being able to read.
   proto.userData.fit = {
@@ -830,6 +897,28 @@ async function buildCover(world, scene) {
     mesh.receiveShadow = true;
     mesh.userData.prop = { mass: 2.6, radius: 1.1, kind: 'rock' };
     place(mesh);
+  }
+
+  // The cabin: one, and placed rather than scattered. The clearing's own radius is 19 m
+  // and the attackers appear in a ring 26-38 m out, so a cabin on the ground between the
+  // two is the landmark the fight happens in front of: close enough to be read from the
+  // clearing, far enough out to be scenery rather than an obstacle in the middle of it.
+  // It is anchored — it takes the boot with no more than a shake — and it is registered
+  // as scenery like the rest, so bullets and sight lines stop at it, movement goes round
+  // it, and the climb (laid out last) keeps its caps clear of it.
+  if (proto.cabin) {
+    const cabin = proto.cabin.clone(true);
+    const angle = rand() * Math.PI * 2;
+    const r = SETTINGS.clearingRadius + 2 + rand() * 3;
+    cabin.position.set(Math.cos(angle) * r, cabin.position.y, Math.sin(angle) * r);
+    cabin.rotation.y = rand() * Math.PI * 2;
+    cabin.userData.prop = { mass: PROPS.cabin.mass, radius: PROPS.cabin.radius, kind: 'cabin', anchored: true };
+    scene.add(cabin);
+    cabin.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(cabin).expandByScalar(-0.05);
+    world.addBox(box);
+    world.addProp(cabin, box, cabin.userData.prop);
+    world.mixLayout(cabin.position.x, cabin.position.z);
   }
 }
 

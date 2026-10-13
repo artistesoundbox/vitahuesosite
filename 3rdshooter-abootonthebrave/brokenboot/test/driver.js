@@ -105,6 +105,9 @@ async function runCampaign(options) {
   const FRAME = 1 / 60;                  // the step the harness drives
   let lastX = 0, lastZ = 0;              // for the wedge watchdog
   let wedgeSeconds = 0, pivotSeconds = 0, pivotSign = 1;
+  let detourSeconds = 0;                 // walking around the last pocket, not at it
+  let wedgeRepeats = 0;                  // wedges in a row at the same spot
+  let wedgeAtX = 0, wedgeAtZ = 0;
 
   const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
   const eye = new THREE.Vector3();
@@ -121,9 +124,6 @@ async function runCampaign(options) {
 
     let visible = null, visibleDist = Infinity;
     let nearest = null, nearestDist = Infinity;
-    // Set below when the last attacker of the wave is a marksman above him: the boot is
-    // held until he is up on the rock (see the perch block at the end of this frame).
-    let climbingToTheRock = false;
     const perched = G.enemyManager.enemies.find((e) => e && !e.dead && !e.routed && e.perched);
     // The post is not part of the walking fight. A marksman on his rock cannot be shot
     // down and cannot be booted from the ground, so while anyone else is standing the
@@ -132,6 +132,13 @@ async function runCampaign(options) {
     // thing in the wave. Without this the officer fixes on the nearest man, who is the
     // one man he can do nothing about, and the walking line is never engaged at all.
     const theRockIsAllThatIsLeft = Boolean(perched) && G.enemyManager.aliveCount === 1;
+    // Where he stands against the rock he has to climb: on it (the boot is the answer) or
+    // still under it (the climb is). Read here, before the boot and the movement are
+    // decided, because both depend on it — the kick is held while he is climbing, and the
+    // first frame he stands on the cap is the frame the boot has to land.
+    const onHisRock = theRockIsAllThatIsLeft && G.player.grounded
+      && G.player.position.y >= perched.perch.top - 0.2;
+    const climbingToTheRock = theRockIsAllThatIsLeft && !onHisRock;
     for (const e of G.enemyManager.enemies) {
       if (!e || e.dead || e.routed) continue;
       if (e.perched && !theRockIsAllThatIsLeft) continue;
@@ -207,13 +214,26 @@ async function runCampaign(options) {
     } else if ((forward !== 0 || strafe !== 0) && moved < 0.012) {
       wedgeSeconds += FRAME;
       if (wedgeSeconds > 1.2) {
-        pivotSeconds = 1.8;
+        // How many times in a row this is the same pocket. A trunk on the line to an
+        // attacker the officer has no sight of is not a pocket he can be backed out of
+        // once: he reverses, turns straight back into it, and does that for the rest of
+        // the wave. So each repeat at the same spot buys a longer reversal and, after it,
+        // a longer stretch of walking *around* rather than at it — which is what a player
+        // does after the second time they bounce off the same tree.
+        const samePocket = Math.hypot(G.player.position.x - wedgeAtX, G.player.position.z - wedgeAtZ) < 1.5;
+        wedgeRepeats = samePocket ? wedgeRepeats + 1 : 1;
+        wedgeAtX = G.player.position.x;
+        wedgeAtZ = G.player.position.z;
+        const stick = Math.min(3, wedgeRepeats - 1);
+        pivotSeconds = 1.4 + 0.5 * stick;
+        detourSeconds = 1.2 + 0.8 * stick;
         pivotSign = -(pivotSign || 1);   // the next wedge tries the other way round
         wedgeSeconds = 0;
       }
     } else {
       wedgeSeconds = 0;
     }
+
 
     const firing = Boolean(G.lock) || G.isAttackerUnderReticle();
     pad.buttons[7] = { pressed: firing, value: firing ? 1 : 0 };
@@ -246,21 +266,16 @@ async function runCampaign(options) {
     // on his perch forever, which is a limitation of the pilot rather than of the fight.
     if (theRockIsAllThatIsLeft) {
       const perch = perched.perch;
-      // Standing on his cap is the moment the boot matters — standing, not merely being
-      // above the cap's height. Reading the height alone had the officer throwing a boot
-      // every time he fell past the level, and a kick holds the animation for its whole
-      // clip, which blocks the next jump and with it the next climb.
-      if (G.player.grounded && G.player.position.y >= perch.top - 0.2) {
-        // On the rock: close the last stride and throw the boot. The rifle is not what
-        // ends him, so the habit of holding a firing line has to be dropped; and the walk
-        // stops at booting distance rather than at his feet, so the officer does not step
-        // off the far edge of the cap he has just climbed.
+      if (onHisRock) {
+        // On the rock: close to booting distance and throw it. The rifle is not what ends
+        // him, so the habit of holding a firing line has to be dropped; and the walk stops
+        // a stride short of him rather than at his feet, so the officer does not step off
+        // the far edge of the cap he has just climbed onto.
         const gap = Math.hypot(perched.position.x - G.player.position.x, perched.position.z - G.player.position.z);
         forward = gap > 1.4 ? 1 : 0;
         strafe = 0;
         sprint = false;
       } else {
-        climbingToTheRock = true;
         // Below him: aim at the rungs underneath his cap, in climb order. His own cap is
         // only reachable from the surface one step down, so that is what to stand on
         // first — the same way the probes walk the climb.
@@ -269,27 +284,45 @@ async function runCampaign(options) {
         for (let i = 0; i < (perch.index || 0); i++) {
           if (G.player.position.y < islands[i].top - 0.2) { rung = islands[i]; break; }
         }
+        // The cap's own radius decides where a jump still lands, and the post carries it
+        // (see World.marksmanPerch): the 1.4 m fallback is a guess, and a guess a metre
+        // short of the rim is the difference between the officer jumping onto the cap and
+        // pressing against it for the rest of the wave.
+        const reach = rung.radius || 1.4;
         const flat = Math.hypot(rung.x - G.player.position.x, rung.z - G.player.position.z);
-        // A cap catches him anywhere inside its own disc — the caps overlap by design, so
-        // the step up is measured off the cap's own reach rather than off a metre around
-        // its centre (which is the probe's rule too). Walking to the centre is not merely
-        // unnecessary: a prop the boot has thrown under a cap blocks the walk there, and
-        // an officer insisting on the centre walks into it for the rest of the wave.
-        const jumpReach = Math.max(0.6, (rung.radius || 1.4) - 0.15);
-        forward = flat > jumpReach ? 1 : 0;
+        // A cap catches him anywhere over its own disc, so the step up is read off the cap's
+        // own reach rather than off the metre around its centre the climb used to insist on.
+        // Insisting on the centre is not merely wasted walking: a prop the boot has thrown
+        // under a cap is a wall, and an officer who will only jump from the middle stands at
+        // the rim of a cap he is already over for the rest of the wave.
+        const comfortable = flat <= reach - 0.15;
+        const over = flat <= reach - 0.02;
+        forward = comfortable ? 0 : 1;
         strafe = 0;
         sprint = flat > 9;
         // Under the cap with the surface below his feet: jump. `jump()` is a no-op in the
         // air and while a kick is running, so asking every frame is a jump the moment he
-        // is able to make one.
-        if (flat <= jumpReach && G.player.position.y < rung.top - 0.2) G.player.jump();
+        // is able to make one. Pressed against something at the rim and unable to walk any
+        // closer, he jumps where he stands — the cap is over him either way.
+        const pressed = wedgeSeconds > 0.4;
+        if ((comfortable || (over && pressed)) && G.player.position.y < rung.top - 0.2) G.player.jump();
       }
     }
     // The climb does not cancel the wedge recovery. The perch block above commands its
     // own movement every frame, which would override the back-off — and a prop kicked
     // under a cap is a wall the officer can only get past by stepping round it, which is
     // what the recovery is for.
-    if (pivotSeconds > 0) { forward = -0.9; strafe = pivotSign; sprint = false; }
+    if (pivotSeconds > 0) {
+      forward = -0.9; strafe = pivotSign; sprint = false;
+    } else if (detourSeconds > 0) {
+      // And after the reversal, a stretch of walking *round* rather than at what stopped
+      // him: a strafe held against the goal bends the approach past the corner he kept
+      // hitting instead of running back into it from the same line.
+      detourSeconds -= FRAME;
+      forward = 1;
+      strafe = pivotSign * 0.9;
+      sprint = false;
+    }
     setMove(forward, strafe, sprint);
     if (G.player.ammo <= 0 && G.player.reloading <= 0) G.player.beginReload();
   }
@@ -528,10 +561,13 @@ async function runCampaign(options) {
       //    crate certainly does.
       G.enemyManager.enemies = [];
       G.step = originalStep;              // frames without the pilot, so nothing else kicks
-      // The heaviest thing on the field, chosen by its own mass rather than by name:
-      // the tank is it while the tank is there, and whatever the heaviest prop is
-      // after that, so the clause survives the dressing being swapped again.
-      const prop = G.world.props.reduce((a, q) => (q.mass > a.mass ? q : a), G.world.props[0]);
+      // The heaviest thing on the field *that the boot can move*, chosen by its own
+      // mass rather than by name: the tank is it while the tank is there, and whatever
+      // the heaviest prop is after that, so the clause survives the dressing being
+      // swapped again. Anchored scenery is skipped because it is the subject of its own
+      // clause below — kicking a building is measured there, not here.
+      const movers = G.world.props.filter((q) => !q.anchored);
+      const prop = movers.reduce((a, q) => (q.mass > a.mass ? q : a), movers[0]);
       out.scenery.kind = prop.kind;
       out.scenery.mass = prop.mass;
       const from = prop.mesh.position.clone();
@@ -560,6 +596,35 @@ async function runCampaign(options) {
       out.scenery.settleSeconds = +(frames / 60).toFixed(1);
       out.scenery.settled = prop.rest;
       out.scenery.boxFollowed = +prop.box.getCenter(new THREE.Vector3()).distanceTo(boxFrom).toFixed(2);
+
+      // 3b. And the one thing out here the boot is not meant to move at all: the
+      //     anchored scenery takes the same swing and stays exactly where it was put —
+      //     position, spin and collision box alike. It is the boot's own limit, measured
+      //     with the kick that has just thrown the heaviest movable prop, so a failure
+      //     here is the anchoring giving way and not a weak swing.
+      out.anchored = { count: 0, kinds: [], moved: 0, spun: false, boxMoved: 0 };
+      for (const fixed of G.world.props.filter((q) => q.anchored)) {
+        out.anchored.count += 1;
+        if (!out.anchored.kinds.includes(fixed.kind)) out.anchored.kinds.push(fixed.kind);
+        const wasAt = fixed.mesh.position.clone();
+        const wasTurned = fixed.mesh.rotation.clone();
+        const wasBox = fixed.box.getCenter(new THREE.Vector3());
+        p.object.position.set(wasAt.x - 2.2, 0, wasAt.z - 2.2);
+        p.yaw = Math.atan2(wasAt.x - p.object.position.x, wasAt.z - p.object.position.z);
+        G.cameraYaw = p.yaw;
+        p.kickCooldown = 0;
+        p.pendingKick = null;
+        G.resolveMelee('stomp');
+        for (let i = 0; i < 90; i++) G.step(1 / 60);
+        out.anchored.moved = Math.max(out.anchored.moved, +fixed.mesh.position.distanceTo(wasAt).toFixed(3));
+        out.anchored.spun = out.anchored.spun
+          || Math.abs(fixed.mesh.rotation.x - wasTurned.x) > 0.01
+          || Math.abs(fixed.mesh.rotation.z - wasTurned.z) > 0.01;
+        out.anchored.boxMoved = Math.max(
+          out.anchored.boxMoved,
+          +fixed.box.getCenter(new THREE.Vector3()).distanceTo(wasBox).toFixed(3),
+        );
+      }
 
       // 4. And what all of it feels like. One mass figure drives the shake, the
       //    camera kickback, the frame roll, the hit-stop and the screen-edge
@@ -2387,35 +2452,17 @@ async function runCampaign(options) {
         playerHeight: +G.player.position.y.toFixed(2),
         playerGrounded: Boolean(G.player.grounded),
         leftovers,
+        // What the officer was doing when the wave stopped: whether he was told to move
+        // and was somehow held, or was not being told to move at all.
         pilot: {
-          aliveCount: G.enemyManager.aliveCount,
-          queue: G.enemyManager.queue.length,
-          perched: Boolean(G.enemyManager.enemies.find((e) => e && !e.dead && !e.routed && e.perched)),
           padAxes: [pad.axes[0], pad.axes[1]],
-          padTrigger: Boolean(pad.buttons[7] && pad.buttons[7].pressed),
-          playerY: +G.player.position.y.toFixed(2),
-          grounded: Boolean(G.player.grounded),
-          busy: Boolean(G.player.anim.busy),
-          lock: Boolean(G.lock),
           inputForward: G.input.forward,
-          inputStrafe: G.input.strafe,
           velocity: [+G.player.velocity.x.toFixed(2), +G.player.velocity.z.toFixed(2)],
           moving: Boolean(G.player.moving),
-          speedMultiplier: G.player.speedMultiplier,
+          grounded: Boolean(G.player.grounded),
+          busy: Boolean(G.player.anim.busy),
           crouching: Boolean(G.player.crouching),
-          pendingKick: G.player.pendingKick ? G.player.pendingKick.type : null,
-          state: G.state,
-          resolvePush: (() => {
-            const v = G.player.position.clone();
-            G.world.resolveCircle(v, 0.55);
-            return [+(v.x - G.player.position.x).toFixed(3), +(v.z - G.player.position.z).toFixed(3)];
-          })(),
-          boxesNear: G.world.boxes.filter((b) => {
-            const dx = Math.max(b.min.x - G.player.position.x, 0, G.player.position.x - b.max.x);
-            const dz = Math.max(b.min.z - G.player.position.z, 0, G.player.position.z - b.max.z);
-            return Math.hypot(dx, dz) < 1.5;
-          }).map((b) => ({ min: [+b.min.x.toFixed(2), +b.min.y.toFixed(2), +b.min.z.toFixed(2)], max: [+b.max.x.toFixed(2), +b.max.y.toFixed(2), +b.max.z.toFixed(2)] })),
-          cylindersNear: G.world.cylinders.filter((c) => Math.hypot(c.x - G.player.position.x, c.z - G.player.position.z) < c.r + 1.5).map((c) => ({ x: +c.x.toFixed(2), z: +c.z.toFixed(2), r: +c.r.toFixed(2) })),
+          perched: Boolean(G.enemyManager.enemies.find((e) => e && !e.dead && !e.routed && e.perched)),
         },
         samples: stallSamples,
       };
@@ -3720,6 +3767,63 @@ async function runCampaign(options) {
           seconds,
           moved: +Math.hypot(marksman.position.x - perch.x, marksman.position.z - perch.z).toFixed(2),
         };
+
+        // What the climb pays on the way back down. A second man is posted on the same
+        // cap and booted off it with the drop roll pinned past the end of its table — the
+        // stretch that drops nothing — so whatever the officer standing up there comes
+        // away with is the guarantee and not luck. It is read off the game's own pickup
+        // handler, which is the code that pays the island crates out, and the officer is
+        // emptied out first (no rounds in reserve, hurt, uncharged, nothing running) so
+        // that a kit of any kind has somewhere to land: a full officer swallows the prize
+        // silently. His magazine is left loaded, because an officer with nothing anywhere
+        // is handed ammo by the table's first rule and never reaches the roll at all.
+        const second = G.enemyManager.spawn(post);
+        spawned.push(second);
+        const purse = () => [
+          p.ammo, p.reserve, Math.round(p.health), Math.round(p.charge),
+          +p.powerups.rapid.toFixed(2), +p.powerups.armor.toFixed(2),
+        ].join('/');
+        const heldPurse = { ammo: p.ammo, reserve: p.reserve, health: p.health,
+          charge: p.charge, rapid: p.powerups.rapid, armor: p.powerups.armor };
+        place(beside.x, perch.top, beside.z, toward(beside, perch));
+        for (let i = 0; i < 2; i++) G.step(FRAME);
+        p.ammo = SETTINGS.magSize; p.reserve = 0; p.health = 50; p.charge = 0;
+        p.powerups.rapid = 0; p.powerups.armor = 0;
+        const purseBefore = purse();
+        const realRandom = Math.random;
+        const realPickup = G.onPickup;
+        let kitType = null;
+        try {
+          Math.random = () => 0.999;
+          G.onPickup = (type) => { kitType = type; realPickup.call(G, type); };
+          p.kickCooldown = 0;
+          p.pendingKick = null;
+          p.melee();
+          for (let i = 0; i < 90; i++) G.step(FRAME);
+        } finally {
+          Math.random = realRandom;
+          G.onPickup = realPickup;
+        }
+        out.post.kit = {
+          offTheRock: second.routed,
+          pinnedRoll: 0.999,        // past the table's weights: the roll that drops nothing
+          collected: kitType,
+          before: purseBefore,
+          after: purse(),
+          achievement: G.achievements.has('off_the_rock'),
+        };
+        // Nothing this probe dropped stays on the field: a kit left at cap height would be
+        // a free pickup in the campaign that follows.
+        for (const q of G.effects.pickups.filter(
+          (r) => !r.anchored && Math.abs(r.baseY - (perch.top + 0.4)) < 1e-6,
+        )) {
+          G.scene.remove(q.mesh);
+          G.effects.pickups.splice(G.effects.pickups.indexOf(q), 1);
+        }
+        Object.assign(p, { ammo: heldPurse.ammo, reserve: heldPurse.reserve,
+          health: heldPurse.health, charge: heldPurse.charge });
+        p.powerups.rapid = heldPurse.rapid;
+        p.powerups.armor = heldPurse.armor;
         const g = out.post.gunfire;
         const below = out.post.fromBelow;
         const above = out.post.fromTheCap;
@@ -3730,7 +3834,9 @@ async function runCampaign(options) {
           && g.rounds > 0 && !g.down && !g.bleeding && g.health === g.floor
           && out.post.control.down
           && !below.routed && below.moved < 0.01
-          && above.kicked && above.landedAt === 0;
+          && above.kicked && above.landedAt === 0
+          && out.post.kit.offTheRock && out.post.kit.collected
+          && out.post.kit.achievement;
       } else {
         out.post.pass = false;
         out.post.note = 'no cap of the climb can see the clearing, so no marksman is posted';

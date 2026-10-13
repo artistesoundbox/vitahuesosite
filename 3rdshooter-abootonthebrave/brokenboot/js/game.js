@@ -585,7 +585,14 @@ export class Game {
     // Every rout charges the boot a little, so the meter fills by playing the
     // way the design intends rather than by waiting.
     this.player.addCharge(SETTINGS.chargePerRout);
-    this.dropLoot(enemy.position, 1);
+    // The post pays where the rifle cannot: a marksman only ever leaves his rock by
+    // the boot, so what he was carrying stays on the cap the officer has just climbed
+    // to, and it never rolls a miss. Everything else drops in the grass where it fell.
+    if (enemy.perched && MARKSMAN.kitDrop) {
+      this.dropLoot(enemy.position.clone().setY(enemy.perch.top), 1, { guaranteed: true });
+    } else {
+      this.dropLoot(enemy.position, 1);
+    }
     this.checkAchievements();
     return true;
   }
@@ -594,11 +601,18 @@ export class Game {
    * Roll the elimination drop table. Ammo is checked first so a dry player can
    * never hard-stall, and healing keeps up with a wave's incoming fire.
    * `scale` lets a slower kill (a gunfire downing) drop less often.
+   *
+   * `guaranteed` draws inside the table instead of across the whole of [0, 1): the
+   * weights below add up to less than one, and the space past their sum is the roll
+   * that drops nothing. It is for the one elimination the climb is for — see
+   * `routEnemy` — where "the boot took him off the rock and the field gave you
+   * nothing" would read as the post not being worth the climb.
    */
-  dropLoot(position, scale = 1) {
+  dropLoot(position, scale = 1, { guaranteed = false } = {}) {
     const dry = this.player.ammo === 0 && this.player.reserve < 30;
-    const roll = Math.random() / Math.max(0.001, scale);
     const s = SETTINGS;
+    const table = s.dropAmmo + s.dropHealth + s.dropReload + s.dropCharge + s.dropRapid + s.dropArmor;
+    const roll = guaranteed ? Math.random() * table : Math.random() / Math.max(0.001, scale);
     let type = null;
     if (dry) type = 'ammo';
     else if (roll < s.dropAmmo) type = 'ammo';
@@ -1096,6 +1110,7 @@ export class Game {
     if (this.player.bootIndex >= 3) unlock('gold');
     if (this.player.bootIndex >= 6) unlock('legendary');
     if (this.tanksKicked >= 1) unlock('tank_kicker');
+    if (this.marksmenBootedOff >= 1) unlock('off_the_rock');
     if (this.enemyManager && this.enemyManager.aliveCount >= 6) unlock('surrounded');
   }
 

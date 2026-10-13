@@ -1,10 +1,10 @@
 {
-  "recordedAt": "2026-10-13T04:09:44.954Z",
+  "recordedAt": "2026-10-13T05:22:10.830Z",
   "seed": 20260411,
   "worldSeed": 1337,
-  "layoutHash": "5ebbc2bc",
+  "layoutHash": "4fbbfaf0",
   "dressing": {
-    "hash": "26adf59c",
+    "hash": "9397467a",
     "kinds": [
       {
         "kind": "barrel",
@@ -30,6 +30,20 @@
               0.951,
               0.161,
               0.127
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "cabin",
+        "count": 1,
+        "models": [
+          {
+            "url": "cabin.glb",
+            "span": [
+              1.611,
+              0.846,
+              1.985
             ]
           }
         ]
@@ -80,43 +94,43 @@
   "waves": [
     {
       "wave": 1,
-      "durationSeconds": 29.02
+      "durationSeconds": 24.83
     },
     {
       "wave": 2,
-      "durationSeconds": 36.03
+      "durationSeconds": 36.17
     },
     {
       "wave": 3,
-      "durationSeconds": 32.1
+      "durationSeconds": 32.6
     },
     {
       "wave": 4,
-      "durationSeconds": 36.6
+      "durationSeconds": 54.63
     },
     {
       "wave": 5,
-      "durationSeconds": 35.23
+      "durationSeconds": 33.65
     },
     {
       "wave": 6,
-      "durationSeconds": 38.97
+      "durationSeconds": 55.89
     },
     {
       "wave": 7,
-      "durationSeconds": 56.68
+      "durationSeconds": 43.1
     },
     {
       "wave": 8,
-      "durationSeconds": 51.79
+      "durationSeconds": 42.95
     },
     {
       "wave": 9,
-      "durationSeconds": 48.11
+      "durationSeconds": 53.01
     },
     {
       "wave": 10,
-      "durationSeconds": 45.87
+      "durationSeconds": 40.55
     }
   ],
   "tiers": [
@@ -126,27 +140,27 @@
     },
     {
       "tier": "Reinforced Boot",
-      "atSeconds": 67.73
+      "atSeconds": 50.43
     },
     {
       "tier": "Silver Boot",
-      "atSeconds": 128.35
+      "atSeconds": 110.25
     },
     {
       "tier": "Gold Boot",
-      "atSeconds": 189.43
+      "atSeconds": 184.32
     },
     {
       "tier": "Spiked Gold Boot",
-      "atSeconds": 272.18
+      "atSeconds": 271.95
     },
     {
       "tier": "Tactical Doom Boot",
-      "atSeconds": 335.6
+      "atSeconds": 331.37
     },
     {
       "tier": "Legendary Broken Boot",
-      "atSeconds": 388.83
+      "atSeconds": 395.07
     }
   ]
 }
