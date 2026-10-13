@@ -1,118 +1,118 @@
 {
   "seed": 20260411,
-  "startedAt": "2026-10-13T05:22:19.780Z",
-  "gameSeconds": 417.38,
-  "steps": 25043,
+  "startedAt": "2026-10-13T07:20:38.097Z",
+  "gameSeconds": 423.83,
+  "steps": 25430,
   "waves": [
     {
       "wave": 1,
       "startSeconds": 0,
-      "clearSeconds": 24.83,
-      "durationSeconds": 24.83,
+      "clearSeconds": 22.77,
+      "durationSeconds": 22.77,
       "hostilesAtStart": 5,
       "eliminations": 5,
-      "damageTaken": 9,
-      "damagePerSecond": 0.36,
+      "damageTaken": 27,
+      "damagePerSecond": 1.19,
       "longestGapSeconds": 6.2
     },
     {
       "wave": 2,
-      "startSeconds": 24.83,
-      "clearSeconds": 61,
-      "durationSeconds": 36.17,
+      "startSeconds": 22.77,
+      "clearSeconds": 52.52,
+      "durationSeconds": 29.75,
       "hostilesAtStart": 8,
       "eliminations": 8,
-      "damageTaken": 61.2,
-      "damagePerSecond": 1.69,
-      "longestGapSeconds": 9.1
+      "damageTaken": 52.2,
+      "damagePerSecond": 1.75,
+      "longestGapSeconds": 9
     },
     {
       "wave": 3,
-      "startSeconds": 61,
-      "clearSeconds": 93.6,
-      "durationSeconds": 32.6,
+      "startSeconds": 52.52,
+      "clearSeconds": 84.37,
+      "durationSeconds": 31.85,
       "hostilesAtStart": 9,
       "eliminations": 9,
-      "damageTaken": 63,
-      "damagePerSecond": 1.93,
-      "longestGapSeconds": 8.5
+      "damageTaken": 18,
+      "damagePerSecond": 0.57,
+      "longestGapSeconds": 8.7
     },
     {
       "wave": 4,
-      "startSeconds": 93.6,
-      "clearSeconds": 148.23,
-      "durationSeconds": 54.63,
+      "startSeconds": 84.37,
+      "clearSeconds": 121.32,
+      "durationSeconds": 36.95,
       "hostilesAtStart": 11,
       "eliminations": 11,
-      "damageTaken": 36,
-      "damagePerSecond": 0.66,
-      "longestGapSeconds": 20.5
+      "damageTaken": 9,
+      "damagePerSecond": 0.24,
+      "longestGapSeconds": 8.2
     },
     {
       "wave": 5,
-      "startSeconds": 148.23,
-      "clearSeconds": 181.88,
-      "durationSeconds": 33.65,
+      "startSeconds": 121.32,
+      "clearSeconds": 159.95,
+      "durationSeconds": 38.63,
       "hostilesAtStart": 12,
       "eliminations": 12,
-      "damageTaken": 18,
-      "damagePerSecond": 0.53,
-      "longestGapSeconds": 7.9
+      "damageTaken": 99.9,
+      "damagePerSecond": 2.59,
+      "longestGapSeconds": 10.5
     },
     {
       "wave": 6,
-      "startSeconds": 181.88,
-      "clearSeconds": 237.77,
-      "durationSeconds": 55.89,
+      "startSeconds": 159.95,
+      "clearSeconds": 200.15,
+      "durationSeconds": 40.2,
       "hostilesAtStart": 13,
       "eliminations": 13,
-      "damageTaken": 164.3,
-      "damagePerSecond": 2.94,
-      "longestGapSeconds": 12.5
+      "damageTaken": 63,
+      "damagePerSecond": 1.57,
+      "longestGapSeconds": 7.4
     },
     {
       "wave": 7,
-      "startSeconds": 237.77,
-      "clearSeconds": 280.87,
-      "durationSeconds": 43.1,
+      "startSeconds": 200.15,
+      "clearSeconds": 246.18,
+      "durationSeconds": 46.03,
       "hostilesAtStart": 15,
       "eliminations": 15,
-      "damageTaken": 126,
-      "damagePerSecond": 2.92,
-      "longestGapSeconds": 6.9
+      "damageTaken": 121.5,
+      "damagePerSecond": 2.64,
+      "longestGapSeconds": 7.1
     },
     {
       "wave": 8,
-      "startSeconds": 280.87,
-      "clearSeconds": 323.82,
-      "durationSeconds": 42.95,
+      "startSeconds": 246.18,
+      "clearSeconds": 324.7,
+      "durationSeconds": 78.52,
       "hostilesAtStart": 16,
       "eliminations": 16,
-      "damageTaken": 126,
-      "damagePerSecond": 2.93,
-      "longestGapSeconds": 6.6
+      "damageTaken": 185.4,
+      "damagePerSecond": 2.36,
+      "longestGapSeconds": 19.4
     },
     {
       "wave": 9,
-      "startSeconds": 323.82,
-      "clearSeconds": 376.83,
-      "durationSeconds": 53.01,
+      "startSeconds": 324.7,
+      "clearSeconds": 380.93,
+      "durationSeconds": 56.23,
       "hostilesAtStart": 18,
       "eliminations": 18,
-      "damageTaken": 221.4,
-      "damagePerSecond": 4.18,
-      "longestGapSeconds": 12.2
+      "damageTaken": 112.5,
+      "damagePerSecond": 2,
+      "longestGapSeconds": 10.1
     },
     {
       "wave": 10,
-      "startSeconds": 376.83,
-      "clearSeconds": 417.38,
-      "durationSeconds": 40.55,
+      "startSeconds": 380.93,
+      "clearSeconds": 423.83,
+      "durationSeconds": 42.9,
       "hostilesAtStart": 19,
       "eliminations": 19,
-      "damageTaken": 121.5,
-      "damagePerSecond": 3,
-      "longestGapSeconds": 5.9,
+      "damageTaken": 268.2,
+      "damagePerSecond": 6.25,
+      "longestGapSeconds": 10.7,
       "closedByHarness": false,
       "endedByVictory": true
     }
@@ -125,33 +125,38 @@
     },
     {
       "tier": "Reinforced Boot",
-      "atSeconds": 50.43,
-      "credit": 10.25
+      "atSeconds": 45.67,
+      "credit": 10.5
     },
     {
       "tier": "Silver Boot",
-      "atSeconds": 110.25,
-      "credit": 24
+      "atSeconds": 98.65,
+      "credit": 24.75
     },
     {
       "tier": "Gold Boot",
-      "atSeconds": 184.32,
-      "credit": 42.25
+      "atSeconds": 154.83,
+      "credit": 42.75
     },
     {
       "tier": "Spiked Gold Boot",
-      "atSeconds": 271.95,
-      "credit": 62.75
+      "atSeconds": 219.5,
+      "credit": 62
     },
     {
       "tier": "Tactical Doom Boot",
-      "atSeconds": 331.37,
-      "credit": 82.25
+      "atSeconds": 296.48,
+      "credit": 82.5
     },
     {
       "tier": "Legendary Broken Boot",
-      "atSeconds": 395.07,
+      "atSeconds": 376.92,
       "credit": 102.5
+    },
+    {
+      "tier": "Mythical Diamond Boot",
+      "atSeconds": 415.62,
+      "credit": 116.5
     }
   ],
   "banners": [
@@ -160,377 +165,329 @@
       "atSeconds": 0.02
     },
     {
-      "text": "THE BOOT",
-      "atSeconds": 4.63
+      "text": "BLEEDING OUT",
+      "atSeconds": 5.4
     },
     {
       "text": "LAST STAND",
-      "atSeconds": 5.88
+      "atSeconds": 7.02
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 9.53
+      "atSeconds": 10.37
     },
     {
       "text": "BLEEDING OUT",
-      "atSeconds": 12.6
+      "atSeconds": 13.22
     },
     {
       "text": "WAVE CLEARED",
-      "atSeconds": 18.6
+      "atSeconds": 16.53
     },
     {
       "text": "WAVE 2",
-      "atSeconds": 24.83
+      "atSeconds": 22.77
     },
     {
       "text": "MARKSMAN POSTED",
-      "atSeconds": 26.55
+      "atSeconds": 24.48
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 27.68
+      "atSeconds": 25.57
     },
     {
       "text": "LAST STAND",
-      "atSeconds": 46.27
+      "atSeconds": 39.17
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 50.43
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 53.05
+      "atSeconds": 44.17
     },
     {
       "text": "WAVE CLEARED",
-      "atSeconds": 55.05
+      "atSeconds": 46.57
     },
     {
       "text": "WAVE 3",
-      "atSeconds": 61
+      "atSeconds": 52.52
     },
     {
       "text": "MARKSMAN POSTED",
-      "atSeconds": 62.6
+      "atSeconds": 54.12
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 55.25
     },
     {
       "text": "REINFORCED BOOT",
-      "atSeconds": 63.6
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 67.65
+      "atSeconds": 60.57
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 70.78
+      "atSeconds": 61.82
     },
     {
       "text": "LAST STAND",
-      "atSeconds": 82.1
+      "atSeconds": 72.68
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 84.2
+      "atSeconds": 76.4
     },
     {
       "text": "WAVE CLEARED",
-      "atSeconds": 87.92
+      "atSeconds": 78.68
     },
     {
       "text": "WAVE 4",
-      "atSeconds": 93.6
+      "atSeconds": 84.37
     },
     {
       "text": "MARKSMAN POSTED",
-      "atSeconds": 95.1
+      "atSeconds": 85.87
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 96.25
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 100
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 104.42
+      "atSeconds": 86.92
     },
     {
       "text": "REINFORCED BOOT",
-      "atSeconds": 110.25
+      "atSeconds": 98.65
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 111.5
+      "atSeconds": 99.9
     },
     {
       "text": "LAST STAND",
-      "atSeconds": 115.82
+      "atSeconds": 107.27
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 120.2
+      "atSeconds": 111.08
     },
     {
       "text": "WAVE CLEARED",
-      "atSeconds": 142.83
+      "atSeconds": 115.92
     },
     {
       "text": "WAVE 5",
-      "atSeconds": 148.23
+      "atSeconds": 121.32
     },
     {
       "text": "MARKSMAN POSTED",
-      "atSeconds": 149.62
+      "atSeconds": 122.7
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 150.77
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 163.47
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 165.4
+      "atSeconds": 126.45
     },
     {
       "text": "SILVER BOOT",
-      "atSeconds": 167.48
-    },
-    {
-      "text": "LAST STAND",
-      "atSeconds": 169.57
+      "atSeconds": 138.98
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 173.8
+      "atSeconds": 142.92
+    },
+    {
+      "text": "LAST STAND",
+      "atSeconds": 145
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 147.18
     },
     {
       "text": "WAVE CLEARED",
-      "atSeconds": 176.77
+      "atSeconds": 154.83
     },
     {
       "text": "WAVE 6",
-      "atSeconds": 181.88
+      "atSeconds": 159.95
     },
     {
       "text": "MARKSMAN POSTED",
-      "atSeconds": 183.17
+      "atSeconds": 161.23
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 184.32
+      "atSeconds": 162.3
     },
     {
       "text": "BLEEDING OUT",
-      "atSeconds": 187.32
+      "atSeconds": 182.3
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 191.85
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 198.7
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 201.1
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 202.7
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 203.18
+      "atSeconds": 183.9
     },
     {
       "text": "LAST STAND",
-      "atSeconds": 211.95
+      "atSeconds": 188.68
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 214.03
+      "atSeconds": 191.13
     },
     {
       "text": "WAVE CLEARED",
-      "atSeconds": 232.92
+      "atSeconds": 195.3
     },
     {
       "text": "WAVE 7",
-      "atSeconds": 237.77
+      "atSeconds": 200.15
     },
     {
       "text": "MARKSMAN POSTED",
-      "atSeconds": 238.95
+      "atSeconds": 201.33
     },
     {
-      "text": "BOOT CHARGED",
-      "atSeconds": 239.85
+      "text": "THE BOOT",
+      "atSeconds": 202.47
     },
     {
       "text": "GOLD BOOT",
-      "atSeconds": 242.78
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 246.55
+      "atSeconds": 216.07
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 249.85
+      "atSeconds": 219.5
     },
     {
       "text": "BLEEDING OUT",
-      "atSeconds": 256.87
+      "atSeconds": 227.3
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 258.9
+      "atSeconds": 230.25
     },
     {
       "text": "BLEEDING OUT",
-      "atSeconds": 263.02
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 265.15
+      "atSeconds": 232.6
     },
     {
       "text": "LAST STAND",
-      "atSeconds": 269.32
+      "atSeconds": 232.67
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 271.95
+      "atSeconds": 234.9
     },
     {
       "text": "WAVE CLEARED",
-      "atSeconds": 276.3
+      "atSeconds": 241.62
     },
     {
       "text": "WAVE 8",
-      "atSeconds": 280.87
+      "atSeconds": 246.18
     },
     {
       "text": "MARKSMAN POSTED",
-      "atSeconds": 281.93
-    },
-    {
-      "text": "SPIKED GOLD BOOT",
-      "atSeconds": 282.95
+      "atSeconds": 247.25
     },
     {
       "text": "THEY’RE MOVING",
-      "atSeconds": 288.33
+      "atSeconds": 251.58
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 289.47
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 298.97
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 299.68
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 315.48
-    },
-    {
-      "text": "LAST STAND",
-      "atSeconds": 315.5
+      "atSeconds": 253.72
     },
     {
       "text": "SPIKED GOLD BOOT",
-      "atSeconds": 317.45
+      "atSeconds": 260.15
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 262.92
     },
     {
       "text": "WAVE CLEARED",
-      "atSeconds": 319.53
+      "atSeconds": 320.42
     },
     {
       "text": "WAVE 9",
-      "atSeconds": 323.82
+      "atSeconds": 324.7
     },
     {
       "text": "MARKSMAN POSTED",
-      "atSeconds": 324.78
-    },
-    {
-      "text": "THEY’RE MOVING",
-      "atSeconds": 328.27
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 329.28
+      "atSeconds": 325.67
     },
     {
       "text": "TACTICAL DOOM BOOT",
-      "atSeconds": 349.08
-    },
-    {
-      "text": "BLEEDING OUT",
-      "atSeconds": 350.18
+      "atSeconds": 326.8
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 350.75
+      "atSeconds": 330.93
+    },
+    {
+      "text": "THEY’RE MOVING",
+      "atSeconds": 338.47
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 339.22
+    },
+    {
+      "text": "TACTICAL DOOM BOOT",
+      "atSeconds": 366.07
+    },
+    {
+      "text": "LAST STAND",
+      "atSeconds": 366.4
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 367.63
     },
     {
       "text": "WAVE CLEARED",
-      "atSeconds": 372.82
+      "atSeconds": 376.92
     },
     {
       "text": "WAVE 10",
-      "atSeconds": 376.83
+      "atSeconds": 380.93
     },
     {
       "text": "MARKSMAN POSTED",
-      "atSeconds": 377.7
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 378.72
+      "atSeconds": 381.8
     },
     {
       "text": "THEY’RE MOVING",
-      "atSeconds": 382.22
+      "atSeconds": 384.45
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 382.43
-    },
-    {
-      "text": "TACTICAL DOOM BOOT",
-      "atSeconds": 386.77
-    },
-    {
-      "text": "THE BOOT",
-      "atSeconds": 389.13
+      "atSeconds": 387.6
     },
     {
       "text": "LEGENDARY BROKEN BOOT",
-      "atSeconds": 413.13
+      "atSeconds": 400.87
     },
     {
       "text": "THE BOOT",
-      "atSeconds": 414.7
+      "atSeconds": 403.3
+    },
+    {
+      "text": "LAST STAND",
+      "atSeconds": 417.18
+    },
+    {
+      "text": "THE BOOT",
+      "atSeconds": 418.92
+    },
+    {
+      "text": "MYTHICAL DIAMOND BOOT",
+      "atSeconds": 423.83
     }
   ],
   "eliminations": 126,
-  "bootEliminations": 112,
-  "lootCollected": 87,
+  "bootEliminations": 120,
+  "lootCollected": 97,
   "worldSeed": 1337,
   "layoutHash": 1337719536,
   "dressing": {
@@ -654,7 +611,7 @@
     }
   },
   "healthAtEnd": null,
-  "damageTaken": 946.3499999996275,
+  "damageTaken": 956.6999999994878,
   "instrumented": true,
   "outcome": "victory",
   "errors": [],
@@ -666,7 +623,7 @@
     "bootedOff": 9,
     "firstWave": 2
   },
-  "wallClockSeconds": 6.8,
+  "wallClockSeconds": 6.7,
   "consoleErrors": [],
   "consoleWarnings": [
     "console.warn: THREE.FBXLoader: %s map is not supported in three.js, skipping texture. ShininessExponent",

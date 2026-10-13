@@ -164,6 +164,15 @@ body.touch-mode .pad { display: none; }
   .controls { font-size: 11px; }
   .controls li { padding: 2px 0; }
   .start-button { width: 100%; padding: 15px 20px; font-size: 13px; }
+  /* The portal link is a bare text link on desktop, where 18px of hit area is
+     fine for a pointer. A finger needs a real target, so on phones it takes
+     the full width and its own padding. */
+  .portal-link {
+    display: block;
+    margin: 0;
+    padding: 13px 0;
+    font-size: 12px;
+  }
   .over-body .stats { max-width: 100%; }
 }
 
