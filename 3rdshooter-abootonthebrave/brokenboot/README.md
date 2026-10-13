@@ -1070,9 +1070,13 @@ a half: `3rdpersonidle.fbx` answered with 115,526,016 bytes and `game/index.pck`
 327,853,876 (the real pack, not its pointer), and `brokenboot/.gitignore` with 200 —
 the last being the tell, because only an artifact built from a full checkout carries
 dotfiles. The Pages workflow guards that on the runner: it fails the deploy if
-`game/index.pck` arrives shorter than 100 MB. It holds only while Settings → Pages →
-Build and deployment → Source stays on
-**GitHub Actions**; the branch build is still there to win again if that changes. The
+`game/index.pck` arrives shorter than 100 MB. And the deploy ends by asking the live
+URLs what they are actually serving — `node tools/check-live-assets.js`, one ranged
+GET per asset, which fails the run if any of them comes back as a pointer, as the
+wrong format or as too few bytes to be the file. It holds only while Settings → Pages
+→ Build and deployment → Source stays on
+**GitHub Actions**; the branch build is still there to win again if that changes, and
+the check only speaks for the moment it ran — nothing re-tests the host afterwards. The
 overlap pack in `game/` is the asset that would feel it, because that 328 MB `.pck` is
 LFS as well — and the same trick applies to it: put the thing the player downloads
 under the 100 MB line and commit it as an ordinary file, so no host can serve a stub

@@ -66,3 +66,15 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # By now the deploy has succeeded, which says nothing about what the host is
+      # serving: an LFS pointer answers 200 with a plausible content type, and this
+      # repo stores pointers for game/index.pck and 3rdpersonidle.fbx. The checkout
+      # above is smudged and verified, so if the URLs answer with pointers the
+      # publishing pipeline is not this artifact — Pages is sourcing the branch build
+      # (Settings -> Pages -> Build and deployment -> Source). Waiting is for the CDN:
+      # a fresh deploy can briefly answer with the previous build. This is a
+      # deploy-time guard, not a monitor — the branch build can still overwrite the
+      # artifact afterwards, and only the next run would notice.
+      - name: Check the live site serves the real files
+        run: node tools/check-live-assets.js --base="${{ steps.deployment.outputs.page_url }}" --wait=300
