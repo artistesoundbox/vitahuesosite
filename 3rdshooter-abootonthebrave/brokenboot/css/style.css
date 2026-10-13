@@ -15,6 +15,14 @@ html, body {
   color: var(--text);
   font-family: "Segoe UI", Roboto, system-ui, sans-serif;
   overflow: hidden;
+  /* This is an app, not a document: a press that lingers on the HUD, the poster
+     or a button must not start a text selection or raise the browser's
+     Select/Cut/Paste callout. user-select is inherited by everything below, and
+     the grey tap flash is suppressed for the same reason. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 #canvas-wrap { position: fixed; inset: 0; }
@@ -246,6 +254,9 @@ html, body {
   display: flex; align-items: center; justify-content: center;
   background: radial-gradient(ellipse at center, rgba(10, 16, 10, 0.86), rgba(3, 5, 3, 0.97));
   backdrop-filter: blur(3px);
+  /* Manipulation still pans and pinches, but a quick second tap on Deploy
+     cannot zoom the page out from under the player. */
+  touch-action: manipulation;
 }
 .screen-inner { text-align: center; max-width: 560px; padding: 28px; }
 .screen-inner.wide { display: flex; gap: 30px; align-items: center; max-width: 1020px; text-align: left; }
