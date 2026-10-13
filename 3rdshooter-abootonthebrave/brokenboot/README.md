@@ -1046,22 +1046,37 @@ matter, and reads the travelling root bone from that same rig. Measured on the w
 clip: 52 of the body's 65 bones move and none of the visor's, which is the FBX's own
 behaviour. The officer has a single rig, where nothing can collide.
 
+Confirmed on the deployed site rather than only in the harness, in a cold browser with
+no cache: all four of the attacker's clips — idle, walk, aim and crouch — aim 52 nodes
+each at the body's 65 bones and none at the visor's, and in the running match the body's
+arm, leg and spine bones changed pose 224 times across fourteen sampled frames while
+the visor's sixteen equivalent bones did not move once.
+
 **And the pointer no longer reaches the player.** Checked against a host that answers
 both LFS paths with the 134-byte pointer the commit stores, the match starts and draws
 the officer: the load makes 56 requests totalling 56.6 MB and never asks for the
 `.fbx` at all.
 
-That matters because the pointer is still what the live site answers with. Measured
-while writing this: `3rdpersonidle.fbx` returns 134 bytes, `game/index.pck` the same,
-and `brokenboot/.gitignore` returns 404 — which only the legacy branch build does, as
-the Actions artifact is built with `lfs: true`, includes dotfiles, and is verified on
-the runner to carry the real 328 MB pack. The same URLs answered with the real
-115,526,016 bytes earlier in the same session, so both pipelines are publishing to
-the one host and they disagree: the artifact carries the payload, and the branch build
-overwrites it with the pointers a few minutes later. This game no longer depends on
-which one wins. The overlap pack in `game/` still does, because that 328 MB `.pck` is
+That mattered because for a while the live site answered with the pointer instead.
+Measured mid-session, the same URLs returned different things minutes apart —
+`3rdpersonidle.fbx` at 134 bytes and `brokenboot/.gitignore` at 404 (only the legacy
+branch build does that) at one moment, and the real 115,526,016 bytes at another —
+because both pipelines publish to the one host and the branch build overwrites the
+artifact's payload with the pointers it stores. This game no longer depends on which
+one wins.
+
+The host has since settled on the artifact. Sampled five times over about a minute and
+a half: `3rdpersonidle.fbx` answered with 115,526,016 bytes and `game/index.pck` with
+327,853,876 (the real pack, not its pointer), and `brokenboot/.gitignore` with 200 —
+the last being the tell, because only an artifact built from a full checkout carries
+dotfiles. The Pages workflow guards that on the runner: it fails the deploy if
+`game/index.pck` arrives shorter than 100 MB. It holds only while Settings → Pages →
+Build and deployment → Source stays on
+**GitHub Actions**; the branch build is still there to win again if that changes. The
+overlap pack in `game/` is the asset that would feel it, because that 328 MB `.pck` is
 LFS as well — and the same trick applies to it: put the thing the player downloads
-under the 100 MB line and commit it, so no host can serve a stub for it.
+under the 100 MB line and commit it as an ordinary file, so no host can serve a stub
+for it.
 
 `tactical_transport_truck_baked_pbr.glb` (~56 MB) is deliberately unused.
 
