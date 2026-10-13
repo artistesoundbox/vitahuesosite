@@ -38,6 +38,9 @@ npm run test:character  # audit the officer: weighted, anchored, rifle in hand, 
 npm run test:fatality   # shoot an attacker down through the head and then through
                         # the chest: only the head throws the body, and both pay the
                         # same tier credit
+npm run test:platforms  # climb the floating islands: every rung jumped and none
+                        # walked up, the war blind to them, and their crates out of
+                        # reach from the ground
 npm run test:probes     # those mechanic checks and both audits, one page load
 ```
 
@@ -89,13 +92,21 @@ with their health and whether they could see anyone. Each seed costs about twelv
 seconds, which is mostly reloading a 140 MB forest.
 
 Every fuzzed seed also gets a **forest of its own**. The layout is built from one
-seed (`worldSeed`, the 165 pines, the crates, the barriers, the rocks and the five
-cars all come out of the same stream), and the harness passes each seed's own value
+seed (`worldSeed`, the 165 pines, the crates, the barrels, the sandbags, the rocks
+and the three tanks all come out of the same stream), and the harness passes each
+seed's own value
 as `?worldSeed=N`, so a fuzz run explores terrain as well as decisions — different
 cover, different firing lines, different places to get wedged. The page reports the
 seed it was built with and a `layoutHash` folded from every placed object, so the
 report names the forest as well as the campaign, and `--world-seed=N` replays one
-of them on its own. The fuzz checks its own premise too: if two seeds ever built
+of them on its own. A layout hash settles *that* two fields differ, never how: every
+run also reports a **dressing fingerprint**, read off the props that were actually
+loaded rather than off the config — each kind, how many of it, and the model files
+with the size the fit measured in their own units. Both baselines record it, which is
+what lets a set of figures measured on one field be recognised in another; it is
+deliberately blind to the balance figures (a crate's mass is what a kick is divided
+by, so retuning it is the same field with a different fight) and to where the props
+stand, which is the layout's business. The fuzz checks its own premise too: if two seeds ever built
 the same layout it fails outright, because that would mean it had silently stopped
 fuzzing the terrain at all.
 
@@ -105,10 +116,12 @@ the officer at `[0 in the mag, 0 reserve]` and a lone attacker at full health,
 unwounded, in plain view. That is the shape of the whole point — the default seed's
 campaign was the one the single-run check would have reported on.
 
-With terrain in the mix the sags moved as well: across ten seeds and ten forests
-the quietest stretch of any wave runs from 11.8 s to 38.8 s, and the worst of them
-belongs to a forest no earlier run had played. Same game, same pilot — the layout
-is what changed, which is the argument for fuzzing it.
+With terrain in the mix the sags moved as well: across ten seeds and ten forests the
+quietest stretch of any wave runs from 12.6 s to 18.7 s, every campaign of the ten
+cleared (356.9 s to 427.0 s), and the saggiest of them is the default seed's own
+forest — the one a plain `npm test` plays, so the run that gets looked at most is not
+the most forgiving of the ten. Same game, same pilot — the layout is what changed,
+which is the argument for fuzzing it.
 
 `npm run test:forest` asks the terrain question on its own, without playing
 anything. `--check-forest[=N]` rebuilds N forests (the spread of seeds a fuzz would
@@ -168,7 +181,17 @@ as `tighter` or `looser` — with the layout hash whenever the generator itself 
 and the tree and prop counts as the usual cause. Ten percent is the noise floor: the
 audit is deterministic, so two sweeps of one generator agree exactly, while a change
 of density moves a healthy forest by tens of percent. A baseline also serves as a
-record of the floors, so a floor that moves is named as well.
+record of the floors, so a floor that moves is named as well — and as a record of the
+dressing every forest in it was built with, named on both sides above the drift
+table, so a spread measured on one field is never compared against another one
+silently. What the recorded spread is now, after the dressing swap and the placement
+bug that swap exposed (see the note at the end of this file): `connected ground
+10269 / 10314 m²`, `elbow room 2.65 / 2.93 m`, `clearing standable 71 / 77%`, `spawn
+ring reachable 100 / 100%`, `widest clear circle 16.36 / 19.37 m`, all sixteen forests
+`fair`, on 165 trees and 28 props. The spread before it — thirty props, layouts
+`820b292e`…`1a9c3d22` — is gone rather than kept: three of its sixteen forests could
+not be fought in at all, and it carried no dressing record either, which is why the
+harness now reads one.
 
 Drift is reported rather than failed. A generator change is sometimes deliberate, and
 the forests may all still be fair — it is the trend that has to be visible, not the
@@ -362,7 +385,13 @@ scripted pilot died rather than protecting them. `--waves=N`, `--seed=N`
 (default 20260411, for comparable runs measured with the fixed-timestep step),
 `--wave-limit=S` and `--headed` are all worth knowing about; `--help` lists the
 rest, including `--baseline` / `--record` for noticing when a tuning change moves
-the pacing.
+the pacing. A baseline records the field its times were measured on as well as the
+times: the world seed, the layout hash and the dressing fingerprint. A run compared
+against a baseline from another field says so — `← A DIFFERENT FIELD` in the table
+and a finding under *Worth knowing* — rather than having its differences read as
+pacing drift, which is the mistake a dressing swap invites. The current baseline,
+re-recorded after the CC0 dressing went in: 400.82 s over the ten waves, world seed
+1337, layout `5ebbc2bc`, dressing `26adf59c`.
 
 `serve.mjs` serves the **repository root** (not just this folder) so the page can
 load the models with `../`. It sets the correct MIME types for `.fbx`, `.glb`,
@@ -531,28 +560,30 @@ list to read.
 
 ## Kicking the scenery
 
-The boot does not stop at people. Crates, barriers, rocks and the **cars** are
+The boot does not stop at people. Crates, barrels, sandbags, rocks and the **tanks** are
 kicked with the same reach and arc as the attackers. The impulse is the kick's
 `propPower`, and `propLift` upward, divided by the prop's `mass` — 1 for a crate,
-1.5 a barrier, 2.6 a rock and **3 for a car** — so a crate flies and a car rolls
-away instead of merely shifting. Measured through the harness, a car caught by a
+1.2 a barrel, 1.5 a wall of sandbags, 2.6 a rock and **4 for a tank** — so a crate
+flies and a tank rolls away instead of merely shifting. Measured through the
+harness, a tank caught by a
 stomp leaves the boot at 6.29 m/s and travels **6.43 m** before it settles, where the
 4.5 it used to weigh managed 4.67 m. That lightening is the whole of it: 3 is still
-clear of the rock's 2.6, so a car is still the heaviest thing the boot can meet.
+clear of the rock's 2.6, so a tank is still the heaviest thing the boot can meet.
 `propDrag`, `propSpinDrag`, `propRestitution` and ground friction settle it, and it
 goes to sleep once it is slow enough that simulating it would be wasted work.
 
 What makes it more than a particle effect is that a prop's collision box is the
 very box the rest of the world already consults: it blocks bullets, line of sight
-and movement. A car booted out of the way genuinely stops being cover, and one
+and movement. A tank booted out of the way genuinely stops being cover, and one
 left lying in a new spot becomes cover there instead — for the player and the
 attackers alike, because both use the same box. A prop still travelling at
 `propHitSpeed` (4.5 m/s) that catches an attacker floors them, and since it was the
 boot that did it, that rout still pays full boot credit toward the next tier. At the
-car's 3 that gate is inside the boot's own reach: a stomp leaves the car travelling
-6.29 m/s, past the 4.5 the gate asks for, so a car booted into a knot of attackers
-now bowls them over by itself. At 4.5 the same stomp left it at 4.19 m/s, so only a
-charged kick (×1.6, 6.71 m/s) could. Those are the impulse figures themselves —
+tank's 4 the gate is inside the boot's own reach, but only just: the harness measures
+a plain kick leaving the tank at 4.72 m/s, past the 4.5 the gate asks for, so a tank
+booted into a knot of attackers bowls them over by itself. At the rock's 2.6 the same
+kick would leave it short, and only a charged kick would carry it into anybody.
+Those are the impulse figures themselves —
 `propPower` and `propLift` over the mass, vertical included — and a plain kick still
 cannot reach the gate at either mass (3.53 m/s now, 2.35 before).
 
@@ -566,17 +597,17 @@ colour, and that the boot *feels* as heavy as the mass it met.
 
 Above everything else this needed weight, so the whole impact reads off a single
 figure: the mass the boot met. An attacker body counts as `bodyMass` (2.0), a
-crate as 1, a barrier 1.5, a rock 2.6 and a car **3**, and the heaviest thing in
+crate as 1, a barrel 1.2, sandbags 1.5, a rock 2.6 and a tank **4**, and the heaviest thing in
 the arc sets it. Measured through the harness:
 
 | What it met | Mass | Camera shake | Eye kicked back | Frame roll | Hit-stop |
 | --- | --- | --- | --- | --- | --- |
 | empty air | — | 0.3 | — | — | — |
 | a body | 2.0 | 0.9 | 0.32 m | 3.2° | 0.06 s |
-| a car | 3.0 | 1.35 | 0.48 m | 4.8° | 0.09 s |
+| a tank | 4.0 | 1.8 | 0.64 m | 6.4° | 0.12 s |
 
 - **Shake** rattles the frame, as before, but scaled: a kick that meets nothing at
-  all gets only the swing (`kickWhiffShake` 0.3) and a car is 1.35. That gap is the
+  all gets only the swing (`kickWhiffShake` 0.3) and a tank is 1.8. That gap is the
   point — a connect has to feel different from a miss, or neither reads.
 - **Kickback** shoves the eye back along the aim (`kickbackPerMass` 0.16 m per
   unit, capped at 0.9), decaying in about a third of a second rather than
@@ -584,7 +615,7 @@ the arc sets it. Measured through the harness:
   still has the last word: a kick that would push the view into a tree is absorbed
   by the tree instead of clipping through it.
 - **Frame roll** leans away from the impact (`kickRollPerMass` 1.6° per unit, ±8°
-  max, also capped by the wheelbase): a car on the officer's left rolls the frame
+  max, also capped by the wheelbase): a tank on the officer's left rolls the frame
   the other way from one dead ahead. It goes on *after* the look, so the crosshair
   stays on the view axis and the reticle still covers exactly where the rounds go.
 - **Hit-stop** is the weight. Contact charges `kickStopPerMass` (0.03 s per unit,
@@ -595,7 +626,7 @@ the arc sets it. Measured through the harness:
   directly and never sees a freeze.
 - **The screen edges** light up warm (never the red damage vignette, so a heavy
   boot does not read as taking a hit), fading from `flashImpact`, and `kickFlashMass`
-  says what mass fills it — a car does.
+  says what mass fills it — a tank is past it, a rock nearly.
 - **The swing itself** is drawn, which is the one part of a kick that had no picture
   at all. A ribbon follows the right-foot bone — the foot the boot is strapped to —
   for as long as the clip it threw is running, tinted with the tier's colour and
@@ -637,10 +668,12 @@ the arc sets it. Measured through the harness:
   boot, so the clause names that instead of waving it through.
 
 A charged kick multiplies the whole thing by `chargedKnockbackScale` (1.6×), so a
-full meter into a car is the heaviest thing in the game: capped shake, capped
+full meter into a tank is the heaviest thing in the game: capped shake, capped
 hit-stop and a full screen-edge flare, and the largest push-back the game ever asks
-for — 0.77 m, under the 0.9 m where it would start to clip. With the car at 3 no
-kick reaches `kickbackMax`, so that cap is headroom rather than a limit.
+for — a charged kick into the tank at mass 4 reaches `kickbackMax` 0.9 m, which is
+what that cap is for. A plain kick into it lands at 0.64 m, so the cap is the top of
+the range rather than the middle of it, and the camera's own collision arm still has
+the last word on whether it can be spent.
 
 ## Aim tune, the boot charge and the new pickups
 
@@ -708,7 +741,7 @@ start pressing sooner as well as harder.
   pull-in, recoil that recenters, and screen shake — plus the mass-scaled
   kickback, frame roll and hit-stop that make the boot land (above).
 - **Attackers fight from cover, one at a time.** They spawn 26–38 m out and bound
-  forward cover to cover — a spot on the far side of a tree, the car or a crate
+  forward cover to cover — a spot on the far side of a tree, a tank or a crate
   that breaks line of sight — crouching there behind the `crouch` clip. Exactly
   **one** attacker holds the assault token at any moment: it presses in, holds a
   firing line and shoots properly, while everyone else stays down and only snaps
@@ -733,12 +766,28 @@ start pressing sooner as well as harder.
   side until the line to the player opens up) instead of leaning on it.
 - **Waves.** Ten waves sized `round(4 + wave * 1.4)` and capped at 18, staggered
   spawns, a cap of 9 alive at once, elite variants from wave 5, and an
-  intermission with a tagline between waves. Clear times in a simulated run: 26 s
-  for wave 1, then 46 s and 48 s for waves 2 and 3.
-- **Forest.** Instanced pines, a clearing, crates, barriers, rocks and parked cars
+  intermission with a tagline between waves. Clear times in the recorded run: 29 s
+  for wave 1, then 35 s and 34 s for waves 2 and 3, and 401 s for all ten.
+- **Forest.** Instanced pines, a clearing, crates, barrels, sandbag walls, rocks and parked tanks
   used as cover — all with real collision, all built from one seed (`worldSeed`).
   `?worldSeed=N` builds a different forest with the same game in it, which is how
   the harness fuzzes terrain; with no parameter it builds the one it always did.
+- **Floating islands you climb for the loot.** Ten little inverted mountains hang
+  over the forest on a wandering bearing (`PLATFORMS`), each one `rise` above the
+  last: the officer's jump clears `jumpSpeed² / (2 · |gravity|)` ≈ 0.99 m against a
+  0.70 m step, so every rung is cleared by jumping and by nothing else — the cap's
+  tolerance (0.15 m) is deliberately narrower than a step, which is what stops the
+  climb from being a ramp he can walk up. Every other island carries a **supply
+  crate**: block-modelled olive planks with a stencil plate and the asset itself on
+  the open lid (a belt of rounds, a med kit with its cross, a radio, a drum
+  magazine, a folded plate carrier), anchored on its cap and never expiring. Loot
+  is collected by whoever is at its own level or above it, so a crate on a top
+  cannot be vacuumed by jumping under it: the climb is what pays. The islands are
+  **not** in the world's cylinders or boxes, so bullets, sight lines, attacker
+  pathing and the kick's prop pass are all blind to them — the ground fight is
+  exactly what it was, which is what `--check-platforms` measures, and the layout
+  also keeps the climb's ground clear of trunks and props (a tank under a cap is
+  still a wall to his feet, so it is laid out around).
 - **A scanned environment.** `landscape_forest__mountains.glb` is a closed,
   canopy-textured photogrammetry dome. Standing inside it looks like a cave, so it
   is rendered once into a cubemap and used as the sky, then covered overhead by a
@@ -805,25 +854,67 @@ to `three.module.js`; `vendor/addons/` keeps the relative layout the addons expe
 
 ## Models used
 
-| Asset | Role |
-| --- | --- |
-| `3rdpersonidle.fbx` | **Player.** The only skinned SWAT body; carries the idle clip. |
-| `3rdpersonshootwalking/standing/crouch.fbx` | Player locomotion and aim clips. |
-| `3rdpersonjump.fbx` | Jump clip. |
-| `3rdpersonkick / kickhigh / stomp.fbx` | Boot attack clips. |
-| `attackerIdle.fbx` | **Attacker.** Skinned body + idle clip. |
-| `attackershootwalking/standing/crouch.fbx` | Attacker clips. |
-| `ak-47.glb` | Rifle, socketed to the right hand bone. |
-| `silverboot / goldboot / brokenboot / diamondboot.glb` | Boot tier models. |
-| `suggan_53_...glb` | Car, reused as cover. |
-| `landscape_forest__mountains.glb` | Scanned environment, used as the sky cubemap. |
-| `abrokenbootonthebraveposter.jpg` | Start screen art. |
-| `A Broken Boot On The Brave*.mp3` | Music beds. |
-| `bsh / ouch / oua / bootpower.mp3` | The boot: its swing, two takes of the yelp it draws, and the sting for taking somebody off the field. |
-| `<socket>-bsh / <socket>-bootpower.mp3` | Optional per-tier takes (`silver-bsh.mp3`, `doom-bootpower.mp3`); a tier without one uses the shared take in its own voice. |
+Every entry carries its licence, because a pack whose terms are not recorded is a
+pack the project cannot ship again. **CC0** below means Creative Commons Zero v1.0
+Universal — public domain, no attribution required, though the authors are credited
+anyway.
+
+| Asset | Role | Licence and source |
+| --- | --- | --- |
+| `3rdpersonidle.fbx` | **Player.** The only skinned SWAT body; carries the idle clip. | *not recorded in this repo* — see the gap note below |
+| `3rdpersonshootwalking/standing/crouch.fbx` | Player locomotion and aim clips. | *not recorded* |
+| `3rdpersonjump.fbx` | Jump clip. | *not recorded* |
+| `3rdpersonkick / kickhigh / stomp.fbx` | Boot attack clips. | *not recorded* |
+| `attackerIdle.fbx` | **Attacker.** Skinned body + idle clip. | *not recorded* |
+| `attackershootwalking/standing/crouch.fbx` | Attacker clips. | *not recorded* |
+| `ak-47.glb` | Rifle, socketed to the right hand bone. | *not recorded* |
+| `silverboot / goldboot / brokenboot / diamondboot.glb` | Boot tier models. | *not recorded* |
+| `tank_hull.dae`, `tank_turret.dae` | **The vehicle cover**, replacing the low-poly car: a modular tank — hull and turret as separate files — fitted to 4.6 m long, three to a field. | **CC0** — pixelmannen, *Low-Poly tank assets*, [opengameart.org/content/low-poly-tank-assets](https://opengameart.org/content/low-poly-tank-assets), file `TankAndProps.zip` → `Tanks/Body.dae` + `Tanks/Gun.dae`, renamed here |
+| `sandbags.dae` | The barricades: a low wall of sandbags in place of the concrete barrier, three to a field. | **CC0** — pixelmannen, same pack, `Props/sandbags.dae`, renamed here |
+| `crate_mesh.obj` | **The crates** on the field and in the fight's cover. | **CC0** — mastahcez, *Crate & Barrel bundle*, [opengameart.org/content/crate-barrel-bundle](https://opengameart.org/content/crate-barrel-bundle) |
+| `barrel_mesh.obj` | Drums, kicked as scenery. | **CC0** — mastahcez, same bundle |
+| `suggan_53_...glb` | The low-poly car this replaced. No longer loaded. | *not recorded* |
+| `landscape_forest__mountains.glb` | Scanned environment, used as the sky cubemap. | *not recorded* |
+| `abrokenbootonthebraveposter.jpg` | Start screen art. | *not recorded* |
+| `A Broken Boot On The Brave*.mp3` | Music beds. | *not recorded* |
+| `bsh / ouch / oua / bootpower.mp3` | The boot: its swing, two takes of the yelp it draws, and the sting for taking somebody off the field. | *not recorded* |
+| *(built in code)* | The floating islands and their crates: inverted cones and caps from `PLATFORMS`, and the supply crates' small military assets (ammo tin, med kit, radio, drum magazine, plate carrier) modelled as blocks in `Effects`. | this project's own |
+| `<socket>-bsh / <socket>-bootpower.mp3` | Optional per-tier takes (`silver-bsh.mp3`, `doom-bootpower.mp3`); a tier without one uses the shared take in its own voice. | *not recorded* |
 
 Every rig in the set uses the `mixamorig:` bone namespace, which is why clips can
 be freely cross-applied between the player and the attackers.
+
+**The gap worth closing.** The CC0 packs above are recorded because they were
+brought in deliberately and their terms are known. The rest of the table is not:
+the character, the attacker, the rifle, the boots, the scanned landscape, the poster
+and the two music beds arrived without a licence record, and this repository cannot
+say what their terms are. That is a real risk for a project meant to be shown, and
+it is the one item on this list that a licence audit should start with.
+
+**Where the dressing came from.** Both packs are the downloaded archives, taken in
+the formats they ship: `.dae` for the tank and the sandbags, `.obj` for the crate and
+the barrel. The game loads those through `ColladaLoader` and `OBJLoader` — vendored
+in `vendor/addons/` beside the FBX and glTF loaders — rather than re-exporting them
+through a modelling tool, so what is in the repository is what the author published.
+The packs' own
+textures are deliberately not used: the scenery is block-coloured, so each model is
+repainted with this project's flat materials and the megabyte PNGs are left out. A
+model is fitted by *measuring* it — `dressModel` in [`js/world.js`](js/world.js)
+reads the bounding box, scales it to the size the game asks for, seats it on the
+ground and centres its footprint on the point it is placed at — because the packs are
+in centimetres, metres and Blender units between them, and none of that is worth
+trusting twice. That last part is a bug the forest audit turned up: a pack's root sits
+wherever the author left it, at the end of the sandbag wall's own six metres and 0.8
+of the tank hull's length off its own origin, so a model seated by position alone
+stands that many times its scale away from the spot the layout chose — at ×11 that was
+nine metres of tank, and in three forests of sixteen it put the collision box on the
+officer's own spawn point and sealed the field. The fit therefore lives in an **inner
+node**: the outer frame is what the world places and rewrites, the inner one carries
+the centring and the seating, and `fit.origin` keeps what each pack's root was off by,
+in its own units — `0 / 1.444` for the barrel, `0.166 / 1.631` for the crate,
+`-0.828 / -0.326` for the sandbags, `-0.817 / 0` for the hull. With the fix every
+prop's collision box sits within a millimetre of its placement point and the tank
+measures 4.60 × 2.39 × 4.23 m where the layout asks for it.
 
 ## Asset size and hosting
 

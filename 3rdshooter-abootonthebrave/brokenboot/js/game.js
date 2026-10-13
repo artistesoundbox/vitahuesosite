@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
   SETTINGS, PLAYER_SOURCE, ENEMY_SOURCE, ASSET_BASE, ACHIEVEMENTS, BOOT_TIERS, KICKS,
-  BOOT_VOICES, waveRamp,
+  BOOT_VOICES, PLATFORMS, MARKSMAN, waveRamp,
 } from './config.js';
 import { buildCharacter } from './assets.js';
 import { createWorld } from './world.js';
@@ -19,6 +19,7 @@ const LOAD_WEIGHTS = {
   playerClips: 2.7,
   enemyMesh: 11.9,
   enemyClips: 1.2,
+  islands: 0.7,
   world: 7.1,
   weapon: 5.9,
   // The boot he starts in. Each tier loads its own model on top of that file, so
@@ -136,7 +137,7 @@ export class Game {
     // Scenery the boot has moved, and the kicks whose one-off hint has been
     // shown — the three kicks are contextual, so they need teaching once.
     this.sceneryKicked = 0;
-    this.carsKicked = 0;
+    this.tanksKicked = 0;
     this.kicksTaught = new Set();
     // Notes that have been shown once: anything the game teaches when it first happens
     // rather than explaining up front lives here, and a hint repeated every time it is
@@ -147,6 +148,10 @@ export class Game {
     // Every elimination this match, boot or bullet. It is counted from zero: it used
     // to be undefined until the first one, which made it NaN from then on.
     this.enemiesKilledTotal = 0;
+    // The marksmen: how many waves posted one, and how many the boot took off their
+    // rock. The two numbers are the whole point of the post, so the harness reads them.
+    this.marksmenPosted = 0;
+    this.marksmenBootedOff = 0;
 
     this._tmpA = new THREE.Vector3();
     this._tmpB = new THREE.Vector3();
@@ -193,6 +198,9 @@ export class Game {
     this.world = built.world;
     this.sun = built.sun;
     finish('world');
+    // Weighed separately because the climb is a dozen little rocks with their own
+    // layout pass, and it is the last thing the world builds.
+    finish('islands');
 
     this.player = new Player(this.playerTemplate);
     this.scene.add(this.player.object);
@@ -212,6 +220,10 @@ export class Game {
     // one — the tier-up banner was the only part of a boot that reached him.
     await this.player.equipBootModel();
     finish('boot');
+    // The supply crates go on their islands here rather than in the world builder:
+    // the world knows where the rocks are and the effects layer knows how to draw a
+    // pickup, and neither should learn the other's business to make this work.
+    this.stockIslands();
     onProgress(100);
 
     this.state = 'ready';
@@ -321,6 +333,24 @@ export class Game {
   toggleMute() {
     this.audio.setMuted(!this.audio.muted);
     this.hud.toast('Audio', this.audio.muted ? 'Muted' : 'Unmuted');
+  }
+
+  /**
+   * One supply crate on every other island, cycling the drop table. They are the
+   * reward for the climb — the islands are out of the attackers' way by construction,
+   * since they only ever walk on the ground — and the crate is anchored, so it waits.
+   */
+  stockIslands() {
+    const islands = this.world.islands || [];
+    for (let i = PLATFORMS.firstCrate; i < islands.length; i += 2) {
+      const island = islands[i];
+      const type = PLATFORMS.crates[(i / 2 | 0) % PLATFORMS.crates.length];
+      this.effects.spawnPickup(
+        new THREE.Vector3(island.x, island.top, island.z),
+        type,
+        { anchored: true, crate: true },
+      );
+    }
   }
 
   /**
@@ -446,7 +476,7 @@ export class Game {
       this.damageEnemy(hit.enemy, SETTINGS.bulletDamage * hit.multiplier, hit.part, direction);
     } else if (hit) {
       this.effects.burst(hit.point, 5, 0xd8cfa8);
-      this.audio.impact();
+      this.audio.impact(hit.point);
     }
 
     this.recoilPitch += SETTINGS.recoil * 0.02;
@@ -463,12 +493,25 @@ export class Game {
     const downed = enemy.takeDamage(amount);
     this.effects.burst(enemy.headPosition, part === 'head' ? 9 : 5, 0xc2402c);
     this.hud.flashHit(false);
-    if (!wasWounded && enemy.wounded) this.audio.wounded();
+    if (!wasWounded && enemy.wounded) this.audio.wounded(enemy.position);
     if (!wasBleeding && enemy.bleeding) this.hud.toast('WOUNDED', 'Bleeding out — the boot is quicker');
     // A round that finishes an attacker through the head is a fatality. The
     // accounting is the same downing either way — see onEnemyDown — so this only
     // decides how the body goes down.
     if (downed) this.onEnemyDown(enemy, part === 'head' && direction ? direction : null);
+  }
+
+  /**
+   * A marksman has stepped onto his rock. He is announced rather than left to be
+   * noticed, because everything about him is counter-intuitive: he is the one attacker
+   * the rifle cannot remove, and the toast is what says so the first time it matters.
+   */
+  onEnemySpawn(enemy) {
+    if (!enemy.marksman) return;
+    this.marksmenPosted += 1;
+    this.hud.showBanner('MARKSMAN POSTED', 'ON THE ROCK — BOOT HIM OFF', 2.4);
+    this.teach('marksman', 'MARKSMAN ON THE ROCK',
+      'He is dug in up there: the rifle floors him and stops. Climb his rock and boot him off it');
   }
 
   /**
@@ -478,7 +521,7 @@ export class Game {
    * kill: the same credit, the same loot odds, the same wave pacing.
    */
   onEnemyDown(enemy, fatalityDirection = null) {
-    this.audio.downed();
+    this.audio.downed(enemy.position);
     this.effects.burst(enemy.position.clone().setY(0.9), 6, 0xc2402c);
     this.enemiesKilledTotal += 1;
     this.enemyManager.notifyEliminated();
@@ -531,7 +574,10 @@ export class Game {
   /** Send an attacker running, count it, and leave loot behind. */
   routEnemy(enemy, direction, force) {
     if (!enemy.rout(direction, force)) return false;
-    this.audio.scream();
+    // A man the boot took off his rock falls rather than runs — see Enemy.update — and
+    // is counted as that, because the post is what this whole wave's climb is for.
+    if (enemy.perched) this.marksmenBootedOff += 1;
+    this.audio.scream(enemy.position);
     // An elimination buys the rest of the line another window in cover.
     this.enemyManager.notifyEliminated();
     // registerKill raises the boot tier, which fires onTierChange -> onTierUp.
@@ -575,9 +621,9 @@ export class Game {
 
   /**
    * How much mass the boot just met, and where the heaviest of it was: an
-   * attacker counts as `bodyMass`, a kicked crate, barrier, rock or car as its
-   * own mass, and the heaviest thing in the arc sets the figure. A mass of zero
-   * means the swing met nothing at all.
+   * attacker counts as `bodyMass`, a kicked crate, barrel, sandbag wall, rock or
+   * tank as its own mass, and the heaviest thing in the arc sets the figure. A mass
+   * of zero means the swing met nothing at all.
    */
   kickHitMass(hitBodies, props) {
     let mass = hitBodies ? SETTINGS.bodyMass : 0;
@@ -592,9 +638,9 @@ export class Game {
    * The boot connecting, as the camera feels it. Everything here scales with the
    * mass that was hit: the frame rattles, is shoved back along the aim and rolled
    * away from the impact, the world hitch-slides for a moment, and the screen
-   * edges light up. A car is heavy, a body is not, and `side` is which shoulder
+   * edges light up. A tank is heavy, a body is not, and `side` is which shoulder
    * the mass was on, so the frame rolls away from it rather than always the same
-   * way — the officer kicks with the right leg, but a boot into a car parked on
+   * way — the officer kicks with the right leg, but a boot into a tank parked on
    * the left should not read the same as one parked on the right.
    */
   kickImpact(mass, side = 1) {
@@ -695,6 +741,10 @@ export class Game {
       const to = new THREE.Vector3(enemy.position.x - origin.x, 0, enemy.position.z - origin.z);
       const dist = to.length();
       if (dist > kick.range + 0.7) continue;
+      // The boot reaches a body on his own ground, which is where a walking attacker is.
+      // A marksman holding a cap is above that reach however close his rock stands, so
+      // the climb is the only way the boot gets to him — see SETTINGS.bootReachUp.
+      if (enemy.position.y - origin.y > SETTINGS.bootReachUp) continue;
       if (dist > 1e-3) to.divideScalar(dist);
       if (Math.acos(clamp(to.dot(forward), -1, 1)) > kick.arc) continue;
       inArc.push({ enemy, dist });
@@ -714,12 +764,15 @@ export class Game {
     if (charged) this.player.consumeCharge();
     let routed = 0;
     let downed = 0;
+    let offTheRock = 0;
     for (let i = 0; i < inArc.length; i++) {
       const { enemy } = inArc[i];
       enemy.knock.addScaledVector(forward, knockback);
-      this.effects.burst(enemy.position.clone().setY(0.95), charged ? 14 : 8, 0xffd08a);
+      // At his own chest height, so a man on a rock takes the boot where he stands.
+      this.effects.burst(enemy.position.clone().setY(enemy.position.y + 0.95), charged ? 14 : 8, 0xffd08a);
       if (i < routeLimit && this.routEnemy(enemy, forward, knockback)) {
         routed += 1;
+        if (enemy.perched) offTheRock += 1;
         continue;
       }
       // The boot only sends a limited number running; the rest take the hit.
@@ -731,7 +784,7 @@ export class Game {
       }
     }
 
-    // The same boot, into the scenery. A crate is worth a kick; a car is worth a
+    // The same boot, into the scenery. A crate is worth a kick; a tank is worth a
     // kick plus a shove, and it takes whatever it was covering with it.
     const launched = this.world.kickProps(
       origin, forward, kick, charged ? SETTINGS.chargedKnockbackScale : 1,
@@ -741,7 +794,7 @@ export class Game {
     }
     if (launched.length) {
       this.sceneryKicked += launched.length;
-      this.carsKicked += launched.filter((p) => p.kind === 'car').length;
+      this.tanksKicked += launched.filter((p) => p.kind === 'tank').length;
     }
 
     // The three kicks are contextual, so each one is introduced the first time
@@ -764,7 +817,7 @@ export class Game {
     }
 
     // The impact itself, as the camera feels it. What the boot met decides how
-    // heavy it was: a body rattles the frame, a car shoves and rolls it. A swing
+    // heavy it was: a body rattles the frame, a tank shoves and rolls it. A swing
     // through empty air gets only the swing — which is exactly what makes the
     // difference between a connect and a miss readable in the first place.
     const contact = this.kickHitMass(inArc.length > 0, launched);
@@ -795,13 +848,14 @@ export class Game {
     if (routed > 0) {
       this.hud.showBanner(
         charged ? `${boot.name.toUpperCase()}` : 'THE BOOT',
-        routed > 1 ? `${routed} ATTACKERS SENT RUNNING` : 'SENT RUNNING',
+        offTheRock > 0 ? 'MARKSMAN OFF THE ROCK'
+          : routed > 1 ? `${routed} ATTACKERS SENT RUNNING` : 'SENT RUNNING',
         charged ? 2 : 1.2,
       );
     } else if (launched.length > 0) {
       this.hud.showBanner(
         'THE BOOT',
-        launched.some((p) => p.kind === 'car') ? 'CAR, MEET BOOT' : 'SCENERY LAUNCHED',
+        launched.some((p) => p.kind === 'tank') ? 'TANK, MEET BOOT' : 'SCENERY LAUNCHED',
         1,
       );
     } else if (inArc.length > 0) {
@@ -811,8 +865,8 @@ export class Game {
   }
 
   /**
-   * A kicked crate or car has caught an attacker. They go down under it — and it
-   * keeps most of its speed, so a car rolling through a line keeps collecting.
+   * A kicked crate or tank has caught an attacker. They go down under it — and it
+   * keeps most of its speed, so a tank rolling through a line keeps collecting.
    */
   onPropImpact(prop, enemy, speed) {
     const dir = new THREE.Vector3(prop.vel.x, 0, prop.vel.z);
@@ -846,7 +900,10 @@ export class Game {
     const from = enemy.headPosition;
     // A shooter leaning out of cover is rushed and far less accurate, and a
     // crouched player is a smaller target.
-    const base = (wounded ? 0.4 : 0.6) - (suppressed ? 0.2 : 0);
+    // A marksman is the one attacker whose range does not cost him much: the same
+    // arithmetic, with a bonus big enough to keep him dangerous across the field.
+    const base = (wounded ? 0.4 : 0.6) - (suppressed ? 0.2 : 0)
+      + (enemy.marksman ? MARKSMAN.hitBonus : 0);
     const profile = this.player.crouching ? SETTINGS.crouchHitScale : 1;
     const hitChance = clamp(base - dist * 0.011, 0.04, 0.5) * profile;
     const hit = Math.random() < hitChance;
@@ -856,10 +913,12 @@ export class Game {
       target.y += (Math.random() - 0.5) * 1.5;
       target.z += (Math.random() - 0.5) * 2.6;
     }
-    this.audio.enemyShoot();
+    this.audio.enemyShoot(from);
     this.effects.tracer(from, target, 0xffb37a);
     if (hit) {
-      const died = this.player.takeDamage(SETTINGS.enemyDamage * (enemy.elite ? 1.5 : 1));
+      const died = this.player.takeDamage(SETTINGS.enemyDamage
+        * (enemy.elite ? 1.5 : 1)
+        * (enemy.marksman ? MARKSMAN.damageScale : 1));
       this.hud.flashDamage();
       this.addShake(0.5);
       if (died) this.gameOver();
@@ -1036,7 +1095,7 @@ export class Game {
     if (this.player.bootIndex >= 2) unlock('silver');
     if (this.player.bootIndex >= 3) unlock('gold');
     if (this.player.bootIndex >= 6) unlock('legendary');
-    if (this.carsKicked >= 1) unlock('car_kicker');
+    if (this.tanksKicked >= 1) unlock('tank_kicker');
     if (this.enemyManager && this.enemyManager.aliveCount >= 6) unlock('surrounded');
   }
 
@@ -1145,6 +1204,7 @@ export class Game {
     this.updateSwish();
     this.enemyManager.update(dt, {
       player: this.player,
+      onSpawn: (enemy) => this.onEnemySpawn(enemy),
       onFire: (enemy, dist, wounded, suppressed) => this.enemyFire(enemy, dist, wounded, suppressed),
       onDown: (enemy) => this.onEnemyDown(enemy),
       onLand: (enemy) => this.onBodyLand(enemy),
@@ -1154,7 +1214,7 @@ export class Game {
 
     // Kicked scenery keeps moving after the kick: it tumbles, settles, and
     // shoves aside whatever it runs into on the way. It runs on the same box
-    // that already blocks bullets and sight lines, so a car that has been booted
+    // that already blocks bullets and sight lines, so a tank that has been booted
     // out of the way genuinely stops being cover.
     this.world.updateProps(dt, {
       bodies: this.enemyManager.enemies,
@@ -1169,7 +1229,14 @@ export class Game {
     this.updateCamera(dt);
     if (this.input.firing) this.tryShoot();
 
-    // Music reacts to whether there is anyone left to fight.
+    // The ear follows the camera, after the camera has been placed for this frame: the
+    // pan wants to follow the aim rather than the officer's body, since what is heard
+    // should be what is being looked at. Then the music reacts to whether there is
+    // anyone left to fight.
+    this.audio.setListener(
+      this.camera.getWorldPosition(this._tmpA),
+      this.camera.getWorldDirection(this._tmpB),
+    );
     const inContact = this.enemyManager.aliveCount > 0 || this.enemyManager.pendingCount > 0;
     this.audio.setMusicMode(inContact ? 'combat' : 'calm');
     this.audio.updateMusic(dt);

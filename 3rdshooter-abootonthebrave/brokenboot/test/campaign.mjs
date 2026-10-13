@@ -35,6 +35,22 @@ const forestBaselinePath = path.join(here, 'campaign-forest-baseline.json');
 /** A 32-bit layout hash, as the report writes it. */
 const hex32 = (h) => (Number(h) >>> 0).toString(16).padStart(8, '0');
 
+/**
+ * A dressing fingerprint as one readable line: the models a field was dressed with
+ * and how many of each. The layout hash says two fields are not the same one; this
+ * says which files made the difference, which is what a baseline recorded before a
+ * dressing swap needs in order to be recognised as describing another field than the
+ * run it is being compared against.
+ */
+function dressingLine(dressing) {
+  if (!dressing) return 'not recorded';
+  const kinds = (dressing.kinds || []).map((k) => {
+    const files = k.models && k.models.length ? k.models.map((m) => m.url).join(' + ') : 'procedural';
+    return `${files} \u00d7${k.count}`;
+  });
+  return `${dressing.hash}${kinds.length ? ` (${kinds.join(', ')})` : ''}`;
+}
+
 // ----------------------------------------------------------------- forest drift
 // The floors answer "can a wave be fought in this forest at all?". They say
 // nothing about a forest that is still above every one of them but has become
@@ -90,6 +106,7 @@ function parseArgs(argv) {
     worldSeed: 0,
     checkForest: 0,
     recordForest: false,
+    checkPlatforms: false,
   };
   for (const arg of argv) {
     const [flag, value] = arg.split('=');
@@ -109,6 +126,7 @@ function parseArgs(argv) {
       case '--check-dry': opts.checkDry = true; break;
       case '--check-character': opts.checkCharacter = true; break;
       case '--check-fatality': opts.checkFatality = true; break;
+      case '--check-platforms': opts.checkPlatforms = true; break;
       // Bare `--fuzz` is five campaigns; `--fuzz=12` is twelve.
       case '--fuzz': opts.fuzz = Number.isFinite(num) ? Math.max(1, Math.floor(num)) : 5; break;
       // Bare `--check-forest` is fifteen forests, plus the one the page plays.
@@ -144,12 +162,16 @@ cannot finish a wave (default 5, each with its own forest)
 one instead of playing: is the clearing reachable, and is there open ground to
 fight in? Combine with --world-seed=N to audit that one forest only
   --baseline       compare wave and tier timings against test/campaign-baseline.json
-  --record         write the timings from this run to that baseline
+  --record         write the timings from this run to that baseline, with the layout
+                   it built and the models the field was dressed with
   --record-forest  after --check-forest, write the metrics it measured to
                    test/campaign-forest-baseline.json, the spread later sweeps are
                    compared against for having got tighter
-  (with a forest baseline recorded, every --check-forest sweep reports what moved
-   since it, and by how much, even where every forest is still above the floors)
+  (a baseline records the layout and the dressing its figures were measured on, and a
+   run compared against a baseline from another field says so instead of reading as
+   pacing drift; with a forest baseline recorded, every --check-forest sweep also
+   reports what moved since it, and by how much, even where every forest is still
+   above the floors)
   --honest         play the match for real: the officer can die, and the report says where
   --check-lock     assert the aim trigger rule (fresh press retargets, held keeps its
 target) instead of playing the campaign
@@ -157,6 +179,9 @@ target) instead of playing the campaign
 draw (also instead of the campaign; pass both to run both probes)
   --check-dry      play a whole wave with the officer's ammunition taken away, and
 assert the boot alone can still end it
+  --check-platforms assert the floating islands: every step jumped and none walked up,
+the war blind to them, and their crates (small military assets) out of reach from
+the ground, so the climb is what pays
   --check-character audit the officer's own mesh file and how he is drawn instead: where
                     he stands on the ground in each state, and every skinned vertex
 weighted, nothing welded to a bone it does not sit on, his own boot still a part
@@ -275,7 +300,8 @@ let exitCode = 0;
 
 async function main() {
   if (opts.fuzz && (opts.checkLock || opts.checkKick || opts.checkDry || opts.checkCharacter
-    || opts.checkFatality || opts.checkForest || opts.baseline || opts.record || opts.recordForest)) {
+    || opts.checkFatality || opts.checkPlatforms || opts.checkForest
+    || opts.baseline || opts.record || opts.recordForest)) {
     console.error('--fuzz plays whole campaigns, so it does not combine with the mechanic probes, with --check-forest, or with --baseline/--record/--record-forest.');
     return 2;
   }
@@ -441,6 +467,7 @@ async function main() {
       checkDry: opts.checkDry || false,
       checkCharacter: opts.checkCharacter || false,
       checkFatality: opts.checkFatality || false,
+      checkPlatforms: opts.checkPlatforms || false,
       // An empty list is a sweep of the one forest the page is already playing.
       forestSeeds: opts.checkForest ? (opts.worldSeed ? [] : fuzzSeedList(opts.checkForest)) : null,
     })}); })()`;
@@ -616,6 +643,8 @@ async function main() {
         cell: audit.cell,
         limits: audit.limits || null,
         played: { seed: audit.playedSeed, layoutHash: hex32(audit.playedLayoutHash) },
+        // Every forest in the sweep, built with the same models.
+        dressing: audit.dressing || null,
         matchesPlayed: audit.matchesPlayed,
         control: audit.control,
         drift: report.forestDrift || null,
@@ -645,6 +674,12 @@ async function main() {
     fs.writeFileSync(baselinePath, `${JSON.stringify({
       recordedAt: new Date().toISOString(),
       seed: opts.seed,
+      // Which field these times were measured on: the forest seed and the layout it
+      // built, and the models that dressed it. A baseline that carries neither cannot
+      // be told apart from one recorded on another field.
+      worldSeed: report.worldSeed ?? null,
+      layoutHash: report.layoutHash === null || report.layoutHash === undefined ? null : hex32(report.layoutHash),
+      dressing: report.dressing || null,
       waves: report.waves.map((w) => ({ wave: w.wave, durationSeconds: w.durationSeconds })),
       tiers: report.tiers.map((t) => ({ tier: t.tier, atSeconds: t.atSeconds })),
     }, null, 2)}\n`);
@@ -665,14 +700,27 @@ async function main() {
  * whether the next change will push it through one, so they are named.
  */
 function compareForests(baseline, sweep) {
+  const dressingMoved = Boolean(baseline.dressing
+    && baseline.dressing.hash !== (sweep.dressing ? sweep.dressing.hash : null));
   const drift = {
     recordedAt: baseline.recordedAt || null,
+    dressing: baseline.dressing || null,
+    dressingNow: sweep.dressing || null,
+    dressingMoved,
     tolerance: FOREST_DRIFT_TOLERANCE,
     compared: 0,
     notes: [],
     metrics: [],
     forests: [],
   };
+  // Which field the recorded forests belong to, before any metric is compared: a
+  // spread measured on a differently dressed field is not the one this sweep moved
+  // away from, and the layout hashes below will all have moved with it.
+  if (!baseline.dressing) {
+    drift.notes.push('the recorded baseline carries no dressing fingerprint (it predates the harness reading one), so which field its forests were dressed as cannot be confirmed');
+  } else if (dressingMoved) {
+    drift.notes.push(`the baseline was recorded on a different dressing: ${dressingLine(baseline.dressing)} then, ${dressingLine(sweep.dressing)} now`);
+  }
   if (!Array.isArray(baseline.forests) || !baseline.forests.length) {
     drift.notes.push('the recorded baseline holds no forests, so there is nothing to compare against');
     return drift;
@@ -776,6 +824,11 @@ function forestBaselineRecord(sweep) {
   return {
     recordedAt: new Date().toISOString(),
     baseSeed: opts.seed,
+    // The forest the page was playing, and the models every forest in the sweep was
+    // dressed with: the sweep varies the layout, never the dressing.
+    worldSeed: sweep.playedSeed,
+    layoutHash: hex32(sweep.playedLayoutHash),
+    dressing: sweep.dressing || null,
     cell: sweep.cell,
     limits: sweep.limits || null,
     matchesPlayed: sweep.matchesPlayed,
@@ -811,7 +864,7 @@ function assess(report) {
 
   // The probes are single assertions about one mechanic, not a campaign.
   if (report.lockCheck || report.kickCheck || report.dryCheck || report.characterCheck
-    || report.fatalityCheck || report.forestSweep) {
+    || report.fatalityCheck || report.platformCheck || report.forestSweep) {
     const l = report.lockCheck;
     const k = report.kickCheck;
     const d = report.dryCheck;
@@ -873,6 +926,22 @@ function assess(report) {
         if (!t.ownTakePlaysTrue) {
           bits.push(`a tier's own recording was played at \u00d7${t.ownTake && t.ownTake.rate} / ${t.ownTake && t.ownTake.gain} rather than as recorded (\u00d71 / ${t.ownTake && t.ownTake.gain})`);
         }
+        const sp = k.space;
+        if (sp) {
+          if (!(sp.near.gain > sp.far.gain)) bits.push(`a rifle 45 m away played at ${sp.far.gain} against ${sp.near.gain} for one 4 m away: distance is not quieting anything`);
+          if (!(sp.near.cutoff > sp.far.cutoff)) bits.push(`a rifle 45 m away was low-passed to ${sp.far.cutoff} Hz against ${sp.near.cutoff} Hz at 4 m: distance is not dulling anything`);
+          if (!(sp.far.gain >= sp.limits.minGain)) bits.push(`the fall-off went past its floor: ${sp.far.gain} at 45 m against a floor of ${sp.limits.minGain}`);
+          if (sp.near.gain !== 1) bits.push(`a rifle ${sp.near.distance} m away played at ${sp.near.gain} instead of untouched`);
+          if (sp.ahead.pan !== 0) bits.push(`a rifle dead ahead panned to ${sp.ahead.pan}`);
+          if (!(sp.right.pan > 0.9)) bits.push(`a rifle to the right panned to ${sp.right.pan}`);
+          if (!(sp.left.pan < -0.9)) bits.push(`a rifle to the left panned to ${sp.left.pan}`);
+          if (!(sp.turned.pan < -0.9)) bits.push(`a rifle that was on the right panned to ${sp.turned.pan} after a half-turn, so the pan is not following the aim`);
+          if (sp.ownShotPlaced !== false) bits.push('the officer\'s own rifle was placed in the world, so his own gunfire is coming from somewhere other than his hands');
+          if (sp.fromARealRifle === null) bits.push('a real attacker firing gave no placement at all');
+          else if (!(Math.abs(sp.fromARealRifle - sp.expectedDistance) < 0.5)) {
+            bits.push(`a real attacker ${sp.expectedDistance} m away was placed at ${sp.fromARealRifle} m, so the shot is not coming from him`);
+          }
+        }
         if (!t.stingPlaysTheVoice) {
           bits.push(`the sting played at \u00d7${t.stingVoice && t.stingVoice.rate} / ${t.stingVoice && t.stingVoice.gain} rather than the tier's own voice, so it carries the swing's jitter or the wrong tier`);
         }
@@ -930,6 +999,11 @@ function assess(report) {
         findings.push(`the sweep's own button explains itself once through the real pad: "${k.selection.sweepNote}", and the same press again says nothing`);
       }
       const t = k.takes;
+      const sp = k.space;
+      if (sp && sp.fromARealRifle !== null && !sp.ownShotPlaced && sp.near.gain > sp.far.gain) {
+        findings.push(`a firefight reads off the audio: a rifle 45 m out arrives at ${sp.far.gain} gain low-passed to ${sp.far.cutoff} Hz against ${sp.near.gain} and ${sp.near.cutoff} Hz at 4 m, `
+          + `panned to ${sp.right.pan} when it is on your right and to ${sp.turned.pan} once you have turned that way, with the officer's own rifle left unplaced at the ear`);
+      }
       if (t && !t.missing.length && !t.synthYelp && t.yelp.length === 2
         && t.stingOnRout === 1 && t.stingOnDown === 1 && t.stingOnHit === 0 && t.randomDraws === 0
         && t.tiers.length && t.distinctVoices === t.tiers.length && t.stingPlaysTheVoice) {
@@ -940,6 +1014,88 @@ function assess(report) {
         findings.push(`every boot tier has a voice of its own, so upgrading is audible and not only countable: `
           + t.tiers.map((tier) => `${tier.socket} \u00d7${tier.voiceRate.toFixed(2)}/${tier.voiceGain}`).join(', ')
           + ` — and a tier that ships its own pair of recordings plays those as recorded, with only the gain from its voice, while a tier without one still falls back to the shared take in its own pitch`);
+      }
+    }
+    // The floating islands: a climb you jump, not a ramp you walk, that the war cannot
+    // see, with its crates payable only from the top.
+    const pc = report.platformCheck;
+    if (pc && !pc.pass) {
+      const bits = [];
+      if (!pc.count) bits.push('no islands were built at all');
+      for (const s of pc.steps || []) {
+        if (s.ramp) {
+          bits.push(`step ${s.step}: walking on the island below carried him up towards the ${s.target} m cap without a jump, so the climb is a ramp`);
+        } else if (!s.jumped) {
+          bits.push(`step ${s.step}: no way onto the ${s.target} m cap from the one below it (${s.tries} approach(es) tried: ${(s.detail || []).join(', ')})`);
+        } else if (!s.pass) {
+          bits.push(`step ${s.step}: the jump onto the ${s.target} m cap put him at ${s.landedOn} m instead`);
+        }
+      }
+      if (!pc.stepsPass && !(pc.steps || []).length) bits.push('the climb was never jumped');
+      if (pc.routePass === false) {
+        bits.push(`the islands are not a route but a stack: gaps of ${(pc.gaps || []).join('/')} m against a ${(pc.gapBand || []).join('–')} m step across`);
+      }
+      for (const s of pc.sight || []) {
+        if (s.trunk !== null) bits.push(`a ${s.trunk} m trunk stands inside the island at ${s.top} m`);
+        if (s.blocked !== null) bits.push(`a bullet or a sight line crossing the island at ${s.top} m is stopped by its ${s.blocked}, so the war can see a rock in the sky`);
+      }
+      const c = pc.crates || {};
+      if (c.count !== c.expected) bits.push(`${c.count} crate(s) on the islands instead of ${c.expected}`);
+      if (c.cleared !== 0) bits.push(`the world held ${c.cleared} pickup(s) the probe could not clear`);
+      if (c.cycled === false) bits.push(`the crates did not cycle the drop table in order (${(c.types || []).join(', ')})`);
+      if (c.anchored === false) bits.push('a crate on an island is not anchored, so it drifts to whoever walks under it');
+      if (c.waiting === false) bits.push('a crate on an island expires');
+      if (c.onTops === false) bits.push('a crate is not sitting on its island top');
+      if (c.fromBelow !== undefined && c.fromBelow !== null) {
+        bits.push(`a jump from the ground under the first crate (apex ${c.apex} m) collected its ${c.fromBelow}, so the reward is payable without the climb`);
+      }
+      if (c.onIsland === false) bits.push('standing on a crate\'s own island did not collect it');
+      // The post: the marksman the climb exists to answer.
+      const po = pc.post || {};
+      const pp = po.perch;
+      if (!pp) bits.push(po.note || 'no marksman was posted on any cap of the climb');
+      else {
+        if (pp.top > po.level) bits.push(`the marksman's cap stands ${pp.top} m up against the ${po.level} m ceiling for a post, so it is not a low one`);
+        if (pp.sight < po.needed) bits.push(`his cap sees only ${pp.sight} of the ${pp.of} points sampled in the clearing, against ${po.needed}`);
+        if (pp.clearPoints === 0) bits.push('no point of the clearing has a line to him, so a marksman there could not be shot back at');
+        else if (pp.roundFindsHim === false) bits.push('a round cast from the clearing did not find the marksman, so his firing line is one way');
+        const g = po.gunfire || {};
+        const ctl = po.control || {};
+        if (g.down) bits.push(`gunfire took the marksman off his rock after ${g.rounds} round(s), so the boot is not the only answer to him`);
+        else if (g.bleeding) bits.push('the marksman on his rock bleeds out, so gunfire would take him off it eventually');
+        else if (g.health !== g.floor) bits.push(`the marksman on his rock ended on ${g.health} health against his ${g.floor} floor`);
+        if (ctl.down === false) bits.push(`the same ${ctl.rounds} round(s) did not take down a walking attacker, so the rule is about the damage rather than the rock`);
+        const below = po.fromBelow || {};
+        if (below.routed) bits.push('the boot reached the marksman from the ground under his cap, so the climb is not the price of the boot');
+        else if (!(below.moved < 0.01)) bits.push(`the marksman moved ${below.moved} m when kicked from below his cap`);
+        const above = po.fromTheCap || {};
+        if (!above.kicked) bits.push('the boot thrown from his own cap did not take the marksman off it');
+        else if (above.landedAt !== 0) bits.push(`the marksman kicked off his cap never reached the ground (${above.seconds}s)`);
+      }
+      reasons.push(`the floating islands: ${bits.join('; ') || 'the probe did not pass'}`);
+    }
+    if (pc && pc.pass) {
+      const st = pc.steps || [];
+      findings.push(`the climb is climbed and not strolled: all ${st.length} steps clear it — first the ground into the ${pc.tops[0]} m cap, then ${pc.tops.slice(1).join(', ')} m — `
+        + `against a ${pc.clearance} m jump, each one walked to over the cap above and jumped from there, at bearings within ${Math.max(...st.map((s) => Math.abs(s.bearing ?? 0)))} rad of the line `
+        + `(${st.reduce((n, s) => n + (s.tries || 1), 0)} approaches tried, the ground between them not always being clear), laid out as a route rather than a stack `
+        + `(gaps ${(pc.gaps || []).join('/')} m), and no step could be walked up: the tolerance between the caps is narrower than the ${pc.tops[1] - pc.tops[0]} m step`);
+      findings.push(`the war cannot see them: no bullet, sight line or walking attacker crosses a cap (${pc.sight.length} rays through the caps came back empty), `
+        + `so the ground fight still measures what it measured before the sky had rocks in it`);
+      findings.push(`the crates are the reward for the climb: ${pc.crates.count} of them, one every other island from the ${pc.crates.types.join('/')} table, `
+        + `anchored on their caps with no expiry, standing where the island is ${pc.crates.onIsland ? 'in reach' : 'out of reach'} — and out of reach from underneath, `
+        + `where a ${pc.crates.apex} m jump from the ground reaches ${pc.crates.reachFromGround} m against the lowest crate at ${pc.crates.lowestBaseY} m`);
+      if (pc.post?.perch) {
+        const post = pc.post;
+        findings.push(`a marksman is posted on the climb rather than walking it: cap ${post.perch.index} at ${post.perch.top} m, `
+          + `seeing ${post.perch.sight} of the ${post.perch.of} points sampled in the clearing against ${post.needed} asked for, `
+          + `and a round cast from the clearing finds him (${post.perch.clearPoints} of those points have a line to him at chest height), `
+          + `so he can both shoot down into the fight and be shot back at`);
+        findings.push(`gunfire cannot take him off it: ${post.gunfire.rounds} round(s) through the real damage path leave him wounded at ${post.gunfire.health} health, `
+          + `his ${post.gunfire.floor} floor — floored and not bleeding, where the same rounds bleed a walking attacker out (${post.control.rounds} of them downs him)`);
+        findings.push(`the boot is what takes him off the rock, and only from up there: thrown from the ground under his cap it does nothing `
+          + `(he stands ${post.fromBelow.rise} m above the officer against a ${post.reachUp} m reach, unmoved), and thrown from the cap itself it sends him off it, `
+          + `${post.fromTheCap.fellFrom} m down and ${post.fromTheCap.moved} m out, on the ground after ${post.fromTheCap.seconds}s of falling rather than walking away at cap height`);
       }
     }
     // The officer's own mesh file. Every clause names the part and the bone, so a
@@ -1233,6 +1389,25 @@ function assess(report) {
     reasons.push('the run ended without the game reporting a victory or a death');
   }
 
+  // The posts. Every wave from `firstWave` puts a marksman on the climb, and a post
+  // can only leave that rock through the boot, so the two counts are the campaign's
+  // own check that the mechanic ran: a wave that never posted one, or a post that
+  // left the field some other way, is the regression this watches for. A run that
+  // ended while a post still stood is not a failure — it is where the run stopped.
+  if (report.marksmen) {
+    const { posted, bootedOff, firstWave } = report.marksmen;
+    const played = Math.min(opts.waves, report.wavesReached);
+    const expected = Math.max(0, played - (firstWave - 1));
+    if (expected > 0 && !posted) {
+      reasons.push(`no marksman was posted on the climb in ${expected} wave(s) that should have posted one (from wave ${firstWave})`);
+    } else if (posted) {
+      findings.push(`${posted} marksman(s) were posted on the climb, one per wave from wave ${firstWave}, and the boot took ${bootedOff} of them off their rock`);
+      if (bootedOff < posted && !killed) {
+        reasons.push(`${posted - bootedOff} marksman(s) left the field without the boot, so the perch is not what keeps them out of reach`);
+      }
+    }
+  }
+
   // A wave row that closed with the harness still running never handed over.
   // A death or a victory explains the last one, so it is context there.
   for (const w of report.waves || []) {
@@ -1256,8 +1431,26 @@ function assess(report) {
 
   // Optional pacing gate: only compare when a baseline has been recorded.
   let baselineDelta = null;
+  let baselineInfo = null;
   if (opts.baseline && fs.existsSync(baselinePath)) {
     const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+    // Which field the recorded times belong to. Two sets of wave times from two
+    // differently dressed fields are not a pacing change, and this is what says so.
+    baselineInfo = {
+      recordedAt: baseline.recordedAt || null,
+      worldSeed: baseline.worldSeed ?? null,
+      layoutHash: baseline.layoutHash || null,
+      dressing: baseline.dressing || null,
+    };
+    const nowLayout = report.layoutHash === null || report.layoutHash === undefined ? null : hex32(report.layoutHash);
+    if (!baselineInfo.dressing) {
+      findings.push('the recorded baseline carries no dressing fingerprint (it predates the harness reading one), so which field its wave times describe cannot be confirmed');
+    } else if (baselineInfo.dressing.hash !== (report.dressing ? report.dressing.hash : null)) {
+      findings.push(`the baseline was recorded on a different dressing: ${dressingLine(baselineInfo.dressing)} then, ${dressingLine(report.dressing)} now — so these wave times are two fields rather than movement in one`);
+    }
+    if (baselineInfo.layoutHash && nowLayout && baselineInfo.layoutHash !== nowLayout) {
+      findings.push(`the baseline was measured on layout ${baselineInfo.layoutHash} (world seed ${baselineInfo.worldSeed}) and this run on layout ${nowLayout} (world seed ${report.worldSeed}), so they are two different fields whatever the dressing says`);
+    }
     baselineDelta = [];
     for (const w of report.waves || []) {
       const was = baseline.waves?.find((b) => b.wave === w.wave);
@@ -1268,7 +1461,7 @@ function assess(report) {
     }
   }
 
-  return { ok: reasons.length === 0, reasons, findings, baselineDelta, errors };
+  return { ok: reasons.length === 0, reasons, findings, baselineDelta, baselineInfo, errors };
 }
 
 function printReport(report, passed) {
@@ -1277,7 +1470,7 @@ function printReport(report, passed) {
 
   // The mechanic probes: one assertion each, no campaign.
   if (report.lockCheck || report.kickCheck || report.dryCheck || report.characterCheck
-    || report.fatalityCheck || report.forestSweep) {
+    || report.fatalityCheck || report.platformCheck || report.forestSweep) {
     const c = report.lockCheck;
     const k = report.kickCheck;
     const d = report.dryCheck;
@@ -1332,6 +1525,18 @@ function printReport(report, passed) {
         console.log(`  the sting for the top boot plays its voice exactly: ${t.stingVoice ? `\u00d7${t.stingVoice.rate} / ${t.stingVoice.gain}` : 'NOTHING — WRONG'}`
           + `, ${t.stingPlaysTheVoice ? 'not the swing\'s jitter' : 'but that is not its voice — WRONG'}`);
       }
+      if (k.space) {
+        const s = k.space;
+        console.log('');
+        console.log(`  another man's rifle  ${pad('at', 8)}${pad('gain', 8)}${pad('cutoff', 10)}pan`);
+        for (const [label, at] of [['4 m ahead', s.near], ['8 m ahead', s.ahead], ['8 m right', s.right], ['8 m left', s.left], ['8 m behind', s.behind], ['45 m ahead', s.far]]) {
+          console.log(`  ${pad(label, 22)}${pad(`${at.distance}m`, 8)}${pad(at.gain.toFixed(3), 8)}${pad(`${at.cutoff}Hz`, 10)}${at.pan}`);
+        }
+        console.log(`  ${pad('half-turn', 22)}the 8 m right-hand rifle pans ${s.turned.pan} — the pan follows the aim, not the world`);
+        console.log(`  ${pad('his own rifle', 22)}${s.ownShotPlaced ? 'PLACED IN THE WORLD — WRONG' : 'not placed: it happens at the ear'}`);
+        console.log(`  ${pad('a real shot', 22)}an attacker ${s.expectedDistance} m from the camera was placed at ${s.fromARealRifle} m`);
+        console.log(`  ${pad('behind', 22)}a source dead behind sits at pan ${s.behind.pan}, which is what a two-channel pan does: only an HRTF could tell it from dead ahead`);
+      }
       console.log('');
       console.log(`  ${pad('kick', 10)}${pad('reach', 8)}${pad('arc', 8)}${pad('damage', 8)}${pad('prop power', 10)}`);
       for (const [key, prof] of Object.entries(k.profiles)) {
@@ -1349,7 +1554,7 @@ function printReport(report, passed) {
         const row = (label, v, mass) => console.log(`  ${pad(label, 16)}${pad(mass, 7)}${pad(v.shake, 8)}${pad(`${v.kickback}m`, 10)}${pad(`${v.roll}\u00b0`, 8)}${pad(v.hitStop > 0 ? `${v.hitStop}s` : 'none', 10)}`);
         row('empty air', f.whiff, '\u2014');
         row('a body', f.body, f.bodyMass);
-        row('a car', f.car, s.mass);
+        row('a tank', f.heavy, s.mass);
         console.log(`  the camera was shoved back ${f.cameraPushBack} m and the frame rolled ${f.frameRollDegrees}\u00b0 (${f.rollFollowsSide ? 'away from the impact, both sides' : 'WRONG'})`);
         console.log(`  hit-stop: a body froze ${f.stopFrames} frame(s) at \u00d7${f.stopScale} world time, then the clock ran clean again; screen edge lit to ${f.edgeFlashOpacity}`);
       }
@@ -1369,6 +1574,38 @@ function printReport(report, passed) {
         console.log(`  the legs themselves   ${Object.entries(sw.profiles || {}).map(([t, r]) => `${t} ${r.path} m of travel, ${r.rise} m of it rise`).join('; ')}`);
       }
       if (k.detail) console.log(`  ${k.detail}`);
+    }
+    if (report.platformCheck) {
+      const pcv = report.platformCheck;
+      if (c || k || d) console.log('');
+      console.log('The floating islands');
+      console.log(`  ${pcv.count} islands, tops ${(pcv.tops || []).join(', ')} m, against a ${pcv.clearance} m jump`);
+      console.log(`  ${pad('step', 6)}${pad('from', 8)}${pad('to', 8)}${pad('bore', 7)}${pad('tries', 7)}outcome`);
+      for (const s of pcv.steps || []) {
+        console.log(`  ${pad(s.step, 6)}${pad(s.from, 8)}${pad(s.target, 8)}${pad(s.bearing === undefined ? '\u2014' : s.bearing, 7)}${pad(s.tries ?? 1, 7)}`
+          + (s.pass ? 'jumped up and landed' : `NOT REACHED \u2014 ${s.ramp ? 'walked up' : (s.detail || []).join(', ')}`));
+      }
+      const cq = pcv.crates || {};
+      console.log(`  controls             no bearing lets a walk lift him = ${pcv.walkUpPass ? 'no ramp anywhere' : 'A RAMP SOMEWHERE'}`
+        + `; the war's own rays through the caps come back empty = ${pcv.sightPass ? 'yes' : 'NO'}`);
+      console.log(`  the crates           ${cq.count} of ${cq.expected}, ${cq.anchored ? 'anchored' : 'NOT ANCHORED'}`
+        + `, ${cq.waiting ? 'waiting rather than expiring' : 'EXPIRING'}, ${cq.onTops ? 'on their island tops' : 'NOT ON THEIR TOPS'}`
+        + `, drop table in order = ${cq.cycled ? 'yes' : 'NO'} (${(cq.types || []).join(', ')})`);
+      console.log(`  the climb pays       standing on its island collects it = ${cq.onIsland ? 'yes' : 'NO'}`
+        + `; a ${cq.apex} m jump from the ground reaches ${cq.reachFromGround} m against the lowest crate at ${cq.lowestBaseY} m = `
+        + `${cq.fromBelow === null ? 'out of reach' : `COLLECTED ${cq.fromBelow} FROM BELOW`}`);
+      const po = pcv.post || {};
+      if (po.perch) {
+        console.log(`  the post             cap ${po.perch.index} at ${po.perch.top} m (ceiling ${po.level} m), seeing ${po.perch.sight} of ${po.perch.of} points of the clearing `
+          + `against ${po.needed}, a round from the clearing finds him = ${po.perch.roundFindsHim ? 'yes' : 'NO'} (${po.perch.clearPoints} point(s) with a line to him)`);
+        console.log(`  gunfire on the rock  ${po.gunfire.rounds} round(s) leave him at ${po.gunfire.health} health, his ${po.gunfire.floor} floor, `
+          + `bleeding = ${po.gunfire.bleeding ? 'YES — he would bleed out' : 'no'}, down = ${po.gunfire.down ? 'YES' : 'no'}`
+          + `; the same treatment on a walking attacker downs him in ${po.control.rounds} round(s) = ${po.control.down ? 'yes' : 'NO'}`);
+        console.log(`  the boot on him      from the ground under his cap: ${po.fromBelow.routed ? 'ROUTED — out of reach means nothing' : `nothing (he stands ${po.fromBelow.rise} m up against a ${po.reachUp} m reach, moved ${po.fromBelow.moved} m)`}`
+          + `; from his own cap: ${po.fromTheCap.kicked ? `off the rock — ${po.fromTheCap.fellFrom} m down, ${po.fromTheCap.moved} m out, on the ground after ${po.fromTheCap.seconds}s` : 'NOT KICKED OFF'}`);
+      } else {
+        console.log(`  the post             none — ${po.note || 'no cap of the climb can see the clearing'}`);
+      }
     }
     if (cc) {
       if (c || k || d) console.log('');
@@ -1531,6 +1768,9 @@ function printReport(report, passed) {
       if (c || k || d || cc || fat) console.log('');
       const control = sweep.control;
       console.log('Forest fairness');
+      // The sweep varies the layout and never the dressing, so one line covers every
+      // forest below it — and says which field they were all dressed as.
+      console.log(`  dressing: ${dressingLine(sweep.dressing)}`);
       console.log(`  control: an empty field is ${control.openFair ? 'fair' : 'UNFAIR'}, and a trunk wall round the clearing is ${control.sealedUnfair ? 'unfair' : 'FAIR'} — ${control.pass ? 'the audit can tell them apart' : 'IT CANNOT TELL THEM APART'}`);
       console.log(`    the wall was rejected because: ${(control.sealedReasons || []).join('; ') || '(no reason given)'}`);
       console.log(`  ${pad('seed', 12)}${pad('layout', 11)}${pad('trees', 7)}${pad('props', 7)}${pad('ground', 9)}${pad('room', 7)}${pad('open', 8)}${pad('clearing', 10)}${pad('ring', 8)}${pad('pockets', 9)}verdict`);
@@ -1556,6 +1796,8 @@ function printReport(report, passed) {
         const when = drift.recordedAt ? `, recorded ${drift.recordedAt}` : '';
         console.log(`  drift since ${path.basename(forestBaselinePath)}${when}, tolerance ${Math.round(drift.tolerance * 100)}%`
           + (drift.accepted ? ' — accepted, this sweep is the new baseline' : ''));
+        console.log(`    dressing: ${dressingLine(drift.dressing)} in the baseline, ${dressingLine(drift.dressingNow)} in this sweep`
+          + (drift.dressingMoved ? ' — A DIFFERENT FIELD, so every layout hash below has moved with it' : ''));
         for (const note of drift.notes || []) console.log(`    ${note}`);
         if (drift.metrics.length) {
           console.log(`    ${pad('metric', 24)}${pad('was (min / mean)', 22)}${pad('now (min / mean)', 22)}moved`);
@@ -1615,9 +1857,17 @@ function printReport(report, passed) {
   console.log('');
   console.log(`Simulated ${report.gameSeconds}s over ${report.steps} frames (${report.wallClockSeconds}s wall clock).`);
   console.log(`Eliminations ${report.eliminations} (boot ${report.bootEliminations}), loot ${report.lootCollected}, outcome ${report.outcome}${report.endTitle ? ` ("${report.endTitle}")` : ''}${report.instrumented ? '' : `, health ${report.healthAtEnd}`}.`);
+  // Which field these figures describe, named in every run: a run is only comparable
+  // with another that was measured on the same dressing and the same layout.
+  console.log(`Dressing: ${dressingLine(report.dressing)}`);
 
   if (passed.baselineDelta?.length) {
-    console.log('\nAgainst the baseline');
+    const info = passed.baselineInfo || {};
+    const when = info.recordedAt ? `, recorded ${info.recordedAt}` : '';
+    const field = info.layoutHash ? `, world seed ${info.worldSeed}, layout ${info.layoutHash}` : '';
+    console.log(`\nAgainst the baseline${when}${field}`);
+    console.log(`  measured on dressing: ${dressingLine(info.dressing)}`);
+    console.log(`  this run is dressing: ${dressingLine(report.dressing)}${info.dressing && info.dressing.hash !== (report.dressing ? report.dressing.hash : null) ? '  ← A DIFFERENT FIELD' : ''}`);
     console.log(`  ${pad('wave', 6)}${pad('was', 10)}${pad('now', 10)}change`);
     for (const d of passed.baselineDelta) {
       console.log(`  ${pad(d.wave, 6)}${pad(`${d.wasSeconds}s`, 10)}${pad(`${d.nowSeconds}s`, 10)}${d.changePercent > 0 ? '+' : ''}${d.changePercent}%`);

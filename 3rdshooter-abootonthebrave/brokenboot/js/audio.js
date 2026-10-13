@@ -1,6 +1,12 @@
 // Synthesised combat sound effects plus the provided music tracks and the boot's
 // own recorded takes. Every sample is optional: the synthesis stands in for one
 // that is missing, so the game never depends on a file being there.
+//
+// Anything somebody else makes is placed in the world: quieter and duller with
+// distance, panned to the side it came from (see `where`). The officer's own rifle,
+// boot and pickups happen at the ear, and the music is a bed rather than a source.
+import { clamp } from './mathx.js';
+import { AUDIO_SPACE } from './config.js';
 
 /**
  * Two-track dynamic music.
@@ -83,6 +89,89 @@ export class GameAudio {
     // `Math.random`: a sound that takes a draw from the fight's stream is a design
     // change dressed as a sound, and the campaign would no longer be the same run.
     this._seed = 0x9e3779b9;
+    // The ear: where it is, which way it faces, and where the last sound somebody
+    // else made was placed. `lastSpace` is kept so the harness can read the placement
+    // back off the game rather than reaching into the audio graph for it.
+    this.listener = { x: 0, z: 0 };
+    this.listenerYaw = 0;
+    this.lastSpace = null;
+  }
+
+  /**
+   * Where the ear is and which way it is facing, fed from the camera every frame: the
+   * pan follows the aim and not the officer's body, so what is heard is what is being
+   * looked at.
+   */
+  setListener(position, forward) {
+    this.listener.x = position.x;
+    this.listener.z = position.z;
+    this.listenerYaw = Math.atan2(forward.x, forward.z);
+  }
+
+  /**
+   * How a sound at `at` arrives: how much quieter, how much duller, and how far to
+   * one side.
+   *
+   * The fall-off is the standard inverse distance model — full gain inside
+   * `refDistance`, then `refDistance / (refDistance + rolloff * (d - refDistance))`,
+   * floored so a distant fight goes faint rather than silent. The dulling is air
+   * absorption, which is exponential in distance rather than linear, since a sound
+   * loses a fixed *share* of its top end per metre: the curve is a ratio, not a ramp,
+   * which is why the far end of it flattens out instead of vanishing.
+   *
+   * The pan is the source's bearing off the ear's forward vector, taken against the
+   * project's own right-hand vector (`cos yaw, 0, -sin yaw`, the one `kickImpact` uses
+   * for the frame roll), so a source on the right pans right. It is a two-channel pan:
+   * a sound dead ahead and one dead behind both sit in the middle, which is the one
+   * thing only an HRTF could tell apart, and this game does not pay for one.
+   */
+  where(at) {
+    const space = AUDIO_SPACE;
+    const dx = at.x - this.listener.x;
+    const dz = at.z - this.listener.z;
+    const distance = Math.hypot(dx, dz);
+    const past = Math.max(0, distance - space.refDistance);
+    const gain = clamp(space.refDistance / (space.refDistance + space.rolloff * past), space.minGain, 1);
+    const travelled = Math.min(1, distance / space.dullestAt);
+    const cutoff = space.brightHz * Math.pow(space.dullestHz / space.brightHz, travelled);
+    const rightX = Math.cos(this.listenerYaw);
+    const rightZ = -Math.sin(this.listenerYaw);
+    const pan = distance > 1e-4
+      ? clamp((dx * rightX + dz * rightZ) / distance, -1, 1)
+      : 0;
+    this.lastSpace = {
+      distance: +distance.toFixed(2),
+      gain: +gain.toFixed(3),
+      cutoff: Math.round(cutoff),
+      pan: +pan.toFixed(3),
+    };
+    return this.lastSpace;
+  }
+
+  /**
+   * The node a sound plays into: the master directly, or — for a sound with a place in
+   * the world — through the air, the distance and the pan that `where` worked out.
+   * A browser without `createStereoPanner` still gets the distance and the dulling and
+   * just not the side, which is the one part of this the platform can withhold.
+   */
+  output(at) {
+    if (!at || !this.ctx) return this.master;
+    const { gain, cutoff, pan } = this.where(at);
+    const air = this.ctx.createBiquadFilter();
+    air.type = 'lowpass';
+    air.frequency.value = cutoff;
+    const level = this.ctx.createGain();
+    level.gain.value = gain;
+    air.connect(level);
+    let tail = level;
+    if (typeof this.ctx.createStereoPanner === 'function') {
+      const panner = this.ctx.createStereoPanner();
+      panner.pan.value = pan;
+      level.connect(panner);
+      tail = panner;
+    }
+    tail.connect(this.master);
+    return air;
   }
 
   /** A cheap xorshift, for take and pitch variation only. */
@@ -122,7 +211,7 @@ export class GameAudio {
     return buf;
   }
 
-  blip(freq, duration, type = 'square', gain = 0.2, slideTo = null) {
+  blip(freq, duration, type = 'square', gain = 0.2, slideTo = null, at = null) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
@@ -132,12 +221,12 @@ export class GameAudio {
     if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t + duration);
     g.gain.setValueAtTime(gain * this.sfxVolume, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
-    osc.connect(g).connect(this.master);
+    osc.connect(g).connect(this.output(at));
     osc.start(t);
     osc.stop(t + duration + 0.02);
   }
 
-  noise(duration, filterFreq, gain = 0.35, q = 1) {
+  noise(duration, filterFreq, gain = 0.35, q = 1, at = null) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     const src = this.ctx.createBufferSource();
@@ -149,7 +238,7 @@ export class GameAudio {
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(gain * this.sfxVolume, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
-    src.connect(filter).connect(g).connect(this.master);
+    src.connect(filter).connect(g).connect(this.output(at));
     src.start(t);
     src.stop(t + duration + 0.02);
   }
@@ -181,7 +270,7 @@ export class GameAudio {
    * what keeps a sound played on every kick from sounding like one file on repeat.
    * Returns whether it played at all.
    */
-  sample(name, gain = 0.7, rate = 1) {
+  sample(name, gain = 0.7, rate = 1, at = null) {
     const buffer = this.samples[name];
     if (!this.ctx || !buffer) return false;
     const t = this.ctx.currentTime;
@@ -190,19 +279,16 @@ export class GameAudio {
     src.playbackRate.value = rate;
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(gain * this.sfxVolume, t);
-    src.connect(g).connect(this.master);
+    src.connect(g).connect(this.output(at));
     src.start(t);
     return true;
   }
 
+  // The officer's own rifle: at the ear, never placed.
   shoot() { this.noise(0.16, 4200, 0.42); this.blip(180, 0.09, 'square', 0.16, 60); }
-  enemyShoot() { this.noise(0.14, 2600, 0.2); this.blip(140, 0.08, 'triangle', 0.08, 50); }
+  /** Somebody else's rifle, from where they are standing. */
+  enemyShoot(at) { this.noise(0.14, 2600, 0.2, 1, at); this.blip(140, 0.08, 'triangle', 0.08, 50, at); }
   kick() { this.blip(120, 0.22, 'sawtooth', 0.26, 40); this.noise(0.18, 900, 0.3); }
-  /**
-   * The boot meeting something, laid over the swing on every kick whether it lands
-   * or whiffs — the synthesis is already the feel of the kick, this is the sound of
-   * it. Nothing to fall back to: `kick()` is the fallback.
-   */
   /**
    * A boot take: the named recording played through the tier's voice — its playback
    * rate and gain — with a little variation on top, so a wave of kicks is not one
@@ -215,7 +301,8 @@ export class GameAudio {
     const jitter = 1 + (this.rand() * 2 - 1) * spread;
     return this.sample(name, voice.gain, voice.rate * jitter);
   }
-  impact() { this.noise(0.12, 1400, 0.28); this.blip(220, 0.1, 'square', 0.12, 80); }
+  /** A round into the scenery, where it struck. */
+  impact(at) { this.noise(0.12, 1400, 0.28, 1, at); this.blip(220, 0.1, 'square', 0.12, 80, at); }
 
   /**
    * The scream of someone who has just met the boot: one of the recorded takes if
@@ -225,18 +312,19 @@ export class GameAudio {
    * buffers out of `Math.random`, which is the fight's own stream, and the boot is
    * already sounding its swing over this.
    */
-  scream() {
+  scream(at) {
     const take = this.rand() < 0.5 ? 'ouch' : 'oua';
-    if (this.sample(take, 0.85, 0.94 + this.rand() * 0.12)) return;
-    this.blip(760, 0.5, 'sawtooth', 0.2, 170);
-    setTimeout(() => this.blip(560, 0.42, 'square', 0.14, 130), 80);
-    setTimeout(() => this.blip(380, 0.34, 'triangle', 0.1, 90), 170);
-    this.noise(0.34, 1500, 0.16);
+    if (this.sample(take, 0.85, 0.94 + this.rand() * 0.12, at)) return;
+    this.blip(760, 0.5, 'sawtooth', 0.2, 170, at);
+    setTimeout(() => this.blip(560, 0.42, 'square', 0.14, 130, at), 80);
+    setTimeout(() => this.blip(380, 0.34, 'triangle', 0.1, 90, at), 170);
+    this.noise(0.34, 1500, 0.16, 1, at);
   }
 
-  wounded() { this.blip(420, 0.14, 'square', 0.1, 300); }
-  // A bullet downing: a slow slump, no boot scream.
-  downed() { this.blip(150, 0.5, 'sawtooth', 0.13, 62); this.noise(0.3, 520, 0.16); }
+  /** A round finding an attacker, where it landed. */
+  wounded(at) { this.blip(420, 0.14, 'square', 0.1, 300, at); }
+  // A bullet downing: a slow slump, no boot scream. Where it happened.
+  downed(at) { this.blip(150, 0.5, 'sawtooth', 0.13, 62, at); this.noise(0.3, 520, 0.16, 1, at); }
   // The hidden line breaking cover and coming on.
   flush() { this.blip(240, 0.35, 'sawtooth', 0.12, 460); this.blip(180, 0.5, 'triangle', 0.09, 300); }
   hurt() { this.noise(0.2, 700, 0.3); this.blip(90, 0.25, 'sine', 0.2, 50); }

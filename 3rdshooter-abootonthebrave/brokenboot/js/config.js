@@ -100,12 +100,16 @@ export const SETTINGS = {
   propHitKnockback: 16,
 
   // What the boot feels like when it connects. Every figure below scales off one
-  // mass: an attacker body counts as `bodyMass`, a kicked crate, barrier, rock or
-  // car as its own mass (1, 1.5, 2.6, 3), and the heaviest thing the boot met
-  // decides. So a crate barely rattles the frame, a rock is a shove and a car is a
-  // car. A kick into empty air meets no mass at all and gets none of it, which is
-  // what makes a connect read as a connect.
+  // mass: an attacker body counts as `bodyMass`, a kicked crate, barrel, sandbag
+  // wall, rock or tank as its own mass (1, 1.2, 1.5, 2.6, 4), and the heaviest
+  // thing the boot met decides. So a crate barely rattles the frame, a rock is a
+  // shove and a tank is a wall. A kick into empty air meets no mass at all and gets
+  // none of it, which is what makes a connect read as a connect.
   bodyMass: 2.0,
+  // How far above his own feet the boot reaches. Every ground fight is on one level,
+  // so this is about the war above it: a marksman holding a cap is out of the boot's
+  // reach from underneath, and climbing his rock is what gets the boot to him.
+  bootReachUp: 0.6,
   kickShakePerMass: 0.45,       // camera rattle per unit of mass
   kickShakeMax: 2.0,
   kickWhiffShake: 0.3,          // the swing alone, when it meets nothing
@@ -119,8 +123,9 @@ export const SETTINGS = {
   kickStopPerMass: 0.03,        // seconds the world hitch-slides for
   kickStopMax: 0.14,
   kickStopScale: 0.12,          // world time runs at this fraction during one
-  kickFlashMass: 3,             // the mass that fills the screen-edge flash: a car
-  propHitShakePerMass: 0.16,    // a car rolling through a line, per unit mass
+  kickFlashMass: 3,             // the mass that fills the screen-edge flash: a rock is
+                                // under it, so only the tank fills the frame
+  propHitShakePerMass: 0.16,    // a tank rolling through a line, per unit mass
   shakeMax: 2.4,
 
   // Boot charge. Routs and charge crates fill it; a full meter turns the next
@@ -174,7 +179,7 @@ export const SETTINGS = {
   enemyFireBase: 1.35,
   enemyDamage: 9,
 
-  // Attackers fight from cover: they crouch behind trees, the car and the
+  // Attackers fight from cover: they crouch behind trees, the tanks and the
   // crates and bound forward cover to cover, so the fight opens out instead of
   // turning into a close-range brawl. How many press the attack at once, how
   // long they hold cover and how hard they come on all scale with the wave —
@@ -345,7 +350,42 @@ export const LANDSCAPE = {
   probeHeight: 1.7,
   skyboxIntensity: 1,
 };
-export const VEHICLE = { model: 'suggan_53_modified_-_low_poly_model.glb', length: 4.6 };
+// The vehicle cover: a CC0 modular tank — hull and turret, two files from the same
+// pack — in place of the low-poly car. The pair is scaled as one assembly off the
+// models' own bounding boxes, because every pack in the set is in its own units
+// (centimetres, metres, Blender units) and none of that is worth trusting twice.
+// The turret is turned to lie along the hull: the pack models it across, which only
+// shows up once it is on.
+// `length` is what the tank is fitted by, not its height: in the pack's own units the
+// hull is all but square (0.406 × 0.159 × 0.373, so 5.9 m across if it were scaled to
+// stand 2.3 m tall), and five of those on the field are not cover, they are a wall —
+// the forest audit caught exactly that. Fitted to the car's own 4.6 m of length it
+// measures 4.60 × 1.80 × 4.23 m and reaches 2.39 m to the top of the turret: a
+// low-slung tank, and a piece of cover the fight can still use.
+export const VEHICLE = {
+  model: 'tank_hull.dae',
+  turret: 'tank_turret.dae',
+  length: 4.6,
+  count: 3,
+  turretTurn: -Math.PI / 2,
+  turretShare: 0.55,  // the turret's length as a fraction of the hull's own
+  mass: 4,          // the heaviest thing the boot can meet, heavier than the rocks
+  radius: 2.6,      // how close an attacker has to be to be under its cover
+};
+
+// The CC0 prop pack dressing the field: a plank crate and a barrel from the
+// crate-and-barrel pack, and a wall of sandbags where the concrete barrier used to
+// be. `by`/`size` is the target the model is scaled to, measured from its own
+// bounding box, and `mass` is what a kick is divided by — a crate flies, a barrel
+// rolls, a wall of sandbags shifts.
+export const PROPS = {
+  crate:   { model: 'crate_mesh.obj',  by: 'height', size: 1.05, mass: 1,   radius: 1.05, count: 10, colour: 0x5c5344 },
+  barrel:  { model: 'barrel_mesh.obj', by: 'height', size: 0.95, mass: 1.2, radius: 0.75, count: 5,  colour: 0x47503c },
+  // The sandbag model is a long low wall (6.1 m of it at 0.95 m high once scaled), so
+  // it is scaled by height and only three are laid: it is cover first, and a wall the
+  // length of a bus makes cover the fight can use without sealing the clearing.
+  barrier: { model: 'sandbags.dae',    by: 'height', size: 1.05, mass: 1.5, radius: 1.4,  count: 3,  colour: 0x7d7a66 },
+};
 
 // Gradient sky cap drawn over the scanned horizon.
 // `capAngle` is the fraction of the sphere covered from the zenith downwards.
@@ -400,6 +440,77 @@ export const BOOT_BONE_AXES = { sole: [0.046, -0.592, 0.804], toe: [0.006, 0.976
 // joint and sits near the back of a foot. Centring a boot on the bone alone hangs it
 // off the heel, so every tier carries a forward offset as well as a lift.
 //
+// The floating islands: little inverted mountains in the air over the fight, stepped
+// so they can be climbed by jumping and far enough apart to be a route rather than a
+// staircase. Three numbers decide whether they are a climb or a ramp:
+//
+//   `rise`          0.70 m against a jump apex of `jumpSpeed² / (2 · |gravity|)` ≈ 0.99 m,
+//                   so every step is clear of him by a third of a metre
+//   `stepTolerance` how far *below* a cap his feet may be and still be caught by it.
+//                   It has to be narrower than `rise`, or walking into the overlap between
+//                   two caps lifts him a step for free — the harness measures that it
+//                   does not. It also has to swallow a frame of falling onto a cap from
+//                   above: 0.15 m is 9 m/s, and a fall off an island arrives slower.
+//   `firstRise`     0.95 m, the first step sized to the same climb: his feet have to
+//                   reach `firstRise - stepTolerance` = 0.80 m of the 0.99 m apex.
+//
+// The jump that reaches each of those is checked by the harness rather than assumed.
+// Some islands carry a supply crate — a small military asset on the open lid, which is
+// the reward for the climb and therefore out of reach from the ground (see
+// `Effects.update`: loot is collected at its own level or above, never from below).
+export const PLATFORMS = {
+  count: 10,        // islands in the climb
+  firstRise: 0.95,  // m the first one floats above the ground
+  rise: 0.70,       // m each step up
+  stepTolerance: 0.15, // m below a cap that still counts as being caught by it
+  gapMin: 2.05,     // m between the centres of neighbours
+  gapMax: 2.55,
+  wander: 1.15,     // rad the climb is allowed to curve by, per step
+  radius: 1.55,     // m of top the officer can stand on
+  depth: 2.6,       // m the inverted peak hangs below its top
+  spread: 9,        // m the first island is laid out from the clearing centre
+  crates: ['ammo', 'health', 'charge', 'rapid', 'armor'],
+  firstCrate: 2,    // the island the first crate sits on, and every other one after
+};
+
+// The marksman on the islands. One cap of the climb — the lowest one that can see the
+// clearing — is posted with a shooter who holds it: he does not walk, he does not take
+// cover, and while he is up there gunfire only ever wounds him. That last rule is the
+// whole point of him: the rifle floors him and stops, so the boot is the only thing
+// that takes him off the rock, and the climb is what gets the boot to him (he stands
+// above `SETTINGS.bootReachUp`).
+//
+// He is posted rather than walked there: the perch is a cap, and nothing in the fight
+// can hand him one, so `world.marksmanPerch()` picks it and `EnemyManager.queueWave`
+// puts him on it before the walking line steps off.
+export const MARKSMAN = {
+  firstWave: 2,       // waves before this are the walking line alone
+  maxTop: 1.65,       // m: a LOW cap — the first rung (0.95) or one step above it
+  sightSamples: 9,    // points of the clearing he is asked to see
+  sightNeeded: 3,     // of those, how many a perch has to see before it is worth posting
+  sightRadius: 0.62,  // fraction of the clearing radius the samples sit at
+  sightHeight: 1.2,   // m: the chest height of whoever he is shooting at down there
+  fireInterval: 2.9,  // s between shots — slow, and unbroken by cover the way the line's is
+  damageScale: 1.8,   // multiplies `SETTINGS.enemyDamage`
+  hitBonus: 0.18,     // added to the hit chance, so range costs him far less than it costs them
+  maxRange: 60,       // m he will shoot to
+};
+
+// How a sound behaves in space: how fast it falls away, how dull it gets, and how
+// hard a side is a side. A firefight is meant to be readable with the screen out of
+// frame — an attacker firing from the trees on the left is heard on the left, and
+// further off than one standing in your face — so these are the numbers that tuning
+// that means. They apply to what somebody else makes: the officer's own rifle, boot
+// and pickups happen at the ear and are never placed.
+export const AUDIO_SPACE = {
+  refDistance: 7,     // m at which a sound plays at the gain it was given
+  rolloff: 1.15,      // how fast it falls away past that (inverse distance, 1 = real)
+  minGain: 0.05,      // m the floor: nothing goes silent out there, it goes faint
+  brightHz: 12000,    // the low-pass cutoff at arm's length, effectively open
+  dullestHz: 600,     // the cutoff it has been filtered down to at `dullestAt`
+  dullestAt: 60,      // m over which the air takes the top off a sound
+};
+
 // How each tier sounds. A heavier boot lands lower and louder, so upgrading changes
 // the boot's voice as well as its numbers — which is what a tier without its own
 // recording gets, and the voice a tier with one is played through on top of its own
@@ -450,7 +561,7 @@ export const BOOT_SOCKETS = {
 // the air for the high kick — and upgrading the boot changes the standing one.
 // `damageScale` and `knockbackScale` apply to the equipped tier's figures, so a
 // better boot is felt in every kick. `propPower` and `propLift` are the impulse
-// put into scenery, divided by the prop's mass: a crate flies, a car shifts.
+// put into scenery, divided by the prop's mass: a crate flies, a tank shifts.
 export const KICKS = {
   kick: {
     name: 'Kick', clip: 'kick',
@@ -492,5 +603,5 @@ export const ACHIEVEMENTS = [
   { id: 'legendary',    label: 'The Legend Of The Boot',    desc: 'Unlock the Legendary Broken Boot.' },
   { id: 'surrounded',   label: 'Surrounded',                desc: 'Become surrounded by six or more attackers.' },
   { id: 'one_man_army', label: 'One-Man Army',              desc: 'Complete every wave.' },
-  { id: 'car_kicker',   label: 'Boot Versus Bodywork',      desc: 'Kick a car off its mark.' },
+  { id: 'tank_kicker',  label: 'Boot Versus Armour',        desc: 'Kick a tank off its mark.' },
 ];

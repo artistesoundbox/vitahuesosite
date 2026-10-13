@@ -18,6 +18,8 @@ const TYPES = {
   '.json': 'application/json; charset=utf-8',
   '.glb': 'model/gltf-binary',
   '.gltf': 'model/gltf+json',
+  '.obj': 'model/obj',
+  '.dae': 'model/vnd.collada+xml',
   '.fbx': 'application/octet-stream',
   '.mp3': 'audio/mpeg',
   '.jpg': 'image/jpeg',

@@ -29,6 +29,57 @@ const PICKUP_LOOK = {
   rapid:  { body: 0x5a3a6b, glow: 0x341b4a, halo: 0xd99bff },
   armor:  { body: 0x2f5a6b, glow: 0x14363a, halo: 0x8fe6ef },
 };
+// The supply crates on the islands hold small military assets rather than only a
+// colour: the lid is open and what sits on it says what the crate is worth at a
+// glance. Materials are shared, because a wave can leave a dozen crates standing and
+// none of them should cost a material each.
+const ASSET_MATERIALS = {
+  olive: new THREE.MeshStandardMaterial({ color: 0x3f4a2c, roughness: 0.95, flatShading: true }),
+  dark: new THREE.MeshStandardMaterial({ color: 0x22261c, roughness: 1, flatShading: true }),
+  brass: new THREE.MeshStandardMaterial({ color: 0xb08d3a, roughness: 0.5, metalness: 0.6, flatShading: true }),
+  steel: new THREE.MeshStandardMaterial({ color: 0x6a6f70, roughness: 0.6, metalness: 0.4, flatShading: true }),
+  white: new THREE.MeshStandardMaterial({ color: 0xdcd8cc, roughness: 0.9, flatShading: true }),
+  red: new THREE.MeshStandardMaterial({ color: 0x8e2020, roughness: 0.9, flatShading: true }),
+  canvas: new THREE.MeshStandardMaterial({ color: 0x5c5a44, roughness: 1, flatShading: true }),
+};
+const ASSET_PARTS = {
+  // A belt of rounds he can top his magazine up from.
+  ammo: [
+    ['olive', 'box', 0.36, 0.14, 0.24, 0, 0.07, 0],
+    ['brass', 'box', 0.22, 0.05, 0.1, 0, 0.17, 0],
+    ['brass', 'box', 0.24, 0.04, 0.03, 0, 0.14, 0.06],
+  ],
+  // A med kit with its own cross.
+  health: [
+    ['white', 'box', 0.28, 0.18, 0.22, 0, 0.09, 0],
+    ['red', 'box', 0.19, 0.05, 0.05, 0, 0.19, 0],
+    ['red', 'box', 0.05, 0.05, 0.13, 0, 0.19, 0],
+  ],
+  // The radio he calls the charged kick in on.
+  charge: [
+    ['dark', 'box', 0.26, 0.16, 0.18, 0, 0.08, 0],
+    ['steel', 'cyl', 0.006, 0.34, 0, 0.32, 0],
+    ['brass', 'cyl', 0.05, 0.03, 0.06, 0.14, 0.05],
+  ],
+  // A drum magazine: the rate, not the sound.
+  rapid: [
+    ['dark', 'cyl', 0.1, 0.16, 0, 0.08, 0],
+    ['brass', 'cyl', 0.075, 0.03, 0, 0.17, 0],
+    ['steel', 'box', 0.08, 0.06, 0.06, 0, 0.03, 0.11],
+  ],
+  // A plate carrier, folded on the lid.
+  armor: [
+    ['olive', 'box', 0.3, 0.1, 0.24, 0, 0.05, 0],
+    ['canvas', 'box', 0.26, 0.05, 0.1, 0, 0.12, -0.05],
+    ['dark', 'box', 0.32, 0.04, 0.1, 0, 0.11, 0.05],
+  ],
+  reload: [
+    ['steel', 'box', 0.1, 0.16, 0.06, 0, 0.08, 0],
+    ['steel', 'box', 0.1, 0.16, 0.06, 0.13, 0.08, 0],
+    ['steel', 'box', 0.1, 0.16, 0.06, 0.065, 0.2, 0],
+  ],
+};
+
 const PARTICLE_LIFE = 0.5;
 const MAX_TRACERS = 24;
 const MAX_PARTICLES = 90;
@@ -331,7 +382,13 @@ export class Effects {
     return slot;
   }
 
-  spawnPickup(position, type) {
+  /**
+   * A dressing on the ground, or a supply crate up on a floating island.
+   * `options.anchored` keeps one where it was put and never lets it expire: loot in the
+   * grass has to be chased before the wave takes it away, but a crate on a rock is a
+   * place the officer went to, and one that faded while he climbed would be a cheat.
+   */
+  spawnPickup(position, type, options = {}) {
     // Each pickup type reads at a glance: body colour, and a glowing halo that
     // makes it findable in the grass.
     const look = PICKUP_LOOK[type] || PICKUP_LOOK.ammo;
@@ -344,7 +401,7 @@ export class Effects {
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.copy(position);
-    mesh.position.y = 0.4;
+    mesh.position.y = position.y + 0.4;
     mesh.castShadow = true;
     const halo = new THREE.Mesh(
       new THREE.TorusGeometry(0.36, 0.03, 6, 16),
@@ -353,8 +410,43 @@ export class Effects {
     halo.rotation.x = Math.PI / 2;
     halo.position.y = 0.02;
     mesh.add(halo);
+    if (options.crate) {
+      // A small military supply crate around it, block-modelled like the rest of the
+      // scenery: olive planks, a darker lid and strap, and a stencil plate. It makes
+      // the island loot read as an object somebody left rather than as a glow.
+      const wood = new THREE.MeshStandardMaterial({ color: 0x4a5334, roughness: 0.95 });
+      const strap = new THREE.MeshStandardMaterial({ color: 0x2c3220, roughness: 1 });
+      const plate = new THREE.MeshStandardMaterial({ color: 0xc9c2a0, roughness: 0.9 });
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.44, 0.56), wood);
+      box.castShadow = true;
+      box.receiveShadow = true;
+      const lid = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.06, 0.58), strap);
+      lid.position.y = 0.24;
+      const band = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.46, 0.58), strap);
+      band.position.set(-0.18, 0, 0);
+      const stencil = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.16, 0.02), plate);
+      stencil.position.set(0.18, 0.04, 0.29);
+      box.add(lid, band, stencil);
+      // What is in the crate, on the open lid: the one part of it a player reads
+      // from the ground, since the climbing is what the crate is there to reward.
+      for (const [mat, shape, a, b, c, x, y, z] of ASSET_PARTS[type] || []) {
+        const part = shape === 'cyl'
+          ? new THREE.Mesh(new THREE.CylinderGeometry(a, a, b, 6, 1), ASSET_MATERIALS[mat])
+          : new THREE.Mesh(new THREE.BoxGeometry(a, b, c), ASSET_MATERIALS[mat]);
+        part.position.set(x, 0.27 + y, z);
+        part.castShadow = true;
+        box.add(part);
+      }
+      mesh.add(box);
+    }
     this.scene.add(mesh);
-    this.pickups.push({ mesh, type, life: 26 });
+    this.pickups.push({
+      mesh,
+      type,
+      life: options.anchored ? Infinity : 26,
+      baseY: mesh.position.y,
+      anchored: Boolean(options.anchored),
+    });
   }
 
   /**
@@ -440,17 +532,25 @@ export class Effects {
       const p = this.pickups[i];
       p.life -= dt;
       p.mesh.rotation.y += dt * 1.6;
-      p.mesh.position.y = 0.4 + Math.sin(this.time * 2.4 + i) * 0.08;
+      // Bobbing about its own resting height, not about the ground: a crate on an
+      // island is up there with its island.
+      p.mesh.position.y = p.baseY + Math.sin(this.time * 2.4 + i) * 0.08;
       const dist = p.mesh.position.distanceTo(player.position);
-      if (dist < 1.4 && player.alive) {
+      // Collected by somebody at its own level or above it, never from underneath. A
+      // crate on an island top is a metre and a half over the ground — close enough
+      // in a straight line that a jump under it used to swallow it, which made the
+      // climb's reward payable without the climb.
+      const atItsLevel = player.position.y + 0.6 >= p.baseY;
+      if (dist < 1.4 && atItsLevel && player.alive) {
         if (onPickup) onPickup(p.type);
         this.scene.remove(p.mesh);
         this.pickups.splice(i, 1);
         continue;
       }
       // Loot drifts to the player from close by, so a dressing earned in a
-      // firefight is not lost in the grass while they fight the next attacker.
-      if (dist < 6 && player.alive) {
+      // firefight is not lost in the grass while they fight the next attacker. An
+      // anchored crate never drifts: it is a place in the level, not a drop.
+      if (dist < 6 && player.alive && !p.anchored) {
         const pull = (1 - dist / 6) * 3.4 * dt;
         this._pull.set(player.position.x, 0.4, player.position.z);
         p.mesh.position.lerp(this._pull, Math.min(1, pull));

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { SETTINGS, VEHICLE, LANDSCAPE, SKY, ASSET_BASE } from './config.js';
-import { gltfLoader } from './assets.js';
+import { SETTINGS, VEHICLE, LANDSCAPE, SKY, PLATFORMS, PROPS, MARKSMAN, ASSET_BASE } from './config.js';
+import { gltfLoader, loadPropModel } from './assets.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 function makeRandom(seed) {
@@ -53,12 +53,16 @@ export class World {
     this.boxes = [];     // THREE.Box3
     // Scenery that can be kicked about. Each prop keeps the very Box3 that
     // already blocks bullets, sight lines and movement, and that box is moved
-    // with the mesh — so a car shoved out of the way opens the firing line it
+    // with the mesh — so a tank shoved out of the way opens the firing line it
     // was blocking, for the player and the attackers alike.
     this.props = [];
+    // The climb hangs over the fight, and nothing about the ground below it ever reads
+    // this: it exists so the officer's feet have something to ask about before the
+    // world has been built.
+    this.islands = [];
     this.seed = seed >>> 0;
     this.rand = makeRandom(this.seed);
-    // Folded from every tree, crate and car as it is placed: two seeds that built
+    // Folded from every tree, crate and tank as it is placed: two seeds that built
     // different forests cannot share it, and a report can say which forest it got
     // without dumping 165 positions.
     this.layoutHash = 0;
@@ -172,7 +176,7 @@ export class World {
   /**
    * A spot near `from` that breaks line of sight to `threat`, so attackers can
    * bound from cover to cover instead of walking in the open. Candidates are the
-   * static obstacles (trees, the car, the crates); each is scored toward
+   * static obstacles (trees, the tanks, the crates); each is scored toward
    * `preferred` metres from the threat and then by how close it is to `from`.
    * Returns null when nothing within `maxDistance` blocks the sight line.
    */
@@ -217,10 +221,19 @@ export class World {
   }
 
   /** A spawn point on open ground at a given radius band from a centre. */
-  findSpawn(center, minRadius, maxRadius) {
+  findSpawn(center, minRadius, maxRadius, rand = this.rand) {
+    return this.spawnOnOpenGround(center, minRadius, maxRadius, rand);
+  }
+
+  /**
+   * The same search, against a named generator, so a caller with a stream of its own
+   * (the islands, above) can look for open ground without spending the forest's — which
+   * is what every attacker's spawn position later comes out of.
+   */
+  spawnOnOpenGround(center, minRadius, maxRadius, rand) {
     for (let attempt = 0; attempt < 30; attempt++) {
-      const angle = this.rand() * Math.PI * 2;
-      const radius = minRadius + this.rand() * (maxRadius - minRadius);
+      const angle = rand() * Math.PI * 2;
+      const radius = minRadius + rand() * (maxRadius - minRadius);
       const x = center.x + Math.cos(angle) * radius;
       const z = center.z + Math.sin(angle) * radius;
       const limit = SETTINGS.worldSize / 2 - 6;
@@ -245,8 +258,189 @@ export class World {
   }
 
   /**
+   * The floating islands: little inverted mountains in the air above the fight, stepped
+   * so the officer can climb them by jumping and laid out along a wandering bearing so
+   * the route curves rather than stacking.
+   *
+   * They are deliberately **not** in `cylinders`/`boxes`. Bullets, sight lines, the
+   * attackers' pathing and the kick's prop pass all read those, and a war that changes
+   * because somebody put a rock in the sky is no longer the war the ground report
+   * measured. Only the officer's feet know these exist — see `islandFloor`.
+   */
+  buildIslands(scene) {
+    this.islands = [];
+    // A stream of its own, seeded off the world's. The forest's generator is drawn
+    // from at *runtime* — `findSpawn` places every attacker with it, and a kicked prop
+    // takes its spin from it — so a new feature taking draws from it would move every
+    // spawn after it, and the war would change because somebody built a rock in the
+    // sky. Seeded, so the same world seed still builds the same climb.
+    const rand = makeRandom(this.seed ^ 0x5f356495);
+    const centre = new THREE.Vector3();
+    // Trunks are not the only thing in the way: `resolveCircle` sells a tank, a crate
+    // or a rock to the officer's feet at *any* height, so a cap overlapping one cannot
+    // be stood on and a route through one cannot be walked. The climb is laid out
+    // around the props as well, which is why it is built last.
+    // A prop counts when it reaches up into the island's body — a tank under a cap is
+    // what the officer's feet are pushed out of — and the ask is modest: ground to
+    // stand on at the island's own centre, half a metre more than his own width. The
+    // `radius` a prop carries is for the kick, not for its footprint, so the box is
+    // what is measured.
+    const propClear = (x, z, top) => {
+      for (const q of this.props) {
+        if (q.box.max.y < top - PLATFORMS.depth - 0.2) continue;   // entirely under the body
+        const dx = Math.max(q.box.min.x - x, 0, x - q.box.max.x);
+        const dz = Math.max(q.box.min.z - z, 0, z - q.box.max.z);
+        if (Math.hypot(dx, dz) < 0.9) return false;
+      }
+      return true;
+    };
+    let start = this.spawnOnOpenGround(centre, PLATFORMS.spread, PLATFORMS.spread + 4, rand);
+    for (let attempt = 0; attempt < 12 && !propClear(start.x, start.z, PLATFORMS.firstRise); attempt++) {
+      start = this.spawnOnOpenGround(centre, PLATFORMS.spread, PLATFORMS.spread + 4, rand);
+    }
+    let x = start.x;
+    let z = start.z;
+    let bearing = rand() * Math.PI * 2;
+    let top = PLATFORMS.firstRise;
+    for (let i = 0; i < PLATFORMS.count; i++) {
+      if (i > 0) {
+        // Each step wanders off the last one and rises by one jump's worth. A step
+        // that would land inside a trunk is turned rather than dropped, so the climb
+        // stays whole and keepable rather than ending in the trees.
+        for (let attempt = 0; attempt < 12; attempt++) {
+          const turn = bearing + (rand() * 2 - 1) * PLATFORMS.wander;
+          const gap = PLATFORMS.gapMin + rand() * (PLATFORMS.gapMax - PLATFORMS.gapMin);
+          const nx = x + Math.sin(turn) * gap;
+          const nz = z + Math.cos(turn) * gap;
+          const limit = SETTINGS.worldSize / 2 - 8;
+          if (Math.abs(nx) > limit || Math.abs(nz) > limit) continue;
+          // The peak hangs `depth` below the top, so the body of the island has to
+          // clear the trunks too, not only the top. A crown is a cone rather than a
+          // cylinder, so the check is generous rather than exact.
+          let clear = true;
+          for (const c of this.cylinders) {
+            for (const below of [0, PLATFORMS.depth * 0.5, PLATFORMS.depth]) {
+              const seat = top - below;
+              if (seat > c.top) continue;
+              if (Math.hypot(c.x - nx, c.z - nz) < c.r + PLATFORMS.radius + 0.4) { clear = false; break; }
+            }
+            if (!clear) break;
+          }
+          if (!clear || !propClear(nx, nz, top)) continue;
+          x = nx;
+          z = nz;
+          bearing = turn;
+          break;
+        }
+        top += PLATFORMS.rise;
+      }
+      this.islands.push({ x, z, top: +top.toFixed(3), radius: PLATFORMS.radius });
+      this.mixLayout(x, z);
+    }
+    this.buildIslandMeshes(scene, rand);
+    return this.islands;
+  }
+
+  /** The rocks themselves: a peak hanging point-down under a cap he can stand on. */
+  buildIslandMeshes(scene, rand) {
+    const peak = new THREE.MeshStandardMaterial({ color: 0x6b6f63, roughness: 1, flatShading: true });
+    const cap = new THREE.MeshStandardMaterial({ color: 0x4f6b39, roughness: 1, flatShading: true });
+    for (const island of this.islands) {
+      const body = new THREE.Mesh(
+        new THREE.ConeGeometry(island.radius * 0.86, PLATFORMS.depth, 7, 1),
+        peak,
+      );
+      body.position.set(island.x, island.top - PLATFORMS.depth / 2, island.z);
+      body.rotation.x = Math.PI;          // apex down: an upside-down mountain
+      body.rotation.y = rand() * Math.PI * 2;
+      body.castShadow = true;
+      body.receiveShadow = true;
+      scene.add(body);
+      // The cap is the floor he lands on, so it is wider than the cone's own base and
+      // sits with its top face at exactly `island.top`.
+      const crown = new THREE.Mesh(
+        new THREE.CylinderGeometry(island.radius, island.radius * 0.94, 0.3, 7, 1),
+        cap,
+      );
+      crown.position.set(island.x, island.top - 0.15, island.z);
+      crown.rotation.y = rand() * Math.PI * 2;
+      crown.receiveShadow = true;
+      scene.add(crown);
+      island.meshes = [body, crown];
+    }
+  }
+
+  /**
+   * The highest island top under a pair of feet, or null. The officer's own floor test
+   * calls this: an island is a floor when his feet are at or above its top (within
+   * `stepTolerance`, which covers a frame of falling and nothing more) and he is over
+   * its cap. A cap over his head is not a floor he can be sucked onto, and one a step
+   * above him is not either — that narrower tolerance is the whole reason the climb is
+   * climbed rather than walked: standing on the island below, his feet are `rise` under
+   * the next cap, so strolling into the overlap does not lift him onto it.
+   */
+  islandFloor(x, z, feetY) {
+    let best = null;
+    for (const island of this.islands) {
+      if (feetY < island.top - PLATFORMS.stepTolerance) continue;
+      const dx = x - island.x;
+      const dz = z - island.z;
+      if (dx * dx + dz * dz > island.radius * island.radius) continue;
+      if (best === null || island.top > best) best = island.top;
+    }
+    return best;
+  }
+
+  /**
+   * The cap a marksman is posted on: the lowest island of the climb that can actually
+   * see the fight — a perch from which the clearing is shootable. The climb is laid
+   * out inside the clearing, so this is usually the first rung; it is *asked* rather
+   * than assumed, because a tank or a trunk between the two would make the post a man
+   * shooting at cover.
+   *
+   * The samples are the clearing at chest height, at its centre and on a ring inside
+   * it, and a perch has to see `MARKSMAN.sightNeeded` of them. Returns null when no
+   * low cap qualifies, which leaves that wave with the walking line alone rather than
+   * posting a marksman with nothing to shoot at.
+   */
+  marksmanPerch() {
+    const points = [new THREE.Vector3(0, MARKSMAN.sightHeight, 0)];
+    const ring = SETTINGS.clearingRadius * MARKSMAN.sightRadius;
+    for (let i = 0; i < MARKSMAN.sightSamples - 1; i++) {
+      const a = (i / (MARKSMAN.sightSamples - 1)) * Math.PI * 2;
+      points.push(new THREE.Vector3(Math.cos(a) * ring, MARKSMAN.sightHeight, Math.sin(a) * ring));
+    }
+    // Lowest first, and by climb order within a height: the whole point of a low cap is
+    // that the officer can get up to it.
+    const low = this.islands
+      .map((island, index) => ({ island, index }))
+      .filter((c) => c.island.top <= MARKSMAN.maxTop)
+      .sort((a, b) => (a.island.top - b.island.top) || (a.index - b.index));
+    for (const candidate of low) {
+      const eye = new THREE.Vector3(
+        candidate.island.x,
+        candidate.island.top + 1.55,          // his own head height, see Enemy.headPosition
+        candidate.island.z,
+      );
+      const sight = points.filter((p) => this.hasLineOfSight(eye, p)).length;
+      if (sight >= MARKSMAN.sightNeeded) {
+        return {
+          island: candidate.island,
+          index: candidate.index,
+          x: candidate.island.x,
+          z: candidate.island.z,
+          top: candidate.island.top,
+          sight,
+          points: points.length,
+        };
+      }
+    }
+    return null;
+  }
+
+  /**
    * Register a piece of scenery as something the boot can move. `mass` decides
-   * how much of a kick it takes: a crate flies, a car shoves. `kind` is only for
+   * how much of a kick it takes: a crate flies, a tank shoves. `kind` is only for
    * reporting.
    */
   addProp(mesh, box, { mass = 1, radius = 1, kind = 'scenery' } = {}) {
@@ -265,7 +459,7 @@ export class World {
   /**
    * Everything with a mass inside the kick's reach and arc takes an impulse: the
    * along-kick part is `propPower / mass` and the upward part `propLift / mass`,
-   * so the same stomp skitters crates and only shifts a car. Returns what moved,
+   * so the same stomp skitters crates and only shifts a tank. Returns what moved,
    * for the banner and the achievements.
    */
   kickProps(origin, forward, kick, powerScale = 1) {
@@ -295,7 +489,7 @@ export class World {
 
   /**
    * Integrate the scenery. Only the movers are simulated, and each settles where
-   * it comes to rest rather than snapping back, so a kicked car stays where it
+   * it comes to rest rather than snapping back, so a kicked tank stays where it
    * ended up and keeps working as cover there.
    *
    * `bodies` are the things a fast-moving prop can knock down (the attackers),
@@ -409,7 +603,7 @@ export class World {
   }
 
   /**
-   * Prop against prop: a crate hurled into a car should shove the car. Only the
+   * Prop against prop: a crate hurled into a tank should shove the tank. Only the
    * movers are tested, so a settled clearing costs nothing, and the impulse is
    * split by mass so the heavy end wins.
    */
@@ -517,15 +711,78 @@ function buildTrees(world, scene) {
   scene.add(trunks, cones, tops);
 }
 
-function buildCover(world, scene) {
-  const rand = world.rand;
-  const crateMat = new THREE.MeshStandardMaterial({ color: 0x5c5344, roughness: 0.95 });
-  const barrierMat = new THREE.MeshStandardMaterial({ color: 0x7d7f76, roughness: 0.95 });
-  const rockMat = new THREE.MeshStandardMaterial({ color: 0x6b6b66, roughness: 1, flatShading: true });
+/**
+ * Load a static prop and dress it for this world: scaled to the size the game asks
+ * for rather than the size the pack used, seated on the ground rather than wherever
+ * its origin happened to be, and painted with the game's own flat colours instead of
+ * the pack's textures — the scenery is block-coloured by design, and importing a
+ * megabyte of PNG per crate to sit in a shadow does not pay for itself.
+ */
+async function dressModel(url, { by = 'length', size }, colour, roughness = 0.95) {
+  const loaded = await loadPropModel(`${ASSET_BASE}${url}`);
+  // The fit is applied to a group of our own rather than to what the loader handed
+  // back: a Collada scene carries its own root scale from the file it came out of, and
+  // setting a scale on it throws that away — which is how a wall of sandbags ends up
+  // nearly seven metres tall.
+  // Two nodes, and the split matters. `proto` is the frame the world places: its
+  // origin is the model's footprint centre with its feet at zero, and every placer
+  // rewrites its position and rotation as it likes. `model` carries the fit itself,
+  // inside the frame — a fit written onto the frame is thrown away the moment a
+  // placer sets the frame down, which is exactly how a tank ended up nine metres from
+  // the point it was placed at and sitting on the officer's spawn.
+  const proto = new THREE.Group();
+  const model = new THREE.Group();
+  model.add(loaded);
+  proto.add(model);
+  model.updateMatrixWorld(true);
+  const span = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+  const longest = Math.max(span.x, span.y, span.z) || 1;
+  const measured = by === 'height' ? span.y : longest;
+  const factor = size / (measured || 1);
+  model.scale.setScalar(factor);
+  model.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(model);
+  const centre = box.getCenter(new THREE.Vector3());
+  model.position.y -= box.min.y;            // its feet on the ground, not its origin
+  // ...and its footprint centred on the point it is placed at. A pack's root sits
+  // wherever the author left it — the sandbag wall's is at the end of its own six
+  // metres, the tank hull's 0.8 of its length off — so a model seated by position
+  // alone stands that many times its scale away from the spot the layout chose. At
+  // 11× that was 9 m of tank, and in three forests of sixteen it put the collision box
+  // on the officer's own spawn point and sealed the field, which is how the forest
+  // audit found it. `fit.origin` is what the model's own root was off by, in units.
+  model.position.x -= centre.x;
+  model.position.z -= centre.z;
+  const material = new THREE.MeshStandardMaterial({ color: colour, roughness, flatShading: true });
+  proto.traverse((o) => { if (o.isMesh) { o.material = material; o.castShadow = true; o.receiveShadow = true; } });
+  // What the fit measured and what it scaled to, kept on the model: a pack in its own
+  // units is only ever right by this arithmetic, so it is worth being able to read.
+  proto.userData.fit = {
+    url, by, size,
+    measured: +measured.toFixed(4),
+    factor: +factor.toFixed(4),
+    span: [+span.x.toFixed(3), +span.y.toFixed(3), +span.z.toFixed(3)],
+    // Where the pack's own root sat relative to the model it holds, in the pack's own
+    // units: the amount this fit had to take out to put the model where it is placed.
+    origin: [+(centre.x / factor).toFixed(3), +(centre.z / factor).toFixed(3)],
+  };
+  return proto;
+}
 
-  const crateGeo = new THREE.BoxGeometry(1.5, 1.2, 1.5);
-  const barrierGeo = new THREE.BoxGeometry(2.6, 1.1, 0.6);
+async function buildCover(world, scene) {
+  const rand = world.rand;
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0x6b6b66, roughness: 1, flatShading: true });
   const rockGeo = new THREE.DodecahedronGeometry(1.1, 0);
+
+  // The CC0 prop pack, one prototype per kind, cloned per placement.
+  const proto = {};
+  for (const [kind, spec] of Object.entries(PROPS)) {
+    try {
+      proto[kind] = await dressModel(spec.model, spec, spec.colour);
+    } catch (err) {
+      console.warn(`[world] ${kind} model unavailable, skipping that dressing`, err);
+    }
+  }
 
   const spawnRing = (minR, maxR) => {
     const angle = rand() * Math.PI * 2;
@@ -535,65 +792,105 @@ function buildCover(world, scene) {
 
   // Crates, barriers and rocks are light enough for the boot: their mass is what
   // a kick is divided by, so a crate flies and a rock barely hops.
-  const place = (geo, mat, y, prop) => {
+  const place = (mesh) => {
     const p = spawnRing(6, SETTINGS.clearingRadius + 10);
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(p.x, y, p.z);
+    mesh.position.set(p.x, mesh.position.y, p.z);
     mesh.rotation.y = rand() * Math.PI;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
     scene.add(mesh);
     mesh.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(mesh).expandByScalar(-0.05);
     world.addBox(box);
-    world.addProp(mesh, box, prop);
+    world.addProp(mesh, box, mesh.userData.prop);
     world.mixLayout(p.x, p.z);
     return mesh;
   };
 
-  for (let i = 0; i < 10; i++) place(crateGeo, crateMat, 0.6, { mass: 1, radius: 1.05, kind: 'crate' });
-  for (let i = 0; i < 8; i++) place(barrierGeo, barrierMat, 0.55, { mass: 1.5, radius: 1.4, kind: 'barrier' });
-  for (let i = 0; i < 7; i++) place(rockGeo, rockMat, 0.55, { mass: 2.6, radius: 1.1, kind: 'rock' });
+  // A model per placement: every pack's mesh is loaded once and cloned, so a field of
+  // crates costs one download and one geometry.
+  const placeModel = (kind) => {
+    const spec = PROPS[kind];
+    if (!proto[kind]) return null;
+    const mesh = proto[kind].clone(true);
+    mesh.userData.prop = { mass: spec.mass, radius: spec.radius, kind };
+    return place(mesh);
+  };
+
+  // Crates and barrels and walls of sandbags: light enough for the boot — their mass
+  // is what a kick is divided by, so a crate flies and a barrel rolls away.
+  for (let i = 0; i < (PROPS.crate.count || 0); i++) placeModel('crate');
+  for (let i = 0; i < (PROPS.barrel.count || 0); i++) placeModel('barrel');
+  for (let i = 0; i < (PROPS.barrier.count || 0); i++) placeModel('barrier');
+
+  // The rocks stay procedural: they are terrain rather than dressing, and a rock has
+  // no right shape to import.
+  for (let i = 0; i < 7; i++) {
+    const mesh = new THREE.Mesh(rockGeo, rockMat);
+    mesh.position.y = 0.55;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.userData.prop = { mass: 2.6, radius: 1.1, kind: 'rock' };
+    place(mesh);
+  }
 }
 
 async function buildVehicles(world, scene) {
   try {
-    const gltf = await gltfLoader.loadAsync(`${ASSET_BASE}${VEHICLE.model}`);
-    const proto = gltf.scene;
-    proto.updateMatrixWorld(true);
-    let box = new THREE.Box3().setFromObject(proto);
-    const size = box.getSize(new THREE.Vector3());
-    const longest = Math.max(size.x, size.y, size.z) || 1;
-    const factor = VEHICLE.length / longest;
-    proto.scale.setScalar(factor);
-    proto.updateMatrixWorld(true);
-    box = new THREE.Box3().setFromObject(proto);
-    proto.position.y -= box.min.y;
+    // The tank: hull and turret from one CC0 pack, fitted to each other before the
+    // pair is scaled, so the turret's own units never matter. The hull decides the
+    // scale — measured off the model, in whatever units the pack used — and the
+    // turret is turned to lie along it and seated on the hull's roof.
+    const hull = await dressModel(VEHICLE.model, { by: 'length', size: VEHICLE.length }, 0x4a5330, 0.9);
+    // The assembly root carries no scale of its own: each part arrives already fitted,
+    // and hanging the turret off the hull instead would multiply it by the hull's own
+    // factor again — a turret twelve times too big and forty metres off the ground.
+    const proto = new THREE.Group();
+    proto.add(hull);
+    const hullBox = new THREE.Box3().setFromObject(hull);
+    const hullSize = hullBox.getSize(new THREE.Vector3());
+    proto.userData.fit = hull.userData.fit;
+    try {
+      const turret = await dressModel(
+        VEHICLE.turret,
+        { by: 'length', size: hullSize.x * VEHICLE.turretShare },
+        0x3b4327, 0.9,
+      );
+      // Turned first, then measured, then seated by its own box: the pack models the
+      // turret across the hull, and where its box sits depends on which way it faces.
+      turret.rotation.y = VEHICLE.turretTurn;
+      turret.updateMatrixWorld(true);
+      const turretBox = new THREE.Box3().setFromObject(turret);
+      const turretCentre = turretBox.getCenter(new THREE.Vector3());
+      turret.position.x += (hullBox.min.x + hullBox.max.x) / 2 - turretCentre.x;
+      turret.position.z += (hullBox.min.z + hullBox.max.z) / 2 - turretCentre.z;
+      turret.position.y += hullBox.max.y - turretBox.min.y - 0.08;
+      proto.add(turret);
+    } catch (err) {
+      console.warn('[world] tank turret unavailable, rolling the hull only', err);
+    }
 
     const rand = world.rand;
-    for (let i = 0; i < 5; i++) {
-      const angle = (i / 5) * Math.PI * 2 + rand() * 0.6;
+    for (let i = 0; i < VEHICLE.count; i++) {
+      const angle = (i / VEHICLE.count) * Math.PI * 2 + rand() * 0.6;
       const radius = 11 + rand() * 9;
-      const car = proto.clone(true);
-      car.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
-      car.rotation.y = rand() * Math.PI * 2;
-      car.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-      scene.add(car);
-      car.updateMatrixWorld(true);
-      const box = new THREE.Box3().setFromObject(car);
+      const tank = proto.clone(true);
+      tank.position.set(Math.cos(angle) * radius, proto.position.y, Math.sin(angle) * radius);
+      tank.rotation.y = rand() * Math.PI * 2;
+      tank.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      scene.add(tank);
+      tank.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(tank);
       world.addBox(box);
       // The heaviest thing on the field, and the best thing to kick. Light enough
       // that the boot sends it rolling away rather than just shifting it: the kick's
-      // whole impulse is divided by this, so at 3 the same boot gives a car half
-      // again the shove it gave at 4.5, and it still takes whatever it was covering
-      // with it. It stays well clear of the rock's 2.6, so a car is still the
-      // heaviest thing the boot can meet.
-      world.addProp(car, box, { mass: 3, radius: 2.3, kind: 'car' });
-      world.mixLayout(car.position.x, car.position.z);
+      // whole impulse is divided by this, so the same boot gives a tank a smaller
+      // shove than it gives a rock — and the tank still takes whatever it was
+      // covering with it, which is what makes it worth kicking.
+      world.addProp(tank, box, { mass: VEHICLE.mass, radius: VEHICLE.radius, kind: 'tank' });
+      world.mixLayout(tank.position.x, tank.position.z);
     }
     return true;
   } catch (err) {
-    console.warn('[world] vehicle cover unavailable, using crates only', err);
+    console.warn('[world] tank cover unavailable, using the crates only', err);
     return false;
   }
 }
@@ -770,8 +1067,10 @@ export async function createWorld(scene, renderer, { seed = SETTINGS.worldSeed }
   const hasLandscape = await buildLandscape(scene, renderer);
   const sky = hasLandscape ? buildSky(scene) : null;
   buildTrees(world, scene);
-  buildCover(world, scene);
+  await buildCover(world, scene);      // the props are models now, so they load
   await buildVehicles(world, scene);
+  // Last, so the climb is laid out against the trunks that are already there.
+  world.buildIslands(scene);
 
   return { world, sun, ground, sky, hasLandscape };
 }

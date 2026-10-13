@@ -1,6 +1,82 @@
 {
-  "recordedAt": "2026-10-12T01:54:39.992Z",
+  "recordedAt": "2026-10-13T03:27:09.589Z",
   "baseSeed": 20260411,
+  "worldSeed": 1337,
+  "layoutHash": "5ebbc2bc",
+  "dressing": {
+    "hash": "26adf59c",
+    "kinds": [
+      {
+        "kind": "barrel",
+        "count": 5,
+        "models": [
+          {
+            "url": "barrel_mesh.obj",
+            "span": [
+              46.777,
+              48.801,
+              46.777
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "barrier",
+        "count": 3,
+        "models": [
+          {
+            "url": "sandbags.dae",
+            "span": [
+              0.951,
+              0.161,
+              0.127
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "crate",
+        "count": 10,
+        "models": [
+          {
+            "url": "crate_mesh.obj",
+            "span": [
+              44.317,
+              25.419,
+              33.745
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "rock",
+        "count": 7,
+        "models": []
+      },
+      {
+        "kind": "tank",
+        "count": 3,
+        "models": [
+          {
+            "url": "tank_hull.dae",
+            "span": [
+              0.406,
+              0.159,
+              0.373
+            ]
+          },
+          {
+            "url": "tank_turret.dae",
+            "span": [
+              0.362,
+              0.105,
+              0.398
+            ]
+          }
+        ]
+      }
+    ]
+  },
   "cell": 0.25,
   "limits": {
     "bandReachMin": 0.9,
@@ -22,224 +98,224 @@
   "forests": [
     {
       "seed": 1337,
-      "layoutHash": "820b292e",
+      "layoutHash": "5ebbc2bc",
       "fair": true,
       "trees": 165,
-      "props": 30,
-      "reachableArea": 10364.9,
-      "fieldRoom": 3.3,
+      "props": 28,
+      "reachableArea": 10319.1,
+      "fieldRoom": 3.34,
       "openRadius": 10.15,
-      "clearingOpenFraction": 0.81,
-      "bandReachFraction": 1,
-      "pockets": 0,
-      "largestPocketArea": 0
-    },
-    {
-      "seed": 20260411,
-      "layoutHash": "41ab6b94",
-      "fair": true,
-      "trees": 165,
-      "props": 30,
-      "reachableArea": 10386.6,
-      "fieldRoom": 2.98,
-      "openRadius": 9.05,
-      "clearingOpenFraction": 0.813,
-      "bandReachFraction": 1,
-      "pockets": 0,
-      "largestPocketArea": 0
-    },
-    {
-      "seed": 20268330,
-      "layoutHash": "163e6ddb",
-      "fair": true,
-      "trees": 165,
-      "props": 30,
-      "reachableArea": 10345.3,
-      "fieldRoom": 2.75,
-      "openRadius": 9.18,
-      "clearingOpenFraction": 0.821,
-      "bandReachFraction": 1,
-      "pockets": 0,
-      "largestPocketArea": 0
-    },
-    {
-      "seed": 20276249,
-      "layoutHash": "34184687",
-      "fair": true,
-      "trees": 165,
-      "props": 30,
-      "reachableArea": 10354,
-      "fieldRoom": 2.8,
-      "openRadius": 9.77,
-      "clearingOpenFraction": 0.83,
-      "bandReachFraction": 1,
-      "pockets": 0,
-      "largestPocketArea": 0
-    },
-    {
-      "seed": 20284168,
-      "layoutHash": "a0fca860",
-      "fair": true,
-      "trees": 165,
-      "props": 30,
-      "reachableArea": 10377.7,
-      "fieldRoom": 3.03,
-      "openRadius": 9.66,
-      "clearingOpenFraction": 0.791,
-      "bandReachFraction": 1,
-      "pockets": 0,
-      "largestPocketArea": 0
-    },
-    {
-      "seed": 20292087,
-      "layoutHash": "bb1e79c7",
-      "fair": true,
-      "trees": 165,
-      "props": 30,
-      "reachableArea": 10354,
-      "fieldRoom": 2.98,
-      "openRadius": 9.82,
-      "clearingOpenFraction": 0.745,
-      "bandReachFraction": 1,
-      "pockets": 0,
-      "largestPocketArea": 0
-    },
-    {
-      "seed": 20300006,
-      "layoutHash": "519ee22f",
-      "fair": true,
-      "trees": 165,
-      "props": 30,
-      "reachableArea": 10352.2,
-      "fieldRoom": 2.84,
-      "openRadius": 9.97,
-      "clearingOpenFraction": 0.799,
-      "bandReachFraction": 1,
-      "pockets": 0,
-      "largestPocketArea": 0
-    },
-    {
-      "seed": 20307925,
-      "layoutHash": "a6df7c07",
-      "fair": true,
-      "trees": 165,
-      "props": 30,
-      "reachableArea": 10339.5,
-      "fieldRoom": 2.81,
-      "openRadius": 9.7,
-      "clearingOpenFraction": 0.805,
-      "bandReachFraction": 1,
-      "pockets": 0,
-      "largestPocketArea": 0
-    },
-    {
-      "seed": 20315844,
-      "layoutHash": "bc68efb9",
-      "fair": true,
-      "trees": 165,
-      "props": 30,
-      "reachableArea": 10376.5,
-      "fieldRoom": 2.91,
-      "openRadius": 11.3,
-      "clearingOpenFraction": 0.808,
-      "bandReachFraction": 1,
-      "pockets": 0,
-      "largestPocketArea": 0
-    },
-    {
-      "seed": 20323763,
-      "layoutHash": "17b96906",
-      "fair": true,
-      "trees": 165,
-      "props": 30,
-      "reachableArea": 10364.1,
-      "fieldRoom": 2.92,
-      "openRadius": 8.63,
-      "clearingOpenFraction": 0.77,
-      "bandReachFraction": 1,
-      "pockets": 0,
-      "largestPocketArea": 0
-    },
-    {
-      "seed": 20331682,
-      "layoutHash": "9d894906",
-      "fair": true,
-      "trees": 165,
-      "props": 30,
-      "reachableArea": 10340.4,
-      "fieldRoom": 2.97,
-      "openRadius": 9.41,
       "clearingOpenFraction": 0.789,
       "bandReachFraction": 1,
       "pockets": 0,
       "largestPocketArea": 0
     },
     {
-      "seed": 20339601,
-      "layoutHash": "bfe5fd05",
+      "seed": 20260411,
+      "layoutHash": "162e7d3e",
       "fair": true,
       "trees": 165,
-      "props": 30,
-      "reachableArea": 10339.1,
+      "props": 28,
+      "reachableArea": 10351.3,
+      "fieldRoom": 2.96,
+      "openRadius": 9.05,
+      "clearingOpenFraction": 0.812,
+      "bandReachFraction": 1,
+      "pockets": 0,
+      "largestPocketArea": 0
+    },
+    {
+      "seed": 20268330,
+      "layoutHash": "4c2199e8",
+      "fair": true,
+      "trees": 165,
+      "props": 28,
+      "reachableArea": 10302.6,
+      "fieldRoom": 2.76,
+      "openRadius": 9.18,
+      "clearingOpenFraction": 0.815,
+      "bandReachFraction": 1,
+      "pockets": 0,
+      "largestPocketArea": 0
+    },
+    {
+      "seed": 20276249,
+      "layoutHash": "69127706",
+      "fair": true,
+      "trees": 165,
+      "props": 28,
+      "reachableArea": 10315.4,
+      "fieldRoom": 2.86,
+      "openRadius": 9.77,
+      "clearingOpenFraction": 0.783,
+      "bandReachFraction": 1,
+      "pockets": 0,
+      "largestPocketArea": 0
+    },
+    {
+      "seed": 20284168,
+      "layoutHash": "3bd8e811",
+      "fair": true,
+      "trees": 165,
+      "props": 28,
+      "reachableArea": 10309.8,
+      "fieldRoom": 3.03,
+      "openRadius": 9.66,
+      "clearingOpenFraction": 0.75,
+      "bandReachFraction": 1,
+      "pockets": 0,
+      "largestPocketArea": 0
+    },
+    {
+      "seed": 20292087,
+      "layoutHash": "05565d64",
+      "fair": true,
+      "trees": 165,
+      "props": 28,
+      "reachableArea": 10292.3,
+      "fieldRoom": 2.95,
+      "openRadius": 9.82,
+      "clearingOpenFraction": 0.711,
+      "bandReachFraction": 1,
+      "pockets": 0,
+      "largestPocketArea": 0
+    },
+    {
+      "seed": 20300006,
+      "layoutHash": "62c757c7",
+      "fair": true,
+      "trees": 165,
+      "props": 28,
+      "reachableArea": 10268.9,
+      "fieldRoom": 2.83,
+      "openRadius": 9.97,
+      "clearingOpenFraction": 0.724,
+      "bandReachFraction": 1,
+      "pockets": 0,
+      "largestPocketArea": 0
+    },
+    {
+      "seed": 20307925,
+      "layoutHash": "83a756c2",
+      "fair": true,
+      "trees": 165,
+      "props": 28,
+      "reachableArea": 10307.3,
+      "fieldRoom": 2.83,
+      "openRadius": 9.7,
+      "clearingOpenFraction": 0.77,
+      "bandReachFraction": 1,
+      "pockets": 0,
+      "largestPocketArea": 0
+    },
+    {
+      "seed": 20315844,
+      "layoutHash": "3254c665",
+      "fair": true,
+      "trees": 165,
+      "props": 28,
+      "reachableArea": 10345.1,
+      "fieldRoom": 2.9,
+      "openRadius": 11.3,
+      "clearingOpenFraction": 0.77,
+      "bandReachFraction": 1,
+      "pockets": 0,
+      "largestPocketArea": 0
+    },
+    {
+      "seed": 20323763,
+      "layoutHash": "2d2fe8f4",
+      "fair": true,
+      "trees": 165,
+      "props": 28,
+      "reachableArea": 10305.1,
+      "fieldRoom": 2.89,
+      "openRadius": 9.03,
+      "clearingOpenFraction": 0.738,
+      "bandReachFraction": 1,
+      "pockets": 0,
+      "largestPocketArea": 0
+    },
+    {
+      "seed": 20331682,
+      "layoutHash": "de9cd547",
+      "fair": true,
+      "trees": 165,
+      "props": 28,
+      "reachableArea": 10290.1,
+      "fieldRoom": 2.96,
+      "openRadius": 9.41,
+      "clearingOpenFraction": 0.787,
+      "bandReachFraction": 1,
+      "pockets": 0,
+      "largestPocketArea": 0
+    },
+    {
+      "seed": 20339601,
+      "layoutHash": "b39d371a",
+      "fair": true,
+      "trees": 165,
+      "props": 28,
+      "reachableArea": 10309.2,
       "fieldRoom": 2.82,
       "openRadius": 8.18,
-      "clearingOpenFraction": 0.774,
+      "clearingOpenFraction": 0.76,
       "bandReachFraction": 1,
       "pockets": 0,
       "largestPocketArea": 0
     },
     {
       "seed": 20347520,
-      "layoutHash": "6d4de472",
+      "layoutHash": "af63d85b",
       "fair": true,
       "trees": 165,
-      "props": 30,
-      "reachableArea": 10384,
-      "fieldRoom": 3.16,
+      "props": 28,
+      "reachableArea": 10341.6,
+      "fieldRoom": 3.19,
       "openRadius": 9.05,
-      "clearingOpenFraction": 0.806,
+      "clearingOpenFraction": 0.773,
       "bandReachFraction": 1,
       "pockets": 0,
       "largestPocketArea": 0
     },
     {
       "seed": 20355439,
-      "layoutHash": "c2ca1b7d",
+      "layoutHash": "e3523c18",
       "fair": true,
       "trees": 165,
-      "props": 30,
-      "reachableArea": 10398.1,
-      "fieldRoom": 2.96,
+      "props": 28,
+      "reachableArea": 10352.6,
+      "fieldRoom": 2.97,
       "openRadius": 12.84,
-      "clearingOpenFraction": 0.811,
+      "clearingOpenFraction": 0.797,
       "bandReachFraction": 1,
       "pockets": 0,
       "largestPocketArea": 0
     },
     {
       "seed": 20363358,
-      "layoutHash": "f945f330",
+      "layoutHash": "11304cb0",
       "fair": true,
       "trees": 165,
-      "props": 30,
-      "reachableArea": 10355.3,
-      "fieldRoom": 2.67,
+      "props": 28,
+      "reachableArea": 10311.8,
+      "fieldRoom": 2.65,
       "openRadius": 9.12,
-      "clearingOpenFraction": 0.824,
+      "clearingOpenFraction": 0.807,
       "bandReachFraction": 1,
       "pockets": 0,
       "largestPocketArea": 0
     },
     {
       "seed": 20371277,
-      "layoutHash": "1a9c3d22",
+      "layoutHash": "682cc0be",
       "fair": true,
       "trees": 165,
-      "props": 30,
-      "reachableArea": 10320.3,
+      "props": 28,
+      "reachableArea": 10299.6,
       "fieldRoom": 2.93,
       "openRadius": 8.74,
-      "clearingOpenFraction": 0.819,
+      "clearingOpenFraction": 0.812,
       "bandReachFraction": 1,
       "pockets": 0,
       "largestPocketArea": 0

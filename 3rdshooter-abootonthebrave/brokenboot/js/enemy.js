@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SETTINGS, waveRamp } from './config.js';
+import { SETTINGS, MARKSMAN, waveRamp } from './config.js';
 import { AnimController } from './assets.js';
 import { dampAngle } from './mathx.js';
 
@@ -20,6 +20,21 @@ export class Enemy {
     this.health = this.maxHealth;
     this.fireInterval = SETTINGS.enemyFireBase * (this.elite ? 0.62 : 1);
     if (this.elite) this.object.scale.setScalar(1.08);
+
+    // A marksman is posted rather than spawned into the line: he holds a cap of the
+    // climb (see World.marksmanPerch) instead of walking the field. He never takes
+    // cover and never presses in, and while he is up there `takeDamage` will not bleed
+    // him out — the boot is the only thing that takes him off the rock.
+    this.marksman = Boolean(options.marksman);
+    this.perch = options.perch || null;
+    this.perched = Boolean(this.marksman && this.perch);
+    this.fallVel = 0;                 // for a body put off a rock, see the routed branch
+    if (this.marksman) {
+      this.aggressive = false;
+      this.preferredRange = MARKSMAN.maxRange * 0.6;
+      this.fireInterval = MARKSMAN.fireInterval;
+      if (this.perch) this.object.position.set(this.perch.x, this.perch.top, this.perch.z);
+    }
 
     // Most attackers hold a firing line; a third press in close. The aggressive
     // ones give the boot something to do and stop an ammo-dry player stalling out.
@@ -82,6 +97,10 @@ export class Enemy {
     this.health = Math.max(SETTINGS.bulletMinHealth, this.health - amount);
     if (this.health <= this.maxHealth * 0.65) this.wounded = true;
     if (this.health <= SETTINGS.bulletMinHealth) {
+      // Dug in on his rock: the wound floors him and stops there, and he does not bleed
+      // out. No amount of gunfire takes a marksman off his cap — which is what makes
+      // the boot the answer to him, and the climb the price of the boot.
+      if (this.perched) return false;
       if (!this.bleeding) {
         this.bleeding = true;
         this.bleedTimer = SETTINGS.bleedoutTime * (this.elite ? SETTINGS.bleedoutEliteScale : 1);
@@ -189,6 +208,15 @@ export class Enemy {
       this.object.position.z += this.knock.z * dt;
       this.knock.multiplyScalar(Math.max(0, 1 - 3.2 * dt));
       this.world.resolveCircle(this.object.position, 0.5);
+      // A routed attacker who was up in the air — a marksman put off his rock — comes
+      // down on the way out: the boot starts him moving, gravity puts him on the ground,
+      // and only then does he run. Without this he would be a man walking through the
+      // air the height of his cap the whole way off the field.
+      if (this.object.position.y > 0) {
+        this.fallVel += SETTINGS.gravity * dt;
+        this.object.position.y = Math.max(0, this.object.position.y + this.fallVel * dt);
+        if (this.object.position.y === 0) this.fallVel = 0;
+      }
       this.yaw = dampAngle(this.yaw, Math.atan2(away.x, away.z), 9, dt);
       this.object.rotation.y = this.yaw;
       if (this.anim.has('walk')) this.anim.play('walk', { timeScale: 1.6 });
@@ -219,108 +247,121 @@ export class Enemy {
     let gaitScale = 1;
     let mayFire = false;
 
-    if (assaulting) {
-      // This attacker's turn: press in and hold a firing line.
-      this.coverPoint = null;
-      this.coverTimer = 0;
-      mayFire = true;
-      if (dist > SETTINGS.enemyEngageRange) {
+    if (this.perched) {
+      // The post: he shoots into the clearing and does not leave the cap. Nothing down
+      // there moves him — not separation, not a crate, not the watchdog — and he picks
+      // no cover, because a rock overlooking the fight already is the best one.
+      this.moving = false;
+      this.object.position.set(this.perch.x, this.perch.top, this.perch.z);
+      mayFire = dist < MARKSMAN.maxRange;
+    } else {
+      if (assaulting) {
+        // This attacker's turn: press in and hold a firing line.
+        this.coverPoint = null;
+        this.coverTimer = 0;
+        mayFire = true;
+        if (dist > SETTINGS.enemyEngageRange) {
+          move.copy(dir);
+          this.moving = true;
+        } else {
+          this.strafeTimer -= dt;
+          if (this.strafeTimer <= 0) {
+            this.strafeDir *= -1;
+            this.strafeTimer = 1.4 + Math.random() * 2.2;
+          }
+          const closing = dist - this.preferredRange;
+          if (closing > 1.2) move.addScaledVector(dir, 1);
+          else if (closing < -1.2) move.addScaledVector(dir, -1);
+          this._side.set(dir.z, 0, -dir.x).multiplyScalar(this.strafeDir * 0.85);
+          move.add(this._side);
+          this.moving = true;
+        }
+      } else if (ctx.push) {
+        // The line has broken cover: close the distance at a jog, still letting
+        // the assault holder do the shooting.
+        this.coverPoint = null;
         move.copy(dir);
         this.moving = true;
+        gaitScale = 1.05;
       } else {
-        this.strafeTimer -= dt;
-        if (this.strafeTimer <= 0) {
-          this.strafeDir *= -1;
-          this.strafeTimer = 1.4 + Math.random() * 2.2;
+        // Everyone else fights from cover, crouched and hard to hit.
+        const hold = this.updateCover(dt, ctx, { dist, dir, move });
+        crouch = hold.crouch;
+        gaitScale = hold.gaitScale;
+        mayFire = hold.mayFire;
+      }
+
+      for (const other of enemies) {
+        if (other === this || other.dead) continue;
+        const dx = this.object.position.x - other.object.position.x;
+        const dz = this.object.position.z - other.object.position.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < 4 && d2 > 1e-4) {
+          const d = Math.sqrt(d2);
+          this._sep.set(dx / d, 0, dz / d).multiplyScalar((2 - d) * 0.9);
+          move.add(this._sep);
         }
-        const closing = dist - this.preferredRange;
-        if (closing > 1.2) move.addScaledVector(dir, 1);
-        else if (closing < -1.2) move.addScaledVector(dir, -1);
-        this._side.set(dir.z, 0, -dir.x).multiplyScalar(this.strafeDir * 0.85);
+      }
+
+      // Steering is a straight line with only a slide along whatever it bumps
+      // into, so an attacker whose target sits on the far side of a crate presses
+      // into the same face indefinitely and the wave can never end. Once the
+      // watchdog below says it has stopped making progress, walk along the face
+      // instead — keeping to one side until the line to the player opens up,
+      // because swapping sides every couple of seconds just paces up and down
+      // the same face.
+      if (this.detourTimer > 0) {
+        this.detourTimer -= dt;
+        this._side.set(dir.z, 0, -dir.x).multiplyScalar(this.detourSign * 1.7);
         move.add(this._side);
-        this.moving = true;
+        if (this.world.hasLineOfSight(this.headPosition, player.headPosition)) this.detourTimer = 0;
       }
-    } else if (ctx.push) {
-      // The line has broken cover: close the distance at a jog, still letting
-      // the assault holder do the shooting.
-      this.coverPoint = null;
-      move.copy(dir);
-      this.moving = true;
-      gaitScale = 1.05;
-    } else {
-      // Everyone else fights from cover, crouched and hard to hit.
-      const hold = this.updateCover(dt, ctx, { dist, dir, move });
-      crouch = hold.crouch;
-      gaitScale = hold.gaitScale;
-      mayFire = hold.mayFire;
-    }
 
-    for (const other of enemies) {
-      if (other === this || other.dead) continue;
-      const dx = this.object.position.x - other.object.position.x;
-      const dz = this.object.position.z - other.object.position.z;
-      const d2 = dx * dx + dz * dz;
-      if (d2 < 4 && d2 > 1e-4) {
-        const d = Math.sqrt(d2);
-        this._sep.set(dx / d, 0, dz / d).multiplyScalar((2 - d) * 0.9);
-        move.add(this._sep);
-      }
-    }
+      if (move.lengthSq() > 1e-6) move.normalize();
+      // The whole line moves a little quicker as the game escalates.
+      const gait = SETTINGS.enemyWalkSpeed * gaitScale * (this.wounded ? 0.72 : 1) * (ctx.speedScale || 1);
+      this._prevPos.copy(this.object.position);
+      this.object.position.addScaledVector(move, gait * dt);
+      this.object.position.x += this.knock.x * dt;
+      this.object.position.z += this.knock.z * dt;
+      this.knock.multiplyScalar(Math.max(0, 1 - 3.2 * dt));
+      this.world.resolveCircle(this.object.position, 0.5);
 
-    // Steering is a straight line with only a slide along whatever it bumps
-    // into, so an attacker whose target sits on the far side of a crate presses
-    // into the same face indefinitely and the wave can never end. Once the
-    // watchdog below says it has stopped making progress, walk along the face
-    // instead — keeping to one side until the line to the player opens up,
-    // because swapping sides every couple of seconds just paces up and down
-    // the same face.
-    if (this.detourTimer > 0) {
-      this.detourTimer -= dt;
-      this._side.set(dir.z, 0, -dir.x).multiplyScalar(this.detourSign * 1.7);
-      move.add(this._side);
-      if (this.world.hasLineOfSight(this.headPosition, player.headPosition)) this.detourTimer = 0;
-    }
-
-    if (move.lengthSq() > 1e-6) move.normalize();
-    // The whole line moves a little quicker as the game escalates.
-    const gait = SETTINGS.enemyWalkSpeed * gaitScale * (this.wounded ? 0.72 : 1) * (ctx.speedScale || 1);
-    this._prevPos.copy(this.object.position);
-    this.object.position.addScaledVector(move, gait * dt);
-    this.object.position.x += this.knock.x * dt;
-    this.object.position.z += this.knock.z * dt;
-    this.knock.multiplyScalar(Math.max(0, 1 - 3.2 * dt));
-    this.world.resolveCircle(this.object.position, 0.5);
-
-    // Progress watchdog for the detour above.
-    const travelled = Math.hypot(
-      this.object.position.x - this._prevPos.x,
-      this.object.position.z - this._prevPos.z,
-    );
-    if (this.detourTimer <= 0 && move.lengthSq() > 1e-6 && travelled < gait * dt * 0.4) {
-      this.stuckTime += dt;
-      if (this.stuckTime > 1.2) {
-        // Long enough to walk right around a crate; if that side leads nowhere
-        // the next episode tries the other one.
-        this.detourSign = -(this.detourSign || 1);
-        this.detourTimer = 5 + Math.random() * 2;
+      // Progress watchdog for the detour above.
+      const travelled = Math.hypot(
+        this.object.position.x - this._prevPos.x,
+        this.object.position.z - this._prevPos.z,
+      );
+      if (this.detourTimer <= 0 && move.lengthSq() > 1e-6 && travelled < gait * dt * 0.4) {
+        this.stuckTime += dt;
+        if (this.stuckTime > 1.2) {
+          // Long enough to walk right around a crate; if that side leads nowhere
+          // the next episode tries the other one.
+          this.detourSign = -(this.detourSign || 1);
+          this.detourTimer = 5 + Math.random() * 2;
+          this.stuckTime = 0;
+        }
+      } else {
         this.stuckTime = 0;
       }
-    } else {
-      this.stuckTime = 0;
     }
 
     this.yaw = dampAngle(this.yaw, Math.atan2(dir.x, dir.z), 7, dt);
     this.object.rotation.y = this.yaw;
 
     this.fireTimer -= dt;
-    if (mayFire && this.fireTimer <= 0 && dist < SETTINGS.enemyMaxRange) {
+    // A marksman fires on his own clock and does not have to lean out of cover to do
+    // it; a man holding a tree does, and pays for it with a far slower, wilder shot.
+    const braced = assaulting || this.perched;
+    const reach = this.perched ? MARKSMAN.maxRange : SETTINGS.enemyMaxRange;
+    if (mayFire && this.fireTimer <= 0 && dist < reach) {
       const from = this.headPosition;
       const to = player.headPosition;
       if (this.world.hasLineOfSight(from, to)) {
         // Cover shooters fire far less often, and far less accurately.
-        const slower = assaulting ? 1 : 2.6;
+        const slower = braced ? 1 : 2.6;
         this.fireTimer = (this.fireInterval * (this.wounded ? 1.55 : 1) * slower) + Math.random() * 0.8;
-        onFire(this, dist, this.wounded, !assaulting);
+        onFire(this, dist, this.wounded, !braced);
       } else {
         this.fireTimer = 0.35;
       }
@@ -340,7 +381,7 @@ export class Enemy {
 
   /**
    * Hold position behind cover while another attacker makes the assault. The
-   * attacker bounds to a spot on the far side of a tree, the car or a crate,
+   * attacker bounds to a spot on the far side of a tree, a tank or a crate,
    * ducks down there, and only risks a close-range shot if the player closes in.
    */
   updateCover(dt, ctx, { dist, dir, move }) {
@@ -463,6 +504,38 @@ export class EnemyManager {
         elite,
       });
     }
+    // And the post. He goes to the front of the queue, so he is on his rock from the
+    // first seconds of the wave: a marksman who turned up with the last of the line
+    // would be a straggler to round up rather than a reason to climb.
+    const post = waveNumber >= MARKSMAN.firstWave ? this.marksmanPost() : null;
+    if (post) this.queue.unshift(post);
+  }
+
+  /**
+   * This wave's post: the queue entry for a marksman on the lowest cap of the climb
+   * that can see the clearing (see `World.marksmanPerch`), or null when no cap
+   * qualifies — a world whose low caps are all walled off gets the walking line alone
+   * rather than a marksman with nothing to shoot at.
+   */
+  marksmanPost() {
+    const perch = this.world.marksmanPerch ? this.world.marksmanPerch() : null;
+    if (!perch) return null;
+    return {
+      spawn: new THREE.Vector3(perch.x, perch.top, perch.z),
+      elite: false,
+      marksman: true,
+      perch,
+    };
+  }
+
+  /** Put one queued attacker on the field. */
+  spawn(entry) {
+    const enemy = new Enemy(this.template, entry.spawn, this.world, {
+      elite: entry.elite, marksman: entry.marksman, perch: entry.perch,
+    });
+    this.scene.add(enemy.object);
+    this.enemies.push(enemy);
+    return enemy;
   }
 
   update(dt, ctx) {
@@ -472,9 +545,7 @@ export class EnemyManager {
       if (this.spawnTimer <= 0 && this.aliveCount < cap) {
         const next = this.queue.shift();
         this.spawnTimer = this.spawnInterval;
-        const enemy = new Enemy(this.template, next.spawn, this.world, { elite: next.elite });
-        this.scene.add(enemy.object);
-        this.enemies.push(enemy);
+        const enemy = this.spawn(next);
         if (ctx.onSpawn) ctx.onSpawn(enemy);
       }
     }
@@ -546,12 +617,15 @@ export class EnemyManager {
     // Count the whole wave, not just who has stepped out so far: attackers spawn
     // in on a stagger, so the first seconds of every wave look like three men
     // left and would trigger a last stand before the line has even formed.
-    const remaining = this.aliveCount + this.queue.length;
-    const lastStand = this.aliveCount > 0 && remaining <= SETTINGS.flushLastStandCount;
+    // The marksman on his rock is not part of that line: he cannot come at anyone, so
+    // counting him would announce a last stand his wave never makes.
+    const walkers = this.enemies.filter((e) => !e.dead && !e.routed && !e.perched).length;
+    const remaining = walkers + this.queue.filter((q) => !q.marksman).length;
+    const lastStand = walkers > 0 && remaining <= SETTINGS.flushLastStandCount;
     const wasFlushing = this.flushing;
     // They hold cover while the player is making progress; the moment the fight
     // stalls they all come at once. Any kill buys a fresh window of hiding.
-    this.flushing = this.aliveCount > 0
+    this.flushing = walkers > 0
       && (lastStand || this.sinceElimination >= this.ramp.flushAfter * (this.flushTune || 1));
     if (this.flushing && !wasFlushing) {
       // Announce the first charge of a wave and the last stand, once each.
@@ -576,7 +650,8 @@ export class EnemyManager {
    */
   pickAssault(player, slots = 1) {
     const dist = (e) => e.position.distanceTo(player.position);
-    const pool = this.enemies.filter((e) => !e.dead && !e.routed && !e.removeMe && !e.bleeding);
+    // The marksman is not in the rotation: his turn is every second of the wave.
+    const pool = this.enemies.filter((e) => !e.dead && !e.routed && !e.removeMe && !e.bleeding && !e.perched);
     pool.sort((a, b) => dist(a) - dist(b));
     const chosen = pool.filter((e) => e !== this.lastAssault).slice(0, slots);
     for (const e of pool) {

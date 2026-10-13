@@ -1,10 +1,32 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
 import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
 
 export const fbxLoader = new FBXLoader();
 export const gltfLoader = new GLTFLoader();
+export const objLoader = new OBJLoader();
+export const colladaLoader = new ColladaLoader();
+
+/**
+ * Load one static prop, from whichever of the three formats the packs use: glTF for
+ * the models the game already had, OBJ and Collada for the CC0 dressing that replaced
+ * the placeholders. An `Object3D` comes back either way, so a caller can measure it,
+ * scale it and seat it on the ground without knowing which pack it came from — and
+ * without one pack's units (centimetres, metres, Blender units) leaking into the world.
+ */
+export async function loadPropModel(url) {
+  const ext = url.slice(url.lastIndexOf('.')).toLowerCase();
+  if (ext === '.obj') return objLoader.loadAsync(url);
+  if (ext === '.dae') {
+    const collada = await colladaLoader.loadAsync(url);
+    return collada.scene;
+  }
+  const gltf = await gltfLoader.loadAsync(url);
+  return gltf.scene;
+}
 
 export function loadFBX(url, onProgress) {
   return new Promise((resolve, reject) => {

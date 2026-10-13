@@ -1,46 +1,122 @@
 {
-  "recordedAt": "2026-10-11T19:46:40.003Z",
+  "recordedAt": "2026-10-13T04:09:44.954Z",
   "seed": 20260411,
+  "worldSeed": 1337,
+  "layoutHash": "5ebbc2bc",
+  "dressing": {
+    "hash": "26adf59c",
+    "kinds": [
+      {
+        "kind": "barrel",
+        "count": 5,
+        "models": [
+          {
+            "url": "barrel_mesh.obj",
+            "span": [
+              46.777,
+              48.801,
+              46.777
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "barrier",
+        "count": 3,
+        "models": [
+          {
+            "url": "sandbags.dae",
+            "span": [
+              0.951,
+              0.161,
+              0.127
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "crate",
+        "count": 10,
+        "models": [
+          {
+            "url": "crate_mesh.obj",
+            "span": [
+              44.317,
+              25.419,
+              33.745
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "rock",
+        "count": 7,
+        "models": []
+      },
+      {
+        "kind": "tank",
+        "count": 3,
+        "models": [
+          {
+            "url": "tank_hull.dae",
+            "span": [
+              0.406,
+              0.159,
+              0.373
+            ]
+          },
+          {
+            "url": "tank_turret.dae",
+            "span": [
+              0.362,
+              0.105,
+              0.398
+            ]
+          }
+        ]
+      }
+    ]
+  },
   "waves": [
     {
       "wave": 1,
-      "durationSeconds": 26.15
+      "durationSeconds": 29.02
     },
     {
       "wave": 2,
-      "durationSeconds": 33.17
+      "durationSeconds": 36.03
     },
     {
       "wave": 3,
-      "durationSeconds": 33.26
+      "durationSeconds": 32.1
     },
     {
       "wave": 4,
-      "durationSeconds": 36.52
+      "durationSeconds": 36.6
     },
     {
       "wave": 5,
-      "durationSeconds": 37.92
+      "durationSeconds": 35.23
     },
     {
       "wave": 6,
-      "durationSeconds": 36.23
+      "durationSeconds": 38.97
     },
     {
       "wave": 7,
-      "durationSeconds": 41.37
+      "durationSeconds": 56.68
     },
     {
       "wave": 8,
-      "durationSeconds": 43.01
+      "durationSeconds": 51.79
     },
     {
       "wave": 9,
-      "durationSeconds": 206.85
+      "durationSeconds": 48.11
     },
     {
       "wave": 10,
-      "durationSeconds": 44.62
+      "durationSeconds": 45.87
     }
   ],
   "tiers": [
@@ -50,23 +126,27 @@
     },
     {
       "tier": "Reinforced Boot",
-      "atSeconds": 67.27
+      "atSeconds": 67.73
     },
     {
       "tier": "Silver Boot",
-      "atSeconds": 123.7
+      "atSeconds": 128.35
     },
     {
       "tier": "Gold Boot",
-      "atSeconds": 208.08
+      "atSeconds": 189.43
     },
     {
       "tier": "Spiked Gold Boot",
-      "atSeconds": 271.13
+      "atSeconds": 272.18
     },
     {
       "tier": "Tactical Doom Boot",
-      "atSeconds": 501.38
+      "atSeconds": 335.6
+    },
+    {
+      "tier": "Legendary Broken Boot",
+      "atSeconds": 388.83
     }
   ]
 }

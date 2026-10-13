@@ -177,7 +177,7 @@ export class Hud {
 
   /**
    * The screen edges lighting up as the boot connects, as hard as it landed: a
-   * body is a flicker, a car is a flare. `strength` is that mass, normalised.
+   * body is a flicker, a tank is a flare. `strength` is that mass, normalised.
    */
   flashImpact(strength = 1) {
     if (!this.impactEdge) return;

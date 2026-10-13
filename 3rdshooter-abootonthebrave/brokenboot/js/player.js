@@ -158,11 +158,20 @@ export class Player {
     this.object.position.z = clamp(this.object.position.z, -limit, limit);
     world.resolveCircle(this.object.position, 0.55);
 
-    // Vertical motion. The ground plane sits at y = 0.
+    // Vertical motion. The ground plane sits at y = 0, and a floating island's cap is
+    // a floor too when his feet are crossing it. Read off the *previous* height: an
+    // island whose top he is already above is a floor for this frame, which is what
+    // keeps a fall from stepping straight through one between frames. Walking off an
+    // edge is not special-cased — the island stops being under him, and he falls.
+    const feetBefore = this.object.position.y;
     this.velocityY += SETTINGS.gravity * dt;
     this.object.position.y += this.velocityY * dt;
-    if (this.object.position.y <= 0) {
-      this.object.position.y = 0;
+    const island = world.islandFloor
+      ? world.islandFloor(this.object.position.x, this.object.position.z, feetBefore)
+      : null;
+    const floor = island === null ? 0 : Math.max(0, island);
+    if (this.object.position.y <= floor) {
+      this.object.position.y = floor;
       if (this.velocityY < 0) this.velocityY = 0;
       this.grounded = true;
     } else {
