@@ -83,6 +83,72 @@ function takeClip(root) {
 }
 
 /**
+ * The rig the body itself is skinned to, when the file carries more than one.
+ *
+ * The attacker's mesh file holds two 65-bone rigs under the same bone names: one
+ * his visor is skinned to and one his body is, and in the GLB the visor's comes
+ * first. Null means the file has a single rig, where nothing can collide.
+ */
+function bodySkeleton(root) {
+  const skeletons = new Set();
+  let body = null;
+  let most = -1;
+  root.traverse((o) => {
+    if (!o.isSkinnedMesh) return;
+    skeletons.add(o.skeleton);
+    const vertices = o.geometry.attributes.position.count;
+    if (vertices > most) { most = vertices; body = o; }
+  });
+  if (skeletons.size < 2 || !body) return null;
+  return body.skeleton;
+}
+
+/** The rig's own root: the one bone with nothing but objects above it. */
+function rootBoneNameOf(skeleton) {
+  const bone = skeleton.bones.find((b) => !(b.parent && b.parent.isBone));
+  return bone ? bone.name : null;
+}
+
+/**
+ * Aim every clip at the bones the body actually wears.
+ *
+ * Clips bind to the model by node name, and the binder takes the first match — so
+ * a clip written for `mixamorigHips` drove whichever `mixamorigHips` the file
+ * happened to hold first. In the FBX that was the body's rig; in the GLB it is the
+ * visor's, which left the attacker's body standing in its bind pose and sliding
+ * across the field in a T-pose whenever a walk, aim or crouch clip played before
+ * him. (His idle clip escaped it only because glTF animates by node index rather
+ * than by name, which is why he stood correctly and only moved wrong.)
+ *
+ * The loader also de-collides the two rigs' names — the second one becomes
+ * `mixamorigHips_1` — so the rewrite matches on the base name and lands each track
+ * on the body's own bone, whatever order the file stores its rigs in.
+ */
+function rebindClipsTo(clips, skeleton) {
+  const exact = new Set(skeleton.bones.map((b) => b.name));
+  const byBase = new Map();
+  for (const bone of skeleton.bones) {
+    const base = bone.name.replace(/_\d+$/, '');
+    if (!byBase.has(base)) byBase.set(base, bone.name);
+  }
+  let rewritten = 0;
+  for (const clip of Object.values(clips)) {
+    if (!clip || !clip.tracks) continue;
+    for (const track of clip.tracks) {
+      const dot = track.name.indexOf('.');
+      if (dot < 0) continue;
+      const node = track.name.slice(0, dot);
+      if (exact.has(node)) continue;
+      const target = byBase.get(node.replace(/_\d+$/, ''));
+      if (!target || target === node) continue;
+      track.name = target + track.name.slice(dot);
+      rewritten++;
+    }
+  }
+  return rewritten;
+}
+
+/**
  * Drop a clip's baked root translation.
  *
  * Mixamo bakes the rig's own travel into the root bone, and the clip files here
@@ -262,13 +328,20 @@ export async function buildCharacter({ meshUrl, clipUrls = {}, targetHeight, onP
     }
   }
 
+  // If the file carries a second rig, every clip has to be aimed at the body's
+  // bones before anything is measured, or the body is posed by nothing at all.
+  const skeleton = bodySkeleton(root);
+  if (skeleton) rebindClipsTo(clips, skeleton);
+
   // The root bone and the top-level objects of this file name the nodes that
   // carry a clip's travel; every clip is measured against them before it is
-  // handed on.
-  let rootBoneName = null;
-  root.traverse((o) => {
-    if (!rootBoneName && o.isBone && !(o.parent && o.parent.isBone)) rootBoneName = o.name;
-  });
+  // handed on. The body's rig is what travels, so its root is the one that counts.
+  let rootBoneName = skeleton ? rootBoneNameOf(skeleton) : null;
+  if (!rootBoneName) {
+    root.traverse((o) => {
+      if (!rootBoneName && o.isBone && !(o.parent && o.parent.isBone)) rootBoneName = o.name;
+    });
+  }
   const modelNodeNames = new Set(root.children.map((c) => c.name));
   for (const clip of Object.values(clips)) stripRootMotion(clip, rootBoneName, modelNodeNames);
 

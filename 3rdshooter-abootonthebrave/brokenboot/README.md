@@ -1030,19 +1030,38 @@ to PBR (glTF has no Phong, so the specular map becomes an inverted roughness map
 The rig clauses, all four kicks, the eight boot tiers and the ten-wave campaign pass
 on the GLB (`npm run test:probes`, `npm test`).
 
-**And the pointer no longer reaches the player.** Checked against a host that answers
-both LFS paths with the 134-byte pointer the commit stores — which is what the live
-deployment serves today — the match starts and draws the officer: the load makes 56
-requests totalling 56.6 MB and never asks for the `.fbx` at all.
+**One thing the conversion exposed.** The attacker's file carries **two** 65-bone
+rigs under the same bone names — one his visor is skinned to and one his body is —
+and the GLB stores the visor's first, where the FBX had the body's. Clips bind to the
+model by node name and the binder takes the *first* match, so the walk, aim and
+crouch files were driving the visor's skeleton and leaving his body in its bind pose:
+a T-pose that slid across the field. His idle clip escaped it only because glTF
+animates by node index rather than by name, which is exactly why he stood correctly
+and only *moved* wrong, and why no probe caught it — the probes measure where he is
+and what he does, not which rig is wearing his pose.
 
-That last sentence is worth spelling out, because the claim this file used to make
-here — that "the published site does not see the pointer" — is not what the live site
-does. Measured: `3rdpersonidle.fbx` answers with 134 bytes, `game/index.pck` the
-same, and `brokenboot/.gitignore` answers 404, which only the legacy branch build
-would do (the Actions artifact, built with `lfs: true`, includes dotfiles and is
-verified on the runner to carry the real 328 MB pack). So the artifact is uploaded
-and never served. For this game the GLB settles it; the overlap pack in `game/` is
-still exposed, because that 328 MB `.pck` is LFS as well.
+`buildCharacter` now rebinds every clip onto the bones the body's own skeleton
+wears, matched on the base name so the loader's `_1` de-collision suffix does not
+matter, and reads the travelling root bone from that same rig. Measured on the walk
+clip: 52 of the body's 65 bones move and none of the visor's, which is the FBX's own
+behaviour. The officer has a single rig, where nothing can collide.
+
+**And the pointer no longer reaches the player.** Checked against a host that answers
+both LFS paths with the 134-byte pointer the commit stores, the match starts and draws
+the officer: the load makes 56 requests totalling 56.6 MB and never asks for the
+`.fbx` at all.
+
+That matters because the pointer is still what the live site answers with. Measured
+while writing this: `3rdpersonidle.fbx` returns 134 bytes, `game/index.pck` the same,
+and `brokenboot/.gitignore` returns 404 — which only the legacy branch build does, as
+the Actions artifact is built with `lfs: true`, includes dotfiles, and is verified on
+the runner to carry the real 328 MB pack. The same URLs answered with the real
+115,526,016 bytes earlier in the same session, so both pipelines are publishing to
+the one host and they disagree: the artifact carries the payload, and the branch build
+overwrites it with the pointers a few minutes later. This game no longer depends on
+which one wins. The overlap pack in `game/` still does, because that 328 MB `.pck` is
+LFS as well — and the same trick applies to it: put the thing the player downloads
+under the 100 MB line and commit it, so no host can serve a stub for it.
 
 `tactical_transport_truck_baked_pbr.glb` (~56 MB) is deliberately unused.
 
