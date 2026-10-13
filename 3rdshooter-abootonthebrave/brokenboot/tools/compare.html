@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>FBX vs GLB — same rig, same camera</title>
+<style>
+  body { margin: 0; padding: 16px; background: #0d0f0d; color: #e8e6dd;
+         font-family: "Segoe UI", Roboto, system-ui, sans-serif; }
+  h1 { font-size: 15px; letter-spacing: 0.1em; text-transform: uppercase; color: #f2c94c; }
+  .row { display: flex; gap: 14px; align-items: flex-start; }
+  figure { margin: 0; }
+  figcaption { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+               opacity: 0.7; margin-top: 6px; }
+  pre { white-space: pre-wrap; font-size: 12px; line-height: 1.5; margin-top: 14px; }
+</style>
+</head>
+<body>
+<h1>FBX vs GLB</h1>
+<div class="row">
+  <figure><div id="fbx"></div><figcaption>source FBX</figcaption></figure>
+  <figure><div id="glb"></div><figcaption>converted GLB</figcaption></figure>
+  <figure><div id="diff"></div><figcaption>difference ×4</figcaption></figure>
+</div>
+<pre id="log">loading…</pre>
+<script type="importmap">
+{
+  "imports": {
+    "three": "/3rdshooter-abootonthebrave/brokenboot/vendor/three/three.module.js",
+    "three/addons/": "/3rdshooter-abootonthebrave/brokenboot/vendor/addons/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// Renders the source FBX and the converted GLB through one camera and one light rig
+// and reports how far apart the two images are. The rig is the point: the conversion
+// is only allowed to change the shading model and the texture resolution, so the
+// comparison is framed on the FBX's own bounds and both models sit under the same sun.
+const ASSET_BASE = '/3rdshooter-abootonthebrave/';
+const q = new URLSearchParams(location.search);
+const FBX_FILE = q.get('fbx') || '3rdpersonidle.fbx';
+const GLB_FILE = q.get('glb') || FBX_FILE.replace(/\.fbx$/i, '.glb');
+const W = Number(q.get('w') || 360);
+const H = Number(q.get('h') || 560);
+const log = document.getElementById('log');
+const report = { fbx: FBX_FILE, glb: GLB_FILE };
+window.__compare = { stage: 'start', report };
+function say(t) { log.textContent += '\n' + t; }
+
+function makeRenderer(host) {
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: false });
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(1);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  host.appendChild(renderer.domElement);
+  return renderer;
+}
+
+/** Frame the model on its bind pose, so both renders use one identical camera. */
+function frame(root) {
+  const box = new THREE.Box3();
+  root.updateMatrixWorld(true);
+  let found = 0;
+  root.traverse((o) => {
+    if (!o.isSkinnedMesh && !o.isMesh) return;
+    found++;
+    box.expandByObject(o);
+  });
+  if (!found) throw new Error('no mesh in model');
+  const size = box.getSize(new THREE.Vector3());
+  const centre = box.getCenter(new THREE.Vector3());
+  const span = Math.max(size.x, size.y, size.z);
+  return {
+    fov: 30,
+    near: span / 100,
+    far: span * 20,
+    centre,
+    position: new THREE.Vector3(span * 1.15, centre.y, span * 1.75),
+  };
+}
+
+function sceneFor(root) {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0d0f0d);
+  // One key light from the front-left plus a fill, so specular response — the thing
+  // the material swap changes most — is actually visible.
+  const key = new THREE.DirectionalLight(0xffffff, 2.2);
+  key.position.set(-2, 3, 2);
+  const fill = new THREE.AmbientLight(0xffffff, 0.55);
+  scene.add(key, fill, root);
+  return scene;
+}
+
+function render(renderer, scene, cam) {
+  const camera = new THREE.PerspectiveCamera(cam.fov, W / H, cam.near, cam.far);
+  camera.position.copy(cam.position);
+  camera.lookAt(cam.centre);
+  renderer.render(scene, camera);
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(renderer.domElement, 0, 0);
+  return ctx.getImageData(0, 0, W, H);
+}
+
+function show(host, imageData) {
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  c.getContext('2d').putImageData(imageData, 0, 0);
+  host.appendChild(c);
+}
+
+function difference(a, b) {
+  const out = new ImageData(W, H);
+  let sum = 0, worst = 0, over8 = 0, pixels = 0;
+  for (let i = 0; i < a.data.length; i += 4) {
+    for (let k = 0; k < 3; k++) {
+      const d = Math.abs(a.data[i + k] - b.data[i + k]);
+      sum += d;
+      if (d > worst) worst = d;
+      if (d > 8) over8++;
+      out.data[i + k] = Math.min(255, d * 4);
+    }
+    out.data[i + 3] = 255;
+    pixels += 3;
+  }
+  return { image: out, mean: sum / pixels, worst, over8: over8 / pixels };
+}
+
+(async () => {
+  const asset = (file) => ASSET_BASE + file;
+  window.__compare.stage = 'load-fbx';
+  const fbxRoot = await new FBXLoader().loadAsync(asset(FBX_FILE));
+  window.__compare.stage = 'load-glb';
+  const gltf = await new GLTFLoader().loadAsync(asset(GLB_FILE));
+
+  // Both models are in the same units, so the FBX frames the pair.
+  const camera = frame(fbxRoot);
+  report.cameraDistance = camera.position.length().toFixed(2);
+  report.centre = [camera.centre.x.toFixed(2), camera.centre.y.toFixed(2), camera.centre.z.toFixed(2)];
+
+  window.__compare.stage = 'render';
+  const fbxImage = render(makeRenderer(document.getElementById('fbx')), sceneFor(fbxRoot), camera);
+  const glbImage = render(makeRenderer(document.getElementById('glb')), sceneFor(gltf.scene), camera);
+  const diff = difference(fbxImage, glbImage);
+
+  show(document.getElementById('diff'), diff.image);
+  report.meanAbsDiff = +diff.mean.toFixed(2);
+  report.worstChannelDiff = diff.worst;
+  report.shareOfChannelsOver8 = +(diff.over8 * 100).toFixed(2);
+  say(`mean abs difference: ${report.meanAbsDiff}/255 per channel`);
+  say(`channels off by more than 8: ${report.shareOfChannelsOver8}%`);
+  say(`worst single channel: ${report.worstChannelDiff}`);
+  window.__compare.stage = 'done';
+})().catch((err) => { window.__compare.stage = 'failed'; window.__compare.error = String(err && err.stack ? err.stack : err); say('FAILED: ' + window.__compare.error); });
+</script>
+</body>
+</html>

@@ -281,9 +281,12 @@ export function waveRamp(waveNumber) {
   };
 }
 
-// Third-person body for the SWAT officer. 3rdpersonidle.fbx carries the mesh.
+// Third-person body for the SWAT officer. The GLB carries the mesh and the idle
+// clip; tools/convert-glb.mjs builds it from the 115 MB FBX master, which stays in
+// the repository as the source but is no longer downloaded — see "Asset size and
+// hosting" in the README.
 export const PLAYER_SOURCE = {
-  mesh: '3rdpersonidle.fbx',
+  mesh: '3rdpersonidle.glb',
   clips: {
     walk: '3rdpersonshootwalking.fbx',
     aim: '3rdpersonshootstanding.fbx',
@@ -295,9 +298,9 @@ export const PLAYER_SOURCE = {
   },
 };
 
-// Attackers. attackerIdle.fbx carries the mesh (this is the "light brown" soldier).
+// Attackers. The GLB carries the mesh (this is the "light brown" soldier).
 export const ENEMY_SOURCE = {
-  mesh: 'attackerIdle.fbx',
+  mesh: 'attackerIdle.glb',
   clips: {
     walk: 'attackershootwalking.fbx',
     aim: 'attackershootstanding.fbx',

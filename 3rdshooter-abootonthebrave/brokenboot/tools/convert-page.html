@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>FBX to GLB — character conversion</title>
+<style>
+  body { margin: 0; padding: 18px; background: #0d0f0d; color: #e8e6dd;
+         font-family: "Segoe UI", Roboto, system-ui, sans-serif; }
+  h1 { font-size: 16px; letter-spacing: 0.1em; text-transform: uppercase; color: #f2c94c; }
+  pre { white-space: pre-wrap; font-size: 12px; line-height: 1.5; }
+  .ok { color: #8ce38c; } .bad { color: #ff8a7a; }
+</style>
+</head>
+<body>
+<h1>FBX → GLB</h1>
+<pre id="log">starting…</pre>
+<script type="importmap">
+{
+  "imports": {
+    "three": "/3rdshooter-abootonthebrave/brokenboot/vendor/three/three.module.js",
+    "three/addons/": "/3rdshooter-abootonthebrave/brokenboot/vendor/addons/",
+    "gltf-exporter": "/exporter/GLTFExporter.js"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GLTFExporter } from 'gltf-exporter';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+
+// The game's own asset folder, so the file being converted is the one that ships.
+const ASSET_BASE = '/3rdshooter-abootonthebrave/';
+const q = new URLSearchParams(location.search);
+const MESH = q.get('mesh') || '3rdpersonidle.fbx';
+const OUT = q.get('out') || MESH.replace(/\.fbx$/i, '.glb');
+const MAX = Number(q.get('size') || 1024);
+const log = document.getElementById('log');
+const lines = [];
+const report = { mesh: MESH, out: OUT, max: MAX };
+window.__convert = { stage: 'start', report, log: '' };
+
+function say(text, cls) {
+  lines.push(cls ? `<span class="${cls}">${text}</span>` : text);
+  log.innerHTML = lines.join('\n');
+  window.__convert.log = lines.join('\n').replace(/<[^>]+>/g, '');
+}
+
+function mb(bytes) { return (bytes / 1048576).toFixed(2) + ' MB'; }
+
+/** Mean and spread of a map's luminance, sampled at 64² — enough to say whether a
+ *  map carries detail worth keeping or is a near-flat constant. */
+function stats(image) {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 64;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(image, 0, 0, 64, 64);
+  const d = ctx.getImageData(0, 0, 64, 64).data;
+  let sum = 0, sum2 = 0, n = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+    sum += l; sum2 += l * l; n++;
+  }
+  const mean = sum / n;
+  return { mean: Math.round(mean), sd: Math.round(Math.sqrt(sum2 / n - mean * mean)) };
+}
+
+/**
+ * Weld duplicate vertices and collapse the material groups to one per material.
+ *
+ * Mixamo exports the officer's body as 264 material groups alternating between its
+ * two materials, with every triangle carrying its own three vertices: 264 draw
+ * calls and 138,891 vertices for one 46,297-triangle body, drawn about ten times a
+ * frame once the attackers are on the field. Every one of those groups draws from
+ * the same vertex buffer, so re-ordering the index by material and welding the
+ * duplicates is lossless — same triangles, same materials, two draws.
+ */
+function optimizeGeometry(geometry) {
+  const before = {
+    verts: geometry.attributes.position.count,
+    groups: geometry.groups.length,
+    tris: (geometry.index ? geometry.index.count : geometry.attributes.position.count) / 3,
+  };
+  if (geometry.groups.length <= 1) return { geometry, before, after: before };
+
+  // Which material each triangle belongs to. Groups are counted in vertices, and
+  // are whole triangles, so group.start / 3 is the first triangle either way.
+  const triMaterial = new Uint8Array(before.tris);
+  for (const group of geometry.groups) {
+    triMaterial.fill(group.materialIndex, group.start / 3, (group.start + group.count) / 3);
+  }
+
+  // The body arrives with no index buffer at all: three vertices per triangle and
+  // no sharing. Weld needs an index to collapse, so hand it the identity first —
+  // "every vertex is its own" — which is exactly what the weld then de-duplicates.
+  if (!geometry.index) {
+    const identity = new Uint32Array(geometry.attributes.position.count);
+    for (let i = 0; i < identity.length; i++) identity[i] = i;
+    geometry.setIndex(new THREE.BufferAttribute(identity, 1));
+  }
+
+  // Welding preserves the index order, so triangle t stays triangle t and the
+  // per-triangle material is still valid after the weld.
+  const welded = mergeVertices(geometry, 1e-4);
+  const order = [...new Set(geometry.groups.map((g) => g.materialIndex))].sort((a, b) => a - b);
+
+  const index = new Uint32Array(welded.index.count);
+  const groups = [];
+  let cursor = 0;
+  for (const materialIndex of order) {
+    const start = cursor;
+    for (let t = 0; t < before.tris; t++) {
+      if (triMaterial[t] !== materialIndex) continue;
+      index[cursor++] = welded.index.getX(t * 3);
+      index[cursor++] = welded.index.getX(t * 3 + 1);
+      index[cursor++] = welded.index.getX(t * 3 + 2);
+    }
+    groups.push({ start, count: cursor - start, materialIndex });
+  }
+
+  const out = new THREE.BufferGeometry();
+  for (const name of Object.keys(welded.attributes)) out.setAttribute(name, welded.attributes[name]);
+  out.setIndex(new THREE.BufferAttribute(index, 1));
+  for (const g of groups) out.addGroup(g.start, g.count, g.materialIndex);
+
+  const after = { verts: out.attributes.position.count, groups: out.groups.length, tris: index.length / 3 };
+  return { geometry: out, before, after };
+}
+
+/** Glossiness inverted, so it can stand in as a roughness map. */
+function invertToCanvas(image, cap) {
+  const w = Math.min(image.width, cap);
+  const h = Math.min(image.height, cap);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(image, 0, 0, w, h);
+  const data = ctx.getImageData(0, 0, w, h);
+  const d = data.data;
+  for (let i = 0; i < d.length; i += 4) {
+    d[i] = 255 - d[i]; d[i + 1] = 255 - d[i + 1]; d[i + 2] = 255 - d[i + 2];
+  }
+  ctx.putImageData(data, 0, 0);
+  return c;
+}
+
+/** Drop every map reference, so a replaced material cannot drag an old texture along. */
+function clearMaps(m) {
+  for (const key of Object.keys(m)) if (m[key] && m[key].isTexture) m[key] = null;
+}
+
+function convertMaterial(src, { keepRoughness }) {
+  const m = new THREE.MeshStandardMaterial();
+  const slots = [];
+  clearMaps(m);
+  m.name = src.name;
+  m.color.copy(src.color || new THREE.Color(0xffffff));
+  m.opacity = src.opacity;
+  m.transparent = src.transparent;
+  m.alphaTest = src.alphaTest;
+  m.side = src.side;
+  m.depthWrite = src.depthWrite;
+  m.vertexColors = src.vertexColors;
+
+  if (src.map) { m.map = src.map; m.map.userData.mimeType = 'image/jpeg'; slots.push('map'); }
+  if (src.normalMap) { m.normalMap = src.normalMap; slots.push('normalMap'); }
+  if (src.emissiveMap) {
+    m.emissiveMap = src.emissiveMap;
+    m.emissiveMap.userData.mimeType = 'image/jpeg';
+    m.emissive.copy(src.emissive || new THREE.Color(0x000000));
+    slots.push('emissiveMap');
+  }
+  if (keepRoughness && src.specularMap && src.specularMap.image) {
+    const canvas = invertToCanvas(src.specularMap.image, MAX);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = src.specularMap.colorSpace;
+    tex.flipY = src.specularMap.flipY;
+    tex.wrapS = src.specularMap.wrapS;
+    tex.wrapT = src.specularMap.wrapT;
+    tex.repeat.copy(src.specularMap.repeat);
+    tex.offset.copy(src.specularMap.offset);
+    tex.channel = src.specularMap.channel;
+    tex.userData.mimeType = 'image/jpeg';
+    m.roughnessMap = tex;
+    slots.push('roughnessMap(inverted specular)');
+  }
+  m.roughness = 1;
+  m.metalness = 0;
+  return { material: m, slots };
+}
+
+async function run() {
+  window.__convert.stage = 'fetch';
+  const url = ASSET_BASE + MESH;
+  const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
+  report.sourceBytes = bytes.length;
+  say(`source ${MESH}: ${mb(bytes.length)}`);
+
+  window.__convert.stage = 'parse';
+  // Every map is embedded in the FBX, so three hands each one to an image loader
+  // and `texture.image` does not exist until that image arrives. Parsing returns
+  // long before that, so wait on the loading manager — otherwise the inventory and
+  // the exporter both see empty textures and the export dies with "no valid image
+  // data". The race is a backstop: a map that never calls back must not hang the run.
+  const manager = new THREE.LoadingManager();
+  const failedUrls = [];
+  manager.onError = (url) => failedUrls.push(url);
+  const allLoaded = new Promise((resolve) => { manager.onLoad = () => resolve(); });
+  const loader = new FBXLoader(manager);
+  const root = loader.parse(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), ASSET_BASE);
+  root.updateMatrixWorld(true);
+  await Promise.race([allLoaded, new Promise((r) => setTimeout(r, 180000))]);
+  report.mapsFailed = failedUrls;
+  if (failedUrls.length) say(`${failedUrls.length} map(s) failed to load`, 'bad');
+
+  const textures = new Set();
+  root.traverse((o) => {
+    for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
+      if (!m) continue;
+      for (const key of Object.keys(m)) if (m[key] && m[key].isTexture) textures.add(m[key]);
+    }
+  });
+  await Promise.all([...textures].map(async (t) => {
+    const img = t.image;
+    if (img && img.decode && !img.complete) { try { await img.decode(); } catch { /* reported below */ } }
+  }));
+  report.mapsDecoded = [...textures].filter((t) => t.image).length;
+  say(`maps: ${report.mapsDecoded}/${textures.size} decoded`);
+
+  window.__convert.stage = 'materials';
+  const inventory = [];
+  report.optimize = [];
+  let skinned = 0;
+  root.traverse((o) => {
+    if (o.isSkinnedMesh) skinned++;
+    if (!o.isMesh && !o.isSkinnedMesh) return;
+    const isArray = Array.isArray(o.material);
+    const list = isArray ? o.material : [o.material];
+    const built = list.map((src) => {
+      const entry = { mesh: o.name, material: src.type, name: src.name };
+      for (const key of Object.keys(src)) {
+        const t = src[key];
+        if (!t || !t.isTexture) continue;
+        const img = t.image;
+        if (!img) { entry[key] = 'no image'; continue; }
+        const s = stats(img);
+        entry[key] = `${img.width || img.naturalWidth}×${img.height || img.naturalHeight} ` +
+          `luma ${s.mean}±${s.sd}${t.name ? ` [${t.name}]` : ''}`;
+      }
+      inventory.push(entry);
+      return convertMaterial(src, { keepRoughness: true });
+    });
+    o.material = isArray ? built.map((b) => b.material) : built[0].material;
+    if (o.isSkinnedMesh || o.isMesh) {
+      const result = optimizeGeometry(o.geometry);
+      o.geometry = result.geometry;
+      report.optimize.push({
+        mesh: o.name,
+        vertsBefore: result.before.verts,
+        vertsAfter: result.after.verts,
+        groupsBefore: result.before.groups,
+        groupsAfter: result.after.groups,
+        trianglesBefore: result.before.tris,
+        trianglesAfter: result.after.tris,
+      });
+    }
+  });
+  report.inventory = inventory;
+  report.textures = textures.size;
+  report.skinnedMeshes = skinned;
+  for (const o of report.optimize) {
+    const kept = o.trianglesAfter === o.trianglesBefore;
+    say(`mesh ${o.mesh}: ${o.vertsBefore}→${o.vertsAfter} verts, ` +
+        `${o.groupsBefore}→${o.groupsAfter} groups, ` +
+        `${o.trianglesBefore}→${o.trianglesAfter} triangles`, kept ? 'ok' : 'bad');
+    if (!kept) throw new Error(`optimize lost triangles on ${o.mesh}`);
+  }
+  for (const entry of inventory) {
+    say(`material ${entry.name} (${entry.material})`);
+    for (const key of Object.keys(entry)) {
+      if (key === 'mesh' || key === 'material' || key === 'name') continue;
+      say(`   ${key}: ${entry[key]}`);
+    }
+  }
+
+  window.__convert.stage = 'export';
+  const exporter = new GLTFExporter();
+  const options = {
+    binary: true,
+    embedImages: true,
+    maxTextureSize: MAX,
+    // The FBX carries a second, empty "Take 001" beside the real clip; exporting
+    // it would hand the game a zero-track animation to reason about.
+    animations: (root.animations || []).filter((clip) => clip.tracks.length > 0),
+  };
+  const glb = await new Promise((resolve, reject) => {
+    exporter.parse(root, resolve, reject, options);
+  });
+  report.glbBytes = glb.byteLength;
+  say(`exported GLB: ${mb(glb.byteLength)} (from ${mb(bytes.length)})`, 'ok');
+
+  // Read the result back with the loader the game will use, and prove the rig survived.
+  window.__convert.stage = 'verify';
+  const gltf = await new Promise((resolve, reject) => {
+    new GLTFLoader().parse(glb, '', resolve, reject);
+  });
+  const bones = [];
+  gltf.scene.traverse((o) => { if (o.isBone) bones.push(o.name); });
+  report.verify = {
+    bones: bones.length,
+    rootBones: gltf.scene.children.map((c) => `${c.name}(${c.type})`),
+    hips: bones.filter((n) => /hips/i.test(n)).slice(0, 3),
+    foot: bones.filter((n) => /foot/i.test(n)),
+    animations: gltf.animations.map((a) => `${a.name} ${a.tracks.length}t ${a.duration.toFixed(2)}s`),
+    materials: [],
+    triangles: 0,
+    skinned: 0,
+  };
+  gltf.scene.traverse((o) => {
+    if (o.isSkinnedMesh) {
+      report.verify.skinned++;
+      report.verify.triangles += o.geometry.index
+        ? o.geometry.index.count / 3
+        : o.geometry.attributes.position.count / 3;
+    }
+    for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
+      if (m) report.verify.materials.push(`${m.type} ${m.name} ${Object.keys(m).filter((k) => m[k] && m[k].isTexture).join('+')}`);
+    }
+  });
+  say(`verify: ${report.verify.bones} bones, ${report.verify.skinned} skinned mesh(es), ` +
+      `${Math.round(report.verify.triangles)} triangles`, 'ok');
+  say(`verify hips: ${report.verify.hips.join(', ')} · feet: ${report.verify.foot.join(', ')}`);
+  say(`verify animations: ${report.verify.animations.join(' | ') || 'none'}`);
+  for (const m of report.verify.materials) say(`verify material: ${m}`);
+
+  window.__convert.stage = 'save';
+  const res = await fetch(`/save?out=${encodeURIComponent(OUT)}`, { method: 'POST', body: glb });
+  const text = await res.text();
+  report.saved = res.ok ? text : null;
+  say(res.ok ? `saved: ${text}` : `SAVE FAILED: ${text}`, res.ok ? 'ok' : 'bad');
+  window.__convert.stage = res.ok ? 'done' : 'failed';
+}
+
+run().catch((err) => {
+  window.__convert.stage = 'failed';
+  window.__convert.error = String(err && err.stack ? err.stack : err);
+  say(`FAILED: ${window.__convert.error}`, 'bad');
+});
+</script>
+</body>
+</html>

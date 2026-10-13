@@ -221,15 +221,33 @@ function anchorClipsToGround(root, clips, rootBoneName) {
 }
 
 /**
+ * The character body, from whichever format it ships in.
+ *
+ * Both loaders hand back the same shape — a hierarchy whose bones are named the
+ * way the rig names them, plus the clip baked into the file — so the rest of this
+ * module never asks which one it was. The GLB is the FBX put through
+ * `tools/convert-glb.mjs`: identical rig, welded vertices, two material groups
+ * instead of 264, and 1024² textures instead of 4096², which is the difference
+ * between a 115 MB download and an 8 MB one.
+ */
+async function loadCharacterMesh(url, onProgress) {
+  if (/\.glb$/i.test(url)) {
+    const gltf = await gltfLoader.loadAsync(url, onProgress);
+    return { root: gltf.scene, animations: gltf.animations };
+  }
+  const root = await loadFBX(url, onProgress);
+  return { root, animations: root.animations || [] };
+}
+
+/**
  * Load a character mesh together with its named animation clips.
  * Clips are keyed by the state name used by the animation controller,
  * because Mixamo bakes every clip with the same internal name.
  */
 export async function buildCharacter({ meshUrl, clipUrls = {}, targetHeight, onProgress, onStep }) {
-  const root = await loadFBX(meshUrl, onProgress);
+  const { root, animations } = await loadCharacterMesh(meshUrl, onProgress);
   const clips = {};
-  const embedded = takeClip(root);
-  if (embedded) clips.idle = embedded;
+  if (animations.length) clips.idle = animations[0];
 
   const keys = Object.keys(clipUrls);
   for (let i = 0; i < keys.length; i++) {
