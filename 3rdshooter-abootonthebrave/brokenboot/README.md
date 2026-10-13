@@ -929,11 +929,11 @@ anyway.
 
 | Asset | Role | Licence and source |
 | --- | --- | --- |
-| `3rdpersonidle.fbx` | **Player.** The only skinned SWAT body; carries the idle clip. | *not recorded in this repo* — see the gap note below |
+| `3rdpersonidle.glb` | **Player.** The only skinned SWAT body, with the idle clip; converted from the `3rdpersonidle.fbx` master by [`tools/convert-glb.mjs`](tools/convert-glb.mjs). | *not recorded in this repo* — see the gap note below |
 | `3rdpersonshootwalking/standing/crouch.fbx` | Player locomotion and aim clips. | *not recorded* |
 | `3rdpersonjump.fbx` | Jump clip. | *not recorded* |
 | `3rdpersonkick / kickhigh / stomp.fbx` | Boot attack clips. | *not recorded* |
-| `attackerIdle.fbx` | **Attacker.** Skinned body + idle clip. | *not recorded* |
+| `attackerIdle.glb` | **Attacker.** Skinned body + idle clip; same conversion from the `attackerIdle.fbx` master. | *not recorded* |
 | `attackershootwalking/standing/crouch.fbx` | Attacker clips. | *not recorded* |
 | `ak-47.glb` | Rifle, socketed to the right hand bone. | *not recorded* |
 | `silverboot / goldboot / brokenboot / diamondboot.glb` | Boot tier models. | *not recorded* |
@@ -986,8 +986,8 @@ measures 4.60 × 2.39 × 4.23 m where the layout asks for it.
 
 ## Asset size and hosting
 
-`3rdpersonidle.fbx` is ~115 MB, which is over GitHub's 100 MB file limit. It is
-therefore tracked with **Git LFS**:
+`3rdpersonidle.fbx` is ~115 MB, which is over GitHub's 100 MB file limit. The
+master is therefore tracked with **Git LFS**:
 
 ```
 3rdshooter-abootonthebrave/3rdpersonidle.fbx filter=lfs diff=lfs merge=lfs -text
@@ -997,19 +997,52 @@ The commit stores a 134-byte pointer and the real payload lives in LFS storage, 
 a clone needs `git lfs install` once or the model arrives as a pointer. The
 committed blob is 134 bytes.
 
-**The published site does not see the pointer.** `.github/workflows/deploy-pages.yml`
-checks out with `lfs: true` and uploads the whole tree as a Pages artifact, so what
-it publishes is the materialised payload rather than what the repository stores.
-Measured on the live site: that path answers 200 with `content-length` 115526016,
-the first bytes read `Kaydara FBX Binary`, and the running game there has its player
-model loaded. The old branch build is what would have returned the pointer; this one
-does not, and the LFS pull is a per-deploy cost on the runner rather than a
-per-player one.
+That is a property of the **master** now, not of the game: the two characters ship as
+GLB converted from those masters and committed as ordinary files, so a plain clone
+plays the game without `git lfs install` ever having been run.
 
-Converting the character (and the 12 MB attacker) to optimised GLB with downscaled
-textures and committing those normally is therefore an optimisation rather than a
-repair: it removes the 115 MB first download, which is still the single biggest
-remaining improvement.
+| shipped | from | size | skinned vertices | draw calls |
+| --- | --- | --- | --- | --- |
+| `3rdpersonidle.glb` | `3rdpersonidle.fbx`, 115.5 MB | 8.4 MB | 138,891 → 31,687 | 264 → 2 |
+| `attackerIdle.glb` | `attackerIdle.fbx`, 11.9 MB | 5.4 MB | 33,558 → 7,325 (visor 570 → 109) | 2 |
+
+The conversion runs the masters through the game's *own* three build — the same
+`FBXLoader`, the same `GLTFExporter` — because this rig is load-bearing: the boot
+sockets are hand-tuned against `mixamorigRightFoot`'s centimetre axes and every clip
+binds to the mesh by bone name. A modelling tool's import/export would have
+re-scaled the rig out of centimetres and rewritten its bones; loading and writing
+back through three keeps the node names, the bind matrices, the skin weights, the
+units and the embedded idle clip exactly as the game already sees them. What the
+conversion does change:
+
+- the officer's seven embedded 4096² maps become 1024² — JPEG for the colour and
+  the inverted glossiness, PNG for the two normal maps — which is 5.5 of the 8.4 MB;
+- the exports are **unindexed**, three vertices per triangle, so welding the
+  duplicates is what puts the officer at 31,687 vertices and the attacker at 7,325;
+- the officer's 264 material groups — one draw call each, and every one of them
+  drawing from the same vertex buffer — collapse to one group per material.
+
+Measured, not assumed: rendered side by side through one camera and one light rig
+([`tools/compare.html`](tools/compare.html)), the two officer models differ by a mean
+of **1.7/255 per channel**, with 7.6% of channels off by more than 8 and a worst
+single channel of 53 — the residue of the texture downscale and the move from Phong
+to PBR (glTF has no Phong, so the specular map becomes an inverted roughness map).
+The rig clauses, all four kicks, the eight boot tiers and the ten-wave campaign pass
+on the GLB (`npm run test:probes`, `npm test`).
+
+**And the pointer no longer reaches the player.** Checked against a host that answers
+both LFS paths with the 134-byte pointer the commit stores — which is what the live
+deployment serves today — the match starts and draws the officer: the load makes 56
+requests totalling 56.6 MB and never asks for the `.fbx` at all.
+
+That last sentence is worth spelling out, because the claim this file used to make
+here — that "the published site does not see the pointer" — is not what the live site
+does. Measured: `3rdpersonidle.fbx` answers with 134 bytes, `game/index.pck` the
+same, and `brokenboot/.gitignore` answers 404, which only the legacy branch build
+would do (the Actions artifact, built with `lfs: true`, includes dotfiles and is
+verified on the runner to carry the real 328 MB pack). So the artifact is uploaded
+and never served. For this game the GLB settles it; the overlap pack in `game/` is
+still exposed, because that 328 MB `.pck` is LFS as well.
 
 `tactical_transport_truck_baked_pbr.glb` (~56 MB) is deliberately unused.
 

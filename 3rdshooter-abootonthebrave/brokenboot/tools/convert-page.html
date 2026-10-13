@@ -75,6 +75,10 @@ function stats(image) {
  * frame once the attackers are on the field. Every one of those groups draws from
  * the same vertex buffer, so re-ordering the index by material and welding the
  * duplicates is lossless — same triangles, same materials, two draws.
+ *
+ * The weld applies on its own to a mesh with a single material: the attacker's body
+ * is one material but still arrives as 33,558 vertices for 11,186 triangles, and he
+ * is skinned about ten times a frame.
  */
 function optimizeGeometry(geometry) {
   const before = {
@@ -82,8 +86,6 @@ function optimizeGeometry(geometry) {
     groups: geometry.groups.length,
     tris: (geometry.index ? geometry.index.count : geometry.attributes.position.count) / 3,
   };
-  if (geometry.groups.length <= 1) return { geometry, before, after: before };
-
   // Which material each triangle belongs to. Groups are counted in vertices, and
   // are whole triangles, so group.start / 3 is the first triangle either way.
   const triMaterial = new Uint8Array(before.tris);
@@ -91,8 +93,8 @@ function optimizeGeometry(geometry) {
     triMaterial.fill(group.materialIndex, group.start / 3, (group.start + group.count) / 3);
   }
 
-  // The body arrives with no index buffer at all: three vertices per triangle and
-  // no sharing. Weld needs an index to collapse, so hand it the identity first —
+  // These exports carry no index buffer at all: three vertices per triangle and no
+  // sharing. Weld needs an index to collapse, so hand it the identity first —
   // "every vertex is its own" — which is exactly what the weld then de-duplicates.
   if (!geometry.index) {
     const identity = new Uint32Array(geometry.attributes.position.count);
@@ -104,6 +106,12 @@ function optimizeGeometry(geometry) {
   // per-triangle material is still valid after the weld.
   const welded = mergeVertices(geometry, 1e-4);
   const order = [...new Set(geometry.groups.map((g) => g.materialIndex))].sort((a, b) => a - b);
+
+  // One material needs no re-ordering: the weld alone is the whole optimisation.
+  if (order.length <= 1) {
+    const after = { verts: welded.attributes.position.count, groups: welded.groups.length, tris: welded.index.count / 3 };
+    return { geometry: welded, before, after };
+  }
 
   const index = new Uint32Array(welded.index.count);
   const groups = [];
