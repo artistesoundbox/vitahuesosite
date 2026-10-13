@@ -281,6 +281,18 @@ kbd {
 }
 .start-button:hover { filter: brightness(1.08); transform: translateY(-1px); }
 
+/* The way back out of the game: a quiet secondary link, so the deploy button
+   stays the loud one. It points at the portal's index.html two directories up,
+   which is where the published site keeps it beside the game's own folder. */
+.portal-link {
+  display: inline-block; margin-top: 16px;
+  font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--amber); text-decoration: none; opacity: 0.7;
+  border-bottom: 1px solid rgba(242, 201, 76, 0.3); padding-bottom: 2px;
+  transition: opacity 0.15s;
+}
+.portal-link:hover { opacity: 1; }
+
 .loading { width: 320px; margin: 0 auto 12px; }
 .load-text { font-size: 12px; letter-spacing: 0.2em; opacity: 0.8; }
 .fine { font-size: 11px; opacity: 0.5; margin-top: 12px; }
