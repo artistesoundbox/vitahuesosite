@@ -47,9 +47,10 @@
  * disk. A launcher page can open a game that has no guard at all: the portal's
  * SEBLERSKERS page opens a stock export on another host, which loads no pack guard and
  * registers a worker that imports none, while the guarded shell it should open sits one
- * directory away. So every root HTML file in the checkout is fetched as deployed, the
- * games it opens are resolved — an iframe src, a GAME_URL or frame.src assignment, a
- * plain link — and every target that turns out to be a pack build must load
+ * directory away. So every root HTML file in the checkout is fetched as deployed, every
+ * way that page points at another page is resolved — a link or an iframe, a named
+ * constant, a window opened in script, a navigation call, a src set through the DOM —
+ * and every target that turns out to be a pack build must load
  * pack-guard.js; if it registers a worker, that worker must import the guard as well.
  * The launcher page itself is not required to load the guard: the guard belongs to the
  * page the engine runs in. A page that announces no pack is not a game page and the
@@ -127,11 +128,35 @@ function launcherFiles(root) {
   }
 }
 
-/* Every way a page can open something: an assignment in script (GAME_URL = '...',
-   frame.src = ..., location.href = ...) and markup (an iframe, a link). */
+/* Every way a page can open something — written as spellings of "this page points at
+   that page" rather than as the handful of spellings this site happens to use today.
+   A launcher whose mechanism is not on this list is a way into a game that this check
+   cannot see, which is the one failure mode it must not have:
+     - the site's own constant (GAME_URL = '...')
+     - a navigation, by assignment or call: location.href =, window.location =,
+       top/parent/document/self variants, location.assign(), location.replace()
+     - a window: window.open(), self/top.open(), a bare open()
+     - a src/href/action property set on any element, whoever it belongs to:
+       frame.src =, panel.src = — so the receiver is deliberately not named
+     - the same through the DOM API: setAttribute('src', ...)
+     - markup that loads a document in place or navigates: iframe, frame, embed,
+       object, a, area, form
+     - markup that redirects: <meta http-equiv="refresh" content="0; url=...">
+
+   Over-reading is harmless: a target is judged only after it turns out to be a pack
+   build, so an image, a stylesheet, a menu link or a 404 is dropped without a verdict.
+   Under-reading is not harmless, so where the two disagree this list reads wide. */
 const LAUNCH_SOURCES = [
-  /(?:GAME_URL|frame\.src|location\.href|window\.location(?:\.href)?)\s*=\s*['"]([^'"]+)['"]/g,
-  /<(?:iframe|frame|a)\b[^>]*?\b(?:src|href)\s*=\s*["']([^"']+)["']/gi
+  /(?:GAME_URL|GAME_PATH|GAME_SRC|GAME_HREF)\s*=\s*['"]([^'"]+)['"]/g,
+  /\b(?:window|document|top|parent|self)\s*\.\s*location\s*(?:\.\s*(?:href|assign|replace)\s*)?(?:\(|=)\s*['"]([^'"]+)['"]/g,
+  /\blocation\s*(?:\.\s*(?:href|assign|replace)\s*)?(?:\(|=)\s*['"]([^'"]+)['"]/g,
+  /\b(?:window|self|top|parent)\s*\.\s*open\s*\(\s*['"]([^'"]+)['"]/g,
+  /(?<![.\w$])open\s*\(\s*['"]([^'"]+)['"]/g,
+  /\.\s*(?:src|href|action)\s*=\s*['"]([^'"]+)['"]/g,
+  /setAttribute\s*\(\s*['"](?:src|href|action)['"]\s*,\s*['"]([^'"]+)['"]/g,
+  /<(?:iframe|frame|embed|object|a|area|form)\b[^>]*?\b(?:src|href|data|action)\s*=\s*["']([^"']+)["']/gi,
+  /<meta\b[^>]*?http-equiv\s*=\s*["']?refresh["']?[^>]*?\burl\s*=\s*['"]?([^"';>\s]+)/gi,
+  /<meta\b[^>]*?\burl\s*=\s*['"]?([^"';>\s]+)[^>]*?http-equiv\s*=\s*["']?refresh["']?/gi
 ];
 
 /* Addresses of pages, resolved against the launcher they came from and stripped of
