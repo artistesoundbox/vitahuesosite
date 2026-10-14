@@ -57,7 +57,8 @@
  * could not be read does not look the same in the log as a page with nothing to read (see
  * UNREAD LAUNCH SITES). A target that resolves to a page under this site's own base and is
  * not there is named too (see TARGETS THE SITE DOES NOT SERVE): a launcher that leads nowhere
- * is the third thing that reads exactly like a launcher with nothing wrong with it. Every
+ * reads exactly like a launcher with nothing wrong with it. So does a launcher page the
+ * checkout has and the site does not serve (see LAUNCHERS THE SITE DOES NOT SERVE). Every
  * target that turns out to be a pack build must load
  * pack-guard.js; if it registers a worker, that worker must import the guard as well.
  * The launcher page itself is not required to load the guard: the guard belongs to the
@@ -298,6 +299,30 @@ function unservedWhy(target) {
   if (!target.status) return 'no answer at all';
   return 'answered HTTP ' + target.status;
 }
+
+/* ---------------------------------------------------------------------------
+ * LAUNCHERS THE SITE DOES NOT SERVE
+ *
+ * The entry stage reads its launcher list off disk — a Pages site cannot be listed over HTTP,
+ * so the checkout is the only place that set of pages can come from — and then fetches each
+ * one as deployed. A page that is in the checkout and not on the site used to be dropped right
+ * there, without a word: the fetch was not a build, so nothing was judged, and the report went
+ * on to say that every launcher it looked at was fine. It is the silence of a dead target one
+ * level up — there the way in exists and leads nowhere, here the way in does not exist at all.
+ *
+ * Named, not judged, for the strongest version of the reason the other two notes give: this
+ * side of the deploy cannot tell a page that was never published from one that is newer than
+ * the deployment it is being asked about. The list comes from the working tree, so a launcher
+ * page created a minute ago and not yet committed lands here too, and a run pointed at an
+ * older deployment or a preview puts every page added since then in this list. It is also the
+ * same race the dead target has on the other side of the deploy: a page added by the very
+ * commit being published can answer 404 for a moment while its CDN catches up. A failure would
+ * have to be sure of something this check cannot see.
+ *
+ * What it may not do is stay quiet: "every launcher in the checkout is fine" and "every
+ * launcher in the checkout that the site serves is fine" are the same few lines of log, and an
+ * unpublished page is what turns the first into the second.
+ */
 
 /* The string literals in an expression, in order, of any quote kind — what a site's shape can
    be judged from even when the expression itself cannot be resolved. */
@@ -760,12 +785,21 @@ async function checkEntryPoints(base, launchers) {
   const results = [];
   const unread = [];
   const dead = [];
+  const absent = [];
   const cache = {};
   let published = 0;
   for (const file of launchers) {
     const pageUrl = base + '/' + file;
     const page = await probe(pageUrl, 0, { range: false, maxBytes: MAX_PAGE_BYTES });
-    if (page.status !== 200) continue;   // not on the site, so not a way in
+    /* Not on the site, so not a way in — and named, because a launcher page the checkout has
+       and the deployment does not is a way in that was never published; see LAUNCHERS THE SITE
+       DOES NOT SERVE. Nothing is read out of its bytes even though they are sitting on disk:
+       whether this page is served is the whole question, and a target judged out of a page
+       nobody can open would be a verdict on a way in that does not exist. */
+    if (page.status !== 200) {
+      absent.push({ file: file, status: page.status, error: page.error });
+      continue;
+    }
     published++;
     const found = launchTargets(page.head.toString('utf8'), pageUrl);
     if (found.unread.length) unread.push({ file: file, sites: found.unread });
@@ -800,17 +834,19 @@ async function checkEntryPoints(base, launchers) {
       kind: 'entry', ok: false,
       asset: { path: 'every launcher in the checkout', what: 'the ways into the pack games' },
       why: 'none of the ' + launchers.length + ' launcher pages opened anything announcing a ' +
-        'pack (' + published + ' of them are on the site), so this check proved nothing' +
+        'pack (' + published + ' of them are on the site' +
+        (absent.length ? ', ' + absent.length + ' in the checkout and not served' : '') +
+        '), so this check proved nothing' +
         (read
           ? ' — and ' + read + ' launch ' + (read === 1 ? 'site' : 'sites') + ' on ' +
             unread.length + ' of those pages could not be read at all'
           : '')
     });
   }
-  return { entries: results, unread: unread, dead: dead };
+  return { entries: results, unread: unread, dead: dead, absent: absent };
 }
 
-function reportEntries(entries, unread, dead) {
+function reportEntries(entries, unread, dead, absent) {
   console.log('  entry points — every launcher\u2019s game target must carry the pack guard');
   entries.forEach(function (r) {
     console.log('    ' + (r.ok ? 'PASS  ' : 'FAIL  ') + r.asset.path);
@@ -860,6 +896,19 @@ function reportEntries(entries, unread, dead) {
     console.log('    ' + dead.length + ' launcher' + (dead.length === 1 ? '' : 's') + ' ' +
       (dead.length === 1 ? 'points' : 'point') +
       ' at a page this site does not serve — named above, no verdict either way');
+  }
+
+  /* One level up from the dead target above: the launcher page itself, in the checkout and not
+     on the site. Same weight as the other two notes and for the same reason — see LAUNCHERS
+     THE SITE DOES NOT SERVE. This one is one line per page, because what came back from the
+     fetch is the whole of what can be said about it. */
+  if (absent.length) {
+    absent.forEach(function (a) {
+      console.log('    NOTE  ' + a.file + ' — in the checkout, ' + unservedWhy(a));
+    });
+    console.log('    ' + absent.length + ' launcher ' +
+      (absent.length === 1 ? 'page is' : 'pages are') +
+      ' in the checkout and not on the site — named above, no verdict either way');
   }
   return failed;
 }
@@ -1040,19 +1089,26 @@ async function main() {
     const failed = results.concat(entryReport.entries).filter(function (r) { return !r.ok; });
     if (!failed.length || Date.now() >= deadline) {
       const bad = report(opts.base, results);
-      const unguarded = reportEntries(entryReport.entries, entryReport.unread, entryReport.dead);
+      const unguarded = reportEntries(entryReport.entries, entryReport.unread, entryReport.dead,
+        entryReport.absent);
       console.log('  ' + await probePipeline(opts.base));
       const n = entryReport.unread.length;
       const gone = entryReport.dead.length;
-      if (!bad.length && !unguarded.length && (n || gone)) {
-        /* One sentence for whichever of the two silences apply, then a paragraph each: both
-           are notes, so a clean run that has either must say what the notes mean for it. */
+      const missing = entryReport.absent.length;
+      if (!bad.length && !unguarded.length && (n || gone || missing)) {
+        /* One sentence for whichever of the silences apply, then a paragraph each: these are
+           notes, so a clean run that has any of them must say what they mean for it. */
         const said = [];
         if (n) said.push(n + ' launcher ' + (n === 1 ? 'page carries' : 'pages carry') +
           ' a launch site this check could not read');
         if (gone) said.push(gone + ' launcher' + (gone === 1 ? '' : 's') +
           ' ' + (gone === 1 ? 'points' : 'point') + ' at a page this site does not serve');
-        console.log('\nNothing above is a failure — but ' + said.join(', and ') + '.\n');
+        if (missing) said.push(missing + ' launcher ' + (missing === 1 ? 'page is' : 'pages are') +
+          ' in the checkout and not on the site');
+        const list = said.length === 1
+          ? said[0]
+          : said.slice(0, -1).join(', ') + ', and ' + said[said.length - 1];
+        console.log('\nNothing above is a failure — but ' + list + '.\n');
         if (n) {
           console.log('An unreadable launch site has no verdict on where ' +
             (n === 1 ? 'it leads' : 'they lead') + ': if one of them names a pack build,');
@@ -1063,6 +1119,12 @@ async function main() {
           console.log('follows that launcher gets the host\u2019s 404 page. Either the page was');
           console.log('never published, or the launcher names a path that is not in the checkout,');
           console.log('or another deployment was supposed to publish it.');
+        }
+        if (missing) {
+          console.log('A launcher page in the checkout that the site does not serve is a way in');
+          console.log('that was never published: that URL gets the host\u2019s 404 page, so');
+          console.log('nothing it opens can be reached at all. Either the page is newer than this');
+          console.log('deployment, or nothing published it.');
         }
         return;
       }
@@ -1088,6 +1150,11 @@ async function main() {
           console.log('A launcher whose target this site does not serve leads nowhere, whatever');
           console.log('else is wrong here: that page has to exist in this deployment before the');
           console.log('guard on it can matter.');
+        }
+        if (entryReport.absent.length) {
+          console.log('A launcher page the site does not serve is not a way in yet: that URL gets');
+          console.log('the host\u2019s 404 page, so whatever that launcher opens cannot be reached');
+          console.log('through it. Publishing the page comes first.');
         }
         process.exitCode = 1;
       }

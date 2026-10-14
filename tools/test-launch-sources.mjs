@@ -44,6 +44,18 @@
  * That second case is two-sided on purpose: the fixture counts the probes its other origin
  * receives, so "left alone" cannot pass by the target never having been read at all.
  *
+ * The fourth way a launcher can go unmentioned is one level up from that: not its target, the
+ * launcher page itself — in the checkout and not on the site, which the check used to skip
+ * without a word. That case is written into the tree like every other one and withheld by the
+ * server that answers for the site, since which of the two places a page is in is the whole of
+ * the difference the case is about, and a tree alone cannot hold it. It must be named with
+ * what came back; it must be given no verdict at all (its bytes are on disk, and the page it
+ * opens IS served, so a check that judged it off disk is caught inventing a way in for a page
+ * nobody can open); and no page the site does serve may be named that way. There is no counter
+ * to consult here, unlike the off-site case, because both ways of getting the fixture wrong —
+ * the page never written, the server not withholding it — fail the assertion that the note has
+ * to be there.
+ *
  * The fixture is rebuilt from scratch on every run, so it cannot drift away from this file.
  * The tool under test is copied into the fixture rather than re-implemented: the bytes that
  * run are the bytes that ship.
@@ -52,11 +64,10 @@
  * property read (`f.src`), a function defined in another file, a method call, a URL built
  * from `location` — is left alone rather than guessed at, and named in the report only when
  * it sits at a site that is going somewhere or builds a path out of literals (the two cases
- * above); a launcher page that is in the checkout but not on the site, which the check skips
- * without a word (the same silence in the other direction, and the next one to fix); chains
- * through a non-root
- * intermediate page; and launchers published but absent from the checkout, which this side of
- * the deploy cannot list at all.
+ * above); chains through a non-root intermediate page; and launchers published but absent from
+ * the checkout, which this side of the deploy cannot list at all — the mirror of the withheld
+ * case above, and the one silence that stays: a run can only ask about the pages it was given,
+ * so a launcher nobody has in the checkout is a launcher nobody here can name.
  *
  * WHAT IT PINS: mechanisms, not patterns. Several spellings are matched by more than one
  * pattern, and since the computed-target stage reads the same literal argument sites as the
@@ -66,8 +77,8 @@
  * orders), emptying LAUNCH_EXPRESSIONS alone fails eighteen checks — the six
  * computed-mechanism cases one by one, the seven that pin the trace, the four that count the
  * entry set a list that is not there shrinks, and this file's own closing sentence for a clean
- * run, which joins both kinds of note and so needs the unreadable one to be there — and
- * emptying both lists fails forty-two.
+ * run, which is asserted as the single list all three kinds of note are joined into and so
+ * needs every one of them to be there — and emptying both lists fails forty-four.
  * That is the intended shape: simplifying either list stays free, and a mechanism that stops
  * being seen fails here.
  *
@@ -325,7 +336,28 @@ mp4.src = f.src;
       + 'and naming those would bury the dead links that are this site\u2019s own',
     body: () => '<a href="' + ELSEWHERE + '/missing/index.html">Play</a>'
   },
+  /* ---- the fourth silence, a level up from the third: not the launcher's target, the
+     launcher itself. A page in the checkout that the site does not serve has no bytes to read,
+     so nothing about it can be judged — and that is exactly why it has to be named, because
+     "every launcher in the checkout is fine" and "every launcher the site serves is fine" are
+     the same few lines of log otherwise. `absent` is what the fixture does to this page: it is
+     written like every other case (it IS in the checkout) and withheld by the server that
+     answers for the site (it is NOT on the site), which is the whole difference this case is
+     about. ---- */
+  {
+    file: 'undelivered.html', mechanism: 'a launcher page the site does not serve',
+    broken: null, verdict: null, absent: true,
+    shows: 'a page that is in the checkout and 404 on the site, which the check used to skip '
+      + 'without a word \u2014 and it opens a page that IS served, so a check that judged it out '
+      + 'of the bytes on disk would be caught giving a verdict to a page nobody can open',
+    body: () => '<a href="' + BUILD_OK + '">Play</a>'
+  },
 ];
+
+/* The case above is the one page the fixture writes and then refuses to serve: the difference
+   between "in the checkout" and "on the site" is made by the server, not by the tree, so the
+   page's bytes are sitting in the fixture exactly as a checkout would have them. */
+const WITHHELD = CASES.filter((c) => c.absent).map((c) => c.file);
 
 const PACK_CONFIG = 'const GODOT_CONFIG = {"fileSizes":{"index.pck":33554432}};';
 const padding = (n, ch) => '//'.padEnd(n, ch) + '\n';
@@ -425,9 +457,14 @@ const TYPES = {
   '.js': 'text/javascript; charset=utf-8', '.gitignore': 'text/plain'
 };
 
-function serveTree(root) {
+function serveTree(root, withheld) {
+  const gone = new Set((withheld || []).map((f) => '/' + f));
   const server = http.createServer((req, res) => {
     const p = decodeURIComponent(new URL(req.url, 'http://placeholder').pathname);
+    if (gone.has(p)) {
+      res.writeHead(404, { 'content-type': 'text/plain' });
+      return res.end('not here');
+    }
     const asset = ASSETS[p];
     if (asset) {
       const head = Buffer.alloc(256);
@@ -577,9 +614,9 @@ try {
       Buffer.from(toolSource)),
     'the fixture copy differs from tools/check-live-assets.js');
 
-  const broken = await serveTree(brokenRoot);
-  const fixed = await serveTree(fixedRoot);
-  const mutated = mutatedRoot ? await serveTree(mutatedRoot) : null;
+  const broken = await serveTree(brokenRoot, WITHHELD);
+  const fixed = await serveTree(fixedRoot, WITHHELD);
+  const mutated = mutatedRoot ? await serveTree(mutatedRoot, WITHHELD) : null;
 
   try {
     /* ---------- every mechanism, pointed at a build with no guard ---------- */
@@ -662,7 +699,7 @@ try {
        could know is never guessed at and never given a verdict — and it is no longer invisible
        either, so the assertions are two-sided: no entry and no invented target, and, for the
        sites that are going somewhere, a NOTE naming the launcher and the expression. */
-    const unjudged = CASES.filter((c) => !c.broken && !c.dead).map((c) => c.file);
+    const unjudged = CASES.filter((c) => !c.broken && !c.dead && !c.absent).map((c) => c.file);
     const traced = CASES.filter((c) => !c.broken && c.trace === true).map((c) => c.file);
     const quiet = CASES.filter((c) => !c.broken && c.trace === false).map((c) => c.file);
     const deadNamed = CASES.filter((c) => c.dead === 'named').map((c) => c.file);
@@ -773,10 +810,69 @@ try {
 
     check('a clean run closing says what the dead target means for it, not only the unreadable site',
       fixedRun.out.includes('Nothing above is a failure') &&
-        fixedRun.out.includes('and 1 launcher points at a page this site does not serve.') &&
+        fixedRun.out.includes('1 launcher points at a page this site does not serve, and 1 launcher ' +
+          'page is in the checkout and not on the site.') &&
         fixedRun.out.includes('follows that launcher gets the host\u2019s 404 page'),
       (fixedRun.out.split('\n').find((l) => /Nothing above is a failure/.test(l)) || 'no closing line')
         .trim());
+
+    /* The fourth silence, a level up from the third: not the launcher's target, the launcher
+       page itself. There are no bytes to read — the fetch of that page is what came back — so
+       no verdict can carry it, and the note is the only thing between an unpublished launcher
+       and a report that says every launcher it looked at is fine. Two-sided like the others:
+       named for the page the fixture withholds, silent about every page it serves. The serving
+       side needs no counter here, because both ways of getting the fixture wrong — the page
+       never written, or the server not withholding it — turn the named assertion below red. */
+    const absentNamed = CASES.filter((c) => c.absent).map((c) => c.file);
+    const absentServed = CASES.filter((c) => !c.absent).map((c) => c.file);
+    const absentLine = (f) => '    NOTE  ' + f + ' \u2014 in the checkout, not on the site (404)';
+
+    check('a launcher page the site does not serve is named with what came back — ' +
+      absentNamed.join(', '),
+      absentNamed.length > 0 && absentNamed.every((f) =>
+        brokenRun.out.includes(absentLine(f)) && fixedRun.out.includes(absentLine(f))),
+      absentNamed.filter((f) =>
+        !brokenRun.out.includes(absentLine(f)) || !fixedRun.out.includes(absentLine(f)))
+        .map((f) => f + ' NOT named')
+        .join(', ') || 'no case in the fixture is withheld from the site');
+
+    check('and it is never given a verdict, so nothing is read out of bytes nobody can fetch',
+      absentNamed.length > 0 && absentNamed.every((f) =>
+        !brokenRun.out.includes(f + ' ->') && !fixedRun.out.includes(f + ' ->')),
+      'a way in was invented for: ' + absentNamed.filter((f) =>
+        brokenRun.out.includes(f + ' ->') || fixedRun.out.includes(f + ' ->')).join(', '));
+
+    check('and the ' + absentServed.length + ' launcher pages the site does serve are not named '
+      + 'as missing',
+      absentServed.every((f) =>
+        !brokenRun.out.includes('NOTE  ' + f + ' \u2014 in the checkout') &&
+        !fixedRun.out.includes('NOTE  ' + f + ' \u2014 in the checkout')),
+      'named anyway: ' + absentServed.filter((f) =>
+        brokenRun.out.includes('NOTE  ' + f + ' \u2014 in the checkout') ||
+        fixedRun.out.includes('NOTE  ' + f + ' \u2014 in the checkout')).join(', '));
+
+    check('and it is counted in pages, and said to be no verdict either way',
+      brokenRun.out.includes('1 launcher page is in the checkout and not on the site — ' +
+        'named above, no verdict either way') &&
+        fixedRun.out.includes('1 launcher page is in the checkout and not on the site — ' +
+          'named above, no verdict either way'),
+      (brokenRun.out.split('\n').find((l) => /not on the site — named above/.test(l)) ||
+        'no such line').trim());
+
+    check('and the closing sentence is one list of all three notes, in the order they are met',
+      fixedRun.out.includes('Nothing above is a failure — but 2 launcher pages carry a launch ' +
+        'site this check could not read, 1 launcher points at a page this site does not serve, ' +
+        'and 1 launcher page is in the checkout and not on the site.'),
+      (fixedRun.out.split('\n').find((l) => /Nothing above is a failure/.test(l)) || 'no closing line')
+        .trim());
+
+    check('a clean run closing says what an undelivered launcher means for it',
+      fixedRun.code === 0 && fixedRun.out.includes('Nothing above is a failure') &&
+        fixedRun.out.includes('and 1 launcher page is in the checkout and not on the site.') &&
+        fixedRun.out.includes('that was never published'),
+      'exit ' + fixedRun.code + ': ' +
+        (fixedRun.out.split('\n').find((l) => /that was never published/.test(l)) ||
+          'the closing note is missing from the clean run').trim());
 
     /* ---------- both spelling lists narrowed, so the tool goes blind ---------- */
     if (mutated) {
