@@ -27,8 +27,14 @@
  * fixture cases can be blamed.
  *
  * A case whose target only the browser could know — a URL computed from `location`, say —
- * asserts the opposite: no entry at all, in either tree. Guessing there would fail a deploy
- * over a page the launcher never opens, so silence is the correct answer, and it is checked.
+ * asserts the opposite: no entry at all, in either tree, and no target invented for it.
+ * Guessing there would fail a deploy over a page the launcher never opens, so no verdict is
+ * the correct answer. It is no longer invisible, though: the tool names such a site as one it
+ * could not read — a NOTE, never a PASS or a FAIL, and never a change to the exit code —
+ * because "no under-reading found" and "no under-reading looked for" otherwise read alike in
+ * a log. Two cases pin that trace from both sides: one unresolved navigation that must be
+ * named, and one unresolved property site holding no path that must not be, so the trace
+ * stays short enough to be worth reading.
  *
  * The fixture is rebuilt from scratch on every run, so it cannot drift away from this file.
  * The tool under test is copied into the fixture rather than re-implemented: the bytes that
@@ -36,7 +42,9 @@
  *
  * NOT COVERED, deliberately: a target computed from something this side cannot know — a
  * property read (`f.src`), a function defined in another file, a method call, a URL built
- * from `location` — is left alone rather than guessed at; chains through a non-root
+ * from `location` — is left alone rather than guessed at, and named in the report only when
+ * it sits at a site that is going somewhere or builds a path out of literals (the two cases
+ * above); chains through a non-root
  * intermediate page; and launchers published but absent from the checkout, which this side of
  * the deploy cannot list at all.
  *
@@ -45,10 +53,11 @@
  * quoted-literal stage, most single patterns are redundant on their own now. Verified by a
  * sweep, not assumed: dropping each of the ten LAUNCH_SOURCES patterns in turn fails this
  * test for only three of them (the markup pattern, and the two meta-refresh attribute
- * orders), emptying LAUNCH_EXPRESSIONS alone fails ten checks — naming each of the six
- * computed-mechanism cases one by one — and emptying both lists fails thirty. That is the
- * intended shape: simplifying either list stays free, and a mechanism that stops being seen
- * fails here.
+ * orders), emptying LAUNCH_EXPRESSIONS alone fails seventeen checks — naming each of the six
+ * computed-mechanism cases one by one, plus the seven that pin the trace, since a list that
+ * is not there cannot name what it could not read — and emptying both lists fails thirty-seven.
+ * That is the intended shape: simplifying either list stays free, and a mechanism that stops
+ * being seen fails here.
  *
  * exits 1 if any check fails.
  */
@@ -77,7 +86,12 @@ const NOT_A_BUILD = 'shell-nopack/index.html';        // announces no pack: neve
    in the broken fixture and the verdict the check must reach there; `verdict` FAIL means
    that build carries no guard, so the launcher is the thing to change. Every case also
    exists to keep its mechanism on the list: drop the pattern that finds it and the entry
-   disappears, which the exact-set assertion below turns into a failure. */
+   disappears, which the exact-set assertion below turns into a failure.
+
+   A case with `broken: null` opens nothing this check can name, and `trace` says which half
+   of the unread behaviour it pins: true when the site must be named in the report as one the
+   check could not read, false when even that must stay quiet, so the trace cannot grow into
+   noise that hides the one line worth reading. */
 const CASES = [
   {
     file: 'index.html', mechanism: '<a href>', broken: BUILD_OK, verdict: 'PASS',
@@ -247,12 +261,35 @@ frame.src = pick;
   },
   {
     file: 'computed-unknown.html', mechanism: 'a target only the browser can know',
-    broken: null, verdict: null,
-    shows: 'the racegame.html shape: a URL computed from location, which stays invisible rather than guessed',
+    broken: null, verdict: null, trace: true,
+    shows: 'the racegame.html shape: a URL computed from location, which is named as unread rather than guessed',
     body: () => `<script>
 function modeHref() { return location.pathname + (DAILY ? '?daily' : ''); }
 location.href = modeHref();
 </script>`
+  },
+  {
+    file: 'unread-quiet.html', mechanism: 'an unresolved src that holds no path',
+    broken: null, verdict: null, trace: false,
+    shows: 'the other side of the trace: a video src joined onto a literal with a scheme, and a '
+      + 'property read with no path in it \u2014 neither is judged, and neither is named',
+    body: () => `<script>
+var player = document.getElementById('p');
+var mp4 = document.getElementById('m');
+player.src = 'https://www.youtube-nocookie.com/embed/' + v.id;
+mp4.src = f.src;
+</script>`
+  },
+  {
+    file: 'unread-many.html', mechanism: 'more unreadable sites than one page may name',
+    broken: null, verdict: null, trace: true,
+    shows: 'the cap: nine unreadable navigations are named up to the limit and the rest are '
+      + 'counted \u2014 a trace that silently stopped at eight would be the very failure it exists to fix',
+    body: () => {
+      const lines = [];
+      for (let i = 1; i <= 9; i++) lines.push('location.href = href' + i + '();');
+      return '<script>\n' + lines.join('\n') + '\n</script>';
+    }
   },
 ];
 
@@ -556,16 +593,73 @@ try {
       fixedEntries.slice().sort().join('|') === expectedFixed.join('|'),
       '[' + fixedEntries.slice().sort().join(', ') + ']');
 
-    /* The negative control: a target that only the browser could know opens nothing as far
-       as this check is concerned, in either tree, and must never be reported on the strength
-       of a guess. */
-    const silent = CASES.filter((c) => !c.broken).map((c) => c.file);
-    check('a target that cannot be known is left alone, not guessed — ' + silent.join(', '),
-      silent.length > 0 &&
-        silent.every((f) => !brokenRun.out.includes(f)) &&
-        silent.every((f) => !fixedRun.out.includes(f)),
-      'reported: ' + silent.filter((f) => brokenRun.out.includes(f) ||
-        fixedRun.out.includes(f)).join(', '));
+    /* The negative control, in the shape the trace gives it. A target that only the browser
+       could know is never guessed at and never given a verdict — and it is no longer invisible
+       either, so the assertions are two-sided: no entry and no invented target, and, for the
+       sites that are going somewhere, a NOTE naming the launcher and the expression. */
+    const unjudged = CASES.filter((c) => !c.broken).map((c) => c.file);
+    const traced = CASES.filter((c) => !c.broken && c.trace).map((c) => c.file);
+    const quiet = CASES.filter((c) => !c.broken && !c.trace).map((c) => c.file);
+    const NOTE = (f) => '    NOTE  ' + f + ' \u2014 ';
+
+    check('a target that cannot be known is never given a verdict, in either tree — ' +
+      unjudged.join(', '),
+      unjudged.length > 0 && unjudged.every((f) =>
+        !brokenRun.out.includes(f + ' ->') && !fixedRun.out.includes(f + ' ->')),
+      'a target was invented for: ' + unjudged.filter((f) =>
+        brokenRun.out.includes(f + ' ->') || fixedRun.out.includes(f + ' ->')).join(', '));
+
+    check('an unreadable launch site is named rather than passed over — ' + traced.join(', '),
+      traced.length > 0 && traced.every((f) =>
+        brokenRun.out.includes(NOTE(f)) && fixedRun.out.includes(NOTE(f))),
+      'no NOTE for: ' + traced.filter((f) =>
+        !brokenRun.out.includes(NOTE(f)) || !fixedRun.out.includes(NOTE(f))).join(', '));
+
+    check('and the NOTE names the expression, so the line can be acted on',
+      brokenRun.out.includes('a navigation: modeHref()') &&
+        fixedRun.out.includes('a navigation: modeHref()'),
+      'the expression is not in the report');
+
+    check('the trace says how many sites each page has — 1 on one page, 9 on the other',
+      brokenRun.out.includes('NOTE  computed-unknown.html — 1 launch site this check cannot read') &&
+        fixedRun.out.includes('NOTE  computed-unknown.html — 1 launch site this check cannot read') &&
+        brokenRun.out.includes('NOTE  unread-many.html — 9 launch sites this check cannot read') &&
+        fixedRun.out.includes('NOTE  unread-many.html — 9 launch sites this check cannot read'),
+      [brokenRun, fixedRun].map((r) =>
+        (r.out.split('\n').find((l) => /NOTE .*unread-many/.test(l)) || 'no NOTE for unread-many.html').trim())
+        .join(' / '));
+
+    const namedNine = (out) =>
+      out.split('\n').filter((l) => /^ {12}a navigation: href\d+\(\)$/.test(l)).length;
+    check('and the cap names ' + 8 + ' of those 9, counting the rest rather than dropping them',
+      namedNine(brokenRun.out) === 8 && namedNine(fixedRun.out) === 8 &&
+        brokenRun.out.includes('and 1 more like them') && fixedRun.out.includes('and 1 more like them'),
+      namedNine(brokenRun.out) + ' named, ' +
+        (brokenRun.out.includes('and 1 more like them') ? 'the ninth counted' : 'the ninth MISSING'));
+
+    check('and the trace adds up to the pages it names, not to the sites it lists',
+      brokenRun.out.includes('2 launcher pages carry a launch site this check cannot read') &&
+        fixedRun.out.includes('2 launcher pages carry a launch site this check cannot read'),
+      [brokenRun, fixedRun].map((r) =>
+        (r.out.split('\n').find((l) => /carry a launch site/.test(l)) || 'no trace summary').trim())
+        .join(' / '));
+
+    check('a passing run still says what it could not read, and the NOTE is not what fails a run',
+      fixedRun.code === 0 && traced.length > 0 &&
+        /carry a launch site this check cannot read/.test(fixedRun.out),
+      'exit ' + fixedRun.code + ': ' +
+        (fixedRun.out.split('\n').find((l) => /carry a launch site/.test(l)) || 'no trace').trim());
+
+    check('and that passing run closes by saying what the trace means for it',
+      fixedRun.out.includes('Nothing above is a failure') &&
+        fixedRun.out.includes('that way in is unguarded and this report could not have said so.'),
+      'the closing note is missing from the clean run with an unreadable site in it');
+
+    check('a property site with no path in it is not named even as unreadable — ' + quiet.join(', '),
+      quiet.length > 0 && quiet.every((f) =>
+        !brokenRun.out.includes(f) && !fixedRun.out.includes(f)),
+      'named anyway: ' + quiet.filter((f) =>
+        brokenRun.out.includes(f) || fixedRun.out.includes(f)).join(', '));
 
     /* ---------- both spelling lists narrowed, so the tool goes blind ---------- */
     if (mutated) {
@@ -582,6 +676,12 @@ try {
       checkHarness('so the entry-set assertion is what catches a narrowed list, not the exit code',
         mutatedEntries.length !== CASES.length,
         'the narrowed run somehow reported all ' + CASES.length + ' ways in');
+      checkHarness('the trace needs a pattern to fire at all: the narrowed tool prints the ' +
+        'resolved-everything line while reporting one launcher',
+        mutatedRun.out.includes('every launch site in the launcher pages resolved to a target') &&
+          mutatedEntries.length === 1,
+        '[' + mutatedEntries.join(', ') + '] with ' +
+          (mutatedRun.out.split('\n').find((l) => /launch site/.test(l)) || 'no trace line').trim());
     }
   } finally {
     broken.close();

@@ -52,8 +52,10 @@
  * constant, a window opened in script, a navigation call, a src set through the DOM —
  * and a target does not have to be written down either: a constant, a join of parts, a
  * template literal, a function's parameter, or a value a function returns are resolved
- * too (see TARGETS A PAGE COMPUTES), and only a target that cannot be known from the
- * page's own text is left alone. Every target that turns out to be a pack build must load
+ * too (see TARGETS A PAGE COMPUTES), and a target that cannot be known from the page's own
+ * text is left alone — but named, as an unresolved launch site, so that a page whose way in
+ * could not be read does not look the same in the log as a page with nothing to read (see
+ * UNREAD LAUNCH SITES). Every target that turns out to be a pack build must load
  * pack-guard.js; if it registers a worker, that worker must import the guard as well.
  * The launcher page itself is not required to load the guard: the guard belongs to the
  * page the engine runs in. A page that announces no pack is not a game page and the
@@ -117,7 +119,10 @@ const MAX_SCRIPT_BYTES = 262144;
  * Two lists decide what counts as a way in: LAUNCH_SOURCES, below, for targets the page
  * writes down, and LAUNCH_EXPRESSIONS for targets it computes. Both feed the same filter
  * and the same verdict, so a target written down and the same target computed are one way
- * in and produce one entry.
+ * in and produce one entry. A third thing comes out of the same pass: the sites whose
+ * expression could not be read at all, reported as NOTES rather than as verdicts (see
+ * UNREAD LAUNCH SITES), because a way in nobody can read is a fact about this check that its
+ * reader needs, not a target to judge.
  */
 const GUARD_FILE = 'pack-guard.js';
 const GUARD_IMPORT = 'importScripts';
@@ -183,13 +188,15 @@ const LAUNCH_SOURCES = [
  *                               the call sites pass, and its value is whatever its return
  *                               expressions come to)
  *
- * EVERYTHING ELSE IS UNKNOWN, and an unknown expression yields no target at all. That
- * asymmetry is the point: an unresolved expression costs a way in this check cannot see,
- * while a guessed one costs a deploy failed over a page the launcher never opens. So
+ * EVERYTHING ELSE IS UNKNOWN, and an unknown expression yields no target at all — it is
+ * named instead, as a launch site this check could not read (see UNREAD LAUNCH SITES), so an
+ * expression too hard to follow becomes a line in the report rather than a hole nobody can
+ * see. That asymmetry is the point: an unresolved expression costs a way in this check cannot
+ * see, while a guessed one costs a deploy failed over a page the launcher never opens. So
  * nothing here evaluates a property read, a call to a function defined in another file, a
  * method, arithmetic, or a URL built from location — `modeHref(!DAILY_ON)` in racegame.html
- * returns `location.pathname + q` and stays invisible, which is right: that page reloads
- * itself and opens no build.
+ * returns `location.pathname + q`, and so it is named as unresolved and given no verdict,
+ * which is right: that page reloads itself and opens no build.
  *
  * Parameters are bound per function from that function's call sites in the same page, so
  * `function play(u) { open(u) } play('/game/index.html')` resolves, while a site inside a
@@ -197,14 +204,24 @@ const LAUNCH_SOURCES = [
  * branches carries both values; a name with more branches than MAX_VALUES_PER_NAME keeps
  * the first ones, which is the only place this reader stops early.
  */
+/* `opening` is not about the verdicts — a verdict only ever comes from a target that was
+   resolved — it is about which unresolved sites are worth naming, since a navigation is
+   going somewhere by definition and an element's src usually is not. */
 const LAUNCH_EXPRESSIONS = [
-  /(?:GAME_URL|GAME_PATH|GAME_SRC|GAME_HREF)\s*=\s*/g,
-  /\b(?:window|document|top|parent|self)\s*\.\s*location\s*(?:\.\s*(?:href|assign|replace)\s*)?(?:\(|=)\s*/g,
-  /\blocation\s*(?:\.\s*(?:href|assign|replace)\s*)?(?:\(|=)\s*/g,
-  /\b(?:window|self|top|parent)\s*\.\s*open\s*\(\s*/g,
-  /(?<![.\w$])open\s*\(\s*/g,
-  /\.\s*(?:src|href|action)\s*=\s*/g,
-  /setAttribute\s*\(\s*['"](?:src|href|action)['"]\s*,\s*/g
+  { opening: true, what: 'a GAME_URL-style constant',
+    re: /(?:GAME_URL|GAME_PATH|GAME_SRC|GAME_HREF)\s*=\s*/g },
+  { opening: true, what: 'a navigation',
+    re: /\b(?:window|document|top|parent|self)\s*\.\s*location\s*(?:\.\s*(?:href|assign|replace)\s*)?(?:\(|=)\s*/g },
+  { opening: true, what: 'a navigation',
+    re: /\blocation\s*(?:\.\s*(?:href|assign|replace)\s*)?(?:\(|=)\s*/g },
+  { opening: true, what: 'a window opened in script',
+    re: /\b(?:window|self|top|parent)\s*\.\s*open\s*\(\s*/g },
+  { opening: true, what: 'a window opened in script',
+    re: /(?<![.\w$])open\s*\(\s*/g },
+  { opening: false, what: "an element's src/href/action",
+    re: /\.\s*(?:src|href|action)\s*=\s*/g },
+  { opening: false, what: 'a src set through the DOM',
+    re: /setAttribute\s*\(\s*['"](?:src|href|action)['"]\s*,\s*/g }
 ];
 
 const MAX_VALUES_PER_NAME = 8;   // branches one name may carry before the rest are dropped
@@ -212,6 +229,72 @@ const MAX_JOIN = 24;             // combinations one join may produce before the
 const RESOLVE_PASSES = 4;        // passes over the assignments, so a chain of names resolves
 const MAX_EXPR = 2048;           // longer than any target a launcher writes
 const MAX_CALL_DEPTH = 3;        // fn() calling fn() calling fn() is as far as this reads
+
+/* ---------------------------------------------------------------------------
+ * UNREAD LAUNCH SITES
+ *
+ * An expression this reader cannot resolve is not an error — it is a way in this check cannot
+ * see — and saying nothing about it is the one thing the entry report must not do, because
+ * "nothing to report" and "nothing I could read" are the same few lines of log. A launcher
+ * that computes its way into a game the reader cannot follow would otherwise be indistinguish-
+ * able from one with nothing to look at.
+ *
+ * So an unresolved site is named, but only when naming it is worth a person's attention:
+ *
+ *   - a navigation, an open(), or a GAME_URL-style constant is going somewhere by definition,
+ *     so an unread one is under-reading by definition, and it is always named;
+ *   - an element's src is usually a video, a poster, a stylesheet or an embed, so it is named
+ *     only when the expression itself holds a relative string literal — the shape of a path
+ *     being built. `mp4.src = f.src` is a property read with no path in it, and
+ *     `player.src = 'https://www.youtube.com/embed/' + v.id` is a scheme pointing at another
+ *     host; neither can name a page in this checkout, and naming them would train whoever
+ *     reads the report to skip the section that exists to be read.
+ *
+ * A trace is not a verdict, and it never changes the exit code. The expression is unreadable,
+ * not wrong: it matters only if it turns out to name a pack build, which is exactly what the
+ * named expression asks a person to go and check.
+ */
+const MAX_TRACES_PER_PAGE = 8;   // unresolved sites one page may name before the rest are counted
+const MAX_TRACE_CHARS = 120;     // an expression longer than this is cut, with an ellipsis
+                                 // (both cap what is DISPLAYED, never what is counted: the
+                                 // line above the sites always carries the true total, and
+                                 // the rest say how many they are standing in for)
+
+/* The string literals in an expression, in order, of any quote kind — what a site's shape can
+   be judged from even when the expression itself cannot be resolved. */
+function stringLiterals(expr) {
+  const out = [];
+  let i = 0;
+  while (i < expr.length) {
+    const quote = expr[i];
+    if (quote !== '"' && quote !== "'" && quote !== '`') { i++; continue; }
+    let text = '';
+    i++;
+    while (i < expr.length) {
+      if (expr[i] === '\\') { text += unescapeLiteral(expr.slice(i, i + 2)); i += 2; continue; }
+      if (expr[i] === quote) { i++; break; }
+      text += expr[i++];
+    }
+    out.push(text);
+  }
+  return out;
+}
+
+/* Could this literal name a page here? A scheme — `https://...`, `data:` — and a
+   protocol-relative `//host` both point somewhere else, and a fragment with no path shape in
+   it names no file at all. */
+function namesAPage(literal) {
+  const text = literal.trim();
+  if (!text || /^[a-z][a-z0-9+.-]*:/i.test(text) || text.slice(0, 2) === '//') return false;
+  if (/\.(?:html?|pck)\b/i.test(text)) return true;
+  return /[\/\\]$/.test(text) || text === '.' || text === '..';
+}
+
+/* One line, whatever the page's formatting, so a NOTE stays one NOTE. */
+function oneLine(text, max) {
+  const flat = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
+  return flat.length > max ? flat.slice(0, max - 1) + '\u2026' : flat;
+}
 
 /* The expression starting at i: it ends at a `;`, `,` or closing bracket at depth 0, or at
    a newline that arrives once the expression already looks finished — so `var url = 'x'` on
@@ -530,7 +613,9 @@ function evalSite(expr, page, offset) {
    produce one entry. */
 function launchTargets(html, pageUrl) {
   const out = [];
+  const unread = [];
   const seen = {};
+  const noted = {};
   const consider = function (raw) {
     const text = String(raw == null ? '' : raw).trim();
     if (!text || /^(#|about:|javascript:|data:|mailto:|tel:)/i.test(text)) return;
@@ -552,17 +637,29 @@ function launchTargets(html, pageUrl) {
   });
 
   /* The same sites again, but reading the whole expression and resolving it. Pages that
-     hold no computed target cost a handful of regex passes and resolve to nothing. */
+     hold no computed target cost a handful of regex passes and resolve to nothing — and a
+     site that resolves to nothing is the one thing worth naming, because there is no
+     verdict to give it and no target to fetch (see UNREAD LAUNCH SITES). */
   const page = resolvePage(html);
-  LAUNCH_EXPRESSIONS.forEach(function (re) {
-    re.lastIndex = 0;
+  LAUNCH_EXPRESSIONS.forEach(function (site) {
+    site.re.lastIndex = 0;
     let m;
-    while ((m = re.exec(html)) !== null) {
-      evalSite(readExpression(html, re.lastIndex).expr, page, m.index).forEach(consider);
+    while ((m = site.re.exec(html)) !== null) {
+      const expr = readExpression(html, site.re.lastIndex).expr;
+      const values = evalSite(expr, page, m.index);
+      if (values.length) {
+        values.forEach(consider);
+        continue;
+      }
+      if (!site.opening && !stringLiterals(expr).some(namesAPage)) continue;
+      const text = oneLine(expr, MAX_TRACE_CHARS) || '(no expression to read)';
+      if (noted[text]) continue;
+      noted[text] = true;
+      unread.push({ what: site.what, expr: text });
     }
   });
 
-  return out;
+  return { targets: out, unread: unread };
 }
 
 function displayTarget(url, base) {
@@ -618,6 +715,7 @@ function judgeTarget(verdict) {
 
 async function checkEntryPoints(base, launchers) {
   const results = [];
+  const unread = [];
   const cache = {};
   let published = 0;
   for (const file of launchers) {
@@ -625,7 +723,9 @@ async function checkEntryPoints(base, launchers) {
     const page = await probe(pageUrl, 0, { range: false, maxBytes: MAX_PAGE_BYTES });
     if (page.status !== 200) continue;   // not on the site, so not a way in
     published++;
-    for (const target of launchTargets(page.head.toString('utf8'), pageUrl)) {
+    const found = launchTargets(page.head.toString('utf8'), pageUrl);
+    if (found.unread.length) unread.push({ file: file, sites: found.unread });
+    for (const target of found.targets) {
       if (!cache[target]) cache[target] = classifyTarget(target);
       const verdict = await cache[target];
       if (verdict.kind !== 'build') continue;
@@ -640,17 +740,22 @@ async function checkEntryPoints(base, launchers) {
   /* Silence would read as a pass, so an empty result is a failure: it means the page
      set or the launch mechanism changed shape and nothing was actually checked. */
   if (!results.length) {
+    const read = unread.reduce(function (n, u) { return n + u.sites.length; }, 0);
     results.push({
       kind: 'entry', ok: false,
       asset: { path: 'every launcher in the checkout', what: 'the ways into the pack games' },
       why: 'none of the ' + launchers.length + ' launcher pages opened anything announcing a ' +
-        'pack (' + published + ' of them are on the site), so this check proved nothing'
+        'pack (' + published + ' of them are on the site), so this check proved nothing' +
+        (read
+          ? ' — and ' + read + ' launch ' + (read === 1 ? 'site' : 'sites') + ' on ' +
+            unread.length + ' of those pages could not be read at all'
+          : '')
     });
   }
-  return results;
+  return { entries: results, unread: unread };
 }
 
-function reportEntries(entries) {
+function reportEntries(entries, unread) {
   console.log('  entry points — every launcher\u2019s game target must carry the pack guard');
   entries.forEach(function (r) {
     console.log('    ' + (r.ok ? 'PASS  ' : 'FAIL  ') + r.asset.path);
@@ -660,6 +765,28 @@ function reportEntries(entries) {
   console.log(failed.length
     ? '    ' + failed.length + ' of ' + entries.length + ' ways into a pack game are unguarded'
     : '    all ' + entries.length + ' ways into a pack game are guarded');
+
+  /* Named, not judged: an unresolved expression is a way in this check cannot see, and a
+     report that is silent about it reads exactly like a report with nothing to say. These
+     lines are not PASS and not FAIL, and they never change the exit code — see UNREAD
+     LAUNCH SITES for why a guess would be worse and why a failure would be wrong. */
+  if (unread.length) {
+    unread.forEach(function (u) {
+      console.log('    NOTE  ' + u.file + ' — ' + u.sites.length + ' launch ' +
+        (u.sites.length === 1 ? 'site' : 'sites') + ' this check cannot read');
+      u.sites.slice(0, MAX_TRACES_PER_PAGE).forEach(function (s) {
+        console.log('            ' + s.what + ': ' + s.expr);
+      });
+      if (u.sites.length > MAX_TRACES_PER_PAGE) {
+        console.log('            and ' + (u.sites.length - MAX_TRACES_PER_PAGE) + ' more like them');
+      }
+    });
+    console.log('    ' + unread.length + ' launcher ' +
+      (unread.length === 1 ? 'page carries' : 'pages carry') +
+      ' a launch site this check cannot read — named above, no verdict either way');
+  } else {
+    console.log('    every launch site in the launcher pages resolved to a target');
+  }
   return failed;
 }
 
@@ -835,12 +962,22 @@ async function main() {
       results.push({ asset: asset, ok: verdict.ok, why: verdict.why });
     }
     results.push(...await checkScripts(opts.base));
-    const entries = await checkEntryPoints(opts.base, launchers);
-    const failed = results.concat(entries).filter(function (r) { return !r.ok; });
+    const entryReport = await checkEntryPoints(opts.base, launchers);
+    const failed = results.concat(entryReport.entries).filter(function (r) { return !r.ok; });
     if (!failed.length || Date.now() >= deadline) {
       const bad = report(opts.base, results);
-      const unguarded = reportEntries(entries);
+      const unguarded = reportEntries(entryReport.entries, entryReport.unread);
       console.log('  ' + await probePipeline(opts.base));
+      if (!bad.length && !unguarded.length && entryReport.unread.length) {
+        const n = entryReport.unread.length;
+        console.log('\nNothing above is a failure — but ' + n + ' launcher ' +
+          (n === 1 ? 'page carries' : 'pages carry') +
+          ' a launch site this check could not read, so it');
+        console.log('has no verdict on where ' + (n === 1 ? 'it' : 'they') +
+          ' leads. If one of them names a pack build,');
+        console.log('that way in is unguarded and this report could not have said so.');
+        return;
+      }
       if (bad.length || unguarded.length) {
         console.log('\nThe site is not serving what it should. A pointer means the deployed tree');
         console.log('was built without `lfs: true` — or that Pages is sourcing the branch build');
@@ -853,6 +990,11 @@ async function main() {
           console.log('build — or at one that predates the guard. Point it at the guarded shell, or');
           console.log('give that build the guard; until then that way in stays silent when the host');
           console.log('answers with a stub.');
+        }
+        if (entryReport.unread.length) {
+          console.log('A launch site named as unresolved is one this check could not read: if it');
+          console.log('turns out to name a pack build, that way in is unguarded and none of the above');
+          console.log('would have mentioned it.');
         }
         process.exitCode = 1;
       }
