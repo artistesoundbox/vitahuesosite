@@ -24,13 +24,18 @@
    Cloud has the callback URL registered — the guard prints it rather than
    checking it, and only the console knows.
 
+   ONE EXPECTED SOUND: with a complete deployment the guard really starts the
+   flow, so Auth.js's own `[auth][error]` lines can appear on stderr. They are
+   the library doing the work the guard asked for; the exit code is the
+   verdict.
+
    exits 1 if any check fails.
    ============================================================ */
 import http from "node:http";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { d1Adapter } from "./local-google.mjs";
+import { d1Adapter, createFakeGoogle } from "./local-google.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const GUARD = path.join(here, "verify-deploy.mjs");
@@ -40,6 +45,19 @@ const HOST = "127.0.0.1";
    told to expect. A loopback origin because the server under test is one. */
 const SITE_ORIGIN = "http://127.0.0.1:8177";
 
+const GOOGLE_ID = "1234567890-local.apps.googleusercontent.com";
+const GOOGLE_SECRET = "local-test-google-client-secret";
+
+/* Google is faked at the network for the same reason test.mjs fakes it, and
+   here it is not optional: a configured deployment's flow start is real work,
+   and the one time this suite ran without the fake it sat waiting on
+   accounts.google.com until it was killed. The fake advertises Google's own
+   hostnames, so the URL the guard reads is still the URL a browser would get,
+   and the consent step is never reached — the flow is started, not completed. */
+const google = createFakeGoogle({ clientId: GOOGLE_ID, clientSecret: GOOGLE_SECRET });
+await google.start();
+google.install();
+
 const worker = (await import("./worker.js")).default;
 
 /* A complete deployment: every required variable bound. Cases take from this
@@ -48,8 +66,8 @@ const worker = (await import("./worker.js")).default;
 function completeEnv() {
   return {
     AUTH_SECRET: "local-test-auth-secret-not-a-real-one",
-    AUTH_GOOGLE_ID: "1234567890-local.apps.googleusercontent.com",
-    AUTH_GOOGLE_SECRET: "local-test-google-client-secret",
+    AUTH_GOOGLE_ID: GOOGLE_ID,
+    AUTH_GOOGLE_SECRET: GOOGLE_SECRET,
     IDENTITY_SECRET: "local-test-identity-secret",
     SITE_ORIGINS: SITE_ORIGIN,
     DB: d1Adapter()
@@ -58,7 +76,11 @@ function completeEnv() {
 
 /* The deployed bundle behind a plain http server, with the env it is handed —
    the same plumbing serve-local.mjs uses, so what is served is the artifact. */
-function serve(env) {
+/* `rewrite`, when given, is handed the response body before it is written —
+   which is where dev-bridge.mjs rewrites the authorize URL to its fake Google.
+   It is here so that behaviour is covered too: a harness that is healthy must
+   not be failed by the guard. */
+function serve(env, rewrite) {
   const server = http.createServer(async (req, res) => {
     try {
       const chunks = [];
@@ -77,8 +99,10 @@ function serve(env) {
       const cookies = typeof response.headers.getSetCookie === "function"
         ? response.headers.getSetCookie() : [];
       if (cookies.length) headers["set-cookie"] = cookies;
+      let buffer = Buffer.from(await response.arrayBuffer());
+      if (rewrite) buffer = rewrite(response, buffer);
       res.writeHead(response.status, headers);
-      res.end(Buffer.from(await response.arrayBuffer()));
+      res.end(buffer);
     } catch (err) {
       res.writeHead(500, { "content-type": "text/plain" });
       res.end("harness error: " + String((err && err.message) || err));
@@ -94,10 +118,21 @@ function serve(env) {
 
 /* Run the guard exactly as a deployer would, and keep both halves of the
    verdict: the exit code (what a pipeline reads) and the words (what a person
-   reads). */
+   reads).
+
+   Spawned ASYNCHRONOUSLY, which is not a style choice: the deployment under
+   test is a server inside THIS process, so a synchronous spawn blocks the
+   event loop that has to answer the child's own requests. The first version
+   of this suite used spawnSync and sat there until it was killed — the guard
+   was waiting on a server that could not run. */
 function runGuard(args) {
-  const out = spawnSync(process.execPath, [GUARD].concat(args), { encoding: "utf8" });
-  return { status: out.status, text: (out.stdout || "") + (out.stderr || "") };
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [GUARD].concat(args), { stdio: ["ignore", "pipe", "pipe"] });
+    let text = "";
+    child.stdout.on("data", (d) => { text += d; });
+    child.stderr.on("data", (d) => { text += d; });
+    child.on("close", (code) => resolve({ status: code, text: text }));
+  });
 }
 
 let failures = 0;
@@ -111,7 +146,7 @@ function check(name, ok, detail) {
 async function refusalCase(name, env, expect, names, extraArgs) {
   const { server, url } = await serve(env);
   try {
-    const run = runGuard([url, "--origin=" + SITE_ORIGIN].concat(extraArgs || []));
+    const run = await runGuard([url, "--origin=" + SITE_ORIGIN].concat(extraArgs || []));
     const named = (names || []).filter((s) => run.text.indexOf(s) === -1);
     const ok = run.status === expect && named.length === 0;
     check(name + "  (exit " + expect + ")",
@@ -130,11 +165,40 @@ console.log("-- a fully configured deployment is the only thing that passes");
 {
   const { server, url } = await serve(completeEnv());
   try {
-    const run = runGuard([url, "--origin=" + SITE_ORIGIN]);
+    const run = await runGuard([url, "--origin=" + SITE_ORIGIN]);
     check("a complete deployment exits 0", run.status === 0, "exit " + run.status + "\n" + run.text);
     check("and says READY", run.text.indexOf("READY") !== -1, run.text.split("\n").slice(-12).join("\n"));
     check("and prints the callback URL Google needs",
       run.text.indexOf("/api/auth/callback/google") !== -1, run.text.split("\n").slice(-12).join("\n"));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+/* The dev bridge's rewrite, byte for byte in behaviour: only the `url` field
+   of a JSON body, and only when it points at Google. */
+function rewriteAuthorizeLikeTheBridge(response, buffer) {
+  const type = response.headers.get("content-type") || "";
+  if (type.indexOf("application/json") === -1 || !buffer.length) return buffer;
+  let body;
+  try { body = JSON.parse(buffer.toString("utf8")); } catch (e) { return buffer; }
+  if (!body || typeof body.url !== "string") return buffer;
+  let target;
+  try { target = new URL(body.url); } catch (e) { return buffer; }
+  if (target.host !== "accounts.google.com") return buffer;
+  const rewritten = "http://127.0.0.1:65000" + target.pathname + target.search;
+  return Buffer.from(JSON.stringify(Object.assign({}, body, { url: rewritten })));
+}
+
+console.log("\n-- a healthy harness that rewrites Google (dev-bridge) is not failed");
+{
+  const { server, url } = await serve(completeEnv(), rewriteAuthorizeLikeTheBridge);
+  try {
+    const run = await runGuard([url, "--origin=" + SITE_ORIGIN]);
+    check("the local bridge's rewrite does not fail the guard", run.status === 0,
+      "exit " + run.status + "\n" + run.text.split("\n").slice(-10).join("\n"));
+    check("and it says the rewrite is why", run.text.indexOf("local dev bridge") !== -1,
+      run.text.split("\n").filter((l) => l.indexOf("accounts.google.com") !== -1).join("\n"));
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -181,7 +245,7 @@ await refusalCase("ADMIN_EMAILS unset (nobody is an admin: the documented defaul
 
 console.log("\n-- the exit codes that are not a verdict on the configuration");
 {
-  const usage = runGuard([]);
+  const usage = await runGuard([]);
   check("no URL is usage, exit 2", usage.status === 2, "exit " + usage.status + "\n" + usage.text);
   check("and says how to run it", usage.text.indexOf("usage:") !== -1, usage.text);
 }
@@ -190,7 +254,7 @@ console.log("\n-- the exit codes that are not a verdict on the configuration");
      not landed" as this can get without the network. */
   const { server, url } = await serve(completeEnv());
   await new Promise((resolve) => server.close(resolve));
-  const run = runGuard([url, "--origin=" + SITE_ORIGIN]);
+  const run = await runGuard([url, "--origin=" + SITE_ORIGIN]);
   check("an unreachable Worker is exit 2, not a configuration verdict",
     run.status === 2, "exit " + run.status + "\n" + run.text);
   check("and says so without blaming a variable",
@@ -199,4 +263,5 @@ console.log("\n-- the exit codes that are not a verdict on the configuration");
 
 console.log("\n" + "=".repeat(58));
 console.log(failures ? failures + " check(s) FAILED" : "the deploy guard refuses what it must, and passes what is complete");
+await google.close();
 process.exit(failures ? 1 : 0);

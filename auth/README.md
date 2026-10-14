@@ -130,11 +130,49 @@ Worker's log.
 
 ### 3. Deploying
 
+Uploading the bundle and configuring the deployment are two different facts,
+and only the second one decides whether anybody can sign in. The upload is
+reported by the Sites tools; the configuration is not — so a deploy can
+succeed, look fine on every "is it up" check, and answer 503 on the one route
+a player actually uses. That is not a thing to find out from a player.
+
 ```bash
+# 0. BEFORE uploading: are the secret NAMES bound in that environment?
+#    The values are never readable, the names are — Sites → Secrets, or
+#    sites_inspect(siteId, environment) and look at bindings[]. A name that is
+#    not there cannot be fixed by deploying.
 node auth/build.mjs            # only after editing src/worker.src.js
-# then, with the Sites tools:
-#   sites_deploy(siteId, environment, requestId, manifestPath='auth/sites.manifest.json')
+# 1. upload, with the Sites tools:
+#      sites_deploy(siteId, environment, requestId, manifestPath='…/sites.manifest.json')
+# 2. AFTER uploading: the deploy is not finished until this exits 0. It names
+#    whatever is missing, and quotes the Worker's own refusal.
+node auth/verify-deploy.mjs https://site-9066bb3e67224190b78bd63d0ca6bb1e.freebuff.page \
+     --origin=https://artistesoundbox.github.io
 ```
+
+`verify-deploy.mjs` is read-only and needs no Google account: it asks the
+deployment what it was given, checks the site origin by echoing it back (the
+one failure that is invisible — the Worker answers, the browser refuses,
+nothing logs), and starts the sign-in flow to read the URL that comes back
+without following it. It carries the CSRF cookie across those two requests,
+because that is the half a browser supplies for free and without it a healthy
+deployment answers `?error=MissingCSRF`. On success it prints the callback URL
+Google Cloud has to have registered, so the two can be compared.
+
+| exit | means |
+| --- | --- |
+| 0 | ready — every required variable is bound and the sign-in route starts |
+| 1 | not ready — each missing variable is named, with what it breaks |
+| 2 | usage, or the Worker could not be reached (says nothing about its configuration) |
+
+Its own suite — `node auth/test-verify-deploy.mjs` — serves the real bundle in
+a deployment missing exactly one required thing at a time and requires the
+guard to exit non-zero and name it, so the guard cannot quietly stop noticing.
+It runs before anything is published, next to the other suites.
+
+A deploy that answers the sign-in route is still not a *working* sign-in: see
+"State of the deployment" for what only a browser and a real Google account can
+settle.
 
 Preview and production are separate environments of the same site; production
 has to be deployed deliberately, and its `SITE_ORIGINS` / secrets set
@@ -192,8 +230,13 @@ token, and `state` and `nonce` are switched on
   early is not possible. Accounts *are* stored — `users`, keyed by Google's
   `sub` — so deleting a profile is a row delete, but an outstanding cookie
   keeps working until it expires.
-- **No admin role exists yet.** Every row is an ordinary account; `users` has
-  no `role` column and nothing checks one.
+- **Admins are a server variable, not a role you can grant in the app.**
+  `ADMIN_EMAILS` is the authority and the `role` column only caches what it
+  says: every look at a profile reconciles the two in the direction the list
+  decides, so granting is setting a value and revoking is deleting one, and no
+  row can promote itself. `/api/admin/accounts` is the one route that is not
+  about your own profile, and it answers 401 to nobody and 403 to a member
+  rather than trusting a page not to draw a button.
 - **It is not `next-auth`.** Same library, same provider, same session format —
   but it is `@auth/core` mounted by hand, so there is no `auth()` helper, no
   React session provider, and no `next-auth` middleware.
@@ -215,30 +258,54 @@ directory — secrets go through **Sites → Secrets**, not through the upload.
 
 ## State of the deployment
 
-Preview is deployed and live at the URL above. `SITE_ORIGINS`, `AUTH_SECRET`,
+**Preview** is deployed and live at the URL above. `SITE_ORIGINS`, `AUTH_SECRET`,
 `IDENTITY_SECRET` and the `DB` binding are set; `ADMIN_EMAILS` is not, so every
 account is a member until it is. The leaderboard preview holds the same
 `IDENTITY_SECRET`, so the two are paired: a run submitted with a token this
 Worker signed is stored with the name and picture from that token.
 
+**Production** is deployed and live at its own URL, and it is its own
+deployment in every sense that matters: its own `AUTH_SECRET` (so a session from
+preview is not a session here), its own `IDENTITY_SECRET` (**not** preview's —
+see below), its own single-origin `SITE_ORIGINS` (no loopback), and its own D1
+(`DB`), which starts empty: no preview account exists in it, and the first sign
+in creates that person's profile. The schema still creates itself on first use.
+
+Two things are deliberately still open there, and they are the only two:
+
+- `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` are not set, so
+  `node auth/verify-deploy.mjs <production-url> --origin=https://artistesoundbox.github.io`
+  exits 1 and says so. Everything else on production passes, including the
+  origin echo and the CSRF half of the flow.
+- The site has not been moved onto it. `signin.js` still carries the *preview*
+  Worker as `DEFAULT_API`, and that is the switch that decides where every
+  page's sign-in goes — changing it before production passes the guard would
+  break sign-in for the live site, so it is the last step, not the first.
+
+Because production's `IDENTITY_SECRET` is its own, a production leaderboard has
+to be given the *same* value before a production run can carry a Google name:
+the two are a pair, and reusing preview's value in neither place is what
+"its own secrets" means here.
+
 The `role` column was added to the live database by the migration in
 `ensureSchema` — `/api/profiles` answering 200 after a deploy is what proves that
 ran. `AUTH_GOOGLE_ID` /
-`AUTH_GOOGLE_SECRET` are **not**, so today the deployment answers `/api/me` with
-`{signedIn: false}`, `/api/identity` with 401, and refuses the sign-in and
-provider routes with a 503 naming the missing variables — which is exactly what
-the sign-in page reports on screen. So the token *issuing* half is unproven on
-the deployment until those two are set: the pairing itself was verified locally,
+`AUTH_GOOGLE_SECRET` are **not set**, so today the deployment answers `/api/me` with
+`{signedIn: false}` (preview: `/api/identity` answers 401 there rather than 503,
+because its `IDENTITY_SECRET` is set), and refuses the sign-in and provider
+routes with a 503 naming the missing variables — which is exactly what the
+sign-in page reports on screen. So the token *issuing* half is unproven on both
+deployments until those two are set: the pairing itself was verified locally,
 where a real session can be minted. Finish step 1 and step 2 above, redeploy,
 and it is live: the first person to sign in gets a profile created for them,
-with Google's name and picture already in it. Production has not been touched.
+with Google's name and picture already in it.
 
-The profile module is verified live: `/api/profiles` answers an empty list
-against the real D1 (which is what runs the schema), and an edit without a
-session is 401, a foreign origin is 403, an unknown handle is 404 — all against
-the deployed Worker. The end-to-end edit was verified locally, in a browser,
-against the same bundle; there is no signed-in path in the deployment yet
-because there are no Google credentials to sign in with.
+The profile module is verified live on the preview: `/api/profiles` answers an
+empty list against the real D1 (which is what runs the schema), and an edit
+without a session is 401, a foreign origin is 403, an unknown handle is 404 —
+all against the deployed Worker. The end-to-end edit was verified locally, in a
+browser, against the same bundle; there is no signed-in path in either
+deployment yet because there are no Google credentials to sign in with.
 
 ## Tests
 

@@ -71,12 +71,23 @@ jobs:
       # regression. It needs no dependencies: the bundle already contains Auth.js.
       # Its `[auth][error]` lines are the refusals it asks for; the exit code is
       # the verdict. Same deal as the others: local servers only, no network.
+      #
+      # The fourth is the suite of the step that decides whether an auth deploy
+      # is finished. verify-deploy.mjs asks a deployed Worker what it is
+      # configured with and refuses to pass while a required variable is unbound,
+      # so a version of it that stopped noticing one would let an unconfigured
+      # Worker ship and the first sign of it would be a player pressing the
+      # button. Its suite serves the real bundle in a deployment missing exactly
+      # one thing at a time and requires the guard to exit non-zero and name it —
+      # a guard that cannot fail cannot guard. Local only: the bundle, a loopback
+      # server, and the fake Google, because the flow start really is work.
       - name: Test the guard before it is trusted
         run: |
           set -euo pipefail
           node tools/test-pack-guard.mjs
           node tools/test-launch-sources.mjs
           node auth/test.mjs
+          node auth/test-verify-deploy.mjs
 
       - name: Verify the pack arrived as real bytes
         run: |
