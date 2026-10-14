@@ -50,7 +50,10 @@
  * directory away. So every root HTML file in the checkout is fetched as deployed, every
  * way that page points at another page is resolved — a link or an iframe, a named
  * constant, a window opened in script, a navigation call, a src set through the DOM —
- * and every target that turns out to be a pack build must load
+ * and a target does not have to be written down either: a constant, a join of parts, a
+ * template literal, a function's parameter, or a value a function returns are resolved
+ * too (see TARGETS A PAGE COMPUTES), and only a target that cannot be known from the
+ * page's own text is left alone. Every target that turns out to be a pack build must load
  * pack-guard.js; if it registers a worker, that worker must import the guard as well.
  * The launcher page itself is not required to load the guard: the guard belongs to the
  * page the engine runs in. A page that announces no pack is not a game page and the
@@ -110,6 +113,11 @@ const MAX_SCRIPT_BYTES = 262144;
  * A guard in the shells only helps the player who reaches a shell, so every way into
  * the site is checked: each launcher page, every game it opens, and whether that game
  * carries the guard.
+ *
+ * Two lists decide what counts as a way in: LAUNCH_SOURCES, below, for targets the page
+ * writes down, and LAUNCH_EXPRESSIONS for targets it computes. Both feed the same filter
+ * and the same verdict, so a target written down and the same target computed are one way
+ * in and produce one entry.
  */
 const GUARD_FILE = 'pack-guard.js';
 const GUARD_IMPORT = 'importScripts';
@@ -158,30 +166,402 @@ const LAUNCH_SOURCES = [
   /<meta\b[^>]*?http-equiv\s*=\s*["']?refresh["']?[^>]*?\burl\s*=\s*['"]?([^"';>\s]+)/gi,
   /<meta\b[^>]*?\burl\s*=\s*['"]?([^"';>\s]+)[^>]*?http-equiv\s*=\s*["']?refresh["']?/gi
 ];
+/* ---------------------------------------------------------------------------
+ * TARGETS A PAGE COMPUTES
+ *
+ * The list above reads a target out of quotes. A launcher does not have to write one
+ * there: it can keep the path in a constant, join it from parts, hand it to a function
+ * and open the parameter, or return it from a function. Those are ways in that used to be
+ * invisible, and what follows reads them without running the page — a reader for one small
+ * subset of JavaScript:
+ *
+ *   'literal'  "literal"  `template`  `with ${parts}`
+ *   a + b + '/index.html'      (a name, or a part, that was itself resolved)
+ *   cond ? x : y               (both branches are possible ways in)
+ *   x || fallback              (both are possible)
+ *   fn(args)                   (for fn defined in THIS page: its parameters take the values
+ *                               the call sites pass, and its value is whatever its return
+ *                               expressions come to)
+ *
+ * EVERYTHING ELSE IS UNKNOWN, and an unknown expression yields no target at all. That
+ * asymmetry is the point: an unresolved expression costs a way in this check cannot see,
+ * while a guessed one costs a deploy failed over a page the launcher never opens. So
+ * nothing here evaluates a property read, a call to a function defined in another file, a
+ * method, arithmetic, or a URL built from location — `modeHref(!DAILY_ON)` in racegame.html
+ * returns `location.pathname + q` and stays invisible, which is right: that page reloads
+ * itself and opens no build.
+ *
+ * Parameters are bound per function from that function's call sites in the same page, so
+ * `function play(u) { open(u) } play('/game/index.html')` resolves, while a site inside a
+ * nested function sees only that inner function's parameters. A name assigned in two
+ * branches carries both values; a name with more branches than MAX_VALUES_PER_NAME keeps
+ * the first ones, which is the only place this reader stops early.
+ */
+const LAUNCH_EXPRESSIONS = [
+  /(?:GAME_URL|GAME_PATH|GAME_SRC|GAME_HREF)\s*=\s*/g,
+  /\b(?:window|document|top|parent|self)\s*\.\s*location\s*(?:\.\s*(?:href|assign|replace)\s*)?(?:\(|=)\s*/g,
+  /\blocation\s*(?:\.\s*(?:href|assign|replace)\s*)?(?:\(|=)\s*/g,
+  /\b(?:window|self|top|parent)\s*\.\s*open\s*\(\s*/g,
+  /(?<![.\w$])open\s*\(\s*/g,
+  /\.\s*(?:src|href|action)\s*=\s*/g,
+  /setAttribute\s*\(\s*['"](?:src|href|action)['"]\s*,\s*/g
+];
+
+const MAX_VALUES_PER_NAME = 8;   // branches one name may carry before the rest are dropped
+const MAX_JOIN = 24;             // combinations one join may produce before the rest go
+const RESOLVE_PASSES = 4;        // passes over the assignments, so a chain of names resolves
+const MAX_EXPR = 2048;           // longer than any target a launcher writes
+const MAX_CALL_DEPTH = 3;        // fn() calling fn() calling fn() is as far as this reads
+
+/* The expression starting at i: it ends at a `;`, `,` or closing bracket at depth 0, or at
+   a newline that arrives once the expression already looks finished — so `var url = 'x'` on
+   a line of its own stops there, and a line ending in `+` keeps reading. Quotes are
+   followed, so punctuation inside a string is just text. */
+function readExpression(text, i) {
+  let depth = 0;
+  let quote = null;
+  let out = '';
+  for (let j = i; j < text.length && out.length < MAX_EXPR; j++) {
+    const ch = text[j];
+    if (quote) {
+      out += ch;
+      if (ch === '\\') { out += text[j + 1] || ''; j++; }
+      else if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') { quote = ch; out += ch; continue; }
+    if (ch === '(' || ch === '[' || ch === '{') depth++;
+    else if (ch === ')' || ch === ']' || ch === '}') {
+      if (!depth) break;
+      depth--;
+    } else if (!depth && (ch === ';' || ch === ',')) break;
+    else if (ch === '\n' && out.trim() && !/[+\-*/%|&?:.,([{<>=]$/.test(out.trim())) break;
+    out += ch;
+  }
+  return { expr: out.trim(), end: i + out.length };
+}
+
+/* The index of the bracket that closes the one at `open`, quotes followed. */
+function matchingClose(text, open) {
+  const opener = text[open];
+  const closer = opener === '(' ? ')' : '}';
+  let depth = 0;
+  let quote = null;
+  for (let i = open; i < text.length; i++) {
+    const ch = text[i];
+    if (quote) { if (ch === '\\') i++; else if (ch === quote) quote = null; continue; }
+    if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+    if (ch === opener) depth++;
+    else if (ch === closer) { depth--; if (!depth) return i; }
+  }
+  return -1;
+}
+
+/* Split at depth 0, outside quotes: `+` joins and argument lists both need this. */
+function splitTop(text, seps) {
+  const parts = [];
+  let depth = 0;
+  let quote = null;
+  let cur = '';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quote && quote !== '`') {
+      cur += ch;
+      if (ch === '\\') { cur += text[i + 1] || ''; i++; }
+      else if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") { quote = ch; cur += ch; continue; }
+    if (ch === '(' || ch === '[' || ch === '{') depth++;
+    else if (ch === ')' || ch === ']' || ch === '}') depth--;
+    if (!depth) {
+      const sep = seps.find(function (s) { return text.startsWith(s, i); });
+      if (sep) { parts.push(cur); cur = ''; i += sep.length - 1; continue; }
+    }
+    cur += ch;
+  }
+  parts.push(cur);
+  return parts;
+}
+
+/* `cond ? yes : no` in two parts, or null. Both branches are ways in, so the condition
+   itself is never needed — and a `?.` or a `??` is not mistaken for one. */
+function splitTernary(text) {
+  let depth = 0;
+  let quote = null;
+  let nested = 0;
+  let q = -1;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quote) { if (ch === '\\') i++; else if (ch === quote) quote = null; continue; }
+    if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+    if (ch === '(' || ch === '[' || ch === '{') { depth++; continue; }
+    if (ch === ')' || ch === ']' || ch === '}') { depth--; continue; }
+    if (depth) continue;
+    if (ch === '?' && text[i + 1] !== '?' && text[i + 1] !== '.') { if (q < 0) q = i; else nested++; }
+    else if (ch === ':' && q >= 0) {
+      if (nested) nested--;
+      else return [text.slice(q + 1, i), text.slice(i + 1)];
+    }
+  }
+  return null;
+}
+
+function stripParens(text) {
+  let out = text;
+  for (;;) {
+    if (!out.startsWith('(') || !out.endsWith(')') || matchingClose(out, 0) !== out.length - 1) return out;
+    out = out.slice(1, -1).trim();
+  }
+}
+
+function unescapeLiteral(text) {
+  return text.replace(/\\([\s\S])/g, function (all, c) {
+    return c === 'n' ? '\n' : c === 't' ? '\t' : c === 'r' ? '\r' : c;
+  });
+}
+
+/* Every value this expression can have, no duplicates, capped. */
+function unionValues(a, b) {
+  const out = a.slice();
+  b.forEach(function (value) {
+    if (out.indexOf(value) < 0 && out.length < MAX_VALUES_PER_NAME) out.push(value);
+  });
+  return out;
+}
+
+/* Every combination of the parts, capped, and NOTHING if any part is unknown: `'/a/' + x`
+   is a page this check cannot name, and half a path is worse than none. */
+function joinValues(groups) {
+  let acc = [''];
+  for (const values of groups) {
+    if (!values.length) return [];
+    const next = [];
+    for (const a of acc) {
+      for (const b of values) {
+        if (next.length >= MAX_JOIN) break;
+        next.push(a + b);
+      }
+    }
+    acc = next;
+    if (acc.length >= MAX_JOIN) break;
+  }
+  return acc;
+}
+
+/* The functions defined in this page, with their parameters, the expressions they return
+   and the arguments their call sites pass. A function defined in another file has no body
+   here to read, so it stays unknown. */
+function collectFunctions(html) {
+  const heads = [];
+  const byName = {};
+  const add = function (name, paramsText, braceAt) {
+    const end = matchingClose(html, braceAt);
+    if (end < 0) return;
+    const head = {
+      name: name, start: braceAt + 1, end: end, returns: [], calls: [],
+      params: splitTop(paramsText, [',']).map(function (p) { return p.trim(); }).filter(Boolean)
+    };
+    heads.push(head);
+    (byName[name] = byName[name] || []).push(head);
+  };
+  const HEADS = [
+    /\bfunction\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)\s*\{/g,
+    /(?<![.\w$<-])([A-Za-z_$][\w$]*)\s*=\s*function\s*\(([^)]*)\)\s*\{/g,
+    /(?<![.\w$<-])([A-Za-z_$][\w$]*)\s*=\s*\(([^)]*)\)\s*=>\s*\{/g
+  ];
+  HEADS.forEach(function (re) {
+    let m;
+    while ((m = re.exec(html)) !== null) add(m[1], m[2], m.index + m[0].length - 1);
+  });
+  /* A return belongs to the function it is innermost in, so a helper nested inside another
+     function cannot hand its value to the outer one. */
+  const ret = /\breturn\b/g;
+  let m;
+  while ((m = ret.exec(html)) !== null) {
+    const read = readExpression(html, ret.lastIndex);
+    if (!read.expr) continue;
+    const owner = innermost(heads, m.index);
+    if (owner) owner.returns.push(read.expr);
+  }
+  heads.forEach(function (head) { collectCallSites(html, head); });
+  return { heads: heads, byName: byName };
+}
+
+/* The definition containing an offset, innermost first. */
+function innermost(heads, offset) {
+  let best = null;
+  heads.forEach(function (head) {
+    if (head.start <= offset && offset < head.end && (!best || head.start >= best.start)) best = head;
+  });
+  return best;
+}
+
+function collectCallSites(html, head) {
+  const re = new RegExp('(?<![.\\w$])' + head.name + '\\s*\\(', 'g');
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    const open = m.index + m[0].length - 1;
+    const close = matchingClose(html, open);
+    if (close < 0) continue;
+    const before = html.slice(Math.max(0, m.index - 16), m.index);
+    if (/(?:\bfunction|\bnew|\.|=)\s*$/.test(before)) continue;   // the definition itself
+    head.calls.push({
+      args: splitTop(html.slice(open + 1, close), [',']).map(function (a) { return a.trim(); })
+    });
+  }
+}
+
+/* `name = <expr>` for a plain name — not a property (`panel.src =`), not an attribute in
+   markup (`<iframe src=`), not a comparison. */
+function collectAssigned(html) {
+  const assigned = {};
+  const re = /(?<![.\w$<-])([A-Za-z_$][\w$]*)\s*=(?!=)\s*/g;
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    const read = readExpression(html, re.lastIndex);
+    if (read.expr) (assigned[m[1]] = assigned[m[1]] || []).push(read.expr);
+  }
+  return assigned;
+}
+
+function resolvePage(html) {
+  const page = { env: {}, funcs: collectFunctions(html) };
+  const assigned = collectAssigned(html);
+  for (let pass = 0; pass < RESOLVE_PASSES; pass++) {
+    Object.keys(assigned).forEach(function (name) {
+      assigned[name].forEach(function (expr) {
+        page.env[name] = unionValues(page.env[name] || [], evalExpr(expr, page.env, page, 0));
+      });
+    });
+  }
+  return page;
+}
+
+function callValues(name, argsText, page, depth) {
+  const defs = page.funcs.byName[name];
+  if (!defs) return [];
+  const args = splitTop(argsText, [',']).map(function (a) { return a.trim(); }).filter(Boolean);
+  let out = [];
+  defs.forEach(function (head) {
+    if (!head.returns.length) return;
+    const env = Object.assign({}, page.env);
+    head.params.forEach(function (param, i) {
+      if (i >= args.length) return;
+      env[param] = unionValues(env[param] || [], evalExpr(args[i], env, page, depth));
+    });
+    head.returns.forEach(function (expr) { out = unionValues(out, evalExpr(expr, env, page, depth)); });
+  });
+  return out;
+}
+
+/* `a${x}b` — literal text around each interpolation, which is evaluated like any other
+   expression; an interpolation that cannot be resolved makes the whole thing unknown. */
+function templateValues(body, env, page, depth) {
+  const groups = [];
+  let text = '';
+  let i = 0;
+  while (i < body.length) {
+    if (body[i] === '\\') { text += unescapeLiteral(body.slice(i, i + 2)); i += 2; continue; }
+    if (body[i] === '$' && body[i + 1] === '{') {
+      const close = matchingClose(body, i + 1);
+      if (close < 0) return [];
+      groups.push([text]);
+      text = '';
+      groups.push(evalExpr(body.slice(i + 2, close), env, page, depth));
+      i = close + 1;
+      continue;
+    }
+    text += body[i++];
+  }
+  groups.push([text]);
+  return joinValues(groups);
+}
+
+function evalExpr(expr, env, page, depth) {
+  const text = stripParens(String(expr == null ? '' : expr).trim());
+  if (!text || depth > MAX_CALL_DEPTH) return [];
+  const quoted = /^(['"])([\s\S]*)\1$/.exec(text);
+  if (quoted) return [unescapeLiteral(quoted[2])];
+  const template = /^`([\s\S]*)`$/.exec(text);
+  if (template) return templateValues(template[1], env, page, depth);
+  const branch = splitTernary(text);
+  if (branch) {
+    return unionValues(evalExpr(branch[0], env, page, depth), evalExpr(branch[1], env, page, depth));
+  }
+  const either = splitTop(text, ['||']);
+  if (either.length > 1) {
+    return either.reduce(function (acc, part) {
+      return unionValues(acc, evalExpr(part, env, page, depth));
+    }, []);
+  }
+  const plus = splitTop(text, ['+']);
+  if (plus.length > 1) {
+    return joinValues(plus.map(function (part) { return evalExpr(part, env, page, depth); }));
+  }
+  if (/^[A-Za-z_$][\w$]*$/.test(text)) return (env[text] || []).slice(0, MAX_VALUES_PER_NAME);
+  const call = /^([A-Za-z_$][\w$]*)\s*\(([\s\S]*)\)$/.exec(text);
+  if (call) return callValues(call[1], call[2], page, depth + 1);
+  return [];
+}
+
+/* One launch site, evaluated with the parameters of the function it sits in bound to the
+   values that function's call sites pass — which is how a launcher that opens its own
+   parameter is read. Outside any function, only the page's own names apply. */
+function evalSite(expr, page, offset) {
+  const head = innermost(page.funcs.heads, offset);
+  if (!head) return evalExpr(expr, page.env, page, 0);
+  const env = Object.assign({}, page.env);
+  head.params.forEach(function (param, i) {
+    head.calls.forEach(function (call) {
+      if (i >= call.args.length) return;
+      env[param] = unionValues(env[param] || [], evalExpr(call.args[i], page.env, page, 0));
+    });
+  });
+  return evalExpr(expr, env, page, 0);
+}
+
+
 
 /* Addresses of pages, resolved against the launcher they came from and stripped of
    duplicates. Anything that is not a page — an anchor, a stylesheet, a video, an
-   analytics beacon — is dropped before a single request goes out. */
+   analytics beacon — is dropped before a single request goes out. The two lists feed the
+   same filter, so a target written down and the same target computed are one way in and
+   produce one entry. */
 function launchTargets(html, pageUrl) {
   const out = [];
   const seen = {};
+  const consider = function (raw) {
+    const text = String(raw == null ? '' : raw).trim();
+    if (!text || /^(#|about:|javascript:|data:|mailto:|tel:)/i.test(text)) return;
+    if (NON_PAGE.test(text)) return;
+    let url;
+    try { url = new URL(text, pageUrl); } catch (e) { return; }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+    url.hash = '';
+    const key = url.toString();
+    if (seen[key]) return;
+    seen[key] = true;
+    out.push(key);
+  };
+
   LAUNCH_SOURCES.forEach(function (re) {
     re.lastIndex = 0;
     let m;
+    while ((m = re.exec(html)) !== null) consider(m[1]);
+  });
+
+  /* The same sites again, but reading the whole expression and resolving it. Pages that
+     hold no computed target cost a handful of regex passes and resolve to nothing. */
+  const page = resolvePage(html);
+  LAUNCH_EXPRESSIONS.forEach(function (re) {
+    re.lastIndex = 0;
+    let m;
     while ((m = re.exec(html)) !== null) {
-      const raw = m[1].trim();
-      if (!raw || /^(#|about:|javascript:|data:|mailto:|tel:)/i.test(raw)) continue;
-      if (NON_PAGE.test(raw)) continue;
-      let url;
-      try { url = new URL(raw, pageUrl); } catch (e) { continue; }
-      if (url.protocol !== 'http:' && url.protocol !== 'https:') continue;
-      url.hash = '';
-      const key = url.toString();
-      if (seen[key]) continue;
-      seen[key] = true;
-      out.push(key);
+      evalSite(readExpression(html, re.lastIndex).expr, page, m.index).forEach(consider);
     }
   });
+
   return out;
 }
 

@@ -4,43 +4,51 @@
  *
  * WHY THIS EXISTS
  * check-live-assets.js finishes by asking, for every launcher page in the checkout, what
- * that page opens and whether the build it opens carries the pack guard. That answer is
- * only as good as LAUNCH_SOURCES — the list of spellings that count as "this page points
- * at that page" — and the list is easy to narrow by accident, because narrowing it does
- * not fail, it PASSES: a way in the list cannot see is a way in that is never checked,
- * and the run still ends at 0. Silent under-reporting is the one failure mode a guard
- * check must not have, so the list is tested rather than assumed.
+ * that page opens and whether the build it opens carries the pack guard. That answer is only
+ * as good as the two lists that decide what counts as "this page points at that page" —
+ * LAUNCH_SOURCES for the spellings that carry the target in quotes, and LAUNCH_EXPRESSIONS
+ * for the sites whose target has to be computed — and either list is easy to narrow by
+ * accident, because narrowing one does not fail, it PASSES: a way in the lists cannot see is
+ * a way in that is never checked, and the run still ends at 0. Silent under-reporting is the
+ * one failure mode a guard check must not have, so the lists are tested rather than assumed.
  *
  * HOW
- * One fixture launcher page per mechanism, each reaching its build by exactly ONE
- * mechanism, so the verdict on that page is attributable to that mechanism alone. The
- * fixture is built twice: every launcher pointed at an unguarded build (the run must
- * fail, and name every launcher), and every launcher pointed at the guarded shell (the
- * run must pass, which is also what keeps this test from proving only that the tool can
- * say no). A third build mutates LAUNCH_SOURCES down to a single `<a href>` pattern, and
- * that one has to come out looking like a PASS — one guarded way in, nothing else
- * reported. The mutation run is the regression this test exists to catch, and it is also
- * what shows the exact-entry-set assertion has teeth: if narrowing the list ever stops
- * looking like a pass, the mutation case says so before the fixture cases can be blamed.
+ * One fixture launcher page per mechanism, each reaching its build by exactly ONE mechanism,
+ * so the verdict on that page is attributable to that mechanism alone. A mechanism the check
+ * cannot see is a launcher it says nothing about, which is why every case asserts the entry
+ * line itself: there is no such thing as a quiet failure here. The fixture is built twice —
+ * every launcher pointed at an unguarded build (the run must fail, and name every launcher),
+ * and every launcher pointed at the guarded shell (the run must pass, which is also what
+ * keeps this test from proving only that the tool can say no) — and a third time with both
+ * lists cut down to a single `<a href>` markup pattern, which has to come out looking like a
+ * PASS: one guarded way in, nothing else reported. That mutation run is the regression this
+ * test exists to catch, and it is also what shows the exact-entry-set assertion has teeth: if
+ * narrowing the lists ever stops looking like a pass, the mutation case says so before the
+ * fixture cases can be blamed.
  *
- * The fixture is rebuilt from scratch on every run, so it cannot drift away from this
- * file. The tool under test is copied into the fixture rather than re-implemented: the
- * bytes that run are the bytes that ship.
+ * A case whose target only the browser could know — a URL computed from `location`, say —
+ * asserts the opposite: no entry at all, in either tree. Guessing there would fail a deploy
+ * over a page the launcher never opens, so silence is the correct answer, and it is checked.
  *
- * NOT COVERED, deliberately: a target held in a variable — `open(URL)`,
- * `location.assign(buildForLevel)` — cannot be resolved without running the page, and
- * the check does not pretend otherwise; chains through a non-root intermediate page; and
- * launchers published but absent from the checkout, which this side of the deploy cannot
- * list at all.
+ * The fixture is rebuilt from scratch on every run, so it cannot drift away from this file.
+ * The tool under test is copied into the fixture rather than re-implemented: the bytes that
+ * run are the bytes that ship.
+ *
+ * NOT COVERED, deliberately: a target computed from something this side cannot know — a
+ * property read (`f.src`), a function defined in another file, a method call, a URL built
+ * from `location` — is left alone rather than guessed at; chains through a non-root
+ * intermediate page; and launchers published but absent from the checkout, which this side of
+ * the deploy cannot list at all.
  *
  * WHAT IT PINS: mechanisms, not patterns. Several spellings are matched by more than one
- * pattern — `window.location.href = 'x'` is seen by three of them, `window.open('x')` by
- * one — so a sweep that deletes one pattern at a time will find a redundant spelling
- * surviving once and the mechanism only disappearing when its last pattern goes. That is
- * deliberate: simplifying the list stays free, and a mechanism that stops being seen is
- * what fails here. Verified by that sweep, not assumed: dropping each pattern in turn
- * fails this test for nine of the ten, and dropping `window.location` leaves
- * `location.href =` still found by the plain property pattern.
+ * pattern, and since the computed-target stage reads the same literal argument sites as the
+ * quoted-literal stage, most single patterns are redundant on their own now. Verified by a
+ * sweep, not assumed: dropping each of the ten LAUNCH_SOURCES patterns in turn fails this
+ * test for only three of them (the markup pattern, and the two meta-refresh attribute
+ * orders), emptying LAUNCH_EXPRESSIONS alone fails ten checks — naming each of the six
+ * computed-mechanism cases one by one — and emptying both lists fails thirty. That is the
+ * intended shape: simplifying either list stays free, and a mechanism that stops being seen
+ * fails here.
  *
  * exits 1 if any check fails.
  */
@@ -169,7 +177,83 @@ document.getElementById('g').setAttribute('src', '${t}');
     broken: BUILD_BAD, verdict: 'FAIL',
     shows: 'the same tag with content before http-equiv, which no attribute-order-specific pattern would see',
     body: (t) => `<meta content="0; url=${t}" http-equiv="refresh">`
-  }
+  },
+  /* ---- the ways in that used to be invisible: the page computes its target instead of
+     writing it down. Each of these reached a build before this change and the check said
+     nothing about it, which is the failure mode the whole entry stage exists to prevent. ---- */
+  {
+    file: 'computed-concat.html', mechanism: 'a target joined from a constant and a literal',
+    broken: BUILD_BAD, verdict: 'FAIL',
+    shows: 'a build URL assembled from parts, which no quoted-literal pattern can read',
+    body: (t) => {
+      const parts = t.split('/');
+      return `<script>
+const dir = '${parts[0]}';
+const file = '${parts[1]}';
+frame.src = dir + '/' + file;
+</script>`;
+    }
+  },
+  {
+    file: 'computed-template.html', mechanism: 'a template literal holding the path',
+    broken: BUILD_BAD, verdict: 'FAIL',
+    shows: 'the modern spelling of the same join',
+    body: (t) => {
+      const parts = t.split('/');
+      return '<script>\n' +
+        `const dir = '${parts[0]}';\n` +
+        'window.location.href = `\u0024{dir}/' + parts[1] + '`;\n' +
+        '</script>';
+    }
+  },
+  {
+    file: 'computed-param.html', mechanism: 'a target handed to a function and opened there',
+    broken: BUILD_BAD, verdict: 'FAIL',
+    shows: 'the build URL passed as an argument, so only the call sites name the page',
+    body: (t) => `<script>
+const target = '${t}';
+function play(u) {
+  window.open(u, 'game');
+}
+play(target);
+</script>`
+  },
+  {
+    file: 'computed-return.html', mechanism: 'a function that returns the target',
+    broken: BUILD_BAD, verdict: 'FAIL',
+    shows: 'the path built inside a function and handed to a navigation call',
+    body: (t) => `<script>
+function buildHref(dir) { return dir + '/index.html'; }
+location.assign(buildHref('${t.split('/')[0]}'));
+</script>`
+  },
+  {
+    file: 'computed-branch-guarded.html', mechanism: 'a conditional whose other branch is not a build',
+    broken: BUILD_BAD, verdict: 'FAIL',
+    shows: 'branch A is the build and branch B is a page, so branch A is the way in',
+    body: (t) => `<script>
+const pick = USE_DAILY ? '${t}' : '${NOT_A_BUILD}';
+frame.src = pick;
+</script>`
+  },
+  {
+    file: 'computed-branch-plain.html', mechanism: 'a conditional whose other branch is the build',
+    broken: BUILD_OK, verdict: 'PASS',
+    shows: 'the same conditional the other way round, so the second branch is read too',
+    body: (t) => `<script>
+const pick = USE_DAILY ? '${NOT_A_BUILD}' : '${t}';
+frame.src = pick;
+</script>`
+  },
+  {
+    file: 'computed-unknown.html', mechanism: 'a target only the browser can know',
+    broken: null, verdict: null,
+    shows: 'the racegame.html shape: a URL computed from location, which stays invisible rather than guessed',
+    body: () => `<script>
+function modeHref() { return location.pathname + (DAILY ? '?daily' : ''); }
+location.href = modeHref();
+</script>`
+  },
 ];
 
 const PACK_CONFIG = 'const GODOT_CONFIG = {"fileSizes":{"index.pck":33554432}};';
@@ -336,17 +420,25 @@ function summaryLine(out) {
   return (out.split('\n').find((l) => /ways into a pack game/.test(l)) || '').trim();
 }
 
-/* LAUNCH_SOURCES cut down to the one spelling the check had before it was widened — the
-   narrowing this test is here to catch. Applied to a copy and parsed before use, so a
-   mutation that produced a broken file is reported as a mutation, not as a verdict. */
-function narrowTool(source) {
-  const start = source.indexOf('const LAUNCH_SOURCES = [');
-  if (start < 0) throw new Error('LAUNCH_SOURCES is not in check-live-assets.js any more');
+/* A declaration whose array is cut down to one entry — the shape a narrowed tool has. */
+function replaceArray(source, declaration, replacement) {
+  const start = source.indexOf(declaration);
+  if (start < 0) throw new Error(declaration + ' is not in check-live-assets.js any more');
   const end = source.indexOf('\n];', start);
-  if (end < 0) throw new Error('the end of the LAUNCH_SOURCES array was not found');
+  if (end < 0) throw new Error('the end of ' + declaration + ' was not found');
+  return source.slice(0, start) + replacement + source.slice(end + 3);
+}
+
+/* LAUNCH_SOURCES cut back to the one spelling the check started with, and the
+   computed-target list emptied: the two of them together are what sees every way in, so
+   narrowing only one would leave the tool seeing most of the fixture and this test looking
+   broken instead of showing the tool go blind. Applied to a copy and parsed before use, so
+   a mutation that produced a broken file is reported as a mutation, not as a verdict. */
+function narrowTool(source) {
   const one = 'const LAUNCH_SOURCES = [\n' +
     '  /<a\\b[^>]*\\bhref\\s*=\\s*["\']([^"\']+)["\']/gi\n];';
-  return source.slice(0, start) + one + source.slice(end + 3);
+  return replaceArray(replaceArray(source, 'const LAUNCH_SOURCES = [', one),
+    'const LAUNCH_EXPRESSIONS = [', 'const LAUNCH_EXPRESSIONS = [\n];');
 }
 
 console.log('entry points of check-live-assets.js — one launcher per mechanism, ' +
@@ -358,7 +450,7 @@ let narrowedSource = null;
 try {
   narrowedSource = narrowTool(toolSource);
 } catch (err) {
-  checkHarness('LAUNCH_SOURCES can be narrowed for the mutation case', false, String(err.message));
+  checkHarness('both spelling lists can be narrowed for the mutation case', false, String(err.message));
 }
 if (narrowedSource) {
   let parseError = null;
@@ -370,6 +462,9 @@ if (narrowedSource) {
   checkHarness('the mutated tool is still valid JavaScript', parseError === null, parseError || '');
   checkHarness('the mutated tool is not the tool that ships', narrowedSource !== toolSource,
     'narrowTool returned the source unchanged');
+  checkHarness('the mutation emptied the computed-target list as well',
+    narrowedSource.indexOf('const LAUNCH_EXPRESSIONS = [\n];') >= 0,
+    'the mutation left entries in LAUNCH_EXPRESSIONS');
 }
 
 const trees = [];
@@ -398,22 +493,27 @@ try {
     const brokenEntries = entryLines(brokenRun.out);
 
     check('the run fails', brokenRun.code === 1, 'exit ' + brokenRun.code);
-    for (const c of CASES) {
+    /* One case has no way in to assert: its target cannot be known without running the
+       page, which is the whole point of it. */
+    const opensSomething = CASES.filter((c) => c.broken);
+    for (const c of opensSomething) {
       check(c.mechanism + ': ' + c.verdict + ' ' + c.file + ' -> ' + c.broken + ' — ' + c.shows,
         brokenRun.out.includes(c.verdict + '  ' + c.file + ' -> ' + c.broken),
         'no such line in the entry report');
     }
 
-    const expectedBroken = CASES.map((c) => c.file + ' -> ' + c.broken).sort();
+    const expectedBroken = opensSomething.map((c) => c.file + ' -> ' + c.broken).sort();
     const extra = brokenEntries.filter((n) => !expectedBroken.includes(n));
     const missing = expectedBroken.filter((n) => !brokenEntries.includes(n));
-    check('nothing else is reported and nothing is missed — ' + CASES.length + ' entries, exactly',
-      extra.length === 0 && missing.length === 0 && brokenEntries.length === CASES.length,
+    check('nothing else is reported and nothing is missed — ' + expectedBroken.length +
+      ' entries, exactly',
+      extra.length === 0 && missing.length === 0 &&
+        brokenEntries.length === expectedBroken.length,
       'not in the fixture: [' + extra.join(', ') + '] not reported: [' + missing.join(', ') + ']');
 
     const numFail = CASES.filter((c) => c.verdict === 'FAIL').length;
-    check('the summary counts ' + numFail + ' unguarded of ' + CASES.length,
-      brokenRun.out.includes(numFail + ' of ' + CASES.length +
+    check('the summary counts ' + numFail + ' unguarded of ' + expectedBroken.length,
+      brokenRun.out.includes(numFail + ' of ' + expectedBroken.length +
         ' ways into a pack game are unguarded'),
       summaryLine(brokenRun.out) || 'no summary line');
 
@@ -445,29 +545,41 @@ try {
     console.log('\n=== the same ways in, pointed at the guarded shell ===');
     const fixedRun = await runTool(fixedRoot, fixed.base);
     const fixedEntries = entryLines(fixedRun.out);
-    const expectedFixed = CASES.map((c) => c.file + ' -> ' + BUILD_OK).sort();
+    const expectedFixed = opensSomething.map((c) => c.file + ' -> ' + BUILD_OK).sort();
 
     check('the run passes', fixedRun.code === 0, 'exit ' + fixedRun.code);
-    check('every launcher is still found — ' + CASES.length + ' entries, all of them guarded',
-      fixedRun.out.includes('all ' + CASES.length + ' ways into a pack game are guarded'),
+    check('every launcher that opens something is still found — ' + opensSomething.length +
+      ' entries, all of them guarded',
+      fixedRun.out.includes('all ' + opensSomething.length + ' ways into a pack game are guarded'),
       summaryLine(fixedRun.out) || 'no summary line');
     check('and they are the same launchers, none dropped',
       fixedEntries.slice().sort().join('|') === expectedFixed.join('|'),
       '[' + fixedEntries.slice().sort().join(', ') + ']');
 
-    /* ---------- LAUNCH_SOURCES narrowed back to one pattern ---------- */
+    /* The negative control: a target that only the browser could know opens nothing as far
+       as this check is concerned, in either tree, and must never be reported on the strength
+       of a guess. */
+    const silent = CASES.filter((c) => !c.broken).map((c) => c.file);
+    check('a target that cannot be known is left alone, not guessed — ' + silent.join(', '),
+      silent.length > 0 &&
+        silent.every((f) => !brokenRun.out.includes(f)) &&
+        silent.every((f) => !fixedRun.out.includes(f)),
+      'reported: ' + silent.filter((f) => brokenRun.out.includes(f) ||
+        fixedRun.out.includes(f)).join(', '));
+
+    /* ---------- both spelling lists narrowed, so the tool goes blind ---------- */
     if (mutated) {
       console.log('\n=== the same fixture with LAUNCH_SOURCES narrowed to <a href> ===');
       const mutatedRun = await runTool(mutatedRoot, mutated.base);
       const mutatedEntries = entryLines(mutatedRun.out);
 
-      check('narrowing the list still looks like a pass — which is why this test exists',
+      checkHarness('narrowing the list still looks like a pass — which is why this test exists',
         mutatedRun.code === 0 && mutatedRun.out.includes('all 1 ways into a pack game are guarded'),
         'exit ' + mutatedRun.code + ', ' + (summaryLine(mutatedRun.out) || 'no summary line'));
-      check('the narrowed run reports the one launcher it can still see, and no others',
+      checkHarness('the narrowed run reports the one launcher it can still see, and no others',
         mutatedEntries.length === 1 && mutatedEntries[0] === 'index.html -> ' + BUILD_OK,
         '[' + mutatedEntries.join(', ') + ']');
-      check('so the entry-set assertion is what catches a narrowed list, not the exit code',
+      checkHarness('so the entry-set assertion is what catches a narrowed list, not the exit code',
         mutatedEntries.length !== CASES.length,
         'the narrowed run somehow reported all ' + CASES.length + ' ways in');
     }
