@@ -6,3 +6,13 @@ seblerskers/
 # produced it. The Pages workflow checks out fresh, so this never reaches the
 # site artifact either.
 auth/node_modules/
+
+# The local browser bridge's database (auth/dev-bridge.mjs). It is real
+# SQLite holding whichever accounts were signed in with the fake Google, so
+# it is scratch: delete it and the next sign-in creates the accounts again.
+auth/.local-auth.sqlite
+
+# Staging for sites_deploy when the thread's workspace is a subdirectory of
+# the repository: the Sites tools cannot see outside it, so the built bundle
+# is copied next to the manifest. A copy of auth/worker.js, never a source.
+3rdshooter-abootonthebrave/vh-auth-deploy/
