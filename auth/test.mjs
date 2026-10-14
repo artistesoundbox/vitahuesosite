@@ -1,0 +1,586 @@
+/* ============================================================
+   Local end-to-end test for the Google sign-in Worker.
+   node test.mjs          (builds first: node build.mjs && node test.mjs)
+
+   WHAT IT ACTUALLY EXERCISES
+   The real artifact — worker.js, the bundle that gets deployed — driven
+   through the only interface a Worker has: its fetch handler. No part of
+   Auth.js is stubbed, mocked or bypassed: the same @auth/core code that
+   runs on the edge runs here, parses the cookies, checks the CSRF token,
+   does the PKCE exchange and encrypts the session.
+
+   Google is the one thing that is faked, because it cannot be scripted and
+   must not be called from a test. A local server answers the same
+   discovery document, authorization, token, userinfo and JWKS endpoints;
+   outbound fetches to the real Google hosts are redirected to it. The
+   id_token it returns is a genuine RS256 JWT signed with a locally
+   generated key whose JWKS it publishes, so Auth.js verifies a real
+   signature and a real nonce rather than being handed a pre-baked profile.
+   The discovery document keeps advertising Google's own URLs, so the
+   library's https enforcement is still in play.
+
+   WHAT IT DOES NOT COVER
+   Anything specific to workerd: cold starts, isolate reuse, the real
+   Cloudflare cookie handling (the SameSite=None attributes are asserted
+   from the response headers, but no browser's third-party-cookie policy
+   is consulted here), and Google's own consent screen. Those only a
+   deployment and a browser can.
+   ============================================================ */
+import http from "node:http";
+import crypto from "node:crypto";
+
+/* ---- the three origins this deployment lives between ---- */
+const WORKER_ORIGIN = "https://auth.test";                       // the deployed Worker
+const SITE_ORIGIN = "https://artistesoundbox.github.io";         // GitHub Pages
+const SITE_PAGE = SITE_ORIGIN + "/vitahuesosite/auth/signin.html";
+const LOCAL_SITE = "http://127.0.0.1:8177";                     // brokenboot/serve.mjs
+const EVIL_ORIGIN = "https://evil.example";
+
+const AUTH_SECRET = "local-test-auth-secret-not-a-real-one";
+const IDENTITY_SECRET = "local-test-identity-secret";
+const GOOGLE_ID = "1234567890-local.apps.googleusercontent.com";
+const GOOGLE_SECRET = "local-test-google-client-secret";
+
+const env = {
+  AUTH_SECRET: AUTH_SECRET,
+  AUTH_GOOGLE_ID: GOOGLE_ID,
+  AUTH_GOOGLE_SECRET: GOOGLE_SECRET,
+  IDENTITY_SECRET: IDENTITY_SECRET,
+  SITE_ORIGINS: SITE_ORIGIN + "," + LOCAL_SITE
+};
+
+let pass = 0, fail = 0;
+const failures = [];
+function check(name, ok, detail) {
+  if (ok) { pass++; console.log("  ok   " + name); }
+  else { fail++; failures.push(name + (detail ? "  → " + detail : "")); console.log("  FAIL " + name + (detail ? "  → " + detail : "")); }
+}
+function eq(name, got, want) {
+  check(name, JSON.stringify(got) === JSON.stringify(want), "got " + JSON.stringify(got) + " want " + JSON.stringify(want));
+}
+function section(title) { console.log("\n[" + title + "]"); }
+
+/* ============================================================
+   the fake Google
+   ============================================================ */
+const { privateKey, publicKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
+const jwk = publicKey.export({ format: "jwk" });
+const KID = "local-test-key-1";
+
+const codes = new Map();      // authorization code -> what it was issued against
+const accessTokens = new Set();
+let authorizeSeen = null;     // the last /authorize query, for the test's own assertions
+
+const PROFILE = {
+  sub: "110000000000000000001",
+  email: "player@example.com",
+  email_verified: true,
+  name: "Test Player",
+  given_name: "Test",
+  family_name: "Player",
+  picture: "https://example.com/avatar.png",
+  locale: "en"
+};
+
+function b64urlJson(obj) { return Buffer.from(JSON.stringify(obj)).toString("base64url"); }
+
+function idToken(nonce, nowSec) {
+  const header = b64urlJson({ alg: "RS256", typ: "JWT", kid: KID });
+  const payload = b64urlJson(Object.assign({}, PROFILE, {
+    iss: "https://accounts.google.com",
+    aud: GOOGLE_ID,
+    azp: GOOGLE_ID,
+    iat: nowSec,
+    exp: nowSec + 3600,
+    nonce: nonce
+  }));
+  const signed = header + "." + payload;
+  const sig = crypto.sign("sha256", Buffer.from(signed), privateKey).toString("base64url");
+  return signed + "." + sig;
+}
+
+function formToObject(raw) {
+  const out = {};
+  for (const pair of String(raw || "").split("&")) {
+    if (!pair) continue;
+    const i = pair.indexOf("=");
+    out[decodeURIComponent(pair.slice(0, i))] = decodeURIComponent(pair.slice(i + 1).replace(/\+/g, " "));
+  }
+  return out;
+}
+
+/* The discovery document deliberately advertises Google's real hostnames:
+   the library's https checks stay meaningful, and the fetch patch below
+   is what actually delivers the request to this server. */
+const google = http.createServer((req, res) => {
+  const url = new URL(req.url, "http://127.0.0.1");
+  const send = (status, headers, body) => {
+    res.writeHead(status, Object.assign({ "content-type": "application/json" }, headers || {}));
+    res.end(body === undefined ? "" : body);
+  };
+
+  if (url.pathname === "/.well-known/openid-configuration") {
+    return send(200, {}, JSON.stringify({
+      issuer: "https://accounts.google.com",
+      authorization_endpoint: "https://accounts.google.com/authorize",
+      token_endpoint: "https://accounts.google.com/token",
+      userinfo_endpoint: "https://accounts.google.com/userinfo",
+      jwks_uri: "https://accounts.google.com/jwks",
+      scopes_supported: ["openid", "email", "profile"],
+      response_types_supported: ["code"],
+      grant_types_supported: ["authorization_code"],
+      subject_types_supported: ["public"],
+      id_token_signing_alg_values_supported: ["RS256"],
+      code_challenge_methods_supported: ["S256"],
+      token_endpoint_auth_methods_supported: ["client_secret_post", "client_secret_basic"]
+    }));
+  }
+
+  if (url.pathname === "/jwks") {
+    return send(200, {}, JSON.stringify({
+      keys: [{ kty: "RSA", n: jwk.n, e: jwk.e, alg: "RS256", use: "sig", kid: KID }]
+    }));
+  }
+
+  if (url.pathname === "/authorize") {
+    authorizeSeen = Object.fromEntries(url.searchParams.entries());
+    if (authorizeSeen.client_id !== GOOGLE_ID) return send(400, {}, JSON.stringify({ error: "invalid_client" }));
+    if (authorizeSeen.code_challenge_method !== "S256" || !authorizeSeen.code_challenge) {
+      return send(400, {}, JSON.stringify({ error: "invalid_request", detail: "PKCE required" }));
+    }
+    const code = "code-" + crypto.randomBytes(6).toString("hex");
+    codes.set(code, {
+      challenge: authorizeSeen.code_challenge,
+      redirect_uri: authorizeSeen.redirect_uri,
+      nonce: authorizeSeen.nonce,
+      client_id: authorizeSeen.client_id
+    });
+    const target = new URL(authorizeSeen.redirect_uri);
+    target.searchParams.set("code", code);
+    target.searchParams.set("state", authorizeSeen.state || "");
+    return send(302, { location: target.toString() }, "");
+  }
+
+  if (url.pathname === "/token") {
+    let body = "";
+    req.on("data", (c) => { body += c; });
+    req.on("end", () => {
+      const form = formToObject(body);
+      let clientId = form.client_id;
+      let clientSecret = form.client_secret;
+      const basic = req.headers.authorization || "";
+      if (basic.toLowerCase().startsWith("basic ")) {
+        const decoded = Buffer.from(basic.slice(6), "base64").toString("utf8");
+        const i = decoded.indexOf(":");
+        clientId = decodeURIComponent(decoded.slice(0, i));
+        clientSecret = decodeURIComponent(decoded.slice(i + 1));
+      }
+      if (clientId !== GOOGLE_ID || clientSecret !== GOOGLE_SECRET) {
+        return send(401, {}, JSON.stringify({ error: "invalid_client" }));
+      }
+      const record = codes.get(form.code);
+      if (!record) return send(400, {}, JSON.stringify({ error: "invalid_grant" }));
+      if (form.redirect_uri !== record.redirect_uri) {
+        return send(400, {}, JSON.stringify({ error: "invalid_grant", detail: "redirect_uri mismatch" }));
+      }
+      const derived = crypto.createHash("sha256").update(String(form.code_verifier || "")).digest("base64url");
+      if (derived !== record.challenge) {
+        return send(400, {}, JSON.stringify({ error: "invalid_grant", detail: "code_verifier" }));
+      }
+      codes.delete(form.code);                       // single use, as Google does
+      const token = "at-" + crypto.randomBytes(8).toString("hex");
+      accessTokens.add(token);
+      const now = Math.floor(Date.now() / 1000);
+      return send(200, {}, JSON.stringify({
+        access_token: token,
+        token_type: "Bearer",
+        expires_in: 3600,
+        scope: "openid email profile",
+        id_token: idToken(record.nonce, now)
+      }));
+    });
+    return;
+  }
+
+  if (url.pathname === "/userinfo") {
+    const bearer = (req.headers.authorization || "").replace(/^Bearer /i, "");
+    if (!accessTokens.has(bearer)) return send(401, {}, JSON.stringify({ error: "invalid_token" }));
+    return send(200, {}, JSON.stringify(PROFILE));
+  }
+
+  return send(404, {}, JSON.stringify({ error: "not_found", path: url.pathname }));
+});
+await new Promise((resolve) => google.listen(0, "127.0.0.1", resolve));
+const googleBase = "http://127.0.0.1:" + google.address().port;
+
+/* Outbound calls to any Google host land on the local server instead, with
+   the method, headers, body and redirect mode carried across — the token
+   exchange is a POST with a body, and losing it here would make this test
+   pass on a flow that cannot work. */
+const GOOGLE_HOSTS = new Set(["accounts.google.com", "oauth2.googleapis.com", "www.googleapis.com", "openidconnect.googleapis.com"]);
+const realFetch = globalThis.fetch;   // kept for calls that must reach the real network (none yet)
+globalThis.fetch = function (input, init) {
+  const raw = typeof input === "string" ? input : (input instanceof URL ? input.href : input.url);
+  const parsed = new URL(raw);
+  if (!GOOGLE_HOSTS.has(parsed.host)) return realFetch(input, init);
+  const rewritten = googleBase + parsed.pathname + parsed.search;
+  if (typeof input === "string" || input instanceof URL) return realFetch(rewritten, init);
+  return realFetch(new Request(rewritten, input));
+};
+
+/* Imported AFTER the patch, so nothing that captured a fetch at import
+   time can slip past it. */
+const worker = (await import("./worker.js?t=" + Date.now())).default;
+
+/* ============================================================
+   driving the Worker the way a browser would
+   ============================================================ */
+class Jar {
+  constructor() { this.cookies = new Map(); }
+  absorb(res) {
+    for (const raw of res.headers.getSetCookie()) {
+      const pair = raw.split(";")[0];
+      const i = pair.indexOf("=");
+      if (i < 0) continue;
+      const name = pair.slice(0, i).trim();
+      const value = pair.slice(i + 1).trim();
+      /* clearing a cookie is Max-Age=0 with an empty value */
+      if (value === "") this.cookies.delete(name);
+      else this.cookies.set(name, value);
+    }
+  }
+  header() { return [...this.cookies].map(([k, v]) => k + "=" + v).join("; "); }
+  get(name) { return this.cookies.get(name) || null; }
+}
+const jar = new Jar();
+
+function rawSetCookies(res) { return res.headers.getSetCookie(); }
+function cookieNamed(res, name) {
+  return rawSetCookies(res).find((c) => c.split("=")[0] === name) || "";
+}
+
+async function call(target, opts) {
+  const o = opts || {};
+  if (typeof target !== "string") {
+    throw new Error("call() needs a URL — the step before it produced " + JSON.stringify(target));
+  }
+  const url = target.startsWith("http") ? target : WORKER_ORIGIN + target;
+  const headers = new Headers(o.headers || {});
+  if (o.origin !== null) headers.set("origin", o.origin || SITE_ORIGIN);
+  if (o.noCookies !== true && jar.header()) headers.set("cookie", jar.header());
+  const res = await worker.fetch(new Request(url, {
+    method: o.method || "GET",
+    headers: headers,
+    body: o.body,
+    redirect: "manual"
+  }), env);
+  if (o.absorb !== false) jar.absorb(res);
+  return res;
+}
+
+async function jsonOf(res) { try { return await res.json(); } catch (e) { return null; } }
+
+/* ============================================================
+   the flow
+   ============================================================ */
+section("configuration");
+{
+  const res = await call("/api/health");
+  const body = await jsonOf(res);
+  check("health answers 200", res.status === 200, "status " + res.status);
+  check("health reports the Google provider", body && body.provider === "google", JSON.stringify(body));
+  check("health sees AUTH_SECRET", body && body.hasAuthSecret === true, JSON.stringify(body));
+  check("health sees the Google credentials", body && body.hasGoogleCredentials === true, JSON.stringify(body));
+  check("health sees the identity secret", body && body.hasIdentitySecret === true, JSON.stringify(body));
+  check("health does not leak a secret value", !JSON.stringify(body).includes(AUTH_SECRET), JSON.stringify(body));
+  eq("health counts the allowed site origins", body && body.siteOrigins, 2);
+
+  const root = await call("/", { origin: null });
+  check("the route list is served at /", root.status === 200 && (await root.text()).includes("/api/auth/callback/google"));
+}
+
+section("CORS — exactly one origin, and only the allowed one");
+{
+  const allowed = await call("/api/health", { origin: SITE_ORIGIN });
+  eq("allowed origin is echoed back", allowed.headers.get("access-control-allow-origin"), SITE_ORIGIN);
+  eq("credentials are allowed", allowed.headers.get("access-control-allow-credentials"), "true");
+  eq("the response varies on origin", allowed.headers.get("vary"), "origin");
+  check("never a wildcard", allowed.headers.get("access-control-allow-origin") !== "*");
+
+  const foreign = await call("/api/health", { origin: EVIL_ORIGIN });
+  eq("a foreign origin gets no allow-origin", foreign.headers.get("access-control-allow-origin"), null);
+
+  const preflight = await call("/api/auth/signin/google", { method: "OPTIONS", origin: SITE_ORIGIN, noCookies: true });
+  check("preflight answers 204", preflight.status === 204, "status " + preflight.status);
+  check("preflight allows the return-redirect header",
+    String(preflight.headers.get("access-control-allow-headers") || "").toLowerCase().includes("x-auth-return-redirect"));
+}
+
+section("a POST from an origin that is not allowed is refused");
+{
+  const res = await call("/api/auth/signin/google", {
+    method: "POST", origin: EVIL_ORIGIN, body: "csrfToken=whatever", absorb: false
+  });
+  check("foreign-origin POST is 403", res.status === 403, "status " + res.status);
+  const body = await jsonOf(res);
+  eq("and says why", body && body.error, "origin not allowed");
+}
+
+section("providers — the callback URL Google has to know");
+{
+  const res = await call("/api/auth/providers");
+  const body = await jsonOf(res);
+  check("google is offered", !!(body && body.google), JSON.stringify(body));
+  eq("the sign-in route", body && body.google && body.google.signinUrl, WORKER_ORIGIN + "/api/auth/signin/google");
+  eq("the redirect URI to register in Google Cloud",
+    body && body.google && body.google.callbackUrl, WORKER_ORIGIN + "/api/auth/callback/google");
+  eq("and is readable from the site", res.headers.get("access-control-allow-origin"), SITE_ORIGIN);
+}
+
+section("sign-in: CSRF token, then the redirect to Google");
+let signInUrl = null;
+{
+  const csrfRes = await call("/api/auth/csrf");
+  const csrfBody = await jsonOf(csrfRes);
+  check("csrf answers a token", typeof (csrfBody && csrfBody.csrfToken) === "string" && csrfBody.csrfToken.length > 10,
+    JSON.stringify(csrfBody));
+
+  const cookie = cookieNamed(csrfRes, "__Host-authjs.csrf-token");
+  check("the csrf cookie is set", !!cookie, rawSetCookies(csrfRes).join(" | "));
+  check("the csrf cookie is cross-site usable", /samesite=none/i.test(cookie), cookie);
+  check("the csrf cookie is Secure", /;\s*secure/i.test(cookie), cookie);
+  check("the csrf cookie is HttpOnly", /httponly/i.test(cookie), cookie);
+
+  const res = await call("/api/auth/signin/google", {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      "x-auth-return-redirect": "1"
+    },
+    body: new URLSearchParams({ csrfToken: csrfBody.csrfToken, callbackUrl: SITE_PAGE }).toString()
+  });
+  const body = await jsonOf(res);
+  check("sign-in answers a redirect target as JSON", res.status === 200 && !!(body && body.url),
+    "status " + res.status + " " + JSON.stringify(body));
+  signInUrl = body && body.url;
+
+  const cookies = rawSetCookies(res);
+  check("the flow sets state, verifier and callback-url cookies", cookies.length >= 3,
+    cookies.join(" | "));
+  check("no two cookies were folded into one header", new Set(cookies.map((c) => c.split("=")[0])).size === cookies.length,
+    cookies.join(" | "));
+  check("every flow cookie is SameSite=None",
+    cookies.every((c) => /samesite=none/i.test(c)) && cookies.length > 0, cookies.join(" | "));
+  check("every flow cookie is Secure",
+    cookies.every((c) => /;\s*secure/i.test(c)) && cookies.length > 0, cookies.join(" | "));
+  check("the state cookie is HttpOnly", /httponly/i.test(cookieNamed(res, "__Secure-authjs.state")),
+    cookieNamed(res, "__Secure-authjs.state"));
+
+  const target = new URL(String(signInUrl));
+  eq("the sign-in goes to Google", target.host, "accounts.google.com");
+  eq("with our client id", target.searchParams.get("client_id"), GOOGLE_ID);
+  eq("asking for the openid scopes",
+    (target.searchParams.get("scope") || "").split(" ").sort().join(" "), "email openid profile");
+  eq("using PKCE", target.searchParams.get("code_challenge_method"), "S256");
+  check("with a challenge", (target.searchParams.get("code_challenge") || "").length > 20);
+  check("with a state", (target.searchParams.get("state") || "").length > 10);
+  check("with a nonce", (target.searchParams.get("nonce") || "").length > 10);
+}
+
+section("Google's side of the flow (the faked consent screen)");
+{
+  /* globalThis.fetch, not realFetch: the patched one is what redirects
+     Google's hostnames at the local server. */
+  const res = await globalThis.fetch(signInUrl, { redirect: "manual" });
+  check("the authorize endpoint answers a redirect", res.status === 302 || res.status === 303,
+    "status " + res.status);
+  const location = res.headers.get("location");
+  check("returning to this Worker's callback", !!location && location.startsWith(WORKER_ORIGIN + "/api/auth/callback/google"),
+    String(location));
+  eq("the redirect_uri is the exact registered value",
+    authorizeSeen && authorizeSeen.redirect_uri, WORKER_ORIGIN + "/api/auth/callback/google");
+
+  const callbackRes = await call(location);
+  check("the callback completes the sign-in", [302, 303, 307].includes(callbackRes.status), "status " + callbackRes.status);
+  eq("and returns the player to the page they came from", callbackRes.headers.get("location"), SITE_PAGE);
+
+  const sessionCookie = cookieNamed(callbackRes, "__Secure-authjs.session-token");
+  check("a session cookie is issued", !!sessionCookie, rawSetCookies(callbackRes).join(" | "));
+  check("the session cookie is cross-site usable", /samesite=none/i.test(sessionCookie), sessionCookie);
+  check("the session cookie is Secure", /;\s*secure/i.test(sessionCookie), sessionCookie);
+  check("the session cookie is HttpOnly", /httponly/i.test(sessionCookie), sessionCookie);
+  check("the session cookie holds no readable profile",
+    !/test player|player@example\.com/i.test(sessionCookie), sessionCookie);
+  check("the one-shot checks are consumed",
+    !cookieNamed(callbackRes, "__Secure-authjs.state") && !cookieNamed(callbackRes, "__Secure-authjs.pkce.code_verifier"),
+    rawSetCookies(callbackRes).join(" | "));
+}
+
+section("who is signed in");
+{
+  const res = await call("/api/auth/session");
+  const body = await jsonOf(res);
+  check("the session has a user", !!(body && body.user), JSON.stringify(body));
+  eq("with the Google id", body && body.user && body.user.id, PROFILE.sub);
+  eq("with the Google name", body && body.user && body.user.name, PROFILE.name);
+  eq("with the Google picture", body && body.user && body.user.picture, PROFILE.picture);
+  eq("personalized responses are not cached", res.headers.get("cache-control"), "no-store");
+
+  const me = await call("/api/me");
+  const meBody = await jsonOf(me);
+  eq("GET /api/me reports signed in", meBody && meBody.signedIn, true);
+  eq("GET /api/me returns the name", meBody && meBody.user && meBody.user.name, PROFILE.name);
+}
+
+section("a name the leaderboard can verify");
+{
+  const res = await call("/api/identity");
+  const body = await jsonOf(res);
+  check("identity answers a token", typeof (body && body.token) === "string", JSON.stringify(body));
+  const parts = String(body && body.token).split(".");
+  eq("the token is a three-part signed compact", parts.length, 3);
+
+  /* Verified the way the leaderboard will: the same HMAC over the same
+     bytes. If this holds, a Worker holding only IDENTITY_SECRET can accept
+     the name and nothing else about the session can be forged from it. */
+  const expected = crypto.createHmac("sha256", IDENTITY_SECRET).update(parts[1]).digest("base64url");
+  check("the signature verifies with the shared secret only", parts[2] === expected);
+
+  const wrong = crypto.createHmac("sha256", "some-other-secret").update(parts[1]).digest("base64url");
+  check("a different secret does not verify", parts[2] !== wrong);
+
+  const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+  eq("the payload carries the Google id", payload.sub, PROFILE.sub);
+  eq("the payload carries the display name", payload.name, PROFILE.name);
+  eq("the payload carries the avatar", payload.picture, PROFILE.picture);
+  check("the token expires", payload.exp > payload.iat, JSON.stringify(payload));
+  eq("and expires within minutes", payload.exp - payload.iat, 600);
+  check("the payload carries no session material",
+    !/AUTH_SECRET|session/i.test(Buffer.from(parts[1], "base64url").toString("utf8")));
+}
+
+section("the session survives, and only the real one is accepted");
+{
+  const again = await jsonOf(await call("/api/auth/session"));
+  eq("a second request is still signed in", again && again.user && again.user.id, PROFILE.sub);
+
+  const jarBefore = new Map(jar.cookies);
+  jar.cookies.set("__Secure-authjs.session-token", "tampered.value.here");
+  const tampered = await jsonOf(await call("/api/auth/session"));
+  check("a tampered session cookie is not a session", !tampered || !tampered.user, JSON.stringify(tampered));
+  const identity = await call("/api/identity", { absorb: false });
+  eq("and gets no identity token", identity.status, 401);
+  jar.cookies = jarBefore;
+}
+
+section("redirects cannot be aimed at somebody else");
+{
+  const csrf = await jsonOf(await call("/api/auth/csrf"));
+  const res = await call("/api/auth/signin/google", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", "x-auth-return-redirect": "1" },
+    body: new URLSearchParams({ csrfToken: csrf.csrfToken, callbackUrl: EVIL_ORIGIN + "/steal" }).toString()
+  });
+  const body = await jsonOf(res);
+  check("an off-list callbackUrl is not honoured", !!body && body.url && !body.url.includes("evil.example"),
+    String(body && body.url));
+  check("the sign-in still goes to Google", !!body && body.url && body.url.includes("accounts.google.com"));
+
+  const authorize = await globalThis.fetch(body.url, { redirect: "manual" });
+  const callbackRes = await call(authorize.headers.get("location"));
+  check("and the player is not dropped on the foreign site",
+    !String(callbackRes.headers.get("location")).includes("evil.example"),
+    String(callbackRes.headers.get("location")));
+  check("the fallback is this Worker's own origin",
+    String(callbackRes.headers.get("location")).startsWith(WORKER_ORIGIN),
+    String(callbackRes.headers.get("location")));
+  check("the sign-in itself still succeeded", !!cookieNamed(callbackRes, "__Secure-authjs.session-token"));
+}
+
+section("refusals");
+{
+  const noState = await call(WORKER_ORIGIN + "/api/auth/callback/google?code=code-nothing&state=state-nothing", {
+    noCookies: true, absorb: false
+  });
+  check("a callback with no flow cookie is refused", noState.status !== 200 && noState.status !== 302,
+    "status " + noState.status);
+
+  const badCsrf = await call("/api/auth/signin/google", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", "x-auth-return-redirect": "1" },
+    body: new URLSearchParams({ csrfToken: "not-the-token", callbackUrl: SITE_PAGE }).toString(),
+    absorb: false
+  });
+  const badBody = await jsonOf(badCsrf);
+  check("a wrong CSRF token does not start a sign-in",
+    !(badBody && badBody.url && badBody.url.includes("accounts.google.com")),
+    "status " + badCsrf.status + " " + JSON.stringify(badBody));
+
+  const unknown = await call("/api/auth/nope", { absorb: false });
+  check("an unknown auth route is not a 200", unknown.status >= 400, "status " + unknown.status);
+  const notFound = await call("/api/nope", { absorb: false });
+  eq("an unknown API route is 404", notFound.status, 404);
+
+  const unsignedOut = await call("/api/identity", { noCookies: true, absorb: false });
+  eq("no cookie, no identity", unsignedOut.status, 401);
+  const unsignedMe = await jsonOf(await call("/api/me", { noCookies: true, absorb: false }));
+  eq("no cookie, not signed in", unsignedMe && unsignedMe.signedIn, false);
+}
+
+section("the built-in sign-in page renders (preact inside the bundle)");
+{
+  const res = await call("/api/auth/signin", { noCookies: true, absorb: false });
+  const html = await res.text();
+  check("the sign-in page is HTML", res.status === 200 && /<html/i.test(html), "status " + res.status);
+  check("and offers Google", /google/i.test(html), html.slice(0, 120));
+}
+
+section("sign-out");
+{
+  const csrf = await jsonOf(await call("/api/auth/csrf"));
+  const res = await call("/api/auth/signout", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", "x-auth-return-redirect": "1" },
+    body: new URLSearchParams({ csrfToken: csrf.csrfToken }).toString()
+  });
+  check("sign-out answers", [200, 302, 303].includes(res.status), "status " + res.status);
+  const cleared = cookieNamed(res, "__Secure-authjs.session-token");
+  check("the session cookie is cleared", !!cleared && /max-age=0/i.test(cleared), cleared);
+
+  const after = await jsonOf(await call("/api/auth/session"));
+  check("and the session is gone", !after || !after.user, JSON.stringify(after));
+  const identity = await call("/api/identity", { absorb: false });
+  eq("the identity endpoint agrees", identity.status, 401);
+}
+
+section("a deployment missing its secrets fails loudly, not silently");
+{
+  const bare = Object.assign({}, env, { AUTH_SECRET: undefined });
+  const res = await worker.fetch(new Request(WORKER_ORIGIN + "/api/auth/session", {
+    headers: { origin: SITE_ORIGIN }
+  }), bare);
+  eq("without AUTH_SECRET the auth routes answer 503", res.status, 503);
+  const body = await res.json();
+  check("and name the missing variable", /AUTH_SECRET/.test(String(body && body.error)), JSON.stringify(body));
+
+  const short = Object.assign({}, env, { AUTH_SECRET: "too-short" });
+  const shortRes = await worker.fetch(new Request(WORKER_ORIGIN + "/api/auth/session", {}), short);
+  eq("a too-short secret is refused too", shortRes.status, 503);
+
+  const noGoogle = Object.assign({}, env, { AUTH_GOOGLE_ID: undefined });
+  const googleRes = await worker.fetch(new Request(WORKER_ORIGIN + "/api/auth/session", {}), noGoogle);
+  eq("missing Google credentials are refused", googleRes.status, 503);
+
+  const noIdentity = Object.assign({}, env, { IDENTITY_SECRET: undefined });
+  const identityRes = await worker.fetch(new Request(WORKER_ORIGIN + "/api/identity", {}), noIdentity);
+  eq("missing identity secret is refused with 503", identityRes.status, 503);
+}
+
+google.close();
+
+console.log("\n" + pass + " passed, " + fail + " failed");
+if (failures.length) {
+  console.log("\nfailures:");
+  for (const f of failures) console.log("  - " + f);
+}
+process.exit(fail ? 1 : 0);

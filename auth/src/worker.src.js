@@ -167,7 +167,17 @@ function configFor(request, env) {
     providers: [
       Google({
         clientId: env.AUTH_GOOGLE_ID,
-        clientSecret: env.AUTH_GOOGLE_SECRET
+        clientSecret: env.AUTH_GOOGLE_SECRET,
+        /* Auth.js does PKCE on its own and nothing else: `state` is only
+           added when a redirect proxy is configured, and a `nonce` is only
+           created when the provider asks for one (see checks.js — both
+           return early otherwise). PKCE binds the authorization code to
+           this client, but it does not bind the *callback* to the browser
+           that started the sign-in, and it does not tie the returned
+           id_token to this particular sign-in. State does the first and
+           nonce does the second, so both are asked for here rather than
+           left at the library's default. */
+        checks: ["pkce", "state", "nonce"]
       })
     ],
     session: { strategy: "jwt" },

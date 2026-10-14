@@ -6703,6 +6703,13 @@ function cookiesFor(secure) {
     nonce: { name: prefix + "authjs.nonce", options: shared }
   };
 }
+function mutationAllowed(request, env) {
+  const origin = request.headers.get("origin");
+  if (!origin) return true;
+  const own = new URL(request.url).origin;
+  const cleaned = origin.replace(/\/+$/, "");
+  return cleaned === own || siteOrigins(env).indexOf(cleaned) !== -1;
+}
 function configFor(request, env) {
   const secure = new URL(request.url).protocol === "https:";
   const origins = siteOrigins(env);
@@ -6715,7 +6722,17 @@ function configFor(request, env) {
     providers: [
       Google({
         clientId: env.AUTH_GOOGLE_ID,
-        clientSecret: env.AUTH_GOOGLE_SECRET
+        clientSecret: env.AUTH_GOOGLE_SECRET,
+        /* Auth.js does PKCE on its own and nothing else: `state` is only
+           added when a redirect proxy is configured, and a `nonce` is only
+           created when the provider asks for one (see checks.js — both
+           return early otherwise). PKCE binds the authorization code to
+           this client, but it does not bind the *callback* to the browser
+           that started the sign-in, and it does not tie the returned
+           id_token to this particular sign-in. State does the first and
+           nonce does the second, so both are asked for here rather than
+           left at the library's default. */
+        checks: ["pkce", "state", "nonce"]
       })
     ],
     session: { strategy: "jwt" },
@@ -6773,6 +6790,7 @@ async function sessionFor(request, env) {
     return null;
   }
 }
+var IDENTITY_TTL = 600;
 var textEncoder = new TextEncoder();
 function b64url(bytes) {
   let s3 = "";
@@ -6798,7 +6816,6 @@ async function identityToken(env, sessionUser, nowMs) {
   const sig = await crypto.subtle.sign("HMAC", key, textEncoder.encode(body));
   return "vhi1." + body + "." + b64url(new Uint8Array(sig));
 }
-var IDENTITY_TTL = 600;
 var ROUTES = [
   "Sign in with Google — Auth.js (@auth/core) in a Worker",
   "",
@@ -6846,6 +6863,9 @@ var worker_src_default = {
     const cors = corsFor(request, env);
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: cors || { "vary": "origin" } });
+    }
+    if (request.method === "POST" && !mutationAllowed(request, env)) {
+      return json({ ok: false, error: "origin not allowed" }, 403, cors);
     }
     try {
       if (path === BASE_PATH || path.indexOf(BASE_PATH + "/") === 0) {
