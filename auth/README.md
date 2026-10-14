@@ -62,11 +62,16 @@ not vouch for must not be able to name itself on the list. `role` is on your own
 copy of a profile (`GET /api/profile`, `/api/me`-style responses) and never on
 somebody else's public one.
 
-**One more step on the leaderboard.** It verifies `/api/identity` tokens with
-`IDENTITY_SECRET`, so that site needs the same value set, and a deploy after
-setting it. Until then the game's signed-in runs come back 401, the page says
-so and re-sends them under the name on the token — the run is not lost, but its
-picture is, and the name is unverified.
+**The leaderboard's half of this.** It verifies `/api/identity` tokens with
+`IDENTITY_SECRET`, so both Workers need the *same* value: the preview pair has
+it, and a run driven from the page through a real signed-in session lands on the
+board carrying the Google name and picture. Pairing a new deployment is still a
+step, and it is not a copy: a secret cannot be read back — not through the API,
+not through the Sites dashboard — so a pair is made by setting the same value in
+both places, and an already-paired pair is re-paired by rotating both together.
+A mismatch is not silent: the board answers 401 and the page re-sends the run
+under the name the token carried, so the run is not lost, but its picture is, and
+the name is unverified.
 
 ## Setting it up
 
@@ -212,13 +217,19 @@ directory — secrets go through **Sites → Secrets**, not through the upload.
 
 Preview is deployed and live at the URL above. `SITE_ORIGINS`, `AUTH_SECRET`,
 `IDENTITY_SECRET` and the `DB` binding are set; `ADMIN_EMAILS` is not, so every
-account is a member until it is. The `role` column was added to the live
-database by the migration in `ensureSchema` — `/api/profiles` answering 200
-after a deploy is what proves that ran. `AUTH_GOOGLE_ID` /
+account is a member until it is. The leaderboard preview holds the same
+`IDENTITY_SECRET`, so the two are paired: a run submitted with a token this
+Worker signed is stored with the name and picture from that token.
+
+The `role` column was added to the live database by the migration in
+`ensureSchema` — `/api/profiles` answering 200 after a deploy is what proves that
+ran. `AUTH_GOOGLE_ID` /
 `AUTH_GOOGLE_SECRET` are **not**, so today the deployment answers `/api/me` with
 `{signedIn: false}`, `/api/identity` with 401, and refuses the sign-in and
 provider routes with a 503 naming the missing variables — which is exactly what
-the sign-in page reports on screen. Finish step 1 and step 2 above, redeploy,
+the sign-in page reports on screen. So the token *issuing* half is unproven on
+the deployment until those two are set: the pairing itself was verified locally,
+where a real session can be minted. Finish step 1 and step 2 above, redeploy,
 and it is live: the first person to sign in gets a profile created for them,
 with Google's name and picture already in it. Production has not been touched.
 
