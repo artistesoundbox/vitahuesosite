@@ -3,7 +3,7 @@
    `node build.mjs`, which inlines @auth/core so the Worker needs no
    registry at runtime. Edit the source, rebuild, redeploy worker.js.
   
-   source-sha256: 08ca02a6934a352b699f60ba0e439b14dcb5489a32e335506d289d526b598c0e
+   source-sha256: 68ef1e174b49e664f4bbef2637ea6e491c24c049051cf41bf12eb5dbfb8ee6c4
    ============================================================ */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
@@ -6661,8 +6661,7 @@ var LIMITS = {
   displayName: 48,
   bio: 600,
   url: 500,
-  links: 8,
-  sections: 12
+  links: 8
 };
 var SCHEMA = [
   "CREATE TABLE IF NOT EXISTS users ( sub TEXT PRIMARY KEY, email TEXT NOT NULL DEFAULT '', handle TEXT NOT NULL, handle_lower TEXT NOT NULL, display_name TEXT NOT NULL, bio TEXT NOT NULL DEFAULT '', avatar_url TEXT NOT NULL DEFAULT '', banner_url TEXT NOT NULL DEFAULT '', links TEXT NOT NULL DEFAULT '[]', sections TEXT NOT NULL DEFAULT '[]', visibility TEXT NOT NULL DEFAULT 'public', google_name TEXT NOT NULL DEFAULT '', google_picture TEXT NOT NULL DEFAULT '', created INTEGER NOT NULL, updated INTEGER NOT NULL)",
@@ -6762,8 +6761,8 @@ function profileSections(raw2, errors) {
     errors.push({ field: "sections", error: "must be a list" });
     return DEFAULT_SECTIONS.slice();
   }
-  if (raw2.length > LIMITS.sections) {
-    errors.push({ field: "sections", error: "at most " + LIMITS.sections + " sections" });
+  if (raw2.length > SECTIONS.length) {
+    errors.push({ field: "sections", error: "at most " + SECTIONS.length + " sections" });
     return DEFAULT_SECTIONS.slice();
   }
   const seen = [];
@@ -6775,7 +6774,10 @@ function profileSections(raw2, errors) {
     }
     if (seen.indexOf(id) === -1) seen.push(id);
   }
-  for (const id of DEFAULT_SECTIONS) if (seen.indexOf(id) === -1) seen.push(id);
+  if (!seen.length) {
+    errors.push({ field: "sections", error: "at least one section" });
+    return DEFAULT_SECTIONS.slice();
+  }
   return seen;
 }
 function parseJson(text, fallback) {
@@ -6982,7 +6984,14 @@ function corsFor(request, env) {
   return {
     "access-control-allow-origin": origin,
     "access-control-allow-credentials": "true",
-    "access-control-allow-methods": "GET, POST, OPTIONS",
+    /* Every method a route here actually answers. PUT and PATCH are the
+       profile save: a browser preflights that request and, if the method is
+       missing from this list, refuses to send it at all — the Worker never
+       sees the save, nothing is logged anywhere, and the page reports a
+       network failure. A direct caller (curl, the test suite) never
+       preflights, which is why the omission survived until a page tried to
+       save. */
+    "access-control-allow-methods": "GET, POST, PUT, PATCH, OPTIONS",
     "access-control-allow-headers": "content-type, x-auth-return-redirect",
     "access-control-max-age": "86400",
     "vary": "origin"
@@ -7008,7 +7017,8 @@ function json(body, status, cors, extra) {
 }
 function cookiesFor(secure) {
   const prefix = secure ? "__Secure-" : "";
-  const shared = { httpOnly: true, sameSite: "none", path: "/", secure };
+  const sameSite = secure ? "none" : "lax";
+  const shared = { httpOnly: true, sameSite, path: "/", secure };
   return {
     sessionToken: { name: prefix + "authjs.session-token", options: shared },
     callbackUrl: { name: prefix + "authjs.callback-url", options: shared },
