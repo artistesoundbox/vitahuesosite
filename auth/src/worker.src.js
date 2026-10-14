@@ -142,6 +142,19 @@ function cookiesFor(secure) {
   };
 }
 
+/* SameSite=None means the session cookie rides along on a POST from
+   anywhere, so the Origin allowlist has to be enforced here too rather
+   than assumed. Auth.js's own CSRF token still guards these endpoints —
+   this is the second lock, not the only one — and a request with no
+   Origin at all (curl, a health probe) is left to it. */
+function mutationAllowed(request, env) {
+  const origin = request.headers.get("origin");
+  if (!origin) return true;
+  const own = new URL(request.url).origin;
+  const cleaned = origin.replace(/\/+$/, "");
+  return cleaned === own || siteOrigins(env).indexOf(cleaned) !== -1;
+}
+
 function configFor(request, env) {
   const secure = new URL(request.url).protocol === "https:";
   const origins = siteOrigins(env);
@@ -222,6 +235,10 @@ async function sessionFor(request, env) {
   }
 }
 
+/* Ten minutes: long enough to finish a race and post the result, short
+   enough that a token lifted out of a browser is not a lasting key. */
+const IDENTITY_TTL = 600;
+
 const textEncoder = new TextEncoder();
 
 function b64url(bytes) {
@@ -250,10 +267,6 @@ async function identityToken(env, sessionUser, nowMs) {
   const sig = await crypto.subtle.sign("HMAC", key, textEncoder.encode(body));
   return "vhi1." + body + "." + b64url(new Uint8Array(sig));
 }
-
-/* Ten minutes: long enough to finish a race and post the result, short
-   enough that a token lifted out of a browser is not a lasting key. */
-const IDENTITY_TTL = 600;
 
 /* ============================================================
    routes
@@ -309,6 +322,9 @@ export default {
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: cors || { "vary": "origin" } });
+    }
+    if (request.method === "POST" && !mutationAllowed(request, env)) {
+      return json({ ok: false, error: "origin not allowed" }, 403, cors);
     }
 
     try {
