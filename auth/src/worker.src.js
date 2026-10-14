@@ -218,6 +218,10 @@ function configFor(request, env) {
           token.name = profile.name;
           token.picture = profile.picture;
           token.email = profile.email;
+          /* Carried out of the id_token so the admin check can refuse an
+             account Google itself will not vouch for. It is a claim about
+             the session, not a credential: nothing is granted on it alone. */
+          token.emailVerified = profile.email_verified === true;
         }
         return token;
       },
@@ -226,6 +230,7 @@ function configFor(request, env) {
           session.user.id = token.googleId || token.sub;
           session.user.name = token.name;
           session.user.picture = token.picture;
+          session.user.emailVerified = token.emailVerified;
         }
         return session;
       },
@@ -325,6 +330,7 @@ const ROUTES = [
   "PUT  /api/profile                   update it  {displayName,handle,bio,avatar,banner,links,sections,visibility}",
   "GET  /api/profile/<handle>          a public profile",
   "GET  /api/profiles?limit=<1-50>     public profiles, most recently updated first",
+  "GET  /api/admin/accounts            every account (admin only)",
   "",
   "GET  /api/health                    what this deployment is configured with",
   ""
@@ -410,7 +416,8 @@ export default {
       }
       /* Profile routes need to know who is asking, so the session is resolved
          here rather than inside the module — one place decrypts cookies. */
-      if (path === "/api/profile" || path.indexOf("/api/profile/") === 0 || path === "/api/profiles") {
+      if (path === "/api/profile" || path.indexOf("/api/profile/") === 0 ||
+          path === "/api/profiles" || path === "/api/admin/accounts") {
         if (!env.AUTH_SECRET) return json({ ok: false, error: "not configured" }, 503, cors);
         const session = await sessionFor(request, env);
         return await handleProfiles({

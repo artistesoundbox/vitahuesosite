@@ -3,7 +3,7 @@
    `node build.mjs`, which inlines @auth/core so the Worker needs no
    registry at runtime. Edit the source, rebuild, redeploy worker.js.
   
-   source-sha256: 68ef1e174b49e664f4bbef2637ea6e491c24c049051cf41bf12eb5dbfb8ee6c4
+   source-sha256: 78d3e5c7868eaec4371d3a7dabb631191e6200ffd6c853727698161b8c0a8bb9
    ============================================================ */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
@@ -6664,7 +6664,7 @@ var LIMITS = {
   links: 8
 };
 var SCHEMA = [
-  "CREATE TABLE IF NOT EXISTS users ( sub TEXT PRIMARY KEY, email TEXT NOT NULL DEFAULT '', handle TEXT NOT NULL, handle_lower TEXT NOT NULL, display_name TEXT NOT NULL, bio TEXT NOT NULL DEFAULT '', avatar_url TEXT NOT NULL DEFAULT '', banner_url TEXT NOT NULL DEFAULT '', links TEXT NOT NULL DEFAULT '[]', sections TEXT NOT NULL DEFAULT '[]', visibility TEXT NOT NULL DEFAULT 'public', google_name TEXT NOT NULL DEFAULT '', google_picture TEXT NOT NULL DEFAULT '', created INTEGER NOT NULL, updated INTEGER NOT NULL)",
+  "CREATE TABLE IF NOT EXISTS users ( sub TEXT PRIMARY KEY, email TEXT NOT NULL DEFAULT '', handle TEXT NOT NULL, handle_lower TEXT NOT NULL, display_name TEXT NOT NULL, bio TEXT NOT NULL DEFAULT '', avatar_url TEXT NOT NULL DEFAULT '', banner_url TEXT NOT NULL DEFAULT '', links TEXT NOT NULL DEFAULT '[]', sections TEXT NOT NULL DEFAULT '[]', visibility TEXT NOT NULL DEFAULT 'public', role TEXT NOT NULL DEFAULT 'member', google_name TEXT NOT NULL DEFAULT '', google_picture TEXT NOT NULL DEFAULT '', created INTEGER NOT NULL, updated INTEGER NOT NULL)",
   /* Uniqueness is the index's job. handle_lower is what it is unique on, so
      "Ada" and "ada" cannot both exist — two profiles whose URLs differ only in
      case would be one profile to everyone reading them. */
@@ -6672,11 +6672,21 @@ var SCHEMA = [
   "CREATE INDEX IF NOT EXISTS users_updated ON users(updated DESC)",
   "CREATE INDEX IF NOT EXISTS users_visibility ON users(visibility, updated DESC)"
 ];
+var MIGRATIONS = [
+  "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'member'"
+];
 var schemaReady = null;
 function ensureSchema(env) {
   if (!schemaReady) {
     schemaReady = (async () => {
       for (const statement of SCHEMA) await env.DB.prepare(statement).run();
+      for (const statement of MIGRATIONS) {
+        try {
+          await env.DB.prepare(statement).run();
+        } catch (err) {
+          if (!/duplicate column/i.test(String(err && err.message || err))) throw err;
+        }
+      }
       return true;
     })().catch((err) => {
       schemaReady = null;
@@ -6684,6 +6694,23 @@ function ensureSchema(env) {
     });
   }
   return schemaReady;
+}
+function adminEmails(env) {
+  return String(env && env.ADMIN_EMAILS || "").split(",").map(function(s3) {
+    return s3.trim().toLowerCase();
+  }).filter(Boolean);
+}
+function isAdmin(env, sessionUser) {
+  const email = String(sessionUser && sessionUser.email || "").trim().toLowerCase();
+  if (!email) return false;
+  if (sessionUser && sessionUser.emailVerified === false) return false;
+  return adminEmails(env).indexOf(email) !== -1;
+}
+async function syncRole(env, row, sessionUser) {
+  const want = isAdmin(env, sessionUser) ? "admin" : "member";
+  if ((row.role || "member") === want) return row;
+  await env.DB.prepare("UPDATE users SET role = ? WHERE sub = ?").bind(want, row.sub).run();
+  return Object.assign({}, row, { role: want });
 }
 function cleanText(raw2, max, allowNewlines) {
   let s3 = String(raw2 == null ? "" : raw2);
@@ -6806,9 +6833,21 @@ function publicProfile(row) {
 function mineProfile(row) {
   return Object.assign(publicProfile(row), {
     email: row.email,
+    role: row.role === "admin" ? "admin" : "member",
     googleName: row.google_name,
     googlePicture: row.google_picture
   });
+}
+function accountRow(row, meSub) {
+  return {
+    handle: row.handle,
+    displayName: row.display_name,
+    role: row.role === "admin" ? "admin" : "member",
+    visibility: row.visibility,
+    joined: row.created,
+    updated: row.updated,
+    me: row.sub === meSub
+  };
 }
 async function byHandle(env, handle) {
   const lower = cleanHandle(handle);
@@ -6819,7 +6858,7 @@ async function ensureProfile(env, sessionUser, nowMs) {
   const sub = String(sessionUser && sessionUser.id || "");
   if (!sub) return null;
   const existing = await env.DB.prepare("SELECT * FROM users WHERE sub = ?").bind(sub).first();
-  if (existing) return existing;
+  if (existing) return await syncRole(env, existing, sessionUser);
   const googleName = cleanText(sessionUser.name, LIMITS.displayName, false) || "Player";
   const picture = cleanUrl(sessionUser.picture, "google_picture", []);
   let handle = derivedHandle(googleName);
@@ -6835,7 +6874,7 @@ async function ensureProfile(env, sessionUser, nowMs) {
   }
   try {
     await env.DB.prepare(
-      "INSERT INTO users (sub, email, handle, handle_lower, display_name, bio, avatar_url, banner_url, links, sections, visibility, google_name, google_picture, created, updated) VALUES (?, ?, ?, ?, ?, '', ?, '', '[]', ?, 'public', ?, ?, ?, ?)"
+      "INSERT INTO users (sub, email, handle, handle_lower, display_name, bio, avatar_url, banner_url, links, sections, visibility, role, google_name, google_picture, created, updated) VALUES (?, ?, ?, ?, ?, '', ?, '', '[]', ?, 'public', ?, ?, ?, ?, ?)"
     ).bind(
       sub,
       cleanText(sessionUser.email, 254, false),
@@ -6844,6 +6883,7 @@ async function ensureProfile(env, sessionUser, nowMs) {
       googleName,
       picture,
       JSON.stringify(DEFAULT_SECTIONS),
+      isAdmin(env, sessionUser) ? "admin" : "member",
       googleName,
       picture,
       nowMs,
@@ -6922,13 +6962,28 @@ async function listPublic(env, limit) {
 }
 async function handleProfiles(ctx) {
   const { request, env, path, sessionUser, json: json2, cors } = ctx;
-  const needsDb = path === "/api/profile" || path.indexOf("/api/profile/") === 0 || path === "/api/profiles";
+  const needsDb = path === "/api/profile" || path.indexOf("/api/profile/") === 0 || path === "/api/profiles" || path === "/api/admin/accounts";
   if (!needsDb) return null;
   if (!env.DB) {
     return json2({ ok: false, error: "no database bound" }, 503, cors);
   }
   await ensureSchema(env);
   const signedIn = !!(sessionUser && sessionUser.id);
+  if (path === "/api/admin/accounts") {
+    if (!signedIn) return json2({ ok: false, error: "not signed in" }, 401, cors);
+    const mine = await ensureProfile(env, sessionUser, Date.now());
+    if ((mine.role || "member") !== "admin") {
+      return json2({ ok: false, error: "not an admin" }, 403, cors);
+    }
+    if (request.method !== "GET") return json2({ ok: false, error: "method not allowed" }, 405, cors);
+    const limit = Math.min(Math.max(Number(new URL(request.url).searchParams.get("limit")) || 50, 1), 200);
+    const rows = await env.DB.prepare(
+      "SELECT sub, handle, display_name, role, visibility, created, updated FROM users ORDER BY created DESC LIMIT ?"
+    ).bind(limit).all();
+    return json2({ ok: true, accounts: (rows.results || []).map(function(r3) {
+      return accountRow(r3, mine.sub);
+    }) }, 200, cors);
+  }
   if (path === "/api/profiles") {
     if (request.method !== "GET") return json2({ ok: false, error: "method not allowed" }, 405, cors);
     return json2({ ok: true, profiles: await listPublic(env, new URL(request.url).searchParams.get("limit")) }, 200, cors);
@@ -7084,6 +7139,7 @@ function configFor(request, env) {
           token.name = profile.name;
           token.picture = profile.picture;
           token.email = profile.email;
+          token.emailVerified = profile.email_verified === true;
         }
         return token;
       },
@@ -7092,6 +7148,7 @@ function configFor(request, env) {
           session2.user.id = token.googleId || token.sub;
           session2.user.name = token.name;
           session2.user.picture = token.picture;
+          session2.user.emailVerified = token.emailVerified;
         }
         return session2;
       },
@@ -7171,6 +7228,7 @@ var ROUTES = [
   "PUT  /api/profile                   update it  {displayName,handle,bio,avatar,banner,links,sections,visibility}",
   "GET  /api/profile/<handle>          a public profile",
   "GET  /api/profiles?limit=<1-50>     public profiles, most recently updated first",
+  "GET  /api/admin/accounts            every account (admin only)",
   "",
   "GET  /api/health                    what this deployment is configured with",
   ""
@@ -7237,7 +7295,7 @@ var worker_src_default = {
         if (!env.AUTH_SECRET) return json({ ok: false, error: "not configured" }, 503, cors);
         return await handleIdentity(request, env, cors);
       }
-      if (path === "/api/profile" || path.indexOf("/api/profile/") === 0 || path === "/api/profiles") {
+      if (path === "/api/profile" || path.indexOf("/api/profile/") === 0 || path === "/api/profiles" || path === "/api/admin/accounts") {
         if (!env.AUTH_SECRET) return json({ ok: false, error: "not configured" }, 503, cors);
         const session2 = await sessionFor(request, env);
         return await handleProfiles({

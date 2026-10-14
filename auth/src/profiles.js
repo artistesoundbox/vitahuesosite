@@ -31,6 +31,15 @@
        list is what the profile *shows*, in order: what is absent is hidden,
        which is the only way an editor's Hide can mean anything.
 
+   WHO IS AN ADMIN
+   There is one, and it is whoever's Google email is on the ADMIN_EMAILS
+   list — a server variable, not a row. The column caches that answer and the
+   list is the authority: every look at a profile reconciles the two in the
+   direction the list says, so granting is setting a value and revoking is
+   deleting one, and no row in the table can promote itself. Nothing here
+   trusts the caller for it: the email comes from the session, which was
+   minted from a verified Google id_token.
+
    HANDLES
    Public and unique, because they are the URL. Derived from the Google name
    on first sign-in and renamed deliberately afterwards; the uniqueness is a
@@ -71,6 +80,7 @@ const SCHEMA = [
   " links TEXT NOT NULL DEFAULT '[]'," +
   " sections TEXT NOT NULL DEFAULT '[]'," +
   " visibility TEXT NOT NULL DEFAULT 'public'," +
+  " role TEXT NOT NULL DEFAULT 'member'," +
   " google_name TEXT NOT NULL DEFAULT ''," +
   " google_picture TEXT NOT NULL DEFAULT ''," +
   " created INTEGER NOT NULL," +
@@ -83,11 +93,28 @@ const SCHEMA = [
   "CREATE INDEX IF NOT EXISTS users_visibility ON users(visibility, updated DESC)"
 ];
 
+/* Columns added after a table already existed. SQLite has no `ADD COLUMN IF
+   NOT EXISTS`, so each is attempted and the one error it can raise on a table
+   that already has it — "duplicate column name" — is the success case. Any
+   other error is real and propagates. This is the whole migration story here:
+   D1 is reached through this Worker and nothing else, so the Worker is the
+   only thing that has to agree with the schema. */
+const MIGRATIONS = [
+  "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'member'"
+];
+
 let schemaReady = null;
 export function ensureSchema(env) {
   if (!schemaReady) {
     schemaReady = (async () => {
       for (const statement of SCHEMA) await env.DB.prepare(statement).run();
+      for (const statement of MIGRATIONS) {
+        try {
+          await env.DB.prepare(statement).run();
+        } catch (err) {
+          if (!/duplicate column/i.test(String((err && err.message) || err))) throw err;
+        }
+      }
       return true;
     })().catch((err) => {
       schemaReady = null;                 /* let the next request try again */
@@ -95,6 +122,42 @@ export function ensureSchema(env) {
     });
   }
   return schemaReady;
+}
+
+/* ============================================================
+   admins
+   ============================================================ */
+
+/* Comma-separated Google emails, read from a server variable. Empty means
+   nobody is an admin, which is the state a deployment is in until the owner
+   sets it — the safe default. */
+export function adminEmails(env) {
+  return String((env && env.ADMIN_EMAILS) || "")
+    .split(",")
+    .map(function (s) { return s.trim().toLowerCase(); })
+    .filter(Boolean);
+}
+
+function isAdmin(env, sessionUser) {
+  const email = String((sessionUser && sessionUser.email) || "").trim().toLowerCase();
+  if (!email) return false;
+  /* Google's own `email_verified`, carried out of the id_token. A provider
+     that omits the claim is not treated as a refusal — otherwise the owner's
+     access would hinge on a field nobody promises — but a claim that says
+     *unverified* is refused, because an account Google will not vouch for
+     must not be able to name itself on this list. */
+  if (sessionUser && sessionUser.emailVerified === false) return false;
+  return adminEmails(env).indexOf(email) !== -1;
+}
+
+/* Reconcile the row with the list, writing only when they disagree — so a
+   revoked admin is demoted on their own next request and no read costs a
+   write in the ordinary case. */
+async function syncRole(env, row, sessionUser) {
+  const want = isAdmin(env, sessionUser) ? "admin" : "member";
+  if ((row.role || "member") === want) return row;
+  await env.DB.prepare("UPDATE users SET role = ? WHERE sub = ?").bind(want, row.sub).run();
+  return Object.assign({}, row, { role: want });
 }
 
 /* ============================================================
@@ -267,12 +330,31 @@ export function publicProfile(row) {
   };
 }
 
+/* Your own copy. Never anybody else's: the public shape above deliberately has
+   no `role`, so an admin badge is not something a visitor can read off the
+   directory, and nothing about the account leaks from a public read. */
 function mineProfile(row) {
   return Object.assign(publicProfile(row), {
     email: row.email,
+    role: row.role === "admin" ? "admin" : "member",
     googleName: row.google_name,
     googlePicture: row.google_picture
   });
+}
+
+/* The admin's view of the accounts. Handles and roles, deliberately without
+   the emails: a moderation list does not need them, and the fewer places an
+   address is copied to, the fewer can leak it. */
+function accountRow(row, meSub) {
+  return {
+    handle: row.handle,
+    displayName: row.display_name,
+    role: row.role === "admin" ? "admin" : "member",
+    visibility: row.visibility,
+    joined: row.created,
+    updated: row.updated,
+    me: row.sub === meSub
+  };
 }
 
 /* ============================================================
@@ -292,7 +374,7 @@ export async function ensureProfile(env, sessionUser, nowMs) {
   const sub = String(sessionUser && sessionUser.id || "");
   if (!sub) return null;
   const existing = await env.DB.prepare("SELECT * FROM users WHERE sub = ?").bind(sub).first();
-  if (existing) return existing;
+  if (existing) return await syncRole(env, existing, sessionUser);
 
   const googleName = cleanText(sessionUser.name, LIMITS.displayName, false) || "Player";
   const picture = cleanUrl(sessionUser.picture, "google_picture", []);
@@ -314,11 +396,12 @@ export async function ensureProfile(env, sessionUser, nowMs) {
        later changes only this row. */
     await env.DB.prepare(
       "INSERT INTO users (sub, email, handle, handle_lower, display_name, bio, avatar_url, banner_url," +
-      " links, sections, visibility, google_name, google_picture, created, updated)" +
-      " VALUES (?, ?, ?, ?, ?, '', ?, '', '[]', ?, 'public', ?, ?, ?, ?)"
+      " links, sections, visibility, role, google_name, google_picture, created, updated)" +
+      " VALUES (?, ?, ?, ?, ?, '', ?, '', '[]', ?, 'public', ?, ?, ?, ?, ?)"
     ).bind(
       sub, cleanText(sessionUser.email, 254, false), handle, handle.toLowerCase(), googleName,
-      picture, JSON.stringify(DEFAULT_SECTIONS), googleName, picture, nowMs, nowMs
+      picture, JSON.stringify(DEFAULT_SECTIONS), isAdmin(env, sessionUser) ? "admin" : "member",
+      googleName, picture, nowMs, nowMs
     ).run();
   } catch (err) {
     /* Two first requests at once: whoever lost the race reads the winner's
@@ -416,7 +499,8 @@ export async function listPublic(env, limit) {
    or its JSON shape. */
 export async function handleProfiles(ctx) {
   const { request, env, path, sessionUser, json, cors } = ctx;
-  const needsDb = path === "/api/profile" || path.indexOf("/api/profile/") === 0 || path === "/api/profiles";
+  const needsDb = path === "/api/profile" || path.indexOf("/api/profile/") === 0 ||
+    path === "/api/profiles" || path === "/api/admin/accounts";
   if (!needsDb) return null;
   if (!env.DB) {
     return json({ ok: false, error: "no database bound" }, 503, cors);
@@ -424,6 +508,25 @@ export async function handleProfiles(ctx) {
   await ensureSchema(env);
 
   const signedIn = !!(sessionUser && sessionUser.id);
+
+  /* The admin's list of accounts. The one route here that is not about
+     somebody's own profile, so it is the one that has to be guarded on the
+     server rather than by the page not drawing a button: 401 for nobody,
+     403 for a member, and the answer is the same for both only in that
+     neither gets the list. */
+  if (path === "/api/admin/accounts") {
+    if (!signedIn) return json({ ok: false, error: "not signed in" }, 401, cors);
+    const mine = await ensureProfile(env, sessionUser, Date.now());
+    if ((mine.role || "member") !== "admin") {
+      return json({ ok: false, error: "not an admin" }, 403, cors);
+    }
+    if (request.method !== "GET") return json({ ok: false, error: "method not allowed" }, 405, cors);
+    const limit = Math.min(Math.max(Number(new URL(request.url).searchParams.get("limit")) || 50, 1), 200);
+    const rows = await env.DB.prepare(
+      "SELECT sub, handle, display_name, role, visibility, created, updated FROM users ORDER BY created DESC LIMIT ?"
+    ).bind(limit).all();
+    return json({ ok: true, accounts: (rows.results || []).map(function (r) { return accountRow(r, mine.sub); }) }, 200, cors);
+  }
 
   if (path === "/api/profiles") {
     if (request.method !== "GET") return json({ ok: false, error: "method not allowed" }, 405, cors);

@@ -144,10 +144,19 @@
       });
     },
 
-    /* Renders into every [data-vh-auth] on the page. */
+    /* Renders into every [data-vh-auth] on the page. Given a root, it renders
+       into that element when the element *is* a slot, and into the slots
+       inside it otherwise — a caller passing the slot it just created is the
+       obvious way to use this, and querySelectorAll on the element alone
+       would find nothing and leave an empty box behind. */
     mount: function (root) {
-      var nodes = (root || document).querySelectorAll("[data-vh-auth]");
-      Array.prototype.forEach.call(nodes, function (el) {
+      var scope = root || document;
+      var nodes = Array.prototype.slice.call(scope.querySelectorAll("[data-vh-auth]"));
+      if (scope !== document && scope.hasAttribute && scope.hasAttribute("data-vh-auth") &&
+          nodes.indexOf(scope) === -1) {
+        nodes.unshift(scope);
+      }
+      nodes.forEach(function (el) {
         el.classList.add("vh-auth");
         el.textContent = "…";
         VH_AUTH.whoAmI().then(function (me) {

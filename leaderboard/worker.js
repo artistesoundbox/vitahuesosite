@@ -119,6 +119,74 @@ async function ipTag(req, day) {
     .map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
 }
 
+/* ============================================================
+   the signed-in player
+   ============================================================ */
+
+function b64urlBytes(text) {
+  const s = String(text).replace(/-/g, '+').replace(/_/g, '/');
+  const pad = s.length % 4 ? '='.repeat(4 - (s.length % 4)) : '';
+  try {
+    const raw = atob(s + pad);
+    const out = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+    return out;
+  } catch (e) {
+    return null;
+  }
+}
+
+/* The auth Worker mints "vhi1.<base64url payload>.<base64url HMAC-SHA256>" with
+   IDENTITY_SECRET, and this is the other half of it: same secret, same message,
+   an HMAC check. That is why a run can carry a name this board believes without
+   this Worker holding a session, an account or a user table of its own — and why
+   the name is taken from the token rather than from the request body.
+
+   A token that does not verify is not the same as no token. The run is refused
+   with 401 so the page can drop the session and send it again as a typed name;
+   ignoring a forged token would make a refusal indistinguishable from never
+   having signed in, which is how a silent security hole looks. */
+async function verifyIdentity(env, token) {
+  if (!env.IDENTITY_SECRET) return { error: 'no identity secret configured' };
+  const parts = String(token || '').split('.');
+  if (parts.length !== 3 || parts[0] !== 'vhi1' || !parts[1] || !parts[2]) {
+    return { error: 'malformed identity token' };
+  }
+  const signature = b64urlBytes(parts[2]);
+  if (!signature) return { error: 'malformed identity token' };
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(env.IDENTITY_SECRET),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
+  );
+  const good = await crypto.subtle.verify('HMAC', key, signature, new TextEncoder().encode(parts[1]));
+  if (!good) return { error: 'identity token rejected' };
+  let payload = null;
+  try {
+    const bytes = b64urlBytes(parts[1]);
+    payload = bytes ? JSON.parse(new TextDecoder().decode(bytes)) : null;
+  } catch (e) {
+    return { error: 'malformed identity token' };
+  }
+  const now = Math.floor(Date.now() / 1000);
+  /* a minute of slack for a clock that is a little behind this one */
+  if (!(payload && payload.exp > now - 60)) return { error: 'identity token expired' };
+  return { name: payload.name, sub: payload.sub, picture: payload.picture };
+}
+
+/* https only, no credentials — the same rule profile avatars use, because this
+   URL ends up in an <img> on somebody else's screen. */
+function cleanPicture(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s || s.length > 500) return '';
+  try {
+    const u = new URL(s);
+    if (u.protocol !== 'https:' || u.username || u.password) return '';
+    return u.toString();
+  } catch (e) {
+    return '';
+  }
+}
+
 let schemaReady = null;
 function ensureSchema(env) {
   if (!schemaReady) {
@@ -136,12 +204,30 @@ function ensureSchema(env) {
       ' pos INTEGER NOT NULL,' +
       ' of_count INTEGER NOT NULL,' +
       ' stars INTEGER NOT NULL,' +
+      ' picture TEXT NOT NULL DEFAULT \'\',' +
       ' ip TEXT NOT NULL,' +
       ' created INTEGER NOT NULL)'
     ).run().then(function () {
       return env.DB.prepare('CREATE INDEX IF NOT EXISTS scores_day_time ON scores(day, time)').run();
     }).then(function () {
       return env.DB.prepare('CREATE INDEX IF NOT EXISTS scores_day_ip ON scores(day, ip, created)').run();
+    }).then(function () {
+      /* Rows written before a signed-in player could have a picture. SQLite has
+         no ADD COLUMN IF NOT EXISTS, so the attempt is made and its one
+         predictable error — the column already being there — is the success
+         case. Anything else is real.
+
+         The whole attempt is wrapped, not just the `.run()`: a D1-style
+         prepare() can throw before there is a promise to attach a catch to,
+         and a rejection handler that never sees the error is a 500 with the
+         real cause buried in it. */
+      return (async function () {
+        try {
+          await env.DB.prepare("ALTER TABLE scores ADD COLUMN picture TEXT NOT NULL DEFAULT ''").run();
+        } catch (err) {
+          if (!/duplicate column/i.test(String(err && err.message || err))) throw err;
+        }
+      })();
     }).catch(function (err) {
       schemaReady = null;               // let the next request try again
       throw err;
@@ -152,14 +238,14 @@ function ensureSchema(env) {
 
 function rowOut(r, rank) {
   return {
-    rank: rank, handle: r.handle, car: r.car, mod: r.mod,
+    rank: rank, handle: r.handle, picture: r.picture || '', car: r.car, mod: r.mod,
     time: r.time, best: r.best, pos: r.pos, of: r.of_count,
     stars: r.stars, at: r.created
   };
 }
 async function boardFor(env, day, limit) {
   const top = await env.DB.prepare(
-    'SELECT handle, car, mod, time, best, pos, of_count, stars, created FROM scores' +
+    'SELECT handle, picture, car, mod, time, best, pos, of_count, stars, created FROM scores' +
     ' WHERE day = ? ORDER BY time ASC, created ASC LIMIT ?'
   ).bind(day, limit).all();
   const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM scores WHERE day = ?').bind(day).first();
@@ -171,7 +257,7 @@ async function boardFor(env, day, limit) {
 async function standingFor(env, day, handle) {
   if (!handle) return null;
   const mine = await env.DB.prepare(
-    'SELECT handle, car, mod, time, best, pos, of_count, stars, created FROM scores' +
+    'SELECT handle, picture, car, mod, time, best, pos, of_count, stars, created FROM scores' +
     ' WHERE day = ? AND handle = ? ORDER BY time ASC LIMIT 1'
   ).bind(day, handle).first();
   if (!mine) return null;
@@ -243,7 +329,18 @@ async function handleSubmit(req, env) {
     return json({ ok: false, error: 'bad finishing position' }, 422);
   }
 
-  const handle = cleanHandle(body.handle);
+  /* A run may carry the signed-in player's identity. Verified, it decides the
+     name and the picture; the typed handle cannot override it, because that is
+     the whole difference between a name somebody typed and a name Google
+     vouched for. */
+  let handle = cleanHandle(body.handle);
+  let picture = '';
+  if (body.identity) {
+    const who = await verifyIdentity(env, body.identity);
+    if (who.error) return json({ ok: false, error: who.error }, 401);
+    handle = cleanHandle(who.name);
+    picture = cleanPicture(who.picture);
+  }
   const ip = await ipTag(req, day);
   const now = Date.now();
 
@@ -262,9 +359,9 @@ async function handleSubmit(req, env) {
   const stars = starsFor(time, cfg.par);
   if (!dupe) {
     await env.DB.prepare(
-      'INSERT INTO scores (day, seed, handle, car, mod, par, time, best, pos, of_count, stars, ip, created)' +
-      ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).bind(day, cfg.seed, handle, cfg.car, cfg.mod, cfg.par,
+      'INSERT INTO scores (day, seed, handle, picture, car, mod, par, time, best, pos, of_count, stars, ip, created)' +
+      ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(day, cfg.seed, handle, picture, cfg.car, cfg.mod, cfg.par,
       Math.round(time * 100) / 100, Math.round(best * 100) / 100,
       pos, of, stars, ip, now).run();
   }
@@ -311,7 +408,9 @@ export default {
         return new Response(
           'City Grand Prix daily leaderboard API\n' +
           'GET  /api/board?day=<n>&limit=<1-25>&handle=<name>\n' +
-          'POST /api/runs  {day,seed,car,mod,par,time,best,pos,of,handle}\n' +
+          'POST /api/runs  {day,seed,car,mod,par,time,best,pos,of,handle,identity?}\n' +
+          '  identity: the signed-in player\'s token from the auth Worker; when it\n' +
+          '  verifies, its name and picture are used and `handle` is ignored\n' +
           'GET  /api/health\n', {
           headers: Object.assign({ 'content-type': 'text/plain; charset=utf-8' }, CORS)
         });

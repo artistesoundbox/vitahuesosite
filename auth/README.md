@@ -45,6 +45,28 @@ itself is still a JWT in the player's own cookie.
 | `GET /api/profile` | my profile — created on first look, `{me: true}` |
 | `PUT /api/profile` | validated update: `displayName`, `handle`, `bio`, `avatar`, `banner`, `links`, `sections`, `visibility` |
 | `GET /api/profile/<handle>` | that profile's public face — 403 when it is private and it is not yours |
+| `GET /api/admin/accounts` | every account, handles and roles only — admin only, 403 for a member, 401 signed out |
+
+## Who is an admin
+
+Whoever's Google email is on **`ADMIN_EMAILS`**, and nothing else. The list is
+the authority and the `users.role` column only caches it: every look at a
+profile reconciles the two in the direction the list says, so granting is
+setting a value, revoking is deleting one, and no row can promote itself. A
+request cannot ask for the role — a body containing `"role":"admin"` is
+ignored, and the test suite pins that.
+
+The email comes from the session, which was minted from a verified Google
+`id_token`; `email_verified: false` is refused, because an account Google will
+not vouch for must not be able to name itself on the list. `role` is on your own
+copy of a profile (`GET /api/profile`, `/api/me`-style responses) and never on
+somebody else's public one.
+
+**One more step on the leaderboard.** It verifies `/api/identity` tokens with
+`IDENTITY_SECRET`, so that site needs the same value set, and a deploy after
+setting it. Until then the game's signed-in runs come back 401, the page says
+so and re-sends them under the name on the token — the run is not lost, but its
+picture is, and the name is unverified.
 
 ## Setting it up
 
@@ -73,7 +95,8 @@ itself is still a JWT in the player's own cookie.
 | `AUTH_GOOGLE_ID` | the OAuth client id from step 1 |
 | `AUTH_GOOGLE_SECRET` | the client secret from step 1 |
 | `AUTH_SECRET` | signs and encrypts sessions. `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"` — 32 bytes or more, and **changing it signs everybody out** |
-| `IDENTITY_SECRET` | signs the short-lived name the leaderboard verifies. Deliberately not `AUTH_SECRET`: the leaderboard only needs this one |
+| `IDENTITY_SECRET` | signs the short-lived name and picture the leaderboard verifies (`/api/identity`). Deliberately not `AUTH_SECRET`: the leaderboard only needs this one — and it needs the *same value* to check what this Worker signed |
+| `ADMIN_EMAILS` | comma-separated Google emails that are admins. Empty (or unset) means nobody is one, which is the safe default |
 | `SITE_ORIGINS` | comma-separated origins allowed to call this Worker **with credentials** and to be the target of the post-sign-in redirect, e.g. `https://artistesoundbox.github.io,http://127.0.0.1:8177` |
 
 Set them in **Sites → Secrets** (values never go through a chat or a commit),
@@ -188,7 +211,10 @@ directory — secrets go through **Sites → Secrets**, not through the upload.
 ## State of the deployment
 
 Preview is deployed and live at the URL above. `SITE_ORIGINS`, `AUTH_SECRET`,
-`IDENTITY_SECRET` and the `DB` binding are set. `AUTH_GOOGLE_ID` /
+`IDENTITY_SECRET` and the `DB` binding are set; `ADMIN_EMAILS` is not, so every
+account is a member until it is. The `role` column was added to the live
+database by the migration in `ensureSchema` — `/api/profiles` answering 200
+after a deploy is what proves that ran. `AUTH_GOOGLE_ID` /
 `AUTH_GOOGLE_SECRET` are **not**, so today the deployment answers `/api/me` with
 `{signedIn: false}`, `/api/identity` with 401, and refuses the sign-in and
 provider routes with a 503 naming the missing variables — which is exactly what
@@ -208,7 +234,7 @@ because there are no Google credentials to sign in with.
 ```bash
 cd auth && npm install     # once: @auth/core, esbuild
 node build.mjs             # rebuilds worker.js from src/worker.src.js
-node test.mjs              # 215 checks, no network, no Google account
+node test.mjs              # 232 checks, no network, no Google account
 ```
 
 The suite cannot see everything a browser can — a CORS preflight, and whether a

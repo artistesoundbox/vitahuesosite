@@ -659,6 +659,82 @@ section("[handles are unique, case aside; profiles have a public face]");
   eq("and public again is readable by anyone", (await call("/api/profile/tp-profile", { noCookies: true, absorb: false })).status, 200);
 }
 
+section("[who is an admin, and a table that predates the column]");
+{
+  const mine = async () => (await jsonOf(await call("/api/profile"))).profile;
+  const publicKeys = async (handle) => Object.keys((await jsonOf(await call("/api/profile/" + handle))).profile);
+
+  eq("nobody is an admin until the list says so", (await mine()).role, "member");
+  const adaKeys = await publicKeys("ada");
+  check("a role is never part of somebody's public shape",
+    adaKeys.indexOf("role") === -1, adaKeys.join(","));
+  eq("and the accounts list is refused to a member",
+    (await call("/api/admin/accounts", { absorb: false })).status, 403);
+
+  /* Set the way a deployment sets it, through the environment, and check the
+     reading is forgiving of what people actually paste into a field. */
+  env.ADMIN_EMAILS = "  " + PROFILE.email.toUpperCase() + " , somebody@else.test ";
+  eq("the allowlist matches case-insensitively, trimmed", (await mine()).role, "admin");
+  eq("and the admin may list the accounts",
+    (await call("/api/admin/accounts", { absorb: false })).status, 200);
+  const accounts = await jsonOf(await call("/api/admin/accounts"));
+  const list = accounts.accounts || [];
+  check("one entry per account, and no emails in it",
+    list.length >= 3 && list.every((a) => a.email === undefined && a.sub === undefined), JSON.stringify(list));
+  eq("exactly one of them is you", list.filter((a) => a.me).length, 1);
+  check("and the roles are only ever admin or member",
+    list.every((a) => a.role === "admin" || a.role === "member"), JSON.stringify(list.map((a) => a.role)));
+  check("somebody else's profile has no role either", (await publicKeys("ada")).indexOf("role") === -1);
+
+  /* The list is the authority and the column only caches it: deleting the
+     value demotes the account on its next look, with no row edited by hand. */
+  env.ADMIN_EMAILS = "";
+  eq("removing the value demotes on the next look", (await mine()).role, "member");
+  /* The promise that matters most about a privilege: no request can ask for
+     it. The allowlist is empty here, the body demands admin, and the answer
+     is still member. */
+  eq("and asking for the role in the body grants nothing",
+    (await jsonOf(await putProfile({ role: "admin", displayName: "Ada Lovelace" }))).profile.role, "member");
+  eq("and the list closes again", (await call("/api/admin/accounts", { absorb: false })).status, 403);
+  const stored = await env.DB.prepare("SELECT role FROM users WHERE sub = ?").bind(PROFILE.sub).first();
+  eq("the row followed the list, not the other way round", stored.role, "member");
+
+  /* A deployment whose `users` table predates the column: the schema has to
+     grow it on its own. A fresh copy of the module is imported because the
+     schema is built once per isolate — which is correct in a Worker and
+     precisely what a second import undoes. */
+  const legacy = d1Adapter();
+  await legacy.prepare(
+    "CREATE TABLE users (sub TEXT PRIMARY KEY, email TEXT NOT NULL DEFAULT '', handle TEXT NOT NULL," +
+    " handle_lower TEXT NOT NULL, display_name TEXT NOT NULL, bio TEXT NOT NULL DEFAULT ''," +
+    " avatar_url TEXT NOT NULL DEFAULT '', banner_url TEXT NOT NULL DEFAULT '', links TEXT NOT NULL DEFAULT '[]'," +
+    " sections TEXT NOT NULL DEFAULT '[]', visibility TEXT NOT NULL DEFAULT 'public'," +
+    " google_name TEXT NOT NULL DEFAULT '', google_picture TEXT NOT NULL DEFAULT ''," +
+    " created INTEGER NOT NULL, updated INTEGER NOT NULL)"
+  ).run();
+  await legacy.prepare(
+    "INSERT INTO users (sub, handle, handle_lower, display_name, created, updated)" +
+    " VALUES ('old-1', 'old-one', 'old-one', 'Old One', 1, 1)"
+  ).run();
+  const fresh = await import("./src/profiles.js?legacy=" + Date.now());
+  const ctx = {
+    request: new Request(WORKER_ORIGIN + "/api/profile"),
+    env: { DB: legacy },
+    path: "/api/profile",
+    sessionUser: { id: "old-1", name: "Old One", email: "old@example.com", emailVerified: true },
+    json: (body, status) => new Response(JSON.stringify(body), { status: status || 200 }),
+    cors: {}
+  };
+  const first = await fresh.handleProfiles(ctx);
+  const firstBody = await first.json();
+  eq("an old table is migrated on the first request", first.status, 200);
+  eq("and its account reads back a role", firstBody.profile.role, "member");
+  const columns = (await legacy.prepare("PRAGMA table_info(users)").all()).results.map((c) => c.name);
+  check("the column is there now", columns.indexOf("role") !== -1, columns.join(","));
+  const second = await fresh.handleProfiles(ctx);
+  eq("and running it again is not an error", second.status, 200);
+}
+
 section("[methods, origins, and a deployment with no database]");
 {
   eq("POST to a profile is not a thing", (await call("/api/profile", { method: "POST", absorb: false })).status, 405);

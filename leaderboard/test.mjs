@@ -10,6 +10,7 @@
    (bindings, cold starts, the edge cache), which only `wrangler dev`
    or a deployment can.
    ============================================================ */
+import crypto from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import worker from './worker.js';
 
@@ -249,6 +250,82 @@ console.log('\n[14] stored IPs are salted per day and not reversible-looking');
   check('the raw address never reaches the table', cols.every(x => x.indexOf('203.0.113') === -1 && x !== 'unknown'));
   const same = await post(run({ time: 112.2, handle: 'again' }), IP);
   check('the same visitor is still accepted', same.status === 201, 'status ' + same.status);
+}
+
+console.log('\n[15] a signed-in player: the token decides the name, and carries the picture');
+{
+  /* The same construction the auth Worker mints with: "vhi1.<base64url
+     payload>.<base64url HMAC-SHA256>", signed over the base64url body with
+     IDENTITY_SECRET. There is no second implementation to drift from — the
+     verifier here is the leaderboard's half of that scheme, and this is the
+     only way to test it without a real Google account. */
+  const SECRET = 'local-test-identity-secret';
+  const b64url = (buf) => Buffer.from(buf).toString('base64url');
+  const now = Math.floor(Date.now() / 1000);
+  const mint = (payload, secret) => {
+    const body = b64url(JSON.stringify(Object.assign({ iat: now, exp: now + 300 }, payload)));
+    const sig = b64url(crypto.createHmac('sha256', secret || SECRET).update(body).digest());
+    return 'vhi1.' + body + '.' + sig;
+  };
+  const PICTURE = 'https://lh3.googleusercontent.com/a/ada=s96-c';
+  const token = mint({ sub: '110000000000000000001', name: 'Ada Lovelace', picture: PICTURE });
+
+  env.IDENTITY_SECRET = SECRET;
+  const signed = await post(run({ time: 113.3, handle: 'ignored-typed-name', identity: token }), IP);
+  const body = await signed.json();
+  eq('a verified run is accepted', signed.status, 201);
+  eq('and is filed under the name from the token', body.you.handle, 'Ada Lovelace');
+  eq('not the handle that came with the request', body.you.handle === 'ignored-typed-name', false);
+  eq('and the picture comes with it', body.you.picture, PICTURE);
+
+  const board = await (await get('/api/board?day=' + DAY + '&limit=25')).json();
+  const mine = board.top.filter((r) => r.handle === 'Ada Lovelace')[0];
+  check('the row is on the board with its picture', !!mine && mine.picture === PICTURE, JSON.stringify(mine));
+  check('every row has a picture field, empty when nobody signed in',
+    board.top.every((r) => typeof r.picture === 'string'), JSON.stringify(board.top.map((r) => typeof r.picture)));
+
+  /* a name Google gave can be longer than a typed one; both ends cap it the same */
+  const long = await post(run({ time: 114.4, identity: mint({ name: 'Bartholomew Featherstonehaugh III', picture: PICTURE }) }), IP);
+  eq('a long verified name is capped like a typed one', (await long.json()).you.handle.length, 14);
+
+  /* things that must not become a name on the board */
+  const forged = token.slice(0, -4) + 'AAAA';
+  eq('a forged signature → 401', (await post(run({ time: 115.5, identity: forged }), IP)).status, 401);
+  eq('and says so', (await (await post(run({ time: 115.5, identity: forged }), IP)).json()).error, 'identity token rejected');
+  eq('a token signed with another secret → 401',
+    (await post(run({ time: 116.6, identity: mint({ name: 'Mallory' }, 'not-the-secret') }), IP)).status, 401);
+  eq('an expired token → 401',
+    (await post(run({ time: 117.7, identity: mint({ name: 'Ada', exp: now - 3600 }) }), IP)).status, 401);
+  eq('a mangled token → 401', (await post(run({ time: 118.8, identity: 'vhi1.zzzz' }), IP)).status, 401);
+  eq('a re-signed payload with the name swapped is still forged',
+    (await post(run({ time: 119.9, identity: 'vhi1.' + b64url(JSON.stringify({ sub: 'x', name: 'Mallory', exp: now + 300 })) + '.' + token.split('.')[2] }), IP)).status, 401);
+  const after = await (await get('/api/board?day=' + DAY + '&limit=25')).json();
+  check('none of the refusals reached the board',
+    after.top.every((r) => r.handle !== 'Mallory'), JSON.stringify(after.top.map((r) => r.handle)));
+
+  /* A picture is a URL that ends up in an <img> on somebody else's screen.
+     Separate names, because `you` is the player's *best* run and reusing one
+     name would read the row above rather than the one just sent. */
+  const badUrl = await post(run({ time: 120.1, identity: mint({ name: 'Pic Http', picture: 'http://insecure.example/a.png' }) }), IP);
+  eq('an http picture is dropped, not stored', (await badUrl.json()).you.picture, '');
+  const creds = await post(run({ time: 121.2, identity: mint({ name: 'Pic Creds', picture: 'https://user:pass@example.com/a.png' }) }), IP);
+  eq('credentials in a picture URL are dropped too', (await creds.json()).you.picture, '');
+  const noPic = await post(run({ time: 121.7, identity: mint({ name: 'Pic None', picture: 'not a url at all' }) }), IP);
+  eq('and something that is not a URL is dropped', (await noPic.json()).you.picture, '');
+
+  /* a deployment that cannot check tokens must not believe one */
+  const noSecret = Object.assign({}, env, { IDENTITY_SECRET: undefined });
+  const unverifiable = await worker.fetch(new Request(BASE + '/api/runs', {
+    method: 'POST',
+    headers: Object.assign({ 'content-type': 'application/json' }, IP),
+    body: JSON.stringify(run({ time: 122.3, identity: token }))
+  }), noSecret);
+  eq('no identity secret → 401, not a trusted name', unverifiable.status, 401);
+  eq('and it names the missing variable', (await unverifiable.json()).error, 'no identity secret configured');
+
+  const typed = await post(run({ time: 123.4, handle: 'typed-fine' }), IP);
+  eq('a run with no token at all is unchanged', typed.status, 201);
+  eq('and keeps its typed handle', (await typed.json()).you.handle, 'typed-fine');
 }
 
 console.log('\n' + '='.repeat(58));

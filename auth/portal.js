@@ -303,7 +303,8 @@
         state.mine = r.body.profile;
         fillEditor(state.mine);
         statusCard(true, "Your profile",
-          "Signed in as " + (state.session.user && state.session.user.name || "you") + ". Your page is " +
+          "Signed in as " + (state.session.user && state.session.user.name || "you") +
+          (state.mine.role === "admin" ? " (admin)" : "") + ". Your page is " +
           (state.mine.visibility === "private" ? "private — only you can open it." : "public — anyone with @" + state.mine.handle + " can open it."),
           [showMyProfile(), { label: "Edit profile", className: "primary", run: function () { selectTab("editor"); } }]);
         out.hidden = false;

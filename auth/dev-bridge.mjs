@@ -60,6 +60,10 @@ const env = {
   AUTH_GOOGLE_ID: GOOGLE_ID,
   AUTH_GOOGLE_SECRET: GOOGLE_SECRET,
   IDENTITY_SECRET: process.env.IDENTITY_SECRET || "local-dev-identity-secret",
+  /* Which fake account is the admin, so the admin paths can be exercised
+     locally at all: `ADMIN_EMAILS=user-ev-2@example.com node dev-bridge.mjs`
+     makes whoever /__dev/act-as gave sub dev-2 the admin. */
+  ADMIN_EMAILS: process.env.ADMIN_EMAILS || "",
   SITE_ORIGINS: process.env.SITE_ORIGINS || "http://127.0.0.1:8177,http://localhost:8177",
   DB: d1Adapter({ file: dbFile })
 };
@@ -166,6 +170,7 @@ server.listen(port, host, () => {
   console.log("  Google:           faked locally, signs real RS256 id_tokens");
   console.log("  callback URL:     http://" + host + ":" + port + "/api/auth/callback/google");
   console.log("  SITE_ORIGINS:     " + env.SITE_ORIGINS);
+  console.log("  ADMIN_EMAILS:     " + (env.ADMIN_EMAILS || "(nobody is an admin)"));
   console.log("  sign in as:       http://" + host + ":" + port + "/__dev/act-as?sub=dev-1&name=Ada%20Lovelace");
   console.log("  not a deployment: node:sqlite and a plain http server, not workerd");
 });

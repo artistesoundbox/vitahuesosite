@@ -309,6 +309,16 @@
     #daily-panel input[type=text]:focus { border-color: rgba(90, 255, 190, 0.8); }
     #daily-panel table.world td.pos { color: #ffc247; }
     #daily-panel table.world tr.me td { color: #9dffcf; }
+    /* the signed-in player, beside the board: Google's name and picture, or
+       the typed handle when nobody is signed in */
+    #daily-panel .who-chip { display: inline-flex; align-items: center; gap: 7px;
+      font-size: 10px; letter-spacing: 0.12em; color: #9dffcf; }
+    #daily-panel .who-chip img { width: 22px; height: 22px; border-radius: 50%; display: block; }
+    #daily-panel .who-chip .g { color: #7d90ae; }
+    #daily-panel .who-chip button { font: inherit; letter-spacing: 0.12em; cursor: pointer;
+      background: none; border: 0; padding: 0; color: #ffc247; text-decoration: underline; }
+    #daily-panel table.world img.who { width: 18px; height: 18px; border-radius: 50%;
+      display: inline-block; vertical-align: -5px; margin-right: 5px; }
     /* drag-steering takes the canvas, so the two steer pads step aside and the
        pedals stay where the other thumb expects them */
     #pads.dragsteer #pad-left, #pads.dragsteer #pad-right { display: none; }
@@ -3202,9 +3212,13 @@
       h += '<h5>today\'s board — ' + today.length + (today.length === 1 ? ' run' : ' runs') + '</h5>' + boardTable(today.slice(0, 5), false);
       h += '<h5>recent runs</h5>' + boardTable(recent, true);
       h += '<h5>global board' + (BOARD_API ? '' : ' (off)') + ' — day #' + DAILY_DAY + '</h5>' +
-        '<div class="row-btns"><label class="hint" for="pilot">your name on the board</label>' +
-        '<input id="pilot" type="text" maxlength="14" spellcheck="false" autocomplete="off" value="' +
-        escapeHTML(pilotName) + '"><span class="hint" id="global-status">…</span></div>' +
+        '<div class="row-btns">' +
+        (identity
+          ? whoChipHTML()
+          : '<label class="hint" for="pilot">your name on the board</label>' +
+            '<input id="pilot" type="text" maxlength="14" spellcheck="false" autocomplete="off" value="' +
+            escapeHTML(pilotName) + '">') +
+        '<span class="hint" id="global-status">…</span></div>' +
         '<div id="global-board"></div>';
       return h;
     }
@@ -3226,6 +3240,12 @@
         pilot.addEventListener('change', commit);
         pilot.addEventListener('blur', commit);
       }
+      const out = dailyEl.querySelector('#who-out');
+      if (out) out.addEventListener('click', function () {
+        identity = null;
+        if (window.VH_AUTH) window.VH_AUTH.signOut();
+        renderDailyPanel();
+      });
       renderGlobalBoard();
       /* the panel is built on the flag and at boot: both are the moments the
          board is worth asking again, and both are rare enough not to poll */
@@ -3274,10 +3294,30 @@
        flag lives on the run itself (sent: 0 pending, 1 delivered, -1 refused),
        so a reload or a week offline does not lose the queue.
        ============================================================ */
-    const BOARD_API = 'https://site-5c345ac2201048e49773f3a2db67be22.freebuff.page';   // the deployed Worker root; '' = this device only
+    /* A local override, for working on the board without the deployed Worker:
+       ?board=http://127.0.0.1:8179 — accepted only on loopback, so a link
+       cannot point somebody else's game at another server. The same rule as
+       signin.js's ?api, and for the same reason. */
+    const DEPLOYED_BOARD = 'https://site-5c345ac2201048e49773f3a2db67be22.freebuff.page';   // the deployed Worker root; '' = this device only
+    const BOARD_API = (function () {
+      try {
+        const want = new URLSearchParams(location.search).get('board');
+        const host = location.hostname;
+        const local = host === '127.0.0.1' || host === 'localhost' || host === '[::1]' || host === '::1';
+        if (want && local && /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(want)) {
+          return want.replace(/\/+$/, '');
+        }
+      } catch (e) { /* no URLSearchParams: fall through to the deployed board */ }
+      return DEPLOYED_BOARD;
+    })();
     const PILOT_KEY = 'vh-gp-pilot', BOARD_TIMEOUT = 8000, SEND_BATCH = 5;
     let pilotName = 'pilot';
     try { pilotName = cleanPilot(localStorage.getItem(PILOT_KEY) || ''); } catch (e) { pilotName = 'pilot'; }
+    /* The signed-in player: the token the board verifies, and the name and
+       picture that come with it. Null when nobody is signed in — which is the
+       state every other line here already assumed, so a signed-out page
+       behaves exactly as it did before there was a sign-in at all. */
+    let identity = null;
     let boardState = { status: BOARD_API ? 'idle' : 'off', total: 0, top: [], you: null, config: null, note: '' };
     let boardBusy = false;
 
@@ -3314,7 +3354,10 @@
     }
     function boardPayload(run) {
       return { day: run.day, seed: run.seed, car: run.car, mod: run.mod, par: run.par,
-        time: run.time, best: run.best, pos: run.pos, of: run.of, handle: pilotName };
+        time: run.time, best: run.best, pos: run.pos, of: run.of, handle: pilotName,
+        /* the board checks this and takes the name from it; the handle above
+           is what it uses when there is no token */
+        identity: identity ? identity.token : null };
     }
     async function flushRuns() {
       if (!BOARD_API || boardBusy) return 0;
@@ -3338,6 +3381,16 @@
           if (res.status === 200 || res.status === 201) {
             run.sent = 1; delivered++;
             if (res.body) applyBoard(res.body, 'sent');
+          } else if (res.status === 401 && identity) {
+            /* the board does not believe the token — an expired session, or
+               something pretending to be one. Stop claiming to be signed in
+               and send the run again as a typed name; it stays queued, so
+               nothing is lost over a stale cookie. */
+            identity = null;
+            run.sent = 0;
+            boardState.note = (res.body && res.body.error) || 'the board did not accept the sign-in';
+            renderDailyPanel();
+            break;
           } else if (res.status === 409 || res.status === 422 || res.status === 413) {
             /* the server will never take this one (it names the field), so stop
                retrying it — but it stays in the local board, flagged */
@@ -3430,7 +3483,8 @@
       boardState.top.forEach(function (r) {
         h += '<tr' + (r.handle === pilotName ? ' class="me"' : '') + '>' +
           '<td class="pos">' + r.rank + '</td>' +
-          '<td class="nm">' + escapeHTML(r.handle) + '</td>' +
+          '<td class="nm">' + (r.picture ? '<img class="who" src="' + escapeHTML(r.picture) + '" alt="">' : '') +
+            escapeHTML(r.handle) + '</td>' +
           '<td class="tm">' + fmtTime(r.time) + '</td>' +
           '<td class="st">' + STAR_RUN[r.stars] + '</td>' +
           '<td class="tm">P' + r.pos + '/' + r.of + '</td></tr>';
@@ -3449,6 +3503,31 @@
       refreshBoard();
       return pilotName;
     }
+
+    /* The signed-in player, if there is one. VH_AUTH comes from signin.js,
+       which is parsed after this script, so this waits for the document
+       rather than the parse: at DOMContentLoaded the helper exists. */
+    function whoChipHTML() {
+      if (!identity) return '';
+      return '<span class="who-chip">' +
+        (identity.picture ? '<img src="' + escapeHTML(identity.picture) + '" alt="">' : '') +
+        '<b>' + escapeHTML(identity.name) + '</b>' +
+        '<span class="g">signed in with Google</span>' +
+        '<button type="button" id="who-out">sign out</button></span>';
+    }
+    function loadIdentity() {
+      if (!window.VH_AUTH) return;
+      window.VH_AUTH.identity().then(function (who) {
+        if (!who || !who.token) return;                    /* not signed in is not an error */
+        identity = { token: who.token, name: cleanPilot(who.name), picture: who.picture || '' };
+        /* the name on the board is the one Google gave, not one that was
+           typed: that is the whole point of signing in */
+        setPilot(identity.name);
+        renderDailyPanel();
+      }).catch(function () { /* the helper looked, and there is nobody */ });
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadIdentity);
+    else loadIdentity();
 
     function renderDailyNote() {
       if (!DAILY_ON) return;
@@ -4914,7 +4993,8 @@
         runs: function () { return runs; },
         /* the hosted board, from the page's side: what it thinks it is doing,
            and the two calls the panel makes for it */
-        worldBoard: function () { return { api: BOARD_API, pilot: pilotName, status: boardState.status,
+        worldBoard: function () { return { api: BOARD_API, pilot: pilotName, signedIn: identity ? identity.name : null,
+          status: boardState.status,
           total: boardState.total, top: boardState.top, you: boardState.you, config: boardState.config,
           note: boardState.note, statusText: boardStatusText(), mismatch: boardMismatch(),
           pending: runs.filter(function (r) { return r.sent === 0; }).length,
@@ -4967,6 +5047,7 @@
     }
   </script>
 
+  <script src="signin.js"></script>
   <script src="banner.js"></script>
 </body>
 </html>
