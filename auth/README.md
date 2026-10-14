@@ -3,7 +3,8 @@
 The site is static HTML on GitHub Pages, so there is nowhere for `next-auth`
 to run. This directory is the Auth.js half that can run off the Pages host:
 `@auth/core` mounted by hand in a Cloudflare Worker, with the Google
-provider, JWT sessions and no database.
+provider and JWT sessions. Accounts and profiles live in D1; the session
+itself is still a JWT in the player's own cookie.
 
 | | |
 | --- | --- |
@@ -11,6 +12,7 @@ provider, JWT sessions and no database.
 | callback URL | `https://site-9066bb3e67224190b78bd63d0ca6bb1e.freebuff.page/api/auth/callback/google` |
 | site-side helper | [`../signin.js`](../signin.js) |
 | page | `https://artistesoundbox.github.io/vitahuesosite/auth/signin.html` |
+| portal | `https://artistesoundbox.github.io/vitahuesosite/auth/portal.html` |
 
 ## What is in here
 
@@ -19,7 +21,11 @@ provider, JWT sessions and no database.
 | `src/worker.src.js` | the Worker. Edit this. |
 | `worker.js` | the deployed artifact — `src/worker.src.js` with `@auth/core` inlined. Committed, because Sites uploads a prebuilt module and the site has no build step of its own. |
 | `build.mjs` | `node build.mjs` — bundles the source into `worker.js`, refuses to emit a module with a `node:` import or no fetch handler, and stamps the source's digest into the banner. |
-| `test.mjs` | 101 checks. Runs the real bundle's fetch handler end to end against a locally faked Google: URL-encoded PKCE exchange, RS256 id_token verified against a published JWKS, sessions, refusals. No network. |
+| `src/profiles.js` | accounts and profiles: the schema, the validation, and the `/api/profile*` routes. The pattern the next modules follow. |
+| `portal.html` / `portal.css` / `portal.js` | the portal page — profile view, editor, drag-and-drop section order. Hand-written CSS, vanilla JS, no build step, no framework. |
+| `local-google.mjs` | the D1 shim and the fake Google, shared by the suite and the bridge so the two cannot drift. |
+| `dev-bridge.mjs` | the built Worker on `127.0.0.1` with a real SQLite database and the fake Google, so the pages can be driven in a browser. |
+| `test.mjs` | 215 checks. Runs the real bundle's fetch handler end to end against a locally faked Google: URL-encoded PKCE exchange, RS256 id_token verified against a published JWKS, sessions, profile CRUD, refusals. No network. |
 | `sites.manifest.json` | what `sites_deploy` uploads: `worker.js` as `index.js`, nothing else. |
 
 ## Routes
@@ -34,7 +40,11 @@ provider, JWT sessions and no database.
 | `POST /api/auth/signout` | ends the session — `{csrfToken}` |
 | `GET /api/me` | `{signedIn, user}` shaped for the site |
 | `GET /api/identity` | `{token, name, picture}` — a short-lived signed name for the leaderboard |
-| `GET /api/health` | which of the secrets are set (never their values) |
+| `GET /api/health` | which of the secrets are set (never their values), and whether a database is bound |
+| `GET /api/profiles` | recently updated public profiles, `?limit=` (max 50) |
+| `GET /api/profile` | my profile — created on first look, `{me: true}` |
+| `PUT /api/profile` | validated update: `displayName`, `handle`, `bio`, `avatar`, `banner`, `links`, `sections`, `visibility` |
+| `GET /api/profile/<handle>` | that profile's public face — 403 when it is private and it is not yours |
 
 ## Setting it up
 
@@ -69,6 +79,13 @@ provider, JWT sessions and no database.
 Set them in **Sites → Secrets** (values never go through a chat or a commit),
 then redeploy so the bindings attach — a secret set after a deploy is not in the
 running Worker until the next one.
+
+The profile module also needs storage:
+`sites_add_storage(siteId, environment, requestId, kind='d1', name='DB')` binds a
+D1 database as `DB`, and **a deploy after that attaches it**. There is no
+migration step — the schema creates itself on the first profile request — and a
+deployment with no binding answers the profile routes with 503 and says which
+variable is missing rather than pretending to have saved.
 
 Missing secrets fail loudly, and each one fails only what needs it. Without
 `AUTH_SECRET` every `/api/auth/*` route answers 503 and names the variable;
@@ -121,6 +138,15 @@ Secure`. That is a deliberate departure from the library's defaults and the
 one thing to check first if sign-in ever "works" but leaves the page signed
 out.
 
+Over plain http — which is only ever the local bridge — `SameSite=None` is not a
+legal cookie at all: Chrome drops the whole `Set-Cookie` without telling the
+server, the next POST arrives without its CSRF cookie, and the flow answers
+`error=MissingCSRF` with nothing anywhere pointing at a cookie. So the options
+are derived from the request protocol as well: https gets `None; Secure`, http
+gets `Lax` — the page and the bridge are both loopback, so they are the same
+site and Lax is sent. (Found by pointing a browser at it; the suite could not
+see it, because the suite's requests are https and it never preflights.)
+
 It also means the session cookie travels on cross-site POSTs, so the Worker
 enforces its own `SITE_ORIGINS` check on POSTs in addition to Auth.js's CSRF
 token, and `state` and `nonce` are switched on
@@ -133,9 +159,13 @@ token, and `state` and `nonce` are switched on
   are fine; on iOS the sign-in can complete and the session still not persist.
   Serving this Worker on a subdomain of the site's own domain would fix it
   properly, and that needs a custom domain.
-- **No accounts are stored.** There is no adapter and no user table: the
-  session is a JWT in the player's own cookie, so nothing here can list users
-  or revoke one person's session.
+- **A session cannot be revoked, only expired.** The session is a JWT in the
+  player's own cookie and no adapter is mounted, so signing one person out
+  early is not possible. Accounts *are* stored — `users`, keyed by Google's
+  `sub` — so deleting a profile is a row delete, but an outstanding cookie
+  keeps working until it expires.
+- **No admin role exists yet.** Every row is an ordinary account; `users` has
+  no `role` column and nothing checks one.
 - **It is not `next-auth`.** Same library, same provider, same session format —
   but it is `@auth/core` mounted by hand, so there is no `auth()` helper, no
   React session provider, and no `next-auth` middleware.
@@ -157,21 +187,45 @@ directory — secrets go through **Sites → Secrets**, not through the upload.
 
 ## State of the deployment
 
-Preview is deployed and live at the URL above. `SITE_ORIGINS`, `AUTH_SECRET` and
-`IDENTITY_SECRET` are set. `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` are **not**,
-so today the deployment answers `/api/me` with `{signedIn: false}`,
-`/api/identity` with 401, and refuses the sign-in and provider routes with a 503
-naming the missing variables — which is exactly what the sign-in page reports on
-screen. Finish step 1 and step 2 above, redeploy, and it is live. Production has
-not been touched.
+Preview is deployed and live at the URL above. `SITE_ORIGINS`, `AUTH_SECRET`,
+`IDENTITY_SECRET` and the `DB` binding are set. `AUTH_GOOGLE_ID` /
+`AUTH_GOOGLE_SECRET` are **not**, so today the deployment answers `/api/me` with
+`{signedIn: false}`, `/api/identity` with 401, and refuses the sign-in and
+provider routes with a 503 naming the missing variables — which is exactly what
+the sign-in page reports on screen. Finish step 1 and step 2 above, redeploy,
+and it is live: the first person to sign in gets a profile created for them,
+with Google's name and picture already in it. Production has not been touched.
+
+The profile module is verified live: `/api/profiles` answers an empty list
+against the real D1 (which is what runs the schema), and an edit without a
+session is 401, a foreign origin is 403, an unknown handle is 404 — all against
+the deployed Worker. The end-to-end edit was verified locally, in a browser,
+against the same bundle; there is no signed-in path in the deployment yet
+because there are no Google credentials to sign in with.
 
 ## Tests
 
 ```bash
 cd auth && npm install     # once: @auth/core, esbuild
 node build.mjs             # rebuilds worker.js from src/worker.src.js
-node test.mjs              # 101 checks, no network, no Google account
+node test.mjs              # 215 checks, no network, no Google account
 ```
+
+The suite cannot see everything a browser can — a CORS preflight, and whether a
+cookie is legal — so the pages get driven too:
+
+```bash
+node auth/dev-bridge.mjs   # the Worker + sqlite + fake Google, on :8178
+node brokenboot/serve.mjs  # the site on :8177
+# http://127.0.0.1:8177/auth/portal.html?api=http://127.0.0.1:8178
+# switch accounts: http://127.0.0.1:8178/__dev/act-as?sub=dev-2&name=Grace%20Hopper
+```
+
+Two bugs in this directory were found that way and by nothing else: the profile
+save was blocked by the Worker's own `Access-Control-Allow-Methods` (it listed
+`GET, POST, OPTIONS`, so the browser refused to send the PUT and no request ever
+reached the Worker), and over http every cookie was `SameSite=None`, which is
+illegal without `Secure` and silently dropped. Both are pinned by the suite now.
 
 `test.mjs` also fails if `worker.js` is not the bundle of the current
 `src/worker.src.js` (the source digest is stamped into the banner), so editing

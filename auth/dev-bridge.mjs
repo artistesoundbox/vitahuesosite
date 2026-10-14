@@ -119,14 +119,17 @@ async function rewriteGoogleLinks(response, buffer) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://" + host + ":" + port);
   try {
+    /* The dev routes answer the site's own origin so a page (or the console on
+       one) can switch accounts without a round trip through a navigation. */
+    const devHeaders = { "content-type": "application/json", "access-control-allow-origin": "*" };
     if (url.pathname === "/__dev/act-as") {
       const now = actAs(url);
-      res.writeHead(200, { "content-type": "application/json" });
+      res.writeHead(200, devHeaders);
       res.end(JSON.stringify({ ok: true, next: now }, null, 2));
       return;
     }
-    if (url.pathname === "/__dev/who" ) {
-      res.writeHead(200, { "content-type": "application/json" });
+    if (url.pathname === "/__dev/who") {
+      res.writeHead(200, devHeaders);
       res.end(JSON.stringify({ ok: true, next: google.profile }, null, 2));
       return;
     }
