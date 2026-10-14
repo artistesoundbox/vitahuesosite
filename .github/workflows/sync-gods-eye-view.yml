@@ -19,6 +19,11 @@
 # build that did not produce it) fails the run rather than mirroring a demo
 # without its level over the live one. That guard exists because it happened.
 #
+# And it will not replace a demo it did not produce. A mirror is `--delete`, so a run
+# stops unless the demo path still matches .gev-mirror.json — the path-and-hash record
+# the last mirror left outside the mirrored directory. That is what protects a demo
+# published by hand, which the live one still is: tools/check-gev-mirror.mjs.
+#
 # ONE MANUAL STEP (repo owner)
 # Add CESIUM_ION_TOKEN under Settings -> Secrets and variables -> Actions, with
 # the value the source build inlines. Without it the job fails before publishing
@@ -52,12 +57,15 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # Mirrored in the "Check out the source repo" step: `with:` takes no variables.
+  # Drives both the probe and the checkout below, so the ref this workflow builds is
+  # named in exactly one place. (A workflow-level env is available inside a step's
+  # `with:` — see the Contexts reference.)
   SOURCE_REPO: bilawalsidhu/gods-eye-view
   SOURCE_BRANCH: main
   SOURCE_DIR: .gev-source
   TARGET_DIR: gods-eye-view
   STAMP_PATH: .gev-source-sha
+  MIRROR_PATH: .gev-mirror.json
 
 jobs:
   sync:
@@ -92,12 +100,32 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # A guard that has gone blind is not a guard, so its own suite runs first, and it
+      # needs nothing but node: it builds its fixtures in a temp directory, with no
+      # repository and no network.
+      #
+      # The other half of the refusal, and the reason the site can keep serving a demo
+      # this workflow did not build: a mirror is `--delete`, so it may only ever replace
+      # a tree the workflow itself produced. The live demo was published by hand — a
+      # source checkout built and copied over — because the work it is made of (the
+      # flying-saucer sandbox, the Grand Central start view, the Godot level) is on no ref
+      # this workflow can build. With no record of a mirror having produced what is there,
+      # the run stops here: before the clone, the install, the build and the rsync. The
+      # message names the way forward — move the work to a ref, or re-record the tree
+      # deliberately with --accept. See tools/check-gev-mirror.mjs.
+      - name: Refuse to mirror over a demo this workflow did not produce
+        if: steps.probe.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          node tools/test-gev-mirror.mjs
+          node tools/check-gev-mirror.mjs
+
       - name: Check out the source repo
         if: steps.probe.outputs.changed == 'true'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: bilawalsidhu/gods-eye-view
-          ref: main
+          ref: ${{ env.SOURCE_BRANCH }}
           path: .gev-source
           fetch-depth: 1
           persist-credentials: false
@@ -169,6 +197,9 @@ jobs:
           # A mirror, not a merge: the demo path holds build output only.
           rsync --archive --delete .gev-source/dist/ "${TARGET_DIR}/"
           echo "${{ steps.probe.outputs.upstream }}" > "${STAMP_PATH}"
+          # The record the next run checks: this tree is now the mirror's own, and any
+          # change to it afterwards stops the following mirror.
+          node tools/check-gev-mirror.mjs --accept "${{ steps.probe.outputs.upstream }}"
 
       - name: Land the sync commit
         if: steps.probe.outputs.changed == 'true'
@@ -178,7 +209,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- "${TARGET_DIR}" "${STAMP_PATH}"
+          git add -- "${TARGET_DIR}" "${STAMP_PATH}" "${MIRROR_PATH}"
           if git diff --cached --quiet; then
             echo "the published demo already matches this build — nothing to commit"
             exit 0

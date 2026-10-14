@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-EY4SD4FCN4"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-EY4SD4FCN4');
+  </script>
+  <meta charset="UTF-8" />
+  <title>VitaminaHueso – Sign in</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; min-height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(circle at top, #1b2a3d 0%, #05070b 60%, #000000 100%);
+      color: #cfe4ff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 24px;
+    }
+    .card {
+      width: 100%; max-width: 420px;
+      border: 1px solid rgba(207, 228, 255, 0.14);
+      border-radius: 16px;
+      padding: 28px 26px 24px;
+      background: rgba(8, 14, 24, 0.72);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+      text-align: center;
+    }
+    h1 { font-size: 20px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; }
+    p { font-size: 14px; line-height: 1.5; color: #9fb8d6; margin-top: 10px; }
+    a { color: #7cc4ff; }
+    .state { margin-top: 20px; }
+    .vh-auth { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; min-height: 40px; }
+    .vh-auth > button { flex: 0 0 auto; }
+    .vh-auth img { width: 32px; height: 32px; border-radius: 50%; }
+    .vh-auth span { font-weight: 600; }
+    .vh-auth button {
+      font: inherit; cursor: pointer;
+      border-radius: 8px; padding: 9px 14px;
+      border: 1px solid rgba(207, 228, 255, 0.3);
+      background: transparent; color: #cfe4ff;
+    }
+    .vh-auth .vh-auth-google {
+      background: #1a73e8; border-color: #1a73e8; color: #fff; font-weight: 600;
+    }
+    .vh-auth button:disabled { opacity: 0.6; cursor: progress; }
+    /* The failure text takes its own line rather than sitting beside the
+       button: as a flex item it would squeeze the button out of shape, and
+       a squeezed button reads as something different having gone wrong. */
+    .vh-auth[data-error]::after {
+      content: attr(data-error);
+      flex: 1 0 100%;
+      margin-top: 12px; color: #ffb4b4; font-size: 13px;
+    }
+    #note {
+      margin-top: 18px; font-size: 13px; color: #8fa6c2;
+      border-top: 1px solid rgba(207, 228, 255, 0.12); padding-top: 14px;
+      text-align: left; white-space: pre-line;
+    }
+    .back { display: inline-block; margin-top: 18px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Sign in</h1>
+    <p>Signing in with Google gives you a name on the City Grand Prix leaderboard — the one you actually use, instead of a typed handle.</p>
+    <div class="state" data-vh-auth></div>
+    <div id="note">Checking the sign-in service…</div>
+    <a class="back" href="../index.html">← back to the site</a>
+  </main>
+
+  <script src="../signin.js"></script>
+  <script>
+    /* What the page says when the Worker is not set up yet. Two separate
+       facts, because they are fixed in two different places: the Worker's
+       own configuration (secrets), which is a deployment problem, and a
+       network failure reaching it at all, which is not. */
+    (async function () {
+      const note = document.getElementById("note");
+      try {
+        const res = await fetch(VH_AUTH.api() + "/api/health", { mode: "cors" });
+        const body = await res.json();
+        if (body.hasGoogleCredentials && body.hasAuthSecret) {
+          note.textContent = "Ready. The sign-in service is configured and this page will hand you to Google.";
+          return;
+        }
+        note.textContent =
+          "The sign-in service is running but not configured yet:\n" +
+          "  AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET  " + (body.hasGoogleCredentials ? "set" : "missing") + "\n" +
+          "  AUTH_SECRET                          " + (body.hasAuthSecret ? "set" : "missing") + "\n" +
+          "See auth/README.md for the Google Cloud steps.";
+      } catch (err) {
+        note.textContent = "Could not reach the sign-in service at " + VH_AUTH.api() + " — " + err;
+      }
+    })();
+  </script>
+</body>
+</html>

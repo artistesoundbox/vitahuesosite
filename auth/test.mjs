@@ -25,9 +25,18 @@
    from the response headers, but no browser's third-party-cookie policy
    is consulted here), and Google's own consent screen. Those only a
    deployment and a browser can.
+
+   ONE EXPECTED SOUND
+   `[auth][error] ...` lines on stderr are Auth.js reporting the very
+   refusals this suite asks for — a tampered session cookie, a callback
+   with no flow cookie, a wrong CSRF token, an unknown route. They are the
+   library working, not the test failing; the exit code is the verdict.
    ============================================================ */
 import http from "node:http";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 /* ---- the three origins this deployment lives between ---- */
 const WORKER_ORIGIN = "https://auth.test";                       // the deployed Worker
@@ -232,6 +241,21 @@ globalThis.fetch = function (input, init) {
    time can slip past it. */
 const worker = (await import("./worker.js?t=" + Date.now())).default;
 
+/* Is the committed bundle the bundle of the source next to it? It has to
+   be asked before anything else means much: every check below would pass
+   just as happily against an old build, and an old build is what gets
+   deployed if somebody edits the source and forgets `node build.mjs`. */
+const here = path.dirname(fileURLToPath(import.meta.url));
+const sourceBytes = fs.readFileSync(path.join(here, "src", "worker.src.js"));
+const bundleText = fs.readFileSync(path.join(here, "worker.js"), "utf8");
+const recorded = /source-sha256:\s*([0-9a-f]{64})/.exec(bundleText);
+const actual = crypto.createHash("sha256").update(sourceBytes).digest("hex");
+section("the committed bundle is the bundle of the source beside it");
+check("worker.js records the digest of its source", !!recorded, String(recorded && recorded[1]));
+check("and it is the digest of the source as it stands now (run `node build.mjs` after editing src/)",
+  !!recorded && recorded[1] === actual,
+  recorded ? "bundle " + recorded[1].slice(0, 12) + " vs source " + actual.slice(0, 12) : "no digest in the bundle");
+
 /* ============================================================
    driving the Worker the way a browser would
    ============================================================ */
@@ -411,9 +435,10 @@ section("Google's side of the flow (the faked consent screen)");
   check("the session cookie is HttpOnly", /httponly/i.test(sessionCookie), sessionCookie);
   check("the session cookie holds no readable profile",
     !/test player|player@example\.com/i.test(sessionCookie), sessionCookie);
-  check("the one-shot checks are consumed",
-    !cookieNamed(callbackRes, "__Secure-authjs.state") && !cookieNamed(callbackRes, "__Secure-authjs.pkce.code_verifier"),
-    rawSetCookies(callbackRes).join(" | "));
+  const spent = ["__Secure-authjs.state", "__Secure-authjs.pkce.code_verifier", "__Secure-authjs.nonce"];
+  check("the one-shot checks are consumed, not left lying around",
+    spent.every((n) => /max-age=0/i.test(cookieNamed(callbackRes, n))),
+    rawSetCookies(callbackRes).map((c) => c.split(";")[0] + "…").join(" | "));
 }
 
 section("who is signed in");
@@ -424,7 +449,8 @@ section("who is signed in");
   eq("with the Google id", body && body.user && body.user.id, PROFILE.sub);
   eq("with the Google name", body && body.user && body.user.name, PROFILE.name);
   eq("with the Google picture", body && body.user && body.user.picture, PROFILE.picture);
-  eq("personalized responses are not cached", res.headers.get("cache-control"), "no-store");
+  check("personalized responses are not cacheable",
+    /no-store/i.test(String(res.headers.get("cache-control"))), String(res.headers.get("cache-control")));
 
   const me = await call("/api/me");
   const meBody = await jsonOf(me);
@@ -459,10 +485,34 @@ section("a name the leaderboard can verify");
     !/AUTH_SECRET|session/i.test(Buffer.from(parts[1], "base64url").toString("utf8")));
 }
 
-section("the session survives, and only the real one is accepted");
+section("the identity is the player's own, and it does not change");
 {
   const again = await jsonOf(await call("/api/auth/session"));
   eq("a second request is still signed in", again && again.user && again.user.id, PROFILE.sub);
+
+  /* The same person signing in again must be the same identity. Auth.js's
+     own id is a fresh UUID per sign-in, which is exactly what a
+     scoreboard cannot use — hence Google's account id instead, asserted
+     here by signing in a second time from a clean jar. */
+  const secondJar = new Jar();
+  const savedJar = jar.cookies;
+  jar.cookies = secondJar.cookies;
+  const csrf2 = await jsonOf(await call("/api/auth/csrf"));
+  const start2 = await jsonOf(await call("/api/auth/signin/google", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", "x-auth-return-redirect": "1" },
+    body: new URLSearchParams({ csrfToken: csrf2.csrfToken, callbackUrl: SITE_PAGE }).toString()
+  }));
+  const authorize2 = await globalThis.fetch(start2.url, { redirect: "manual" });
+  await call(authorize2.headers.get("location"));
+  const secondSession = await jsonOf(await call("/api/auth/session"));
+  eq("signing in again is the same player, not a new one",
+    secondSession && secondSession.user && secondSession.user.id, PROFILE.sub);
+  const secondIdentity = await jsonOf(await call("/api/identity"));
+  check("and no Auth.js-generated id leaks into the token",
+    !!secondIdentity && !/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/.test(String(secondIdentity.token)),
+    String(secondIdentity && secondIdentity.token).slice(0, 40));
+  jar.cookies = savedJar;
 
   const jarBefore = new Map(jar.cookies);
   jar.cookies.set("__Secure-authjs.session-token", "tampered.value.here");
@@ -471,6 +521,8 @@ section("the session survives, and only the real one is accepted");
   const identity = await call("/api/identity", { absorb: false });
   eq("and gets no identity token", identity.status, 401);
   jar.cookies = jarBefore;
+
+  check("the restored session still works", !!jar.get("__Secure-authjs.session-token"), jar.header().slice(0, 40));
 }
 
 section("redirects cannot be aimed at somebody else");
@@ -499,11 +551,18 @@ section("redirects cannot be aimed at somebody else");
 
 section("refusals");
 {
+  /* Auth.js refuses this by redirecting to its own error page rather than
+     answering a 4xx, so the refusal is asserted where it actually shows:
+     an error in the redirect, and no session issued. */
   const noState = await call(WORKER_ORIGIN + "/api/auth/callback/google?code=code-nothing&state=state-nothing", {
     noCookies: true, absorb: false
   });
-  check("a callback with no flow cookie is refused", noState.status !== 200 && noState.status !== 302,
-    "status " + noState.status);
+  const noStateWhere = String(noState.headers.get("location"));
+  check("a callback with no flow cookie is refused, not honoured",
+    noState.status === 302 && /error/i.test(noStateWhere) && !!noStateWhere,
+    "status " + noState.status + " -> " + noStateWhere);
+  check("and no session is issued for it",
+    !cookieNamed(noState, "__Secure-authjs.session-token"), rawSetCookies(noState).join(" | "));
 
   const badCsrf = await call("/api/auth/signin/google", {
     method: "POST",
@@ -567,9 +626,21 @@ section("a deployment missing its secrets fails loudly, not silently");
   const shortRes = await worker.fetch(new Request(WORKER_ORIGIN + "/api/auth/session", {}), short);
   eq("a too-short secret is refused too", shortRes.status, 503);
 
+  /* Half-configured is its own state, and the page has to be able to tell
+     it apart from "signed out": the sign-in routes refuse, the routes that
+     never talk to Google keep working, and nothing renders a Google button
+     that cannot work. */
   const noGoogle = Object.assign({}, env, { AUTH_GOOGLE_ID: undefined });
-  const googleRes = await worker.fetch(new Request(WORKER_ORIGIN + "/api/auth/session", {}), noGoogle);
-  eq("missing Google credentials are refused", googleRes.status, 503);
+  const signinNoGoogle = await worker.fetch(new Request(WORKER_ORIGIN + "/api/auth/signin/google", {}), noGoogle);
+  eq("missing Google credentials refuse the sign-in route", signinNoGoogle.status, 503);
+  const providersNoGoogle = await worker.fetch(new Request(WORKER_ORIGIN + "/api/auth/providers", {}), noGoogle);
+  eq("and the provider list, rather than rendering a dead button", providersNoGoogle.status, 503);
+  const csrfNoGoogle = await worker.fetch(new Request(WORKER_ORIGIN + "/api/auth/csrf", {}), noGoogle);
+  const csrfNoGoogleBody = await csrfNoGoogle.json();
+  check("but csrf still answers, so the page can be told what is missing",
+    csrfNoGoogle.status === 200 && !!csrfNoGoogleBody.csrfToken, "status " + csrfNoGoogle.status);
+  const meNoGoogle = await worker.fetch(new Request(WORKER_ORIGIN + "/api/me", {}), noGoogle);
+  eq("and who-am-I still answers", meNoGoogle.status, 200);
 
   const noIdentity = Object.assign({}, env, { IDENTITY_SECRET: undefined });
   const identityRes = await worker.fetch(new Request(WORKER_ORIGIN + "/api/identity", {}), noIdentity);

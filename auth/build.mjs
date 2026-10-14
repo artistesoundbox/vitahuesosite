@@ -18,23 +18,33 @@
    written at all, so a broken build cannot quietly ship over a good one.
 */
 import { build } from "esbuild";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const outfile = path.join(here, "worker.js");
+const sourceFile = path.join(here, "src", "worker.src.js");
+
+/* The source's digest travels inside the bundle so test.mjs can tell a
+   bundle built from this source from one built from an older version of
+   it — without esbuild, which CI does not install. A committed build
+   artifact that nobody can check is a file that drifts. */
+const sourceSha = crypto.createHash("sha256").update(fs.readFileSync(sourceFile)).digest("hex");
 
 const banner = [
   "/* ============================================================",
   "   GENERATED FILE — do not edit. Built from src/worker.src.js by",
   "   `node build.mjs`, which inlines @auth/core so the Worker needs no",
   "   registry at runtime. Edit the source, rebuild, redeploy worker.js.",
+  "  ",
+  "   source-sha256: " + sourceSha,
   "   ============================================================ */"
 ].join("\n");
 
 await build({
-  entryPoints: [path.join(here, "src", "worker.src.js")],
+  entryPoints: [sourceFile],
   outfile: outfile,
   bundle: true,
   format: "esm",
@@ -84,4 +94,4 @@ if (problems.length) {
 }
 
 const kb = (fs.statSync(outfile).size / 1024).toFixed(1);
-console.log("worker.js written: " + kb + " KB, no imports, fetch handler present");
+console.log("worker.js written: " + kb + " KB, no imports, fetch handler present, source " + sourceSha.slice(0, 12));

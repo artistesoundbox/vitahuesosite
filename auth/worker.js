@@ -2,6 +2,8 @@
    GENERATED FILE — do not edit. Built from src/worker.src.js by
    `node build.mjs`, which inlines @auth/core so the Worker needs no
    registry at runtime. Edit the source, rebuild, redeploy worker.js.
+  
+   source-sha256: 5e981a1b5fe4c915564db724c0a5a7585d87ac994b2dbb0f89ffdacf66f01d95
    ============================================================ */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
@@ -6739,8 +6741,19 @@ function configFor(request, env) {
     cookies: cookiesFor(secure),
     callbacks: {
       /* Kept minimal on purpose: this deployment stores nothing, so the
-         token only has to carry who is signed in. */
-      async jwt({ token, profile }) {
+               token only has to carry who is signed in.
+      
+               `token.googleId` earns its place here. With no adapter Auth.js
+               mints its own user id — a fresh random UUID per sign-in, which
+               lands in `token.sub` — so `sub` identifies this *session*, not
+               this person: the same player signing in tomorrow gets a new one.
+               Google's own account id is the stable thing, and it arrives on the
+               account as `providerAccountId` (the id_token's `sub`), so it is
+               carried separately and used wherever a durable identity matters —
+               the leaderboard above all, where a changing id would let one
+               player's runs scatter across accounts, or let two players collide. */
+      async jwt({ token, account, profile }) {
+        if (account && account.providerAccountId) token.googleId = account.providerAccountId;
         if (profile) {
           token.name = profile.name;
           token.picture = profile.picture;
@@ -6750,7 +6763,7 @@ function configFor(request, env) {
       },
       async session({ session: session2, token }) {
         if (session2.user) {
-          session2.user.id = token.sub;
+          session2.user.id = token.googleId || token.sub;
           session2.user.name = token.name;
           session2.user.picture = token.picture;
         }
@@ -6875,7 +6888,7 @@ var worker_src_default = {
             error: "AUTH_SECRET is missing or shorter than " + MIN_SECRET + " characters"
           }, 503, cors);
         }
-        if (!env.AUTH_GOOGLE_ID || !env.AUTH_GOOGLE_SECRET) {
+        if (/\/(signin|callback|providers)/.test(path) && (!env.AUTH_GOOGLE_ID || !env.AUTH_GOOGLE_SECRET)) {
           return json({
             ok: false,
             error: "AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET are not both set"

@@ -1,2 +1,8 @@
 vitahuesosite-wire/
 seblerskers/
+
+# The sign-in Worker's build dependencies. Only the bundle (auth/worker.js)
+# is ever deployed or committed; auth/package.json and its lockfile pin what
+# produced it. The Pages workflow checks out fresh, so this never reaches the
+# site artifact either.
+auth/node_modules/

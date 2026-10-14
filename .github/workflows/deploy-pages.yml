@@ -62,11 +62,21 @@ jobs:
       # 134-byte LFS pointer. Neither suite touches the network — the fixture answers its own
       # requests from local servers — so this step costs seconds and cannot flake on somebody
       # else's host. Both are hand-run checks worth having in the one place that publishes.
+      #
+      # The third suite is the site's sign-in. auth/worker.js is a build artifact
+      # (Auth.js is bundled into it) and the bundle is what gets deployed, so the
+      # suite is run against the committed bytes rather than a fresh build, and it
+      # fails if those bytes are not the bundle of auth/src/worker.src.js — editing
+      # the source and forgetting `node build.mjs` is a red build, not a silent
+      # regression. It needs no dependencies: the bundle already contains Auth.js.
+      # Its `[auth][error]` lines are the refusals it asks for; the exit code is
+      # the verdict. Same deal as the others: local servers only, no network.
       - name: Test the guard before it is trusted
         run: |
           set -euo pipefail
           node tools/test-pack-guard.mjs
           node tools/test-launch-sources.mjs
+          node auth/test.mjs
 
       - name: Verify the pack arrived as real bytes
         run: |
@@ -77,8 +87,14 @@ jobs:
             exit 1
           fi
 
+      # .git is not part of the site, and the sign-in Worker's dependency tree
+      # is not part of anything — it is a build input (gitignored, and absent
+      # from a fresh checkout anyway), and an artifact that carried it would be
+      # publishing the library's source under /auth/node_modules/.
       - name: Trim working copy before packaging
-        run: rm -rf .git
+        run: |
+          rm -rf .git
+          rm -rf auth/node_modules
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
