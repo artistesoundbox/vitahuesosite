@@ -116,6 +116,11 @@
   <div id="gp-hint">Pad listed here but the game ignores it? Send Buffy exactly what this panel shows.</div>
 </div>
 <script src="./index.js"></script>
+<!-- The refusal vocabulary, shared with both pack workers: what a 134-byte LFS
+     pointer, a quota refusal or an error page should say to a player. The worker
+     imports this same file, so the words on screen and the refusal itself are
+     written in one place. -->
+<script src="../pack-guard.js"></script>
 <script>
 /*
  * SEBLERSKERS shell for the vitahuesosite portal (served from /seblerskers/).
@@ -347,6 +352,14 @@ const GODOT_THREADS_ENABLED = false;
       if (e.data && e.data.type === "seb-engine-updated") {
         console.info("seblerskers: updated engine asset served next reload:", e.data.file);
       }
+      /* The worker refused the pack. This is the one refusal nothing else can
+         report — the engine asks for the pack itself, so the page that started
+         it would only ever see Godot failing to parse a file it cannot
+         describe. The worker saw the bytes, so it says what they were. */
+      if (e.data && e.data.type === "pack-refused") {
+        slog("pack refused", e.data.kind + " \u2014 " + e.data.reason);
+        showPackFailure(e.data.kind);
+      }
     });
   }
   GODOT_CONFIG["canvas"] = document.getElementById("canvas");
@@ -497,6 +510,22 @@ const GODOT_THREADS_ENABLED = false;
       "Details: " + err;
   }
 
+  /* A refused pack, explained rather than parsed. The three lines come from the
+     shared vocabulary in pack-guard.js, so the sentence a player reads matches
+     the refusal the worker actually made. The button comes back: every refusal
+     in there is worth one retry (a half-published build, a deploy landing), and
+     none of them is a dead end the player should be stuck on. */
+  function showPackFailure(kind) {
+    var words = (typeof explainPackFailure === "function")
+      ? explainPackFailure(kind)
+      : { headline: "The saga could not be loaded.", detail: "",
+          advice: "Try again in a minute." };
+    status.textContent = [words.headline, words.detail, words.advice]
+      .filter(Boolean).join(" ");
+    if (wrap) wrap.style.display = "none";
+    if (btn) { btn.disabled = false; btn.classList.remove("hidden"); }
+  }
+
   function setBar(cur, total) {
     wrap.style.display = "block";
     var pct = Math.round(100 * cur / total);
@@ -538,7 +567,16 @@ const GODOT_THREADS_ENABLED = false;
       cache: "no-store",
       redirect: "follow",
     }).then(function (resp) {
-      if (!resp.ok) throw new Error("HTTP " + resp.status + " for chunk " + begin);
+      if (!resp.ok) {
+        /* a refusal from the pack guard carries its kind: say what it means
+           rather than "HTTP 502 for chunk 3" */
+        var refusal = resp.headers.get("X-Pack-Refusal");
+        if (refusal && typeof explainPackFailure === "function") {
+          var words = explainPackFailure(refusal);
+          throw new Error(words.headline + " " + words.advice);
+        }
+        throw new Error("HTTP " + resp.status + " for chunk " + begin);
+      }
       return resp.arrayBuffer().then(function (buf) {
         if (buf.byteLength !== end - begin) {
           throw new Error("short chunk: got " + buf.byteLength +

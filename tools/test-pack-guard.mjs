@@ -55,14 +55,20 @@ function check(name, ok, detail) {
 /* Load a worker file in a context with the globals it expects, and nothing else.
    importScripts is the one piece of the worker environment that has to be
    provided: it reads the URL off disk, resolved against the worker's own path,
-   exactly as the browser resolves it against the worker's own URL. */
+   exactly as the browser resolves it against the worker's own URL. The clients
+   stub records postMessage, so the refusal a page would be told can be checked. */
 function loadWorker(relPath) {
   const code = fs.readFileSync(path.join(ROOT, relPath), 'utf8');
+  const posted = [];
   const sandbox = {
+    __posted: posted,
     self: {
       addEventListener() {},
       skipWaiting() {},
-      clients: { claim: async () => {}, matchAll: async () => [] },
+      clients: {
+        claim: async () => {},
+        matchAll: async () => [{ postMessage: (msg) => posted.push(msg) }]
+      },
       location: { origin: 'https://example.test' }
     },
     caches: {
@@ -322,6 +328,113 @@ const realProbe = await runShellProbe(packHead(64), RANGE_OK).then(
 check('a real pack head still sizes, so the guard cannot block a good load',
   realProbe.ok && realProbe.head.size === 561704920 && realProbe.head.ranges === 'bytes',
   JSON.stringify(realProbe));
+
+/* A refusal that a page cannot act on is barely better than no refusal, so what
+   the page receives is checked: the kind on the response, the message sent to
+   every open page (the engine's own fetch is invisible to the shell), and the
+   three lines the shell puts on screen for each kind. */
+console.log('\n=== refusals a page can act on ===');
+const shop = WORKERS.map((w) => ({ label: w.label, ctx: loadWorker(w.file) }));
+
+for (const { ctx } of shop) {
+  const pointerRes = await ctx.guardPack(
+    textResponse(POINTER, 200, { 'content-length': String(POINTER.length) }), true);
+  const pageRes = await ctx.guardPack(textResponse('<!DOCTYPE html><p>x</p>'), true);
+  const shortRes = ctx.stubByLength(new Response(POINTER, {
+    headers: { 'content-length': String(POINTER.length) }
+  }));
+  await new Promise((r) => setTimeout(r, 0));   // the announcement is a microtask
+  check('a pointer refusal is tagged lfs-pointer on the response',
+    pointerRes.headers.get('X-Pack-Refusal') === 'lfs-pointer',
+    'header was ' + pointerRes.headers.get('X-Pack-Refusal'));
+  check('an error page is tagged not-the-game',
+    pageRes.headers.get('X-Pack-Refusal') === 'not-the-game',
+    'header was ' + pageRes.headers.get('X-Pack-Refusal'));
+  check('a cached stub is tagged truncated',
+    shortRes && shortRes.headers.get('X-Pack-Refusal') === 'truncated',
+    'header was ' + (shortRes && shortRes.headers.get('X-Pack-Refusal')));
+  const announcements = ctx.__posted.filter((m) => m && m.type === 'pack-refused');
+  check('every refusal is announced to the open pages (' + announcements.length + ' so far)',
+    announcements.length >= 3 &&
+    announcements.some((m) => m.kind === 'lfs-pointer') &&
+    /Git LFS pointer/.test(announcements[0].reason),
+    JSON.stringify(announcements));
+}
+
+const one = shop[0].ctx;
+const KINDS = ['lfs-pointer', 'not-the-game', 'truncated', 'missing', 'quota', 'host-error', 'unreachable'];
+for (const kind of KINDS) {
+  const words = one.explainPackFailure(kind);
+  check('explainPackFailure("' + kind + '") says something a player can read',
+    !!(words.headline && words.advice && words.headline.length > 20 &&
+       typeof words.detail === 'string'),
+    JSON.stringify(words));
+}
+const pointerWords = one.explainPackFailure('lfs-pointer');
+check('the pointer explanation names the placeholder and the fix',
+  /placeholder/i.test(pointerWords.headline + pointerWords.detail) &&
+  /redeploy/i.test(pointerWords.advice),
+  JSON.stringify(pointerWords));
+const unknownWords = one.explainPackFailure('something-new');
+check('an unknown kind still produces a headline and advice',
+  !!(unknownWords.headline && unknownWords.advice) && !/undefined/.test(JSON.stringify(unknownWords)),
+  JSON.stringify(unknownWords));
+
+const KIND_CASES = [
+  [403, '', 'quota'], [429, '', 'quota'], [404, '', 'missing'], [500, '', 'host-error'],
+  [200, POINTER, 'lfs-pointer'], [200, '<!DOCTYPE html>', 'not-the-game'],
+  [200, '{"error":"gone"}', 'not-the-game'], [200, 'GDPC\u0004\u0000\u0000\u0000', null]
+];
+for (const [status, text, expected] of KIND_CASES) {
+  const got = one.refusalKindFor(status, text);
+  check('refusalKindFor(' + status + ', ' + JSON.stringify(text.slice(0, 14)) + ') = ' + expected,
+    got === expected, 'got ' + got);
+}
+
+/* The shells are pages, so what can be checked here is that they load the shared
+   vocabulary and that they react to the announcement rather than leaving the
+   engine's parser error on screen. */
+console.log('\n=== the shells put the reason on screen ===');
+const SHELLS = [
+  { file: 'seblerskers/index.html', guardTag: '<script src="../pack-guard.js"></script>',
+    handler: 'pack-refused', uses: 'explainPackFailure' },
+  { file: 'game/index.html', guardTag: '<script src="../pack-guard.js"></script>',
+    handler: 'pack-refused', uses: 'explainPackFailure' }
+];
+/* Every inline script in the page must also PARSE. Both shells hold one large
+   script that boots a game, and a syntax error in it is a page that does nothing
+   with no clue why — the kind of thing that is cheap to check and expensive to
+   find. */
+function inlineScripts(html) {
+  const bodies = [];
+  const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
+  let m;
+  while ((m = re.exec(html))) bodies.push(m[1]);
+  return bodies;
+}
+
+for (const shell of SHELLS) {
+  const src = fs.readFileSync(path.join(ROOT, shell.file), 'utf8');
+  check(shell.file + ': loads the shared refusal vocabulary',
+    src.indexOf(shell.guardTag) >= 0, 'no ' + JSON.stringify(shell.guardTag) + ' tag');
+  check(shell.file + ': listens for the worker\'s pack-refused message',
+    src.indexOf(shell.handler) >= 0, 'never mentions ' + shell.handler);
+  check(shell.file + ': explains a refusal with the shared words',
+    src.indexOf(shell.uses + '(') >= 0, 'never calls ' + shell.uses + '()');
+
+  const bodies = inlineScripts(src);
+  let broken = null;
+  for (const body of bodies) {
+    try {
+      new vm.Script(body);
+    } catch (err) {
+      broken = String(err && err.message);
+      break;
+    }
+  }
+  check(shell.file + ': every inline script parses (' + bodies.length + ' of them)',
+    !broken && bodies.length > 0, broken || 'no inline scripts found');
+}
 
 console.log('\n' + (failures ? failures + ' check(s) FAILED' : 'all checks passed'));
 process.exitCode = failures ? 1 : 0;

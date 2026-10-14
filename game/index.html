@@ -110,6 +110,10 @@ body {
 		</div>
 
 		<script src="index.js"></script>
+<!-- The refusal vocabulary, shared with the pack worker: what a 134-byte LFS
+     pointer, a quota refusal or an error page should say to a player. The worker
+     imports this same file. -->
+<script src="../pack-guard.js"></script>
 		<script>
 const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":327853876,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
@@ -162,6 +166,20 @@ const engine = new Engine(GODOT_CONFIG);
 		initializing = false;
 	}
 
+		/* The pack worker refuses a stub before the engine sees it, and the engine's
+		   own fetch is invisible from here — so a refusal arrives as a message. Without
+		   this the player reads Godot failing to parse a file it cannot name; with it
+		   they read which failure it was and that a retry is worth trying. */
+		window.vhPackRefused = function (kind) {
+			const words = (typeof explainPackFailure === 'function')
+				? explainPackFailure(kind)
+				: { headline: 'The game pack could not be loaded.', detail: '',
+				    advice: 'Try again in a minute.' };
+			setStatusNotice(words.headline + (words.detail ? '\n\n' + words.detail : '') +
+				'\n\n' + words.advice);
+			setStatusMode('notice');
+		};
+
 	const missing = Engine.getMissingFeatures({
 		threads: GODOT_THREADS_ENABLED,
 	});
@@ -208,22 +226,43 @@ const engine = new Engine(GODOT_CONFIG);
 				const R2_BASE = '';
 				const LFS_PACK = 'https://media.githubusercontent.com/media/artistesoundbox/vitahuesosite/main/game/index.pck?v=20260920-1';
 		const LOCAL_PACK = 'index.pck';
-		const head = (u) => fetch(u, { method: 'HEAD', mode: 'cors' }).then((r) => {
+				/* Ask each tier WHY it failed, not just whether it did. A 200 whose body is far
+		   too small is the 134-byte LFS placeholder; 403/429 is the free host's used-up
+		   quota; 404 is a build that never published the file. Those are three different
+		   sentences to a player, and "unreachable" tells them the least of all. */
+		const tierFailure = (u) => fetch(u, { method: 'HEAD', mode: 'cors' }).then((r) => {
 			const len = Number(r.headers.get('content-length') || 0);
-			return r.ok && len >= MIN_PACK_BYTES;
-		}).catch(() => false);
+			if (r.ok && len >= MIN_PACK_BYTES) return null;                 // the pack is here
+			if (r.ok) return len > 0 ? 'lfs-pointer' : 'not-the-game';   // 200, but tiny
+			return refusalKindFor(r.status, '') || 'host-error';
+		}).catch(() => 'unreachable');
+		/* The most specific failure wins the screen: the placeholder says more than the
+		   fallback host running out of quota behind it. */
+		const WORST_FIRST = ['lfs-pointer', 'quota', 'missing', 'not-the-game',
+			'host-error', 'unreachable'];
 		const probe = (async () => {
-			if (await head(LOCAL_PACK)) return LOCAL_PACK;
-			if (R2_BASE && (await head(R2_BASE + '/index.pck'))) return R2_BASE + '/index.pck';
-			if (await head(LFS_PACK)) return LFS_PACK;
-			return null;
+			const failed = [];
+			const tiers = [LOCAL_PACK, R2_BASE && R2_BASE + '/index.pck', LFS_PACK]
+				.filter(Boolean);
+			for (const u of tiers) {
+				const why = await tierFailure(u);
+				if (!why) return { url: u };
+				failed.push(why);
+			}
+			return { url: null, kind: WORST_FIRST.find((k) => failed.includes(k)) || null };
 		})();
-		probe.then((packUrl) => {
-			if (!packUrl) {
-				displayFailureNotice('The game pack is unreachable right now - the free pack host has most likely used up its monthly download quota. It recovers when the quota resets or the site redeploys. This is not your browser failing.');
+		probe.then(({ url, kind }) => {
+			if (!url) {
+				const words = (typeof explainPackFailure === 'function')
+					? explainPackFailure(kind)
+					: { headline: 'The game pack is unreachable right now - the free pack host has most likely used up its monthly download quota.',
+					    detail: 'It recovers when the quota resets or the site redeploys.',
+					    advice: 'This is not your browser failing.' };
+				displayFailureNotice([words.headline, words.detail, words.advice]
+					.filter(Boolean).join('\n\n'));
 				return;
 			}
-		engine.startGame({ mainPack: packUrl,
+			engine.startGame({ mainPack: url,
 			'onProgress': function (current, total) {
 				if (current > 0 && total > 0) {
 					statusProgress.value = current;
@@ -240,11 +279,18 @@ const engine = new Engine(GODOT_CONFIG);
 	}
 }());
 		</script>
-	
+
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('sw-pack.js').catch(function () {});
+    /* a refused pack: the worker saw the bytes, so it says what they were */
+    navigator.serviceWorker.addEventListener('message', function (e) {
+      if (e.data && e.data.type === 'pack-refused' &&
+          typeof window.vhPackRefused === 'function') {
+        window.vhPackRefused(e.data.kind);
+      }
+    });
   });
 }
 </script>
