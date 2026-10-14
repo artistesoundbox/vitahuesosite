@@ -13,15 +13,27 @@
         cross-checked against our own derivation, so a run cannot claim
         a par it did not drive;
      2. a run must be physically possible: three laps of a 1,794-unit
-        circuit at 60 u/s cannot be done in under 76 seconds, and the
-        best lap cannot beat the whole race;
-     3. a per-IP-per-day cap on submissions (the IP is salted with the
+        circuit at 60 u/s cannot be done in under 76 seconds, the best
+        lap must be one of the laps, and the laps must add up to the
+        total;
+     3. a run must arrive with its SHAPE, not just its total. The page
+        samples where it crossed every 50 units of every lap, and those
+        samples are checked here: forward, no bucket faster than the
+        hull can go, and consistent with the lap times and the total
+        that came with them. A total is still forgeable — a patient liar
+        can shape one like a race — but it cannot be picked out of the
+        air any more;
+     4. a per-IP-per-day cap on submissions (the IP is salted with the
         day and hashed, so the stored value is not a tracker).
 
-   What it still cannot do: tell a plausible lie from a real lap. A
-   hand-written POST with a believable time is accepted, exactly as any
-   arcade high-score table accepts a good liar. Rate limits and
-   plausibility bounds raise the cost; they do not remove it.
+   What it still cannot do: tell a good liar from a good lap. The trace
+   raises the cost of the lie (it has to be a trajectory that stays
+   inside the physics) without removing it. Server-side replay of the
+   inputs is the thing that would actually settle it. Note also that the
+   geometry fingerprint the page can produce is NOT checkable here
+   without porting three.js's curve maths, and the seed it is derived
+   from is served by /api/health anyway — so it would cost a great deal
+   and prove very little.
    ============================================================ */
 
 const RACER_NAMES = ['VX-1', 'VX-2', 'FALCON', 'MIRAGE', 'NEEDLE'];
@@ -39,6 +51,18 @@ const MAX_TOTAL = 3600;             // an hour is not a lap time, it is a typo
 const MAX_BODY = 2048;
 const MAX_PER_DAY = 60;             // submissions from one IP for one day
 const DAY_WINDOW_MS = 86400000;
+
+/* the trace */
+/* Required from this day on, so the page can ship first: a run for an earlier
+   day is filed untraced rather than refused, which is what stops a rollout
+   from eating the runs of everyone who happens to be playing at that moment. */
+const TRACE_FROM_DAY = 20741;       // 2026-10-15
+const TRACE_MIN_STEP = 10, TRACE_MAX_STEP = 200;
+/* The hull tops out at MAX_SPEED (60) times BOOST_TOP (1.22). A bucket that
+   outruns this by a wide margin is not a fast lap, it is a teleport. */
+const MAX_BUCKET_SPEED = 150;
+/* How far the declared circuit length may sit from the one the game builds */
+const TRACE_LEN_SLACK = 3;
 
 /* ============================================================
    the day's rules — must match racegame.html exactly
@@ -173,6 +197,102 @@ async function verifyIdentity(env, token) {
   return { name: payload.name, sub: payload.sub, picture: payload.picture };
 }
 
+/* ============================================================
+   the trace — the shape of a run
+
+   The page samples the distance it had covered at every 50-unit mark of every
+   lap, in centiseconds. Those samples are the only part of a submission that
+   constrains the run's own arithmetic: a total is a number, and a plausible
+   number is what a leaderboard with no accounts has always had to accept.
+
+   So the checks here derive the race back out of the trajectory and make it
+   agree with the numbers filed in the same request:
+
+     - exactly one array per lap, each one exactly as long as this circuit
+       allows at the declared step;
+     - every sample after the one before it (a bucket with no duration is an
+       infinite speed, and the speed check below is where that dies);
+     - no bucket faster than the hull can go;
+     - the length declared is this circuit's, within a metre of slack;
+     - the part of the lap after the last sample, at the pace of the last
+       sample, lands on the lap time filed for that lap;
+     - the laps add up to the total, and the best lap is one of them.
+
+   What this cannot do is make a lie impossible: a trajectory can be shaped to
+   fit. It does mean the lie is a trajectory rather than a number.
+   ============================================================ */
+function checkTrace(cfg, body, time, best) {
+  const trace = body.trace;
+  if (!trace || typeof trace !== 'object') return 'a run needs its trace: {step, len, laps}';
+  const step = intish(trace.step);
+  const len = num(trace.len);
+  if (!(step >= TRACE_MIN_STEP && step <= TRACE_MAX_STEP)) {
+    return 'bad trace step (10..200)';
+  }
+  if (!isFinite(len) || Math.abs(len - TRACK_LEN) > TRACE_LEN_SLACK) {
+    return 'the trace is not this circuit\'s length';
+  }
+  const laps = body.laps;
+  if (!Array.isArray(laps) || laps.length !== cfg.laps) {
+    return 'laps must carry one time per lap (expected ' + cfg.laps + ')';
+  }
+  const lapTimes = [];
+  for (let i = 0; i < laps.length; i++) {
+    const t = num(laps[i]);
+    if (!isFinite(t) || t < MIN_LAP || t > MAX_TOTAL) return 'implausible lap time';
+    lapTimes.push(t);
+  }
+  /* the numbers have to agree with each other before they agree with anything */
+  const sum = lapTimes.reduce(function (a, b) { return a + b; }, 0);
+  /* the laps are rounded to a hundredth each and the total to a hundredth, so
+     an honest run's sum sits within a frame or two of the tenth of a second —
+     not half a second, which would let a mismatched total through */
+  if (Math.abs(sum - time) > Math.max(0.2, time * 0.002)) {
+    return 'the laps do not add up to the total';
+  }
+  if (Math.abs(Math.min.apply(null, lapTimes) - best) > Math.max(0.06, best * 0.01)) {
+    return 'the best lap is not one of the laps';
+  }
+  const perLap = Math.floor(len / step);
+  if (!Array.isArray(trace.laps) || trace.laps.length !== cfg.laps) {
+    return 'the trace needs one array per lap';
+  }
+  for (let i = 0; i < trace.laps.length; i++) {
+    const ts = trace.laps[i];
+    if (!Array.isArray(ts) || ts.length !== perLap) {
+      return 'lap ' + (i + 1) + ' is not ' + perLap + ' samples';
+    }
+    let prev = 0;
+    for (let j = 0; j < ts.length; j++) {
+      const cs = ts[j];
+      if (!isFinite(cs) || cs <= prev) return 'the trace does not move forward (lap ' + (i + 1) + ')';
+      const speed = step / ((cs - prev) / 100);
+      if (speed > MAX_BUCKET_SPEED) return 'faster than the hull goes (lap ' + (i + 1) + ')';
+      prev = cs;
+    }
+    /* the tail: the last, partial bucket, at the pace of the bucket before it */
+    const vLast = step / ((ts[ts.length - 1] - ts[ts.length - 2]) / 100);
+    const derived = (prev + ((len - perLap * step) / vLast) * 100) / 100;
+    if (Math.abs(derived - lapTimes[i]) > Math.max(1.0, lapTimes[i] * 0.04)) {
+      return 'lap ' + (i + 1) + ' does not match its trace';
+    }
+  }
+  return null;
+}
+
+/* The trace itself is not stored — a row is a score, not a telemetry archive —
+   but its digest is, so two rows that came with the same trajectory are
+   visible as such. Same FNV-ish shape the page's own fingerprint uses. */
+function traceDigest(trace) {
+  const s = trace.step + 'x' + trace.laps.map(function (ts) { return ts.join(','); }).join('|');
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return trace.step + 'x' + (h >>> 0).toString(16);
+}
+
 /* https only, no credentials — the same rule profile avatars use, because this
    URL ends up in an <img> on somebody else's screen. */
 function cleanPicture(raw) {
@@ -205,6 +325,7 @@ function ensureSchema(env) {
       ' of_count INTEGER NOT NULL,' +
       ' stars INTEGER NOT NULL,' +
       ' picture TEXT NOT NULL DEFAULT \'\',' +
+      ' trace TEXT NOT NULL DEFAULT \'\',' +
       ' ip TEXT NOT NULL,' +
       ' created INTEGER NOT NULL)'
     ).run().then(function () {
@@ -212,20 +333,26 @@ function ensureSchema(env) {
     }).then(function () {
       return env.DB.prepare('CREATE INDEX IF NOT EXISTS scores_day_ip ON scores(day, ip, created)').run();
     }).then(function () {
-      /* Rows written before a signed-in player could have a picture. SQLite has
-         no ADD COLUMN IF NOT EXISTS, so the attempt is made and its one
-         predictable error — the column already being there — is the success
-         case. Anything else is real.
+      /* Columns added after the table was already live in front of players.
+         SQLite has no ADD COLUMN IF NOT EXISTS, so each attempt is made and its
+         one predictable error — the column already being there — is the
+         success case. Anything else is real.
 
          The whole attempt is wrapped, not just the `.run()`: a D1-style
          prepare() can throw before there is a promise to attach a catch to,
          and a rejection handler that never sees the error is a 500 with the
          real cause buried in it. */
+      const added = [
+        "ALTER TABLE scores ADD COLUMN picture TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE scores ADD COLUMN trace TEXT NOT NULL DEFAULT ''"
+      ];
       return (async function () {
-        try {
-          await env.DB.prepare("ALTER TABLE scores ADD COLUMN picture TEXT NOT NULL DEFAULT ''").run();
-        } catch (err) {
-          if (!/duplicate column/i.test(String(err && err.message || err))) throw err;
+        for (let i = 0; i < added.length; i++) {
+          try {
+            await env.DB.prepare(added[i]).run();
+          } catch (err) {
+            if (!/duplicate column/i.test(String(err && err.message || err))) throw err;
+          }
         }
       })();
     }).catch(function (err) {
@@ -240,12 +367,16 @@ function rowOut(r, rank) {
   return {
     rank: rank, handle: r.handle, picture: r.picture || '', car: r.car, mod: r.mod,
     time: r.time, best: r.best, pos: r.pos, of: r.of_count,
-    stars: r.stars, at: r.created
+    stars: r.stars,
+    /* whether this run came with a trajectory: a row from before the trace
+       existed, or from a day filed under the old rules, has none */
+    traced: !!r.trace,
+    at: r.created
   };
 }
 async function boardFor(env, day, limit) {
   const top = await env.DB.prepare(
-    'SELECT handle, picture, car, mod, time, best, pos, of_count, stars, created FROM scores' +
+    'SELECT handle, picture, car, mod, time, best, pos, of_count, stars, trace, created FROM scores' +
     ' WHERE day = ? ORDER BY time ASC, created ASC LIMIT ?'
   ).bind(day, limit).all();
   const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM scores WHERE day = ?').bind(day).first();
@@ -257,7 +388,7 @@ async function boardFor(env, day, limit) {
 async function standingFor(env, day, handle) {
   if (!handle) return null;
   const mine = await env.DB.prepare(
-    'SELECT handle, picture, car, mod, time, best, pos, of_count, stars, created FROM scores' +
+    'SELECT handle, picture, car, mod, time, best, pos, of_count, stars, trace, created FROM scores' +
     ' WHERE day = ? AND handle = ? ORDER BY time ASC LIMIT 1'
   ).bind(day, handle).first();
   if (!mine) return null;
@@ -329,6 +460,15 @@ async function handleSubmit(req, env) {
     return json({ ok: false, error: 'bad finishing position' }, 422);
   }
 
+  /* The shape of the run, checked before anything expensive. From TRACE_FROM_DAY
+     a run without one is not filed at all; an earlier day is filed untraced
+     instead, so the page can be deployed before the board insists. */
+  if (body.trace !== undefined || day >= TRACE_FROM_DAY) {
+    const bad = checkTrace(cfg, body, time, best);
+    if (bad) return json({ ok: false, error: bad }, 422);
+  }
+  const traceTag = body.trace && typeof body.trace === 'object' ? traceDigest(body.trace) : '';
+
   /* A run may carry the signed-in player's identity. Verified, it decides the
      name and the picture; the typed handle cannot override it, because that is
      the whole difference between a name somebody typed and a name Google
@@ -359,11 +499,11 @@ async function handleSubmit(req, env) {
   const stars = starsFor(time, cfg.par);
   if (!dupe) {
     await env.DB.prepare(
-      'INSERT INTO scores (day, seed, handle, picture, car, mod, par, time, best, pos, of_count, stars, ip, created)' +
-      ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO scores (day, seed, handle, picture, car, mod, par, time, best, pos, of_count, stars, trace, ip, created)' +
+      ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(day, cfg.seed, handle, picture, cfg.car, cfg.mod, cfg.par,
       Math.round(time * 100) / 100, Math.round(best * 100) / 100,
-      pos, of, stars, ip, now).run();
+      pos, of, stars, traceTag, ip, now).run();
   }
 
   const board = await boardFor(env, day, 10);
@@ -408,7 +548,9 @@ export default {
         return new Response(
           'City Grand Prix daily leaderboard API\n' +
           'GET  /api/board?day=<n>&limit=<1-25>&handle=<name>\n' +
-          'POST /api/runs  {day,seed,car,mod,par,time,best,pos,of,handle,identity?}\n' +
+          'POST /api/runs  {day,seed,car,mod,par,time,best,pos,of,handle,laps,trace,identity?}\n' +
+          '  laps: [seconds per lap] and trace: {step,len,laps:[[centiseconds…]]}\n' +
+          '  — the shape of the run, required from day ' + TRACE_FROM_DAY + '\n' +
           '  identity: the signed-in player\'s token from the auth Worker; when it\n' +
           '  verifies, its name and picture are used and `handle` is ignored\n' +
           'GET  /api/health\n', {

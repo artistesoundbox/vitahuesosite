@@ -13,9 +13,11 @@ completely without this (`racegame.html`, `BOARD_API = ''`).
 
 The game's `BOARD_API` constant in `racegame.html` points at that preview URL. The
 preview board holds test rows, not a mock: day 20736 (2026-10-10) carries the
-`verify-live` and `pilot` rows, and day 20740 (2026-10-14) carries one signed-in run
-under a Google name with its picture. The board is keyed by day, so they only show on
-the day they were written.
+`verify-live` and `pilot` rows, day 20740 (2026-10-14) carries one signed-in run under a
+Google name with its picture, and **day 21000** (2027-07-01) carries the trace work — a
+shaped submission and one genuinely driven, signed-in run. That day is used for exactly
+this: it is far enough out that a test row sits on a board nobody plays. The board is
+keyed by day, so test rows only ever show on the day they were written.
 
 ### Paired with the sign-in Worker
 
@@ -32,7 +34,7 @@ and a mismatch is loud (401, then the run is re-sent under the typed name).
 | route | what it does |
 | --- | --- |
 | `GET /api/board?day=<n>&limit=<1..25>&handle=<name>` | the day's top runs, the total, and your standing |
-| `POST /api/runs` | `{day, seed, car, mod, par, time, best, pos, of, handle, identity}` → `{ok, rank, total, top, you}` |
+| `POST /api/runs` | `{day, seed, car, mod, par, time, best, pos, of, handle, laps, trace, identity}` → `{ok, rank, total, top, you}` |
 | `GET /api/health?day=<n>` | the day's rules as the server derives them, plus the plausibility bounds |
 | `GET /` | the route list, as text |
 
@@ -48,7 +50,8 @@ it *can* do is refuse the cheap lies:
    derivation is a `409` — so nobody can claim a par they did not drive. (This is also a
    live cross-check: the page and the Worker derive today's rules independently.)
 2. **A run has to be possible.** Three laps of a 1,794-unit circuit at 60 u/s cannot be
-   done in under 76.3 s, and the best lap cannot beat the whole race (`422` otherwise).
+   done in under 76.3 s, the best lap must be one of the laps, and the laps must add up to
+   the total (`422` otherwise).
 3. **A per-IP-per-day cap** of 60 submissions (`429`). The IP is salted with the day and
    truncated to 16 hex characters before storage, so the table holds no address.
 4. **Re-submitting the same run within a minute is deduped** and returns the original
@@ -67,10 +70,52 @@ it *can* do is refuse the cheap lies:
    token-bearing run is a 401 naming the missing variable rather than a silent
    downgrade to the typed name.
 
-What it still cannot do: tell a plausible lie from a real lap. A hand-written POST with a
-believable time is accepted, exactly as any arcade table accepts a good liar. These checks
-raise the cost; they do not remove it. Accounts or server-side replay would be the next
-step, and both are bigger than this feature.
+6. **A run has to arrive with its shape, not just its total** (`TRACE_FROM_DAY`, below).
+   The page samples where it had covered at every 50-unit mark of every lap, in
+   centiseconds, and posts that with the lap times:
+
+   ```json
+   "laps": [36.71, 35.45, 35.43],
+   "trace": { "step": 50, "len": 1794.2, "laps": [[9, 18, …], [9, 18, …], [9, 18, …]] }
+   ```
+
+   The Worker derives the race back out of the trajectory and makes it agree with the
+   numbers filed in the same request: one array per lap, each exactly as long as this
+   circuit allows at the declared step (35 at 50 units); every sample after the one before
+   it, so a bucket with no duration — an infinite speed — dies on the next rule; no bucket
+   faster than the hull can go (60 u/s top speed × 1.22 boost, checked against 150); a
+   declared circuit length within three units of the game's own 1794.2; the part of the lap
+   after the last sample, at the pace of the last sample, landing on the lap time filed for
+   that lap; and the laps adding up to the total.
+
+   This is what a total on its own could never do. The board used to take a believable
+   number from anyone who could type it; now that number has to come with a trajectory
+   that stays inside the physics and agrees with itself. It is a cost, not a proof: a
+   trajectory can be shaped to fit, and a patient liar with the game's constants can shape
+   one. What it does remove is the one-line forgery.
+
+   The rows keep a digest of the trajectory (not the samples: a row is a score, not a
+   telemetry archive), so two rows that arrived with the same shape are visible as such,
+   and every row reports `traced`.
+
+### Rolling the trace out
+
+The page has to ship before the board insists, or the day it starts insisting is the day
+every honest run is refused. So the requirement is dated: **`TRACE_FROM_DAY = 20741`**
+(2026-10-15). A run for an earlier day that arrives without a trace is filed *untraced*
+rather than refused, which is what let the deployed board change over while people were
+playing day 20740. A run that arrives *with* a bad trace is refused whatever day it names.
+
+What it still cannot do: tell a good liar from a good lap — server-side replay of the
+inputs would be the thing that settles it, and that is a much bigger feature than this
+one. Worth knowing before anyone tries the obvious next idea: **the page's geometry
+fingerprint is not checkable here.** It hashes the built circuit — `trackLen` from
+`THREE.CatmullRomCurve3`, every tower after the headroom clamp, the features and pickups
+after the road tests — so verifying it server-side means porting three.js's curve maths and
+the road pipeline into the Worker, where one float diverging from the browser would reject
+honest runs. And it would prove little: `/api/health` serves the day's seed, and the
+generator ships in the page, so the fingerprint of any day can be computed by anyone who
+cares to.
 
 ## Schema
 
@@ -78,12 +123,15 @@ Created lazily on first request (`CREATE TABLE IF NOT EXISTS`), so a fresh D1 ne
 migration step:
 
 ```sql
-scores(id, day, seed, handle, car, mod, par, time, best, pos, of_count, stars, picture, ip, created)
+scores(id, day, seed, handle, car, mod, par, time, best, pos, of_count, stars, picture, trace, ip, created)
 index scores_day_time(day, time)
 index scores_day_ip(day, ip, created)
 ```
 
-`stars` is recomputed from the server's own par — a client's claim is ignored.
+`stars` is recomputed from the server's own par — a client's claim is ignored. `trace`
+holds that digest, empty for a row filed before the trace existed or for a day under the
+cutoff.
+
 `picture` was added after the table was already live: SQLite has no
 `ADD COLUMN IF NOT EXISTS`, so `ensureSchema` attempts the `ALTER TABLE` and treats the
 one predictable "duplicate column" error as the success case. A row written before that
@@ -92,8 +140,8 @@ migration reads back with an empty picture, which is what the panel expects.
 ## Tests
 
 ```bash
-node leaderboard/test.mjs                                    # 105 checks, real SQLite via node:sqlite
-node leaderboard/verify-live.mjs <worker-url> [day] [--write] # 26 checks against a deployment
+node leaderboard/test.mjs                                    # 126 checks, real SQLite via node:sqlite
+node leaderboard/verify-live.mjs <worker-url> [day] [--write] # 18 checks, 26 with --write (28 on a trace-required day)
 ```
 
 `test.mjs` runs the real handler against `node:sqlite` through a D1-shaped shim, so the

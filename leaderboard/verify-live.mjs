@@ -6,6 +6,11 @@
    refused before they touch the table). --write also posts one plausible run
    and reads the board back, which is the only way to prove the D1 write path
    and the schema bootstrap work on the real edge.
+
+   The run it writes carries a trace, because the board requires one from
+   TRACE_FROM_DAY on: a plausible total on its own is refused there, which is
+   the whole point of the last round of work. Point this at an earlier day to
+   exercise the untraced path instead.
    ============================================================ */
 const base = (process.argv[2] || '').replace(/\/+$/, '');
 const day = Number(process.argv[3] || 20736);
@@ -28,6 +33,20 @@ async function call(path, opts) {
 }
 async function post(payload) {
   return call('/api/runs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+}
+
+/* A trace for a run nobody drove: even pace, n+1 equal pieces a lap so the tail
+   after the last sample is the last piece and the lap times come out of it.
+   The board checks shape rather than provenance, so this is a legal run. */
+const TRACE_STEP = 50, TRACK_LEN = 1794.2;
+function traceFor(laps) {
+  const n = Math.floor(TRACK_LEN / TRACE_STEP);
+  return { step: TRACE_STEP, len: Math.round(TRACK_LEN * 10) / 10,
+    laps: laps.map(function (lap) {
+      const ts = [];
+      for (let i = 1; i <= n; i++) ts.push(Math.round(lap * (i / (n + 1)) * 100));
+      return ts;
+    }) };
 }
 
 /* the day's rules as the deployed server derives them */
@@ -78,10 +97,19 @@ if (!write) {
   /* a time no earlier invocation used, or the server's (correct) dedupe would
      swallow it and "the total grew" would be testing the wrong thing */
   const t = Math.round((cfg.par + 6.5 + Math.random() * 12) * 100) / 100;
+  const perLap = Math.round((t / 3) * 100) / 100;
+  const laps = [perLap, perLap, perLap];
   const run = { day: day, seed: health.body.config.seed, car: cfg.car, mod: cfg.mod, par: cfg.par,
-    time: t, best: Math.round((t / 3) * 100) / 100, pos: 2, of: 5, handle: 'verify-live' };
+    time: t, best: perLap, pos: 2, of: 5, handle: 'verify-live',
+    laps: laps, trace: traceFor(laps) };
   const posted = await post(run);
   check('201 created (first time) or 200 (retry)', posted.status === 201 || posted.status === 200, 'status ' + posted.status + ' ' + JSON.stringify(posted.body).slice(0, 160));
+  if (day >= 20741) {
+    eq('the row is marked traced', posted.body.you && posted.body.you.traced, true);
+    const bare = await post({ day: day, seed: health.body.config.seed, car: cfg.car, mod: cfg.mod,
+      par: cfg.par, time: t, best: perLap, pos: 2, of: 5, handle: 'verify-live-bare' });
+    eq('and a bare total is refused on a day that requires one', bare.status, 422);
+  }
   eq('server recomputed stars, not the client', posted.body.stars, run.time <= cfg.par ? 3 : (run.time <= cfg.par * 1.06 ? 2 : 1));
   check('total grew by one', posted.body.total === before + 1, before + ' → ' + posted.body.total);
   check('rank is a number', typeof posted.body.you.rank === 'number', JSON.stringify(posted.body.you));
