@@ -124,6 +124,14 @@ if (accepting) {
   console.log("recorded " + Object.keys(body.files).length + " files as the mirror's own in " + path.relative(repoRoot, MANIFEST));
   if (body.mirroredFrom) console.log("  built from: " + body.mirroredFrom);
   console.log("  a mirror may now run; any change to the demo path after this stops it again");
+  /* Said every time, because it is the one thing --accept does not do. It
+     records a tree; it does not save one, and the next mirror will replace
+     this tree with the build of the ref. Recording the demo is only safe when
+     that ref already builds the demo. */
+  console.log("");
+  console.log("  NOT a rescue: this records the tree, it does not put the work anywhere.");
+  console.log("  The next mirror will still replace every recorded file with the ref's build.");
+  console.log("  Re-record only when that ref already builds what you want published.");
   process.exit(0);
 }
 
