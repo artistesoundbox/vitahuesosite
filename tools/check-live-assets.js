@@ -55,7 +55,10 @@
  * too (see TARGETS A PAGE COMPUTES), and a target that cannot be known from the page's own
  * text is left alone — but named, as an unresolved launch site, so that a page whose way in
  * could not be read does not look the same in the log as a page with nothing to read (see
- * UNREAD LAUNCH SITES). Every target that turns out to be a pack build must load
+ * UNREAD LAUNCH SITES). A target that resolves to a page under this site's own base and is
+ * not there is named too (see TARGETS THE SITE DOES NOT SERVE): a launcher that leads nowhere
+ * is the third thing that reads exactly like a launcher with nothing wrong with it. Every
+ * target that turns out to be a pack build must load
  * pack-guard.js; if it registers a worker, that worker must import the guard as well.
  * The launcher page itself is not required to load the guard: the guard belongs to the
  * page the engine runs in. A page that announces no pack is not a game page and the
@@ -254,11 +257,47 @@ const MAX_CALL_DEPTH = 3;        // fn() calling fn() calling fn() is as far as 
  * not wrong: it matters only if it turns out to name a pack build, which is exactly what the
  * named expression asks a person to go and check.
  */
-const MAX_TRACES_PER_PAGE = 8;   // unresolved sites one page may name before the rest are counted
+const MAX_TRACES_PER_PAGE = 8;   // notes (unresolved sites, unserved targets) one page may
+                                 // name before the rest are counted
 const MAX_TRACE_CHARS = 120;     // an expression longer than this is cut, with an ellipsis
                                  // (both cap what is DISPLAYED, never what is counted: the
                                  // line above the sites always carries the true total, and
                                  // the rest say how many they are standing in for)
+
+/* ---------------------------------------------------------------------------
+ * TARGETS THE SITE DOES NOT SERVE
+ *
+ * A launcher can point at a page that is not there: a build renamed, a directory dropped from
+ * the deploy, a path that never existed. The target resolves, so there is no expression to
+ * trace, and the fetch that would decide the verdict answers 404 — which this check used to
+ * drop on the floor along with every other target that is not a pack build. The player who
+ * follows that launcher gets the host's 404 page, and the report says the launcher is fine.
+ *
+ * So an unreachable target is named — but only when it belongs to the site being checked, the
+ * one place where "not there" is a fact about this deployment rather than about somebody
+ * else's server. A URL off this base is left alone: another host, and another Pages site on the
+ * same host (`.../seblerskers/` beside `.../vitahuesosite`), both belong to a deployment this
+ * run is not checking, and naming every dead link the internet hands back would bury the ones
+ * that are this site's own.
+ *
+ * Named, not judged, for the same reason an unresolved site is: what is missing is a page, and
+ * whether it was meant to be a pack build cannot be told from a 404. So it is never a PASS or a
+ * FAIL and never changes the exit code — and it never makes the deploy gate wait, which is the
+ * other half of that choice: a fresh deploy's CDN can serve its own pages as 404 for a moment,
+ * and a note that is wrong for a minute is cheaper than a run held open for the whole --wait
+ * window by a link that was always going to be fine. The note names the launcher, the resolved
+ * path and what came back, which is what someone has to go and look at.
+ */
+function onSite(url, base) {
+  return url === base || url.indexOf(base + '/') === 0;
+}
+
+function unservedWhy(target) {
+  if (target.error) return 'the request failed: ' + target.error;
+  if (target.status === 404) return 'not on the site (404)';
+  if (!target.status) return 'no answer at all';
+  return 'answered HTTP ' + target.status;
+}
 
 /* The string literals in an expression, in order, of any quote kind — what a site's shape can
    be judged from even when the expression itself cannot be resolved. */
@@ -671,7 +710,11 @@ function displayTarget(url, base) {
    a build — that is the page whose fetch the guard exists for. */
 async function classifyTarget(url) {
   const res = await probe(url, 0, { range: false, maxBytes: MAX_PAGE_BYTES });
-  if (res.error || res.status !== 200) return { kind: 'unreachable' };
+  /* Carries what came back, so a target this site does not serve can be named with the
+     reason rather than only found to be unusable — see TARGETS THE SITE DOES NOT SERVE. */
+  if (res.error || res.status !== 200) {
+    return { kind: 'unreachable', status: res.status, error: res.error || null };
+  }
   const html = res.head.toString('utf8');
   if (html.indexOf(PACK_MARKER) < 0) return { kind: 'not-a-build' };
 
@@ -716,6 +759,7 @@ function judgeTarget(verdict) {
 async function checkEntryPoints(base, launchers) {
   const results = [];
   const unread = [];
+  const dead = [];
   const cache = {};
   let published = 0;
   for (const file of launchers) {
@@ -725,9 +769,19 @@ async function checkEntryPoints(base, launchers) {
     published++;
     const found = launchTargets(page.head.toString('utf8'), pageUrl);
     if (found.unread.length) unread.push({ file: file, sites: found.unread });
+    const gone = [];
     for (const target of found.targets) {
       if (!cache[target]) cache[target] = classifyTarget(target);
       const verdict = await cache[target];
+      /* A way in that leads nowhere gets no verdict — but it does get named, when the page
+         it names is this site's own. Off this base the same 404 is somebody else's server
+         saying no; see TARGETS THE SITE DOES NOT SERVE. */
+      if (verdict.kind === 'unreachable') {
+        if (onSite(target, base)) {
+          gone.push({ path: displayTarget(target, base), status: verdict.status, error: verdict.error });
+        }
+        continue;
+      }
       if (verdict.kind !== 'build') continue;
       const judged = judgeTarget(verdict);
       results.push({
@@ -736,6 +790,7 @@ async function checkEntryPoints(base, launchers) {
                  what: 'a game this launcher opens' }
       });
     }
+    if (gone.length) dead.push({ file: file, targets: gone });
   }
   /* Silence would read as a pass, so an empty result is a failure: it means the page
      set or the launch mechanism changed shape and nothing was actually checked. */
@@ -752,10 +807,10 @@ async function checkEntryPoints(base, launchers) {
           : '')
     });
   }
-  return { entries: results, unread: unread };
+  return { entries: results, unread: unread, dead: dead };
 }
 
-function reportEntries(entries, unread) {
+function reportEntries(entries, unread, dead) {
   console.log('  entry points — every launcher\u2019s game target must carry the pack guard');
   entries.forEach(function (r) {
     console.log('    ' + (r.ok ? 'PASS  ' : 'FAIL  ') + r.asset.path);
@@ -786,6 +841,25 @@ function reportEntries(entries, unread) {
       ' a launch site this check cannot read — named above, no verdict either way');
   } else {
     console.log('    every launch site in the launcher pages resolved to a target');
+  }
+
+  /* The other way a way in goes unmentioned: the launcher points at a page this site does not
+     serve, so there is no build to judge and no expression to trace. Same weight as the trace
+     above, and for the same reason — see TARGETS THE SITE DOES NOT SERVE. */
+  if (dead.length) {
+    dead.forEach(function (d) {
+      console.log('    NOTE  ' + d.file + ' — ' + d.targets.length + ' ' +
+        (d.targets.length === 1 ? 'target' : 'targets') + ' this site does not serve');
+      d.targets.slice(0, MAX_TRACES_PER_PAGE).forEach(function (t) {
+        console.log('            ' + t.path + ' — ' + unservedWhy(t));
+      });
+      if (d.targets.length > MAX_TRACES_PER_PAGE) {
+        console.log('            and ' + (d.targets.length - MAX_TRACES_PER_PAGE) + ' more like them');
+      }
+    });
+    console.log('    ' + dead.length + ' launcher' + (dead.length === 1 ? '' : 's') + ' ' +
+      (dead.length === 1 ? 'points' : 'point') +
+      ' at a page this site does not serve — named above, no verdict either way');
   }
   return failed;
 }
@@ -966,16 +1040,30 @@ async function main() {
     const failed = results.concat(entryReport.entries).filter(function (r) { return !r.ok; });
     if (!failed.length || Date.now() >= deadline) {
       const bad = report(opts.base, results);
-      const unguarded = reportEntries(entryReport.entries, entryReport.unread);
+      const unguarded = reportEntries(entryReport.entries, entryReport.unread, entryReport.dead);
       console.log('  ' + await probePipeline(opts.base));
-      if (!bad.length && !unguarded.length && entryReport.unread.length) {
-        const n = entryReport.unread.length;
-        console.log('\nNothing above is a failure — but ' + n + ' launcher ' +
-          (n === 1 ? 'page carries' : 'pages carry') +
-          ' a launch site this check could not read, so it');
-        console.log('has no verdict on where ' + (n === 1 ? 'it' : 'they') +
-          ' leads. If one of them names a pack build,');
-        console.log('that way in is unguarded and this report could not have said so.');
+      const n = entryReport.unread.length;
+      const gone = entryReport.dead.length;
+      if (!bad.length && !unguarded.length && (n || gone)) {
+        /* One sentence for whichever of the two silences apply, then a paragraph each: both
+           are notes, so a clean run that has either must say what the notes mean for it. */
+        const said = [];
+        if (n) said.push(n + ' launcher ' + (n === 1 ? 'page carries' : 'pages carry') +
+          ' a launch site this check could not read');
+        if (gone) said.push(gone + ' launcher' + (gone === 1 ? '' : 's') +
+          ' ' + (gone === 1 ? 'points' : 'point') + ' at a page this site does not serve');
+        console.log('\nNothing above is a failure — but ' + said.join(', and ') + '.\n');
+        if (n) {
+          console.log('An unreadable launch site has no verdict on where ' +
+            (n === 1 ? 'it leads' : 'they lead') + ': if one of them names a pack build,');
+          console.log('that way in is unguarded and this report could not have said so.');
+        }
+        if (gone) {
+          console.log('A target this site does not serve leads nowhere at all: the player who');
+          console.log('follows that launcher gets the host\u2019s 404 page. Either the page was');
+          console.log('never published, or the launcher names a path that is not in the checkout,');
+          console.log('or another deployment was supposed to publish it.');
+        }
         return;
       }
       if (bad.length || unguarded.length) {
@@ -995,6 +1083,11 @@ async function main() {
           console.log('A launch site named as unresolved is one this check could not read: if it');
           console.log('turns out to name a pack build, that way in is unguarded and none of the above');
           console.log('would have mentioned it.');
+        }
+        if (entryReport.dead.length) {
+          console.log('A launcher whose target this site does not serve leads nowhere, whatever');
+          console.log('else is wrong here: that page has to exist in this deployment before the');
+          console.log('guard on it can matter.');
         }
         process.exitCode = 1;
       }

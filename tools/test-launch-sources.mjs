@@ -82,6 +82,10 @@ const BUILD_BAD = 'shell-bad/index.html';             // no guard anywhere
 const BUILD_WORKERBAD = 'shell-workerbad/index.html'; // guarded page, worker importing nothing
 const NOT_A_BUILD = 'shell-nopack/index.html';        // announces no pack: never reported
 
+/* A second origin, started before the fixture is written because one case points at it. Its
+   address goes in here; see serveElsewhere(). */
+let ELSEWHERE = '';
+
 /* One case per way a page can open another page. `broken` is where that launcher points
    in the broken fixture and the verdict the check must reach there; `verdict` FAIL means
    that build carries no guard, so the launcher is the thing to change. Every case also
@@ -291,6 +295,24 @@ mp4.src = f.src;
       return '<script>\n' + lines.join('\n') + '\n</script>';
     }
   },
+  /* ---- the third silence: a launcher whose target is not there. The target resolves, so no
+     expression can be traced, and the fetch answers 404 \u2014 which used to be dropped with
+     every other target that is not a pack build. `dead` is where that target sits: 'named'
+     when it belongs to this site, 'quiet' when the same 404 comes from another deployment. ---- */
+  {
+    file: 'dead-onsite.html', mechanism: 'a link to a page this site does not serve',
+    broken: null, verdict: null, dead: 'named',
+    shows: 'a resolved target under the site\u2019s own base that is not there, which no verdict '
+      + 'rule can speak about \u2014 unnamed, this launcher reads exactly like a working one',
+    body: () => '<a href="gone/index.html">Play</a>'
+  },
+  {
+    file: 'dead-elsewhere.html', mechanism: 'a link to a page another host does not serve',
+    broken: null, verdict: null, dead: 'quiet',
+    shows: 'the same 404 off this site: another deployment is not what this run was pointed at, '
+      + 'and naming those would bury the dead links that are this site\u2019s own',
+    body: () => '<a href="' + ELSEWHERE + '/missing/index.html">Play</a>'
+  },
 ];
 
 const PACK_CONFIG = 'const GODOT_CONFIG = {"fileSizes":{"index.pck":33554432}};';
@@ -426,6 +448,25 @@ function serveTree(root) {
   });
 }
 
+/* A second origin that answers 404 to everything, as the stand-in for a launcher pointing at
+   another deployment. The counter is what keeps the "left alone" assertion two-sided: the
+   target was reached and then deliberately not named, rather than never read at all. */
+function serveElsewhere() {
+  const state = { hits: 0 };
+  const server = http.createServer((req, res) => {
+    state.hits++;
+    res.writeHead(404, { 'content-type': 'text/plain' });
+    res.end('not here');
+  });
+  return new Promise((resolve) => {
+    server.listen(0, '127.0.0.1', () => {
+      state.base = 'http://127.0.0.1:' + server.address().port;
+      state.close = () => server.close();
+      resolve(state);
+    });
+  });
+}
+
 function runTool(root, base) {
   return new Promise((resolve, reject) => {
     const child = spawn(NODE, [path.join(root, 'tools', 'check-live-assets.js'), '--base=' + base],
@@ -504,6 +545,11 @@ if (narrowedSource) {
     'the mutation left entries in LAUNCH_EXPRESSIONS');
 }
 
+/* Started before the fixture is written, because one launcher page points at it, and closed
+   with the fixture trees below. */
+const elsewhere = await serveElsewhere();
+ELSEWHERE = elsewhere.base;
+
 const trees = [];
 try {
   const brokenRoot = buildTree('broken', toolSource, (c) => c.broken);
@@ -526,7 +572,12 @@ try {
   try {
     /* ---------- every mechanism, pointed at a build with no guard ---------- */
     console.log('\n=== every way in, pointed at an unguarded build ===');
+    /* What each run does with the other origin, counted at the origin: the assertions below
+       need to know it was reached, not only that nothing was said about it. */
+    const elsewhereHits = { broken: 0, fixed: 0, mutated: 0 };
+    let seen = elsewhere.hits;
     const brokenRun = await runTool(brokenRoot, broken.base);
+    elsewhereHits.broken = elsewhere.hits - seen;
     const brokenEntries = entryLines(brokenRun.out);
 
     check('the run fails', brokenRun.code === 1, 'exit ' + brokenRun.code);
@@ -580,7 +631,9 @@ try {
 
     /* ---------- the same mechanisms, pointed at the guarded shell ---------- */
     console.log('\n=== the same ways in, pointed at the guarded shell ===');
+    seen = elsewhere.hits;
     const fixedRun = await runTool(fixedRoot, fixed.base);
+    elsewhereHits.fixed = elsewhere.hits - seen;
     const fixedEntries = entryLines(fixedRun.out);
     const expectedFixed = opensSomething.map((c) => c.file + ' -> ' + BUILD_OK).sort();
 
@@ -597,9 +650,11 @@ try {
        could know is never guessed at and never given a verdict — and it is no longer invisible
        either, so the assertions are two-sided: no entry and no invented target, and, for the
        sites that are going somewhere, a NOTE naming the launcher and the expression. */
-    const unjudged = CASES.filter((c) => !c.broken).map((c) => c.file);
-    const traced = CASES.filter((c) => !c.broken && c.trace).map((c) => c.file);
-    const quiet = CASES.filter((c) => !c.broken && !c.trace).map((c) => c.file);
+    const unjudged = CASES.filter((c) => !c.broken && !c.dead).map((c) => c.file);
+    const traced = CASES.filter((c) => !c.broken && c.trace === true).map((c) => c.file);
+    const quiet = CASES.filter((c) => !c.broken && c.trace === false).map((c) => c.file);
+    const deadNamed = CASES.filter((c) => c.dead === 'named').map((c) => c.file);
+    const deadQuiet = CASES.filter((c) => c.dead === 'quiet').map((c) => c.file);
     const NOTE = (f) => '    NOTE  ' + f + ' \u2014 ';
 
     check('a target that cannot be known is never given a verdict, in either tree — ' +
@@ -661,10 +716,62 @@ try {
       'named anyway: ' + quiet.filter((f) =>
         brokenRun.out.includes(f) || fixedRun.out.includes(f)).join(', '));
 
+    /* The third silence: a target this site does not serve. There is no build to judge, so no
+       verdict can carry it — which makes the note the only thing between that launcher and
+       looking exactly like a working one. Pinned from both sides, like the trace: named under
+       this site's own base, left alone when the same 404 comes from elsewhere. */
+    check('a target this site does not serve is named, and never given a verdict — ' +
+      deadNamed.join(', '),
+      deadNamed.length > 0 && deadNamed.every((f) =>
+        brokenRun.out.includes(NOTE(f)) && fixedRun.out.includes(NOTE(f)) &&
+        !brokenRun.out.includes(f + ' ->') && !fixedRun.out.includes(f + ' ->')),
+      deadNamed.filter((f) =>
+        !brokenRun.out.includes(NOTE(f)) || !fixedRun.out.includes(NOTE(f)))
+        .map((f) => f + ' NOT named')
+        .concat(deadNamed.filter((f) => brokenRun.out.includes(f + ' ->')).map((f) => f + ' given a verdict'))
+        .join(', ') || 'no case in the fixture has a target this site does not serve');
+
+    check('and the note counts that page\u2019s targets and names the path and what came back',
+      brokenRun.out.includes('NOTE  dead-onsite.html — 1 target this site does not serve') &&
+        fixedRun.out.includes('NOTE  dead-onsite.html — 1 target this site does not serve') &&
+        brokenRun.out.includes('gone/index.html — not on the site (404)') &&
+        fixedRun.out.includes('gone/index.html — not on the site (404)'),
+      [brokenRun, fixedRun].map((r) => (r.out.split('\n').find((l) => /dead-onsite/.test(l)) ||
+        'no NOTE for dead-onsite.html').trim()).join(' / '));
+
+    check('and it is counted in pages, and said to be no verdict either way',
+      brokenRun.out.includes('1 launcher points at a page this site does not serve — ' +
+        'named above, no verdict either way') &&
+        fixedRun.out.includes('1 launcher points at a page this site does not serve — ' +
+          'named above, no verdict either way'),
+      (brokenRun.out.split('\n').find((l) => /does not serve —/.test(l)) || 'no such line').trim());
+
+    check('a dead target off this site is left alone — ' + deadQuiet.join(', '),
+      deadQuiet.length > 0 && deadQuiet.every((f) =>
+        !brokenRun.out.includes(f) && !fixedRun.out.includes(f)),
+      'named anyway: ' + deadQuiet.filter((f) =>
+        brokenRun.out.includes(f) || fixedRun.out.includes(f)).join(', '));
+
+    /* The count is asserted for the two runs of the tool that ships; the narrowed run's own
+       count is taken later, in the mutation section, and is not what this pins. */
+    const deadHits = [elsewhereHits.broken, elsewhereHits.fixed];
+    check('and it is left alone because it is another deployment\u2019s, not because it went unread',
+      deadHits.every((h) => h === 1),
+      'the other origin answered ' + deadHits.join(' / ') + ' probe(s) per run, one expected');
+
+    check('a clean run closing says what the dead target means for it, not only the unreadable site',
+      fixedRun.out.includes('Nothing above is a failure') &&
+        fixedRun.out.includes('and 1 launcher points at a page this site does not serve.') &&
+        fixedRun.out.includes('follows that launcher gets the host\u2019s 404 page'),
+      (fixedRun.out.split('\n').find((l) => /Nothing above is a failure/.test(l)) || 'no closing line')
+        .trim());
+
     /* ---------- both spelling lists narrowed, so the tool goes blind ---------- */
     if (mutated) {
       console.log('\n=== the same fixture with LAUNCH_SOURCES narrowed to <a href> ===');
+      seen = elsewhere.hits;
       const mutatedRun = await runTool(mutatedRoot, mutated.base);
+      elsewhereHits.mutated = elsewhere.hits - seen;
       const mutatedEntries = entryLines(mutatedRun.out);
 
       checkHarness('narrowing the list still looks like a pass — which is why this test exists',
@@ -682,6 +789,9 @@ try {
           mutatedEntries.length === 1,
         '[' + mutatedEntries.join(', ') + '] with ' +
           (mutatedRun.out.split('\n').find((l) => /launch site/.test(l)) || 'no trace line').trim());
+      checkHarness('the narrowed tool reaches the other origin too, and still says nothing about it',
+        elsewhereHits.mutated === 1 && !mutatedRun.out.includes('dead-elsewhere.html'),
+        'the other origin answered ' + elsewhereHits.mutated + ' probe(s)');
     }
   } finally {
     broken.close();
@@ -689,6 +799,7 @@ try {
     if (mutated) mutated.close();
   }
 } finally {
+  elsewhere.close();
   if (KEEP) {
     console.log('\nfixtures left in place:\n  ' + trees.join('\n  '));
   } else {
