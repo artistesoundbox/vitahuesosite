@@ -7,6 +7,12 @@ seblerskers/
 # site artifact either.
 auth/node_modules/
 
+# Never a place to keep anything: the dev workspace's hand-off directory for
+# values that have to reach a Sites secret without passing through a chat, a
+# commit or a workflow artifact. The workspace is a tracked directory of this
+# repository, so it is ignored here, up front, before anything is dropped in.
+3rdshooter-abootonthebrave/.secrets/
+
 # The local browser bridge's database (auth/dev-bridge.mjs). It is real
 # SQLite holding whichever accounts were signed in with the fake Google, so
 # it is scratch: delete it and the next sign-in creates the accounts again.
