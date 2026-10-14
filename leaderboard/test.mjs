@@ -328,6 +328,113 @@ console.log('\n[15] a signed-in player: the token decides the name, and carries 
   eq('and keeps its typed handle', (await typed.json()).you.handle, 'typed-fine');
 }
 
+console.log('\n[15] a run has to arrive with its shape, not just its total');
+{
+  /* The first day the trace is required. Its rules come off the API, the way a
+     player's page gets them, rather than from anything hard-coded here. */
+  const D2 = 20741;
+  const cfg2 = (await (await get('/api/health?day=' + D2)).json()).config;
+  const IP2 = { 'cf-connecting-ip': '198.51.100.31' };
+  const LAP = 40.8, TOTAL = 122.4;                 // three equal laps, best = min = one lap
+  function body2(over) {
+    return Object.assign({
+      day: D2, seed: cfg2.seed, car: cfg2.car, mod: cfg2.mod, par: cfg2.par,
+      time: TOTAL, best: LAP, pos: 2, of: 5, handle: 'traced'
+    }, over || {});
+  }
+  /* An honest trace: even pace. n+1 equal pieces means the sample at each
+     boundary and the tail after the last one together are the lap. */
+  const STEP = 50, LEN = 1794.2, N = Math.floor(LEN / STEP);
+  function traceFor(laps, over) {
+    return Object.assign({
+      step: STEP, len: LEN,
+      laps: laps.map(function (lap) {
+        const ts = [];
+        for (let i = 1; i <= N; i++) ts.push(Math.round(lap * (i / (N + 1)) * 100));
+        return ts;
+      })
+    }, over || {});
+  }
+  const honest = body2({ laps: [LAP, LAP, LAP], trace: traceFor([LAP, LAP, LAP]) });
+
+  const bare = await post(body2({}), IP2);
+  eq('a run with no trace is refused on that day', bare.status, 422);
+  check('and the refusal says what is missing', /trace/.test((await bare.json()).error));
+
+  const ok = await post(honest, IP2);
+  const okBody = await ok.json();
+  eq('an honest trace is accepted', ok.status, 201);
+  eq('and the row is marked as traced', okBody.you.traced, true);
+
+  const tag = (await env.DB.prepare('SELECT trace FROM scores WHERE day = ? AND handle = ?')
+    .bind(D2, 'traced').first()).trace;
+  check('the stored tag is a step and a digest', /^50x[0-9a-f]{8}$/.test(tag), JSON.stringify(tag));
+
+  const again = await post(honest, { 'cf-connecting-ip': '198.51.100.32' });
+  const tag2 = (await env.DB.prepare('SELECT trace FROM scores WHERE day = ? AND ip != ?')
+    .bind(D2, (await env.DB.prepare('SELECT ip FROM scores WHERE day = ? LIMIT 1').bind(D2).first()).ip)
+    .first()).trace;
+  eq('the same trajectory twice is the same tag', tag2, tag);
+  check('and it was stored, not refused', again.status === 201, 'status ' + again.status);
+
+  const teleport = body2({ laps: [LAP, LAP, LAP], trace: (function () {
+    const t = traceFor([LAP, LAP, LAP]);
+    t.laps[1][10] = t.laps[1][9] + 1;              // one bucket at 5000 u/s
+    return t;
+  })() });
+  const t1 = await post(teleport, IP2);
+  eq('a bucket faster than the hull is refused', t1.status, 422);
+  check('and says so', /faster than the hull/.test((await t1.json()).error));
+
+  const backwards = body2({ laps: [LAP, LAP, LAP], trace: (function () {
+    const t = traceFor([LAP, LAP, LAP]);
+    t.laps[0][5] = t.laps[0][4];                   // a bucket with no duration
+    return t;
+  })() });
+  eq('a trace that does not move forward is refused', (await post(backwards, IP2)).status, 422);
+
+  const short = body2({ laps: [LAP, LAP, LAP], trace: (function () {
+    const t = traceFor([LAP, LAP, LAP]);
+    t.laps[2].pop();                               // one sample short
+    return t;
+  })() });
+  const s1 = await post(short, IP2);
+  eq('a trace of the wrong length is refused', s1.status, 422);
+  check('and names the count', /is not 35 samples/.test((await s1.json()).error));
+
+  const elsewhere = body2({ laps: [LAP, LAP, LAP], trace: traceFor([LAP, LAP, LAP], { len: 2200 }) });
+  eq('a trace for another circuit is refused', (await post(elsewhere, IP2)).status, 422);
+
+  const badSum = body2({ time: TOTAL, best: LAP, laps: [41, 41, 41], trace: traceFor([41, 41, 41]) });
+  const b1 = await post(badSum, IP2);
+  eq('laps that do not add up to the total are refused', b1.status, 422);
+  check('and says so', /do not add up/.test((await b1.json()).error));
+
+  const badBest = body2({ laps: [30, 45.5, 46.9], best: 45.5, time: 122.4,
+    trace: traceFor([30, 45.5, 46.9]) });
+  const b2 = await post(badBest, IP2);
+  eq('a best lap that is not one of the laps is refused', b2.status, 422);
+  check('and says so', /not one of the laps/.test((await b2.json()).error));
+
+  const noLaps = body2({ trace: traceFor([LAP, LAP, LAP]) });
+  eq('a trace without its lap times is refused', (await post(noLaps, IP2)).status, 422);
+
+  /* the day before the cutoff: a page that has not been redeployed yet still
+     gets its runs filed, and they are visible as untraced */
+  const legacy = await post(run({ handle: 'untraced-legacy', time: 109.3 }), IP2);
+  eq('an earlier day may still arrive without a trace', legacy.status, 201);
+  eq('and is filed untraced', (await legacy.json()).you.traced, false);
+
+  const legacyBad = await post(run({ day: DAY, seed: CFG.seed, car: CFG.car, mod: CFG.mod,
+    par: CFG.par, time: 109.3, best: 34.1, handle: 'bad-trace-on-old-day',
+    laps: [36.4, 36.4, 36.5], trace: (function () {
+      const t = traceFor([36.4, 36.4, 36.5]);
+      t.laps[0][3] = t.laps[0][2] + 1;
+      return t;
+    })() }), IP2);
+  eq('a bad trace is refused even on the old day', legacyBad.status, 422);
+}
+
 console.log('\n' + '='.repeat(58));
 console.log(pass + ' passed, ' + fail + ' failed');
 if (fail) { console.log('\nfailures:'); failures.forEach(f => console.log('  - ' + f)); }

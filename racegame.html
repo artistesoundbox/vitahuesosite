@@ -2853,6 +2853,9 @@
         const lapTime = raceTime - r.lastLapAt;
         r.lastLapAt = raceTime;
         if (lapTime > 4 && r.lap >= 1) r.laps.push(lapTime);
+        /* only the laps that are part of the race: the hull keeps going after
+           the flag, and a crossing then is not another lap of this run */
+        if (r.isPlayer && !r.finished) traceLapDone(r.s);
         if (r.lap >= RACE_LAPS && !r.finished) {
           r.finished = true; r.finishTime = raceTime;
           if (r.isPlayer) finishRace();
@@ -3045,6 +3048,7 @@
          race they actually started played track 2 */
       if (!hold) musicNext();    // each race gets the next track
       raceTime = 0; countdown = 3.0; raceState = 'countdown';
+      traceReset();
       countdownShown = 0; goHold = 0;
       setLamps(0, '');
       cdEl.textContent = '';
@@ -3068,6 +3072,8 @@
         r.group.position.set(h.px + h.nx * r.lat, h.y + HOVER + r.height / 2 - r.lat * Math.sin(h.b), h.pz + h.nz * r.lat);
         r.group.rotation.set(0, r.yaw, 0);
       });
+      /* the lap the trace is sampling starts here, at the grid slot */
+      traceStartS = racers[playerIdx] ? racers[playerIdx].s : 0;
       resetPickups();
       snapCamera();
       /* HOLD: the same grid, standing still. The lamps stay dark and the
@@ -3152,6 +3158,66 @@
       runsOnSeed(seed).forEach(function (r) { if (!best || r.time < best) best = r.time; });
       return best;
     }
+    /* ============================================================
+       The lap trace
+
+       A total is a number anybody can type, and a plausible one gets
+       onto the board as easily as a driven one. What a run can carry
+       for practically nothing is *when* it crossed each 50-unit mark
+       of each lap — 35 samples a lap, about half a kilobyte of
+       centiseconds. The board then checks the shape: that the samples
+       move forward, that no bucket outruns the hull, and that the lap
+       times and the total it is filing agree with the trajectory they
+       claim to have come from.
+
+       It does not make a lie impossible — the trajectory of a patient
+       liar is still a trajectory. It does mean the lie has to be
+       shaped like a race instead of picked out of the air.
+       ============================================================ */
+    const TRACE_STEP = 50;        // world units between samples (the board knows this)
+    let traceLaps = [];           // finished laps: one array of centiseconds each
+    let traceCur = [];            // the lap in progress
+    let traceStartS = 0;          // where s stood when this lap began
+    function traceReset() { traceLaps = []; traceCur = []; traceStartS = 0; }
+    /* Once a frame, after the racers have moved. Both the distance and the clock
+       are measured FROM THE START OF THIS LAP, which is the only frame of
+       reference the board can check a lap time in: a lap starts where the last
+       line crossing left the hull, not at s = 0, and the race clock is not the
+       lap clock. A boundary crossed between two frames is filled by sharing the
+       frame's clock between them: samples that share a centisecond are a bucket
+       with no duration, which is an infinite speed, which is precisely what the
+       board refuses. */
+    function traceTick(me) {
+      if (raceState !== 'racing' || !me) return;
+      const perLap = Math.floor(trackLen / TRACE_STEP);
+      const dist = (me.s - traceStartS + trackLen) % trackLen;
+      const want = Math.min(Math.floor(dist / TRACE_STEP), perLap);
+      const missing = want - traceCur.length;
+      if (missing <= 0) return;
+      const from = traceCur.length ? traceCur[traceCur.length - 1] : 0;
+      const now = Math.round((raceTime - me.lastLapAt) * 100);
+      for (let i = 1; i <= missing; i++) traceCur.push(Math.round(from + (now - from) * (i / missing)));
+    }
+    function traceLapDone(nowS) { traceLaps.push(traceCur); traceCur = []; traceStartS = nowS; }
+    function tracePayload() {
+      /* a copy of the list, not the list: a run banked at the flag is sent
+         later (and may be re-sent), and by then the next lap's samples are in
+         here — the run's own trace must not grow after it was recorded */
+      return { step: TRACE_STEP, len: Math.round(trackLen * 10) / 10, laps: traceLaps.slice() };
+    }
+    /* An evenly paced trace, for a run nobody drove — the debug hook's `craft`
+       and the tests: the board's checks are about the shape, and this is the
+       shape of a clean lap. */
+    function evenTrace(len, laps) {
+      const n = Math.floor(len / TRACE_STEP);
+      return { step: TRACE_STEP, len: Math.round(len * 10) / 10,
+        laps: laps.map(function (t) {
+          const ts = [];
+          for (let i = 1; i <= n; i++) ts.push(Math.round(t * (i / (n + 1)) * 100));
+          return ts;
+        }) };
+    }
+
     function recordRun(me, pos, fieldSize) {
       const time = +me.finishTime.toFixed(2);
       const run = {
@@ -3166,6 +3232,11 @@
         best: +bestLapOf(me).toFixed(2),
         stars: starsFor(time, DAILY_PAR),
         handle: pilotName,
+        /* the trajectory behind the total, and the laps it is made of: the
+           board derives the shape of the race from these and refuses a run
+           that arrives without them */
+        laps: me.laps.map(function (t) { return +t.toFixed(2); }),
+        trace: tracePayload(),
         sent: 0                 // 0 = to send, 1 = on the board, -1 = refused there
       };
       runs.push(run);
@@ -3355,6 +3426,9 @@
     function boardPayload(run) {
       return { day: run.day, seed: run.seed, car: run.car, mod: run.mod, par: run.par,
         time: run.time, best: run.best, pos: run.pos, of: run.of, handle: pilotName,
+        /* the shape of the run, not just its total: per-lap times and the
+           sampled trajectory the board checks them against */
+        laps: run.laps || null, trace: run.trace || null,
         /* the board checks this and takes the name from it; the handle above
            is what it uses when there is no token */
         identity: identity ? identity.token : null };
@@ -4253,6 +4327,7 @@
 
       racers.forEach(function (r) { if (!r.isPlayer) driveAI(r, dt); });
       racers.forEach(function (r) { driveRacer(r, dt); });
+      traceTick(racers[playerIdx]);
       separateCars(dt);
       updatePickups(dt, t);
 
@@ -5004,15 +5079,20 @@
         pilot: function (v) { return v === undefined ? pilotName : setPilot(v); },
         flushRuns: function () { return flushRuns(); },
         refreshBoard: function () { return refreshBoard(); },
+        /* what the run will carry to the board: the shape of the race so far */
+        trace: function () { return tracePayload(); },
         /* submit a run the server will believe, without waiting three laps for
            one: the same client path, a plausible time */
         craft: function (over) {
           const time = (over && over.time) || DAILY_PAR + 6.5;
+          const perLap = +(time / RACE_LAPS).toFixed(2);
+          const laps = [perLap, perLap, perLap];
           const run = { at: Date.now(), day: DAILY_DAY, seed: DAILY_SEED,
             car: RACER_NAMES[playerIdx % RACER_NAMES.length], mod: DAILY_MOD.id, par: DAILY_PAR,
             pos: (over && over.pos) || 2, of: racers.length, time: time,
             best: (over && over.best) || Math.round((time / 3) * 100) / 100,
-            stars: starsFor(time, DAILY_PAR), handle: pilotName, sent: 0 };
+            stars: starsFor(time, DAILY_PAR), handle: pilotName,
+            laps: laps, trace: evenTrace(trackLen, laps), sent: 0 };
           runs.push(run); saveRuns(); renderDailyPanel(run); renderDailyNote();
           return run;
         },
