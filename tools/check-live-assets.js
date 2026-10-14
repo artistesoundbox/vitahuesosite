@@ -42,9 +42,25 @@
  * a full checkout carries dotfiles, so a 200 there means the Actions artifact is what
  * the host is currently serving, and a 404 means the branch build has won again. It
  * is reported because it is the cheapest way to name which pipeline is live.
+ *
+ * The entry points are checked last, and they are why this tool reads anything off
+ * disk. A launcher page can open a game that has no guard at all: the portal's
+ * SEBLERSKERS page opens a stock export on another host, which loads no pack guard and
+ * registers a worker that imports none, while the guarded shell it should open sits one
+ * directory away. So every root HTML file in the checkout is fetched as deployed, the
+ * games it opens are resolved — an iframe src, a GAME_URL or frame.src assignment, a
+ * plain link — and every target that turns out to be a pack build must load
+ * pack-guard.js; if it registers a worker, that worker must import the guard as well.
+ * The launcher page itself is not required to load the guard: the guard belongs to the
+ * page the engine runs in. A page that announces no pack is not a game page and the
+ * guard says nothing about it, which is what keeps a menu link from reading as a
+ * failure. Failures name the launcher, not just the build, because the launcher is the
+ * thing to change.
  */
 const http = require('http');
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
 
 const POINTER_PREFIX = 'version https://git-lfs.github.com/spec/';
 const SITE = 'https://artistesoundbox.github.io/vitahuesosite';
@@ -86,6 +102,161 @@ const SCRIPTS = [
     what: "Over The Ice's pack worker, importing that guard" }
 ];
 const MAX_SCRIPT_BYTES = 262144;
+
+/* ---------------------------------------------------------------------------
+ * ENTRY POINTS
+ *
+ * A guard in the shells only helps the player who reaches a shell, so every way into
+ * the site is checked: each launcher page, every game it opens, and whether that game
+ * carries the guard.
+ */
+const GUARD_FILE = 'pack-guard.js';
+const GUARD_IMPORT = 'importScripts';
+const PACK_MARKER = '.pck';
+/* Large enough for a portal page (the biggest here is ~260 KB) and far too small to
+   pull a pack, so a launcher pointing straight at one cannot stream it through here. */
+const MAX_PAGE_BYTES = 1048576;
+const NON_PAGE = /\.(js|mjs|css|png|jpe?g|gif|svg|webp|ico|mp4|webm|mov|ogv|mp3|wav|ogg|webmanifest|woff2?|map|json|txt|md|glb|gltf|fbx|wasm|zip|ttf|otf)([?#]|$)/i;
+
+/* Root HTML files — the portal's own pages, which is where a launcher lives. */
+function launcherFiles(root) {
+  try {
+    return fs.readdirSync(root).filter(function (f) { return /\.html?$/i.test(f); }).sort();
+  } catch (e) {
+    return [];
+  }
+}
+
+/* Every way a page can open something: an assignment in script (GAME_URL = '...',
+   frame.src = ..., location.href = ...) and markup (an iframe, a link). */
+const LAUNCH_SOURCES = [
+  /(?:GAME_URL|frame\.src|location\.href|window\.location(?:\.href)?)\s*=\s*['"]([^'"]+)['"]/g,
+  /<(?:iframe|frame|a)\b[^>]*?\b(?:src|href)\s*=\s*["']([^"']+)["']/gi
+];
+
+/* Addresses of pages, resolved against the launcher they came from and stripped of
+   duplicates. Anything that is not a page — an anchor, a stylesheet, a video, an
+   analytics beacon — is dropped before a single request goes out. */
+function launchTargets(html, pageUrl) {
+  const out = [];
+  const seen = {};
+  LAUNCH_SOURCES.forEach(function (re) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(html)) !== null) {
+      const raw = m[1].trim();
+      if (!raw || /^(#|about:|javascript:|data:|mailto:|tel:)/i.test(raw)) continue;
+      if (NON_PAGE.test(raw)) continue;
+      let url;
+      try { url = new URL(raw, pageUrl); } catch (e) { continue; }
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') continue;
+      url.hash = '';
+      const key = url.toString();
+      if (seen[key]) continue;
+      seen[key] = true;
+      out.push(key);
+    }
+  });
+  return out;
+}
+
+function displayTarget(url, base) {
+  if (url.indexOf(base + '/') === 0) return decodeURIComponent(url.slice(base.length + 1));
+  return url;
+}
+
+/* What a launcher opens, described. Only a page that announces a pack it will load is
+   a build — that is the page whose fetch the guard exists for. */
+async function classifyTarget(url) {
+  const res = await probe(url, 0, { range: false, maxBytes: MAX_PAGE_BYTES });
+  if (res.error || res.status !== 200) return { kind: 'unreachable' };
+  const html = res.head.toString('utf8');
+  if (html.indexOf(PACK_MARKER) < 0) return { kind: 'not-a-build' };
+
+  const guarded = html.indexOf(GUARD_FILE) >= 0;
+  const registered = /serviceWorker\.register\(\s*['"]([^'"]+)['"]/.exec(html);
+  let worker = null;
+  if (registered) {
+    let workerUrl = null;
+    try { workerUrl = new URL(registered[1], url).toString(); } catch (e) { workerUrl = null; }
+    if (workerUrl) {
+      const w = await probe(workerUrl, 0, { range: false, maxBytes: MAX_PAGE_BYTES });
+      const text = w.head.toString('utf8');
+      worker = {
+        path: new URL(workerUrl).pathname,
+        guarded: w.status === 200 &&
+          text.indexOf(GUARD_FILE) >= 0 && text.indexOf(GUARD_IMPORT) >= 0
+      };
+    }
+  }
+  return { kind: 'build', guarded: guarded, worker: worker };
+}
+
+function judgeTarget(verdict) {
+  if (!verdict.guarded) {
+    return { ok: false,
+      why: 'opens a pack build that loads no ' + GUARD_FILE + ' — this way into the game is ' +
+        'unguarded, so a 134-byte stub here reaches the engine and fails as a parse error ' +
+        'with nothing said' };
+  }
+  if (verdict.worker && !verdict.worker.guarded) {
+    return { ok: false,
+      why: 'loads the guard, but the worker it registers (' + verdict.worker.path +
+        ') does not import it — the engine fetches the pack through that worker, so that ' +
+        'fetch is unguarded' };
+  }
+  return { ok: true,
+    why: verdict.worker
+      ? 'the guarded shell, and ' + verdict.worker.path + ' imports the guard'
+      : 'the guarded shell (it registers no worker)' };
+}
+
+async function checkEntryPoints(base, launchers) {
+  const results = [];
+  const cache = {};
+  let published = 0;
+  for (const file of launchers) {
+    const pageUrl = base + '/' + file;
+    const page = await probe(pageUrl, 0, { range: false, maxBytes: MAX_PAGE_BYTES });
+    if (page.status !== 200) continue;   // not on the site, so not a way in
+    published++;
+    for (const target of launchTargets(page.head.toString('utf8'), pageUrl)) {
+      if (!cache[target]) cache[target] = classifyTarget(target);
+      const verdict = await cache[target];
+      if (verdict.kind !== 'build') continue;
+      const judged = judgeTarget(verdict);
+      results.push({
+        kind: 'entry', ok: judged.ok, why: judged.why,
+        asset: { path: file + ' -> ' + displayTarget(target, base),
+                 what: 'a game this launcher opens' }
+      });
+    }
+  }
+  /* Silence would read as a pass, so an empty result is a failure: it means the page
+     set or the launch mechanism changed shape and nothing was actually checked. */
+  if (!results.length) {
+    results.push({
+      kind: 'entry', ok: false,
+      asset: { path: 'every launcher in the checkout', what: 'the ways into the pack games' },
+      why: 'none of the ' + launchers.length + ' launcher pages opened anything announcing a ' +
+        'pack (' + published + ' of them are on the site), so this check proved nothing'
+    });
+  }
+  return results;
+}
+
+function reportEntries(entries) {
+  console.log('  entry points — every launcher\u2019s game target must carry the pack guard');
+  entries.forEach(function (r) {
+    console.log('    ' + (r.ok ? 'PASS  ' : 'FAIL  ') + r.asset.path);
+    console.log('            ' + r.asset.what + ' — ' + r.why);
+  });
+  const failed = entries.filter(function (r) { return !r.ok; });
+  console.log(failed.length
+    ? '    ' + failed.length + ' of ' + entries.length + ' ways into a pack game are unguarded'
+    : '    all ' + entries.length + ' ways into a pack game are guarded');
+  return failed;
+}
 
 function parseArgs(argv) {
   const opts = { base: SITE, wait: 0 };
@@ -247,6 +418,10 @@ async function probePipeline(base) {
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
+  /* The launcher list comes off disk: a Pages site cannot be listed over HTTP, and the
+     launcher that drifts is often the one nothing links to — the SEBLERSKERS launcher
+     page is live, opens a build on another host, and is reached by URL, not by a link. */
+  const launchers = launcherFiles(path.join(__dirname, '..'));
   const deadline = Date.now() + opts.wait * 1000;
   for (;;) {
     const results = [];
@@ -255,17 +430,25 @@ async function main() {
       results.push({ asset: asset, ok: verdict.ok, why: verdict.why });
     }
     results.push(...await checkScripts(opts.base));
-    const failed = results.filter(function (r) { return !r.ok; });
+    const entries = await checkEntryPoints(opts.base, launchers);
+    const failed = results.concat(entries).filter(function (r) { return !r.ok; });
     if (!failed.length || Date.now() >= deadline) {
       const bad = report(opts.base, results);
+      const unguarded = reportEntries(entries);
       console.log('  ' + await probePipeline(opts.base));
-      if (bad.length) {
+      if (bad.length || unguarded.length) {
         console.log('\nThe site is not serving what it should. A pointer means the deployed tree');
         console.log('was built without `lfs: true` — or that Pages is sourcing the branch build');
         console.log('instead of the Actions artifact (Settings -> Pages -> Build and deployment ->');
         console.log('Source: GitHub Actions). A worker served without its guard import means the');
         console.log('deployed copy predates that change, and until it lands those workers answer a');
         console.log('pack URL with whatever the host returns — a pointer included.');
+        if (unguarded.length) {
+          console.log('A way into a pack game with no guard is a launcher pointed at the wrong');
+          console.log('build — or at one that predates the guard. Point it at the guarded shell, or');
+          console.log('give that build the guard; until then that way in stays silent when the host');
+          console.log('answers with a stub.');
+        }
         process.exitCode = 1;
       }
       return;
