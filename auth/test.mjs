@@ -37,6 +37,9 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+/* The D1 shim and the fake Google. Shared with dev-bridge.mjs, so the thing a
+   browser is driven against and the thing this suite asserts are the same. */
+import { d1Adapter, createFakeGoogle } from "./local-google.mjs";
 
 /* ---- the three origins this deployment lives between ---- */
 const WORKER_ORIGIN = "https://auth.test";                       // the deployed Worker
@@ -57,6 +60,10 @@ const env = {
   IDENTITY_SECRET: IDENTITY_SECRET,
   SITE_ORIGINS: SITE_ORIGIN + "," + LOCAL_SITE
 };
+/* Bound after the literal so a deployment missing it can be tested by handing
+   the worker a different env object — which is exactly what the last section
+   of this suite does. */
+env.DB = d1Adapter();
 
 let pass = 0, fail = 0;
 const failures = [];
@@ -72,170 +79,13 @@ function section(title) { console.log("\n[" + title + "]"); }
 /* ============================================================
    the fake Google
    ============================================================ */
-const { privateKey, publicKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
-const jwk = publicKey.export({ format: "jwk" });
-const KID = "local-test-key-1";
-
-const codes = new Map();      // authorization code -> what it was issued against
-const accessTokens = new Set();
-let authorizeSeen = null;     // the last /authorize query, for the test's own assertions
-
-const PROFILE = {
-  sub: "110000000000000000001",
-  email: "player@example.com",
-  email_verified: true,
-  name: "Test Player",
-  given_name: "Test",
-  family_name: "Player",
-  picture: "https://example.com/avatar.png",
-  locale: "en"
-};
-
-function b64urlJson(obj) { return Buffer.from(JSON.stringify(obj)).toString("base64url"); }
-
-function idToken(nonce, nowSec) {
-  const header = b64urlJson({ alg: "RS256", typ: "JWT", kid: KID });
-  const payload = b64urlJson(Object.assign({}, PROFILE, {
-    iss: "https://accounts.google.com",
-    aud: GOOGLE_ID,
-    azp: GOOGLE_ID,
-    iat: nowSec,
-    exp: nowSec + 3600,
-    nonce: nonce
-  }));
-  const signed = header + "." + payload;
-  const sig = crypto.sign("sha256", Buffer.from(signed), privateKey).toString("base64url");
-  return signed + "." + sig;
-}
-
-function formToObject(raw) {
-  const out = {};
-  for (const pair of String(raw || "").split("&")) {
-    if (!pair) continue;
-    const i = pair.indexOf("=");
-    out[decodeURIComponent(pair.slice(0, i))] = decodeURIComponent(pair.slice(i + 1).replace(/\+/g, " "));
-  }
-  return out;
-}
-
-/* The discovery document deliberately advertises Google's real hostnames:
-   the library's https checks stay meaningful, and the fetch patch below
-   is what actually delivers the request to this server. */
-const google = http.createServer((req, res) => {
-  const url = new URL(req.url, "http://127.0.0.1");
-  const send = (status, headers, body) => {
-    res.writeHead(status, Object.assign({ "content-type": "application/json" }, headers || {}));
-    res.end(body === undefined ? "" : body);
-  };
-
-  if (url.pathname === "/.well-known/openid-configuration") {
-    return send(200, {}, JSON.stringify({
-      issuer: "https://accounts.google.com",
-      authorization_endpoint: "https://accounts.google.com/authorize",
-      token_endpoint: "https://accounts.google.com/token",
-      userinfo_endpoint: "https://accounts.google.com/userinfo",
-      jwks_uri: "https://accounts.google.com/jwks",
-      scopes_supported: ["openid", "email", "profile"],
-      response_types_supported: ["code"],
-      grant_types_supported: ["authorization_code"],
-      subject_types_supported: ["public"],
-      id_token_signing_alg_values_supported: ["RS256"],
-      code_challenge_methods_supported: ["S256"],
-      token_endpoint_auth_methods_supported: ["client_secret_post", "client_secret_basic"]
-    }));
-  }
-
-  if (url.pathname === "/jwks") {
-    return send(200, {}, JSON.stringify({
-      keys: [{ kty: "RSA", n: jwk.n, e: jwk.e, alg: "RS256", use: "sig", kid: KID }]
-    }));
-  }
-
-  if (url.pathname === "/authorize") {
-    authorizeSeen = Object.fromEntries(url.searchParams.entries());
-    if (authorizeSeen.client_id !== GOOGLE_ID) return send(400, {}, JSON.stringify({ error: "invalid_client" }));
-    if (authorizeSeen.code_challenge_method !== "S256" || !authorizeSeen.code_challenge) {
-      return send(400, {}, JSON.stringify({ error: "invalid_request", detail: "PKCE required" }));
-    }
-    const code = "code-" + crypto.randomBytes(6).toString("hex");
-    codes.set(code, {
-      challenge: authorizeSeen.code_challenge,
-      redirect_uri: authorizeSeen.redirect_uri,
-      nonce: authorizeSeen.nonce,
-      client_id: authorizeSeen.client_id
-    });
-    const target = new URL(authorizeSeen.redirect_uri);
-    target.searchParams.set("code", code);
-    target.searchParams.set("state", authorizeSeen.state || "");
-    return send(302, { location: target.toString() }, "");
-  }
-
-  if (url.pathname === "/token") {
-    let body = "";
-    req.on("data", (c) => { body += c; });
-    req.on("end", () => {
-      const form = formToObject(body);
-      let clientId = form.client_id;
-      let clientSecret = form.client_secret;
-      const basic = req.headers.authorization || "";
-      if (basic.toLowerCase().startsWith("basic ")) {
-        const decoded = Buffer.from(basic.slice(6), "base64").toString("utf8");
-        const i = decoded.indexOf(":");
-        clientId = decodeURIComponent(decoded.slice(0, i));
-        clientSecret = decodeURIComponent(decoded.slice(i + 1));
-      }
-      if (clientId !== GOOGLE_ID || clientSecret !== GOOGLE_SECRET) {
-        return send(401, {}, JSON.stringify({ error: "invalid_client" }));
-      }
-      const record = codes.get(form.code);
-      if (!record) return send(400, {}, JSON.stringify({ error: "invalid_grant" }));
-      if (form.redirect_uri !== record.redirect_uri) {
-        return send(400, {}, JSON.stringify({ error: "invalid_grant", detail: "redirect_uri mismatch" }));
-      }
-      const derived = crypto.createHash("sha256").update(String(form.code_verifier || "")).digest("base64url");
-      if (derived !== record.challenge) {
-        return send(400, {}, JSON.stringify({ error: "invalid_grant", detail: "code_verifier" }));
-      }
-      codes.delete(form.code);                       // single use, as Google does
-      const token = "at-" + crypto.randomBytes(8).toString("hex");
-      accessTokens.add(token);
-      const now = Math.floor(Date.now() / 1000);
-      return send(200, {}, JSON.stringify({
-        access_token: token,
-        token_type: "Bearer",
-        expires_in: 3600,
-        scope: "openid email profile",
-        id_token: idToken(record.nonce, now)
-      }));
-    });
-    return;
-  }
-
-  if (url.pathname === "/userinfo") {
-    const bearer = (req.headers.authorization || "").replace(/^Bearer /i, "");
-    if (!accessTokens.has(bearer)) return send(401, {}, JSON.stringify({ error: "invalid_token" }));
-    return send(200, {}, JSON.stringify(PROFILE));
-  }
-
-  return send(404, {}, JSON.stringify({ error: "not_found", path: url.pathname }));
-});
-await new Promise((resolve) => google.listen(0, "127.0.0.1", resolve));
-const googleBase = "http://127.0.0.1:" + google.address().port;
-
-/* Outbound calls to any Google host land on the local server instead, with
-   the method, headers, body and redirect mode carried across — the token
-   exchange is a POST with a body, and losing it here would make this test
-   pass on a flow that cannot work. */
-const GOOGLE_HOSTS = new Set(["accounts.google.com", "oauth2.googleapis.com", "www.googleapis.com", "openidconnect.googleapis.com"]);
-const realFetch = globalThis.fetch;   // kept for calls that must reach the real network (none yet)
-globalThis.fetch = function (input, init) {
-  const raw = typeof input === "string" ? input : (input instanceof URL ? input.href : input.url);
-  const parsed = new URL(raw);
-  if (!GOOGLE_HOSTS.has(parsed.host)) return realFetch(input, init);
-  const rewritten = googleBase + parsed.pathname + parsed.search;
-  if (typeof input === "string" || input instanceof URL) return realFetch(rewritten, init);
-  return realFetch(new Request(rewritten, input));
-};
+/* The fake Google. `PROFILE` is the module's account object rather than a
+   copy, so the assertions below read the account that was actually signed in
+   with. */
+const google = createFakeGoogle({ clientId: GOOGLE_ID, clientSecret: GOOGLE_SECRET });
+const PROFILE = google.profile;
+await google.start();
+google.install();
 
 /* Imported AFTER the patch, so nothing that captured a fetch at import
    time can slip past it. */
@@ -338,6 +188,23 @@ section("CORS — exactly one origin, and only the allowed one");
   check("preflight answers 204", preflight.status === 204, "status " + preflight.status);
   check("preflight allows the return-redirect header",
     String(preflight.headers.get("access-control-allow-headers") || "").toLowerCase().includes("x-auth-return-redirect"));
+
+  /* The profile save is a PUT with a JSON body, so the browser preflights it
+     and will not send it unless PUT is on this list. A direct caller never
+     preflights, so this is the one CORS fact the suite cannot learn by making
+     the request — it has to be asserted from the header. */
+  const save = await call("/api/profile", {
+    method: "OPTIONS",
+    origin: SITE_ORIGIN,
+    noCookies: true,
+    headers: { "access-control-request-method": "PUT", "access-control-request-headers": "content-type" }
+  });
+  const methods = String(save.headers.get("access-control-allow-methods") || "").toUpperCase();
+  check("a preflight for the profile save answers 204", save.status === 204, "status " + save.status);
+  check("and allows PUT, or the browser never sends the save",
+    /(^|[,\s])PUT([,\s]|$)/.test(methods), methods);
+  check("it allows every method the profile routes answer",
+    ["GET", "POST", "PUT", "PATCH"].every((m) => methods.indexOf(m) !== -1), methods);
 }
 
 section("a POST from an origin that is not allowed is refused");
@@ -411,6 +278,24 @@ let signInUrl = null;
   check("with a nonce", (target.searchParams.get("nonce") || "").length > 10);
 }
 
+/* The local bridge reaches the Worker over plain http, where SameSite=None
+   is not a legal cookie: Chrome drops the whole Set-Cookie without telling
+   the server, and the next POST fails as MissingCSRF with no indication of
+   which cookie went. Nothing about the deployed (https) flow changes; this
+   pins the http one so the bridge cannot quietly stop being usable. */
+section("the local bridge: plain http cookies stayed legal");
+{
+  const res = await call("http://127.0.0.1:8178/api/auth/csrf", { absorb: false });
+  const cookies = rawSetCookies(res);
+  check("an http request is answered", res.status === 200, "status " + res.status);
+  check("it sets a csrf cookie", cookies.length > 0, cookies.join(" | "));
+  check("with no sameSite=none, which http may not carry",
+    cookies.every((c) => !/samesite=none/i.test(c)), cookies.join(" | "));
+  check("but sameSite=lax", cookies.every((c) => /samesite=lax/i.test(c)), cookies.join(" | "));
+  check("and no __Secure-/__Host- prefix, as Auth.js requires over http",
+    !!cookieNamed(res, "authjs.csrf-token"), cookies.join(" | "));
+}
+
 section("Google's side of the flow (the faked consent screen)");
 {
   /* globalThis.fetch, not realFetch: the patched one is what redirects
@@ -422,7 +307,7 @@ section("Google's side of the flow (the faked consent screen)");
   check("returning to this Worker's callback", !!location && location.startsWith(WORKER_ORIGIN + "/api/auth/callback/google"),
     String(location));
   eq("the redirect_uri is the exact registered value",
-    authorizeSeen && authorizeSeen.redirect_uri, WORKER_ORIGIN + "/api/auth/callback/google");
+    google.authorizeSeen && google.authorizeSeen.redirect_uri, WORKER_ORIGIN + "/api/auth/callback/google");
 
   const callbackRes = await call(location);
   check("the callback completes the sign-in", [302, 303, 307].includes(callbackRes.status), "status " + callbackRes.status);
@@ -592,6 +477,207 @@ section("the built-in sign-in page renders (preact inside the bundle)");
   const html = await res.text();
   check("the sign-in page is HTML", res.status === 200 && /<html/i.test(html), "status " + res.status);
   check("and offers Google", /google/i.test(html), html.slice(0, 120));
+}
+
+/* ============================================================
+   profiles — the first thing here that has to outlive a cookie
+   ============================================================ */
+
+function putProfile(body, opts) {
+  return call("/api/profile", Object.assign({
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body)
+  }, opts || {}));
+}
+
+/* Another account, written straight into the shim: these are the people this
+   profile is looked at by, and going through Google twice to make them would
+   test the sign-in flow rather than the thing under test. */
+async function seedUser(sub, handle, visibility) {
+  const now = Date.now();
+  await env.DB.prepare(
+    "INSERT INTO users (sub, email, handle, handle_lower, display_name, bio, avatar_url, banner_url," +
+    " links, sections, visibility, google_name, google_picture, created, updated)" +
+    " VALUES (?, '', ?, ?, ?, '', '', '', '[]', '[]', ?, '', '', ?, ?)"
+  ).bind(sub, handle, handle.toLowerCase(), handle, visibility, now, now).run();
+}
+
+section("[accounts: the row appears the first time somebody looks]");
+let myHandle = null;
+{
+  const res = await call("/api/profile");
+  const body = await jsonOf(res);
+  eq("a signed-in look answers 200", res.status, 200);
+  check("and says it is yours", body && body.me === true, JSON.stringify(body && body.error));
+  const profile = body && body.profile;
+  check("with a profile in it", !!profile, JSON.stringify(body));
+  eq("the handle is derived from the Google name", profile && profile.handle, "test-player");
+  eq("the display name starts as the Google name", profile && profile.displayName, PROFILE.name);
+  eq("the avatar starts as the Google picture", profile && profile.avatar, PROFILE.picture);
+  eq("with the default section order", profile && profile.sections, ["about", "links", "showcase", "shorts"]);
+  eq("public until told otherwise", profile && profile.visibility, "public");
+  eq("an empty bio", profile && profile.bio, "");
+  eq("and no links", profile && profile.links, []);
+  check("the email is on your own copy of it", profile && profile.email === PROFILE.email, JSON.stringify(profile && profile.email));
+  check("with timestamps", profile && profile.joined > 0 && profile.updated >= profile.joined);
+  myHandle = profile && profile.handle;
+
+  const tables = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all();
+  const indexes = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'users_handle_lower'").all();
+  eq("the table was created on the way", (tables.results || []).map((r) => r.name).filter((n) => n === "users"), ["users"]);
+  eq("with the unique handle index", (indexes.results || []).length, 1);
+
+  const again = await jsonOf(await call("/api/profile"));
+  eq("a second look does not make a second row", again && again.profile && again.profile.handle, myHandle);
+  const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM users").first();
+  eq("one row", count.n, 1);
+}
+
+section("[editing it]");
+{
+  const res = await putProfile({
+    displayName: "  Ada   Lovelace  ",
+    bio: "First line.\r\n\r\nSecond paragraph, after a blank line.  ",
+    handle: "TP-Profile",
+    links: [
+      { label: "website", url: "https://example.com/ada?ref=1#top" },
+      { label: "x", url: "https://x.com/ada" },
+      { label: "email", url: "ada@example.com" }
+    ],
+    sections: ["shorts", "about"]
+  });
+  const body = await jsonOf(res);
+  eq("an edit answers 200", res.status, 200);
+  const profile = body && body.profile;
+  eq("runs of spaces collapse", profile && profile.displayName, "Ada Lovelace");
+  eq("the bio keeps its paragraphs", profile && profile.bio, "First line.\n\nSecond paragraph, after a blank line.");
+  check("a handle is stored lowercased, because the URL is its identity", profile && profile.handle === "tp-profile", String(profile && profile.handle));
+  myHandle = profile.handle;
+  eq("links keep their labels and only https", profile && profile.links.map((l) => l.label), ["website", "x", "email"]);
+  check("a normalized https url", profile && profile.links[0].url === "https://example.com/ada?ref=1#top", String(profile && profile.links[0].url));
+  eq("an email link becomes a mailto", profile && profile.links[2].url, "mailto:ada@example.com");
+  /* The list is what the profile shows: nothing is appended, which is what
+     makes hiding a section expressible at all. */
+  eq("the sections are exactly the ones the caller listed, in order", profile && profile.sections, ["shorts", "about"]);
+  const reread = await jsonOf(await call("/api/profile"));
+  eq("and a hidden section stays hidden when read back", reread.profile.sections, ["shorts", "about"]);
+
+  const notMine = await jsonOf(await putProfile({ sub: "somebody-else", email: "attacker@example.com" }));
+  eq("unknown fields are ignored, not applied", notMine && notMine.profile && notMine.profile.handle, "tp-profile");
+  const row = await env.DB.prepare("SELECT sub, email FROM users").first();
+  eq("and the account is still the one Google gave", row.sub, PROFILE.sub);
+  eq("with the email Google gave, not the one sent", row.email, PROFILE.email);
+
+  const long = await jsonOf(await putProfile({ bio: "x".repeat(900) }));
+  eq("a long bio is capped, not refused", long.profile.bio.length, 600);
+  const eight = [];
+  for (let i = 0; i < 8; i++) eight.push({ label: "website", url: "https://example.com/" + i });
+  eq("eight links are fine", (await jsonOf(await putProfile({ links: eight }))).profile.links.length, 8);
+  eq("nine are not", (await putProfile({ links: eight.concat([{ label: "website", url: "https://example.com/8" }]) })).status, 422);
+}
+
+section("[refusals answer with the field that was wrong]");
+{
+  const cases = [
+    [{ displayName: "   " }, "displayName", "cannot be empty"],
+    [{ displayName: "x".repeat(80) }, null, null],
+    [{ handle: "ab" }, "handle", null],
+    [{ handle: "admin" }, "handle", "that handle is reserved"],
+    [{ visibility: "secret" }, "visibility", null],
+    [{ links: "not a list" }, "links", null],
+    [{ links: [{ label: "evil", url: "https://example.com" }] }, "links[0].label", null],
+    [{ links: [{ label: "website", url: "http://example.com" }] }, "links[0].url", "only https:// links are accepted"],
+    [{ links: [{ label: "website", url: "javascript:alert(1)" }] }, "links[0].url", "only https:// links are accepted"],
+    [{ links: [{ label: "website", url: "data:text/html,<script>" }] }, "links[0].url", "only https:// links are accepted"],
+    [{ links: [{ label: "website", url: "https://user:pass@example.com" }] }, "links[0].url", "credentials are not allowed in a URL"],
+    [{ links: [{ label: "website", url: "not a url" }] }, "links[0].url", "not a URL"],
+    [{ links: [{ label: "email", url: "not-an-address" }] }, "links[0].url", "not an email address"],
+    [{ avatar: "data:text/html,<script>" }, "avatar", null],
+    [{ banner: "http://example.com/b.png" }, "banner", null],
+    [{ sections: ["about", "evil"] }, "sections", null],
+    [{ sections: "about" }, "sections", null],
+    [{ sections: [] }, "sections", "at least one section"],
+    [{ sections: ["about", "about", "about", "about", "about", "about", "about", "about"] }, "sections", "at most 7 sections"]
+  ];
+  for (const [body, field, maybeMessage] of cases) {
+    const res = await putProfile(body);
+    const payload = await jsonOf(res);
+    const named = payload && payload.fields && payload.fields.map((f) => f.field);
+    if (field === null) {
+      /* a long display name is capped rather than refused */
+      eq("a 80-character display name is capped, not refused", res.status, 200);
+      eq("and stored at the limit", payload.profile.displayName.length, 48);
+      continue;
+    }
+    eq(JSON.stringify(body) + " → 422", res.status, 422);
+    check("  naming " + field, !!named && named.indexOf(field) !== -1, JSON.stringify(payload));
+    if (maybeMessage) check("  saying why", JSON.stringify(payload).indexOf(maybeMessage) !== -1, JSON.stringify(payload));
+  }
+  const row = await env.DB.prepare("SELECT display_name, handle, visibility FROM users").first();
+  eq("and none of the refusals changed the row", row.handle, "tp-profile");
+  /* The only write in the table above that was accepted was the 80-character
+     name, capped from the left: everything the refusals wanted to change is
+     still what the last good edit left. */
+  eq("nor its display name", row.display_name, "x".repeat(48));
+  eq("nor its visibility", row.visibility, "public");
+}
+
+section("[handles are unique, case aside; profiles have a public face]");
+{
+  await seedUser("other-1", "ada", "public");
+  await seedUser("other-2", "quiet-one", "private");
+
+  const taken = await putProfile({ handle: "ADA" });
+  eq("a handle somebody else has is refused", taken.status, 409);
+  eq("and says which", (await taken.clone().json()).fields[0].error, "that handle is taken");
+
+  const mine = await jsonOf(await call("/api/profile/ada"));
+  eq("another account's public profile is readable", mine.ok, true);
+  eq("by handle", mine.profile.handle, "ada");
+  const keys = Object.keys(mine.profile);
+  check("and carries no account data", keys.indexOf("email") === -1 && keys.indexOf("sub") === -1 &&
+    keys.indexOf("googlePicture") === -1 && keys.indexOf("googleName") === -1, keys.join(","));
+  /* The owner's own view of a private profile is the next section's business —
+     this one is signed in as the wrong person to see quiet-one at all. */
+  eq("a private profile is refused to everybody else",
+    (await call("/api/profile/quiet-one", { noCookies: true, absorb: false })).status, 403);
+  eq("a handle that does not exist is a 404", (await call("/api/profile/nobody-here", { absorb: false })).status, 404);
+
+  const list = await jsonOf(await call("/api/profiles"));
+  const handles = (list.profiles || []).map((p) => p.handle);
+  check("the directory lists public profiles", handles.indexOf("ada") !== -1, JSON.stringify(handles));
+  check("and not private ones", handles.indexOf("quiet-one") === -1, JSON.stringify(handles));
+  eq("and not more than asked for", (await jsonOf(await call("/api/profiles?limit=1"))).profiles.length, 1);
+
+  await putProfile({ visibility: "private" });
+  eq("going private hides you from the directory",
+    (await jsonOf(await call("/api/profiles"))).profiles.map((p) => p.handle).indexOf("tp-profile"), -1);
+  eq("and from strangers", (await call("/api/profile/tp-profile", { noCookies: true, absorb: false })).status, 403);
+  eq("while you still see yourself", (await jsonOf(await call("/api/profile/tp-profile"))).me, true);
+  await putProfile({ visibility: "public" });
+  eq("and public again is readable by anyone", (await call("/api/profile/tp-profile", { noCookies: true, absorb: false })).status, 200);
+}
+
+section("[methods, origins, and a deployment with no database]");
+{
+  eq("POST to a profile is not a thing", (await call("/api/profile", { method: "POST", absorb: false })).status, 405);
+  eq("nor DELETE", (await call("/api/profile", { method: "DELETE", absorb: false })).status, 405);
+  eq("nor POST to the directory", (await call("/api/profiles", { method: "POST", absorb: false })).status, 405);
+  eq("a PUT from a foreign origin is refused", (await putProfile({ bio: "x" }, { origin: EVIL_ORIGIN, absorb: false })).status, 403);
+  eq("a signed-out look is 401", (await call("/api/profile", { noCookies: true, absorb: false })).status, 401);
+  eq("a signed-out edit is 401", (await putProfile({ bio: "x" }, { noCookies: true, absorb: false })).status, 401);
+
+  const noDb = Object.assign({}, env, { DB: undefined });
+  const res = await worker.fetch(new Request(WORKER_ORIGIN + "/api/profile", {
+    headers: { origin: SITE_ORIGIN, cookie: jar.header() }
+  }), noDb);
+  eq("a deployment with no database says so", res.status, 503);
+  eq("and names it", (await res.json()).error, "no database bound");
+  const health = await worker.fetch(new Request(WORKER_ORIGIN + "/api/health", {}), noDb);
+  eq("health agrees", (await health.json()).hasDatabase, false);
+  const withDb = await jsonOf(await call("/api/health"));
+  eq("and reports the database when it is bound", withDb.hasDatabase, true);
 }
 
 section("sign-out");

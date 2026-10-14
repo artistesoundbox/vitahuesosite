@@ -58,6 +58,7 @@
 
 import { Auth } from "@auth/core";
 import Google from "@auth/core/providers/google";
+import { handleProfiles } from "./profiles.js";
 
 const BASE_PATH = "/api/auth";
 
@@ -91,7 +92,14 @@ function corsFor(request, env) {
   return {
     "access-control-allow-origin": origin,
     "access-control-allow-credentials": "true",
-    "access-control-allow-methods": "GET, POST, OPTIONS",
+    /* Every method a route here actually answers. PUT and PATCH are the
+       profile save: a browser preflights that request and, if the method is
+       missing from this list, refuses to send it at all — the Worker never
+       sees the save, nothing is logged anywhere, and the page reports a
+       network failure. A direct caller (curl, the test suite) never
+       preflights, which is why the omission survived until a page tried to
+       save. */
+    "access-control-allow-methods": "GET, POST, PUT, PATCH, OPTIONS",
     "access-control-allow-headers": "content-type, x-auth-return-redirect",
     "access-control-max-age": "86400",
     "vary": "origin"
@@ -128,7 +136,16 @@ function json(body, status, cors, extra) {
    prefixed, instead of hard-coding one of the two. */
 function cookiesFor(secure) {
   const prefix = secure ? "__Secure-" : "";
-  const shared = { httpOnly: true, sameSite: "none", path: "/", secure: secure };
+  /* SameSite=None is only legal alongside Secure, and a browser does not
+     merely ignore an illegal one: Chrome drops the whole Set-Cookie and says
+     nothing to the server, so the next POST arrives without its CSRF cookie
+     and the flow answers `error=MissingCSRF` with no clue as to which cookie
+     went missing. Over https (every deployment) None is what the cross-site
+     fetch needs. Over plain http — the local bridge, and nothing else — None
+     cannot be had, and does not need to be: the page and the Worker are both
+     loopback, so they are the same site and Lax is sent. */
+  const sameSite = secure ? "none" : "lax";
+  const shared = { httpOnly: true, sameSite: sameSite, path: "/", secure: secure };
   return {
     sessionToken: { name: prefix + "authjs.session-token", options: shared },
     callbackUrl: { name: prefix + "authjs.callback-url", options: shared },
@@ -303,6 +320,12 @@ const ROUTES = [
   "POST /api/auth/signout              end the session        {csrfToken}",
   "GET  /api/me                        the signed-in user, shaped for the site",
   "GET  /api/identity                  a short-lived signed name for the leaderboard",
+  "",
+  "GET  /api/profile                   your account's profile (created on first look)",
+  "PUT  /api/profile                   update it  {displayName,handle,bio,avatar,banner,links,sections,visibility}",
+  "GET  /api/profile/<handle>          a public profile",
+  "GET  /api/profiles?limit=<1-50>     public profiles, most recently updated first",
+  "",
   "GET  /api/health                    what this deployment is configured with",
   ""
 ].join("\n");
@@ -344,7 +367,12 @@ export default {
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: cors || { "vary": "origin" } });
     }
-    if (request.method === "POST" && !mutationAllowed(request, env)) {
+    /* Every method that can change something, not just POST: the profile
+       routes write with PUT, and a check that only knew about POST would have
+       waved a cross-site PUT straight through. GET and HEAD are reads; OPTIONS
+       was answered above. */
+    if (["POST", "PUT", "PATCH", "DELETE"].indexOf(request.method) !== -1 &&
+        !mutationAllowed(request, env)) {
       return json({ ok: false, error: "origin not allowed" }, 403, cors);
     }
 
@@ -380,6 +408,21 @@ export default {
         if (!env.AUTH_SECRET) return json({ ok: false, error: "not configured" }, 503, cors);
         return await handleIdentity(request, env, cors);
       }
+      /* Profile routes need to know who is asking, so the session is resolved
+         here rather than inside the module — one place decrypts cookies. */
+      if (path === "/api/profile" || path.indexOf("/api/profile/") === 0 || path === "/api/profiles") {
+        if (!env.AUTH_SECRET) return json({ ok: false, error: "not configured" }, 503, cors);
+        const session = await sessionFor(request, env);
+        return await handleProfiles({
+          request: request,
+          env: env,
+          path: path,
+          cors: cors,
+          sessionUser: session && session.user,
+          json: json
+        });
+      }
+
       if (path === "/api/health" && request.method === "GET") {
         return json({
           ok: true,
@@ -388,6 +431,7 @@ export default {
           hasAuthSecret: !!env.AUTH_SECRET && String(env.AUTH_SECRET).length >= MIN_SECRET,
           hasGoogleCredentials: !!env.AUTH_GOOGLE_ID && !!env.AUTH_GOOGLE_SECRET,
           hasIdentitySecret: !!env.IDENTITY_SECRET,
+          hasDatabase: !!env.DB,
           siteOrigins: siteOrigins(env).length
         }, 200, cors);
       }

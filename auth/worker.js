@@ -3,7 +3,7 @@
    `node build.mjs`, which inlines @auth/core so the Worker needs no
    registry at runtime. Edit the source, rebuild, redeploy worker.js.
   
-   source-sha256: 5e981a1b5fe4c915564db724c0a5a7585d87ac994b2dbb0f89ffdacf66f01d95
+   source-sha256: 68ef1e174b49e664f4bbef2637ea6e491c24c049051cf41bf12eb5dbfb8ee6c4
    ============================================================ */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
@@ -6651,6 +6651,324 @@ function Google(options) {
   };
 }
 
+// src/profiles.js
+var SECTIONS = ["about", "links", "showcase", "shorts", "vault", "images", "music"];
+var DEFAULT_SECTIONS = ["about", "links", "showcase", "shorts"];
+var LINK_LABELS = ["website", "x", "instagram", "github", "youtube", "twitch", "tiktok", "discord", "spotify", "bandcamp", "patreon", "email"];
+var RESERVED_HANDLES = ["me", "api", "admin", "administrator", "root", "new", "edit", "settings", "signin", "signout", "signup", "login", "profiles", "search", "help", "support", "null", "undefined"];
+var LIMITS = {
+  handle: 24,
+  displayName: 48,
+  bio: 600,
+  url: 500,
+  links: 8
+};
+var SCHEMA = [
+  "CREATE TABLE IF NOT EXISTS users ( sub TEXT PRIMARY KEY, email TEXT NOT NULL DEFAULT '', handle TEXT NOT NULL, handle_lower TEXT NOT NULL, display_name TEXT NOT NULL, bio TEXT NOT NULL DEFAULT '', avatar_url TEXT NOT NULL DEFAULT '', banner_url TEXT NOT NULL DEFAULT '', links TEXT NOT NULL DEFAULT '[]', sections TEXT NOT NULL DEFAULT '[]', visibility TEXT NOT NULL DEFAULT 'public', google_name TEXT NOT NULL DEFAULT '', google_picture TEXT NOT NULL DEFAULT '', created INTEGER NOT NULL, updated INTEGER NOT NULL)",
+  /* Uniqueness is the index's job. handle_lower is what it is unique on, so
+     "Ada" and "ada" cannot both exist — two profiles whose URLs differ only in
+     case would be one profile to everyone reading them. */
+  "CREATE UNIQUE INDEX IF NOT EXISTS users_handle_lower ON users(handle_lower)",
+  "CREATE INDEX IF NOT EXISTS users_updated ON users(updated DESC)",
+  "CREATE INDEX IF NOT EXISTS users_visibility ON users(visibility, updated DESC)"
+];
+var schemaReady = null;
+function ensureSchema(env) {
+  if (!schemaReady) {
+    schemaReady = (async () => {
+      for (const statement of SCHEMA) await env.DB.prepare(statement).run();
+      return true;
+    })().catch((err) => {
+      schemaReady = null;
+      throw err;
+    });
+  }
+  return schemaReady;
+}
+function cleanText(raw2, max, allowNewlines) {
+  let s3 = String(raw2 == null ? "" : raw2);
+  s3 = allowNewlines ? s3.replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "") : s3.replace(/[\u0000-\u001F\u007F]/g, " ");
+  s3 = allowNewlines ? s3.split("\n").map((line) => line.replace(/[ \t]+/g, " ").trimEnd()).join("\n").replace(/\n{3,}/g, "\n\n") : s3.replace(/\s+/g, " ");
+  s3 = s3.trim();
+  return s3.length > max ? s3.slice(0, max).trim() : s3;
+}
+function cleanHandle(raw2) {
+  return String(raw2 == null ? "" : raw2).toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/-{2,}/g, "-").replace(/^[-_]+|[-_]+$/g, "").slice(0, LIMITS.handle);
+}
+function derivedHandle(name) {
+  const base = cleanHandle(name).slice(0, 20) || "player";
+  return base.length >= 3 ? base : (base + "-player").slice(0, LIMITS.handle);
+}
+function cleanUrl(raw2, field, errors) {
+  const s3 = String(raw2 == null ? "" : raw2).trim();
+  if (!s3) return "";
+  if (s3.length > LIMITS.url) {
+    errors.push({ field, error: "longer than " + LIMITS.url + " characters" });
+    return "";
+  }
+  let parsed;
+  try {
+    parsed = new URL(s3);
+  } catch (err) {
+    errors.push({ field, error: "not a URL" });
+    return "";
+  }
+  if (parsed.protocol !== "https:") {
+    errors.push({ field, error: "only https:// links are accepted" });
+    return "";
+  }
+  if (parsed.username || parsed.password) {
+    errors.push({ field, error: "credentials are not allowed in a URL" });
+    return "";
+  }
+  return parsed.toString();
+}
+function profileLinks(raw2, errors) {
+  if (raw2 == null) return [];
+  if (!Array.isArray(raw2)) {
+    errors.push({ field: "links", error: "must be a list" });
+    return [];
+  }
+  if (raw2.length > LIMITS.links) {
+    errors.push({ field: "links", error: "at most " + LIMITS.links + " links" });
+    return [];
+  }
+  const out = [];
+  raw2.forEach((entry, index) => {
+    const label = String(entry && entry.label || "").trim().toLowerCase();
+    if (LINK_LABELS.indexOf(label) === -1) {
+      errors.push({ field: "links[" + index + "].label", error: "unknown label" });
+      return;
+    }
+    const value = String(entry && entry.url || "").trim();
+    if (label === "email") {
+      const address = value.replace(/^mailto:/i, "").trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address) || address.length > 254) {
+        errors.push({ field: "links[" + index + "].url", error: "not an email address" });
+        return;
+      }
+      out.push({ label, url: "mailto:" + address });
+      return;
+    }
+    const url = cleanUrl(value, "links[" + index + "].url", errors);
+    if (url) out.push({ label, url });
+  });
+  return out;
+}
+function profileSections(raw2, errors) {
+  if (raw2 == null) return DEFAULT_SECTIONS.slice();
+  if (!Array.isArray(raw2)) {
+    errors.push({ field: "sections", error: "must be a list" });
+    return DEFAULT_SECTIONS.slice();
+  }
+  if (raw2.length > SECTIONS.length) {
+    errors.push({ field: "sections", error: "at most " + SECTIONS.length + " sections" });
+    return DEFAULT_SECTIONS.slice();
+  }
+  const seen = [];
+  for (const entry of raw2) {
+    const id = String(entry == null ? "" : entry).trim().toLowerCase();
+    if (SECTIONS.indexOf(id) === -1) {
+      errors.push({ field: "sections", error: "unknown section " + JSON.stringify(id) });
+      return DEFAULT_SECTIONS.slice();
+    }
+    if (seen.indexOf(id) === -1) seen.push(id);
+  }
+  if (!seen.length) {
+    errors.push({ field: "sections", error: "at least one section" });
+    return DEFAULT_SECTIONS.slice();
+  }
+  return seen;
+}
+function parseJson(text, fallback) {
+  try {
+    const value = JSON.parse(text);
+    return value == null ? fallback : value;
+  } catch (err) {
+    return fallback;
+  }
+}
+function publicProfile(row) {
+  if (!row) return null;
+  return {
+    handle: row.handle,
+    displayName: row.display_name,
+    bio: row.bio,
+    avatar: row.avatar_url,
+    banner: row.banner_url,
+    links: parseJson(row.links, []),
+    sections: parseJson(row.sections, []),
+    visibility: row.visibility,
+    joined: row.created,
+    updated: row.updated
+  };
+}
+function mineProfile(row) {
+  return Object.assign(publicProfile(row), {
+    email: row.email,
+    googleName: row.google_name,
+    googlePicture: row.google_picture
+  });
+}
+async function byHandle(env, handle) {
+  const lower = cleanHandle(handle);
+  if (!lower) return null;
+  return await env.DB.prepare("SELECT * FROM users WHERE handle_lower = ?").bind(lower).first();
+}
+async function ensureProfile(env, sessionUser, nowMs) {
+  const sub = String(sessionUser && sessionUser.id || "");
+  if (!sub) return null;
+  const existing = await env.DB.prepare("SELECT * FROM users WHERE sub = ?").bind(sub).first();
+  if (existing) return existing;
+  const googleName = cleanText(sessionUser.name, LIMITS.displayName, false) || "Player";
+  const picture = cleanUrl(sessionUser.picture, "google_picture", []);
+  let handle = derivedHandle(googleName);
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const candidate = attempt === 0 ? handle : derivedHandle(googleName).slice(0, 18) + "-" + randomSuffix();
+    if (RESERVED_HANDLES.indexOf(candidate) !== -1) continue;
+    const clash = await env.DB.prepare("SELECT sub FROM users WHERE handle_lower = ?").bind(candidate).first();
+    if (!clash) {
+      handle = candidate;
+      break;
+    }
+    if (attempt === 5) handle = candidate;
+  }
+  try {
+    await env.DB.prepare(
+      "INSERT INTO users (sub, email, handle, handle_lower, display_name, bio, avatar_url, banner_url, links, sections, visibility, google_name, google_picture, created, updated) VALUES (?, ?, ?, ?, ?, '', ?, '', '[]', ?, 'public', ?, ?, ?, ?)"
+    ).bind(
+      sub,
+      cleanText(sessionUser.email, 254, false),
+      handle,
+      handle.toLowerCase(),
+      googleName,
+      picture,
+      JSON.stringify(DEFAULT_SECTIONS),
+      googleName,
+      picture,
+      nowMs,
+      nowMs
+    ).run();
+  } catch (err) {
+    const raced = await env.DB.prepare("SELECT * FROM users WHERE sub = ?").bind(sub).first();
+    if (raced) return raced;
+    throw err;
+  }
+  return await env.DB.prepare("SELECT * FROM users WHERE sub = ?").bind(sub).first();
+}
+function randomSuffix() {
+  const bytes = new Uint8Array(3);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map((b2) => b2.toString(16).padStart(2, "0")).join("").slice(0, 4);
+}
+async function applyUpdate(env, sub, body, nowMs) {
+  const errors = [];
+  const source = body && typeof body === "object" ? body : {};
+  const displayName = cleanText(source.displayName, LIMITS.displayName, false);
+  if (source.displayName !== void 0 && !displayName) {
+    errors.push({ field: "displayName", error: "cannot be empty" });
+  }
+  let handle = null;
+  if (source.handle !== void 0) {
+    handle = cleanHandle(source.handle);
+    if (handle.length < 3) {
+      errors.push({ field: "handle", error: "needs at least 3 letters, digits, - or _" });
+    } else if (RESERVED_HANDLES.indexOf(handle) !== -1) {
+      errors.push({ field: "handle", error: "that handle is reserved" });
+    }
+  }
+  const visibility = source.visibility === void 0 ? null : String(source.visibility);
+  if (visibility !== null && ["public", "private"].indexOf(visibility) === -1) {
+    errors.push({ field: "visibility", error: "must be public or private" });
+  }
+  const bio = source.bio === void 0 ? null : cleanText(source.bio, LIMITS.bio, true);
+  const avatar = source.avatar === void 0 ? null : cleanUrl(source.avatar, "avatar", errors);
+  const banner = source.banner === void 0 ? null : cleanUrl(source.banner, "banner", errors);
+  const links = source.links === void 0 ? null : profileLinks(source.links, errors);
+  const sections = source.sections === void 0 ? null : profileSections(source.sections, errors);
+  if (errors.length) return { errors };
+  const row = await env.DB.prepare("SELECT * FROM users WHERE sub = ?").bind(sub).first();
+  if (!row) return { errors: [{ field: "profile", error: "no profile for this account" }], missing: true };
+  try {
+    await env.DB.prepare(
+      "UPDATE users SET handle = ?, handle_lower = ?, display_name = ?, bio = ?, avatar_url = ?, banner_url = ?, links = ?, sections = ?, visibility = ?, updated = ? WHERE sub = ?"
+    ).bind(
+      handle === null ? row.handle : handle,
+      handle === null ? row.handle_lower : handle.toLowerCase(),
+      source.displayName === void 0 ? row.display_name : displayName,
+      bio === null ? row.bio : bio,
+      avatar === null ? row.avatar_url : avatar,
+      banner === null ? row.banner_url : banner,
+      links === null ? row.links : JSON.stringify(links),
+      sections === null ? row.sections : JSON.stringify(sections),
+      visibility === null ? row.visibility : visibility,
+      nowMs,
+      sub
+    ).run();
+  } catch (err) {
+    if (/UNIQUE|constraint/i.test(String(err && err.message || err))) {
+      return { errors: [{ field: "handle", error: "that handle is taken" }], taken: true };
+    }
+    throw err;
+  }
+  return { row: await env.DB.prepare("SELECT * FROM users WHERE sub = ?").bind(sub).first() };
+}
+async function listPublic(env, limit) {
+  const capped = Math.min(Math.max(Number(limit) || 12, 1), 50);
+  const rows = await env.DB.prepare(
+    "SELECT * FROM users WHERE visibility = 'public' ORDER BY updated DESC LIMIT ?"
+  ).bind(capped).all();
+  return (rows.results || []).map(publicProfile);
+}
+async function handleProfiles(ctx) {
+  const { request, env, path, sessionUser, json: json2, cors } = ctx;
+  const needsDb = path === "/api/profile" || path.indexOf("/api/profile/") === 0 || path === "/api/profiles";
+  if (!needsDb) return null;
+  if (!env.DB) {
+    return json2({ ok: false, error: "no database bound" }, 503, cors);
+  }
+  await ensureSchema(env);
+  const signedIn = !!(sessionUser && sessionUser.id);
+  if (path === "/api/profiles") {
+    if (request.method !== "GET") return json2({ ok: false, error: "method not allowed" }, 405, cors);
+    return json2({ ok: true, profiles: await listPublic(env, new URL(request.url).searchParams.get("limit")) }, 200, cors);
+  }
+  if (path === "/api/profile") {
+    if (!signedIn) return json2({ ok: false, error: "not signed in" }, 401, cors);
+    if (request.method === "GET") {
+      const row2 = await ensureProfile(env, sessionUser, Date.now());
+      return json2({ ok: true, me: true, profile: mineProfile(row2) }, 200, cors);
+    }
+    if (request.method === "PUT" || request.method === "PATCH") {
+      await ensureProfile(env, sessionUser, Date.now());
+      let body;
+      try {
+        const text = await request.text();
+        if (text.length > 2e4) return json2({ ok: false, error: "body too large" }, 413, cors);
+        body = text ? JSON.parse(text) : {};
+      } catch (err) {
+        return json2({ ok: false, error: "bad json" }, 400, cors);
+      }
+      const result = await applyUpdate(env, sessionUser.id, body, Date.now());
+      if (result.errors) {
+        const status = result.taken ? 409 : 422;
+        return json2({ ok: false, error: result.taken ? "handle taken" : "invalid profile", fields: result.errors }, status, cors);
+      }
+      return json2({ ok: true, me: true, profile: mineProfile(result.row) }, 200, cors);
+    }
+    return json2({ ok: false, error: "method not allowed" }, 405, cors);
+  }
+  const handle = decodeURIComponent(path.slice("/api/profile/".length));
+  if (request.method !== "GET") return json2({ ok: false, error: "method not allowed" }, 405, cors);
+  const row = await byHandle(env, handle);
+  if (!row) return json2({ ok: false, error: "no such profile" }, 404, cors);
+  if (row.visibility === "private" && !(signedIn && sessionUser.id === row.sub)) {
+    return json2({ ok: false, error: "this profile is private" }, 403, cors);
+  }
+  const me = signedIn && sessionUser.id === row.sub;
+  return json2({ ok: true, me, profile: me ? mineProfile(row) : publicProfile(row) }, 200, cors);
+}
+
 // src/worker.src.js
 var BASE_PATH = "/api/auth";
 var MIN_SECRET = 32;
@@ -6666,7 +6984,14 @@ function corsFor(request, env) {
   return {
     "access-control-allow-origin": origin,
     "access-control-allow-credentials": "true",
-    "access-control-allow-methods": "GET, POST, OPTIONS",
+    /* Every method a route here actually answers. PUT and PATCH are the
+       profile save: a browser preflights that request and, if the method is
+       missing from this list, refuses to send it at all — the Worker never
+       sees the save, nothing is logged anywhere, and the page reports a
+       network failure. A direct caller (curl, the test suite) never
+       preflights, which is why the omission survived until a page tried to
+       save. */
+    "access-control-allow-methods": "GET, POST, PUT, PATCH, OPTIONS",
     "access-control-allow-headers": "content-type, x-auth-return-redirect",
     "access-control-max-age": "86400",
     "vary": "origin"
@@ -6692,7 +7017,8 @@ function json(body, status, cors, extra) {
 }
 function cookiesFor(secure) {
   const prefix = secure ? "__Secure-" : "";
-  const shared = { httpOnly: true, sameSite: "none", path: "/", secure };
+  const sameSite = secure ? "none" : "lax";
+  const shared = { httpOnly: true, sameSite, path: "/", secure };
   return {
     sessionToken: { name: prefix + "authjs.session-token", options: shared },
     callbackUrl: { name: prefix + "authjs.callback-url", options: shared },
@@ -6840,6 +7166,12 @@ var ROUTES = [
   "POST /api/auth/signout              end the session        {csrfToken}",
   "GET  /api/me                        the signed-in user, shaped for the site",
   "GET  /api/identity                  a short-lived signed name for the leaderboard",
+  "",
+  "GET  /api/profile                   your account's profile (created on first look)",
+  "PUT  /api/profile                   update it  {displayName,handle,bio,avatar,banner,links,sections,visibility}",
+  "GET  /api/profile/<handle>          a public profile",
+  "GET  /api/profiles?limit=<1-50>     public profiles, most recently updated first",
+  "",
   "GET  /api/health                    what this deployment is configured with",
   ""
 ].join("\n");
@@ -6877,7 +7209,7 @@ var worker_src_default = {
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: cors || { "vary": "origin" } });
     }
-    if (request.method === "POST" && !mutationAllowed(request, env)) {
+    if (["POST", "PUT", "PATCH", "DELETE"].indexOf(request.method) !== -1 && !mutationAllowed(request, env)) {
       return json({ ok: false, error: "origin not allowed" }, 403, cors);
     }
     try {
@@ -6905,6 +7237,18 @@ var worker_src_default = {
         if (!env.AUTH_SECRET) return json({ ok: false, error: "not configured" }, 503, cors);
         return await handleIdentity(request, env, cors);
       }
+      if (path === "/api/profile" || path.indexOf("/api/profile/") === 0 || path === "/api/profiles") {
+        if (!env.AUTH_SECRET) return json({ ok: false, error: "not configured" }, 503, cors);
+        const session2 = await sessionFor(request, env);
+        return await handleProfiles({
+          request,
+          env,
+          path,
+          cors,
+          sessionUser: session2 && session2.user,
+          json
+        });
+      }
       if (path === "/api/health" && request.method === "GET") {
         return json({
           ok: true,
@@ -6913,6 +7257,7 @@ var worker_src_default = {
           hasAuthSecret: !!env.AUTH_SECRET && String(env.AUTH_SECRET).length >= MIN_SECRET,
           hasGoogleCredentials: !!env.AUTH_GOOGLE_ID && !!env.AUTH_GOOGLE_SECRET,
           hasIdentitySecret: !!env.IDENTITY_SECRET,
+          hasDatabase: !!env.DB,
           siteOrigins: siteOrigins(env).length
         }, 200, cors);
       }

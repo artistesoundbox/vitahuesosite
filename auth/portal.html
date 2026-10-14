@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-EY4SD4FCN4"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-EY4SD4FCN4');
+  </script>
+  <meta charset="UTF-8" />
+  <title>VitaminaHueso – Portal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <link rel="stylesheet" href="portal.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../index.html">VitaminaHueso</a>
+    <nav class="tabs" role="tablist" aria-label="Portal sections">
+      <button class="tab" type="button" role="tab" data-view="profile" aria-selected="true">Profile</button>
+      <button class="tab" type="button" role="tab" data-view="editor" aria-selected="false">Editor</button>
+      <button class="tab" type="button" role="tab" data-view="vault" aria-selected="false">Vault<span class="soon">soon</span></button>
+      <button class="tab" type="button" role="tab" data-view="shorts" aria-selected="false">Shorts<span class="soon">soon</span></button>
+      <button class="tab" type="button" role="tab" data-view="community" aria-selected="false">Community<span class="soon">soon</span></button>
+    </nav>
+    <div class="session" data-vh-auth></div>
+  </header>
+
+  <main class="wrap">
+    <!-- =========================== profile =========================== -->
+    <section id="view-profile" role="tabpanel" aria-label="Profile">
+      <div id="profile-status" class="card">
+        <h2>Your profile</h2>
+        <p class="hint" id="profile-status-text">Checking who you are…</p>
+        <div class="row" id="profile-status-actions" style="margin-top:16px"></div>
+      </div>
+      <div id="profile-out" hidden></div>
+    </section>
+
+    <!-- =========================== editor ============================ -->
+    <section id="view-editor" role="tabpanel" aria-label="Editor" hidden>
+      <div id="editor-status" class="card">
+        <h2>Editor</h2>
+        <p class="hint" id="editor-status-text">Sign in to edit your profile.</p>
+      </div>
+
+      <div id="editor-out" class="editor-grid" hidden>
+        <form id="editor" class="card" autocomplete="off">
+          <h2>Details</h2>
+
+          <div class="field" data-field="displayName">
+            <label for="f-displayName">Display name</label>
+            <input id="f-displayName" name="displayName" type="text" maxlength="48" />
+            <div class="note" id="n-displayName">Up to 48 characters. Shown on your profile and beside your name anywhere on the site.</div>
+            <div class="why" hidden></div>
+          </div>
+
+          <div class="field" data-field="handle">
+            <label for="f-handle">Handle</label>
+            <input id="f-handle" name="handle" type="text" maxlength="24" />
+            <div class="note" id="n-handle">Your public URL: /api/profile/&lt;handle&gt;. Lowercase letters, digits, - and _.</div>
+            <div class="why" hidden></div>
+          </div>
+
+          <div class="field" data-field="bio">
+            <label for="f-bio">Bio</label>
+            <textarea id="f-bio" name="bio" maxlength="600"></textarea>
+            <div class="note"><span id="bio-count">0</span>/600</div>
+            <div class="why" hidden></div>
+          </div>
+
+          <div class="field" data-field="avatar">
+            <label for="f-avatar">Avatar image</label>
+            <input id="f-avatar" name="avatar" type="url" placeholder="https://…" />
+            <div class="note">An https link for now; direct uploads arrive with the media module.</div>
+            <div class="why" hidden></div>
+          </div>
+
+          <div class="field" data-field="banner">
+            <label for="f-banner">Banner image</label>
+            <input id="f-banner" name="banner" type="url" placeholder="https://…" />
+            <div class="why" hidden></div>
+          </div>
+
+          <div class="field" data-field="visibility">
+            <label for="f-visibility">Who can see this</label>
+            <select id="f-visibility" name="visibility">
+              <option value="public">Public — anyone with the link</option>
+              <option value="private">Private — only me</option>
+            </select>
+            <div class="why" hidden></div>
+          </div>
+
+          <div class="field" data-field="links">
+            <label>Social links</label>
+            <div class="note" style="margin-top:6px">The label decides the anchor text, so a link cannot be dressed up as something it is not. Up to 8.</div>
+            <ul class="sections" id="links-list"></ul>
+            <div class="row" style="margin-top:12px">
+              <select id="link-label" aria-label="Link label"></select>
+              <input id="link-url" type="url" placeholder="https://…" aria-label="Link URL" />
+              <button class="ghost" type="button" id="link-add">Add link</button>
+            </div>
+            <div class="why" hidden></div>
+          </div>
+
+          <div class="field" data-field="sections">
+            <label id="sections-label">Profile sections, in order</label>
+            <div class="note" style="margin-top:6px">
+              Drag the grip, or use ↑ / ↓, to choose what a visitor sees first. Hide one with <em>Hide</em>: hidden
+              sections keep their place at the end of the list, so showing it again restores the order you built.
+            </div>
+            <ul class="sections" id="sections-list" aria-labelledby="sections-label"></ul>
+            <div class="why" hidden></div>
+          </div>
+
+          <div class="savebar">
+            <div class="state" id="save-state" aria-live="polite">Nothing changed yet.</div>
+            <div class="row">
+              <button class="ghost" type="button" id="revert">Revert</button>
+              <button class="primary" type="submit" id="save">Save profile</button>
+            </div>
+          </div>
+        </form>
+
+        <div class="card">
+          <h2>As a visitor sees it</h2>
+          <p class="hint">This is the live preview, built from the fields on the left — and, in the same shape, from
+            what the API would return to somebody else.</p>
+          <div id="preview-out" style="margin-top:14px"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================== modules not built yet ================== -->
+    <section id="view-vault" role="tabpanel" aria-label="Vault" hidden>
+      <div class="card soon-card">
+        <h2>Personal vault — not built yet</h2>
+        <p class="hint">The next module. It will be a per-account store for anything you want to keep, with folders and
+          tags to find it again by. The database and the API for it do not exist yet; this tab is here so the shape of
+          the portal is visible while it is built.</p>
+        <ul>
+          <li>Save text notes, links, code snippets, images and audio</li>
+          <li>Folders and tags, with a dashboard view over everything saved</li>
+          <li>Bookmark a short, a profile or a post from anywhere on the site</li>
+          <li>Private by default, shareable item by item</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="view-shorts" role="tabpanel" aria-label="Shorts" hidden>
+      <div class="card soon-card">
+        <h2>Shorts — not built yet</h2>
+        <p class="hint">The media module. Video files have to live in object storage, not in this page's repository, so
+          this one needs the storage binding before it can do anything honest.</p>
+        <ul>
+          <li>Upload vertical clips, and arrange the featured ones</li>
+          <li>A Shorts tab on the profile, with likes and comments</li>
+          <li>Poster frames and sizes checked on the server, not in the browser</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="view-community" role="tabpanel" aria-label="Community" hidden>
+      <div class="card soon-card">
+        <h2>Community — not built yet</h2>
+        <p class="hint">Chat and notifications. This host has no Durable Objects, so it will be polling rather than
+          push — which is fine for rooms and messages, and honest about the delay.</p>
+        <ul>
+          <li>Public chat rooms, and direct messages between accounts</li>
+          <li>Notifications for likes, comments and messages, with an unread count</li>
+          <li>Blocking and private profiles respected by every read path</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="../signin.js"></script>
+  <script src="portal.js"></script>
+</body>
+</html>
