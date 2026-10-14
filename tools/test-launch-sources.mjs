@@ -36,6 +36,14 @@
  * named, and one unresolved property site holding no path that must not be, so the trace
  * stays short enough to be worth reading.
  *
+ * A target that resolves but is not there is the third way a launcher can go unmentioned, and
+ * it is pinned the same way: one case points at a path under the fixture's own base that is
+ * not in it (the launcher must be named, with the path and the 404), and one points at a
+ * second origin the fixture answers 404 from (it must not be named — another deployment is
+ * not what this run was pointed at, and naming those would bury the site's own dead links).
+ * That second case is two-sided on purpose: the fixture counts the probes its other origin
+ * receives, so "left alone" cannot pass by the target never having been read at all.
+ *
  * The fixture is rebuilt from scratch on every run, so it cannot drift away from this file.
  * The tool under test is copied into the fixture rather than re-implemented: the bytes that
  * run are the bytes that ship.
@@ -44,7 +52,9 @@
  * property read (`f.src`), a function defined in another file, a method call, a URL built
  * from `location` — is left alone rather than guessed at, and named in the report only when
  * it sits at a site that is going somewhere or builds a path out of literals (the two cases
- * above); chains through a non-root
+ * above); a launcher page that is in the checkout but not on the site, which the check skips
+ * without a word (the same silence in the other direction, and the next one to fix); chains
+ * through a non-root
  * intermediate page; and launchers published but absent from the checkout, which this side of
  * the deploy cannot list at all.
  *
@@ -53,9 +63,11 @@
  * quoted-literal stage, most single patterns are redundant on their own now. Verified by a
  * sweep, not assumed: dropping each of the ten LAUNCH_SOURCES patterns in turn fails this
  * test for only three of them (the markup pattern, and the two meta-refresh attribute
- * orders), emptying LAUNCH_EXPRESSIONS alone fails seventeen checks — naming each of the six
- * computed-mechanism cases one by one, plus the seven that pin the trace, since a list that
- * is not there cannot name what it could not read — and emptying both lists fails thirty-seven.
+ * orders), emptying LAUNCH_EXPRESSIONS alone fails eighteen checks — the six
+ * computed-mechanism cases one by one, the seven that pin the trace, the four that count the
+ * entry set a list that is not there shrinks, and this file's own closing sentence for a clean
+ * run, which joins both kinds of note and so needs the unreadable one to be there — and
+ * emptying both lists fails forty-two.
  * That is the intended shape: simplifying either list stays free, and a mechanism that stops
  * being seen fails here.
  *
