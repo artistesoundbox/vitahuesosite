@@ -1,0 +1,14 @@
+{
+  "name": "vh-auth-signin",
+  "private": true,
+  "type": "module",
+  "description": "Sign in with Google for vitahuesosite — Auth.js (@auth/core) in a Cloudflare Worker. The worker itself is the bundled single-file ES module beside this file; src/ and these devDependencies exist only to produce it.",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test.mjs"
+  },
+  "devDependencies": {
+    "@auth/core": "0.41.3",
+    "esbuild": "^0.28.2"
+  }
+}

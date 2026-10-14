@@ -43,6 +43,31 @@ jobs:
         with:
           lfs: true
 
+      # Node is pinned rather than taken from the runner image, because the step below
+      # decides whether the check at the end of this workflow can be trusted at all and its
+      # runtime should not drift under it. Same action and same version as the sync workflow.
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.14.0
+
+      # A guard that has gone blind cannot publish here. The entry-point check this workflow
+      # ends with is only as good as the two lists that decide which launcher page opens
+      # which game: narrowed by accident they do not fail — they PASS, because a way into a
+      # pack game that the lists cannot see is never checked and the run still ends at 0.
+      # So the check's own suites run first, on the checkout, before anything is published.
+      # The entry-point suite builds a fixture with one launcher page per mechanism, drops
+      # the check into it, and fails if a mechanism stops being seen, a deliberately narrowed
+      # copy of the check included; the pack-guard suite fails if a worker stops refusing the
+      # 134-byte LFS pointer. Neither suite touches the network — the fixture answers its own
+      # requests from local servers — so this step costs seconds and cannot flake on somebody
+      # else's host. Both are hand-run checks worth having in the one place that publishes.
+      - name: Test the guard before it is trusted
+        run: |
+          set -euo pipefail
+          node tools/test-pack-guard.mjs
+          node tools/test-launch-sources.mjs
+
       - name: Verify the pack arrived as real bytes
         run: |
           size=$(stat -c%s game/index.pck)
