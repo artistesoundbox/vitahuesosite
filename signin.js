@@ -28,9 +28,33 @@
    a plain `location.href`. Letting fetch follow the redirect instead would
    turn the trip to Google into a CORS request, which Google does not
    answer, so nothing would happen and the console would blame CORS.
+
+   IT IS SWITCHED OFF SITE-WIDE RIGHT NOW — see SIGNIN_UI below. The API
+   still answers; nobody is offered the button.
    ============================================================ */
 (function () {
   "use strict";
+
+  /* --------------------------------------------------------------- switch
+     Google sign-in is off on the site for now: `false` here means no page
+     draws the button, and none draws the chip that replaces it once
+     somebody is signed in. It also means no /api/me round trip, which is
+     the point — a visible button would send people to a Worker whose
+     Google credentials are not configured yet, and they would land on its
+     503 instead of on a game.
+
+     Nothing else is deleted. The API below is untouched, so the Grand Prix
+     board's identity() and the portal's signIn() keep working, and the
+     server half (auth/) does not know this switch exists.
+
+     Back on is `true`. Two pages will still need their slot returned, because
+     the slot is markup and was deleted with the button:
+       · banner.js  — the chip row it used to inject under the site banner
+       · index.html — <div id="site-signin" data-vh-auth></div>, plus the
+                      #site-signin rules in its stylesheet
+     Any other page that wants the button back only has to carry
+     <div data-vh-auth></div> again, which is how it was documented. */
+  var SIGNIN_UI = false;
 
   /* The deployed Worker. Edit here if it is ever redeployed elsewhere. */
   var DEFAULT_API = "https://site-9066bb3e67224190b78bd63d0ca6bb1e.freebuff.page";
@@ -150,6 +174,10 @@
        obvious way to use this, and querySelectorAll on the element alone
        would find nothing and leave an empty box behind. */
     mount: function (root) {
+      /* Off means off — see SIGNIN_UI at the top. Every slot is left exactly
+         as the page wrote it (empty), and nobody is asked who they are, so
+         a page with a slot costs no request and shows no error. */
+      if (!SIGNIN_UI) return;
       var scope = root || document;
       var nodes = Array.prototype.slice.call(scope.querySelectorAll("[data-vh-auth]"));
       if (scope !== document && scope.hasAttribute && scope.hasAttribute("data-vh-auth") &&

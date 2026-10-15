@@ -57,36 +57,6 @@
             filter: drop-shadow(0 0 18px rgba(80, 150, 255, 0.35));
         }
 
-        /* Who is signed in. signin.js fills this; it is empty and takes no
-           space when nobody is, because the portal is the page that asks
-           people to sign in — this one only says who already did. These are
-           the same handful of rules banner.js injects on the other content
-           pages, which have no stylesheet for the helper. */
-        #site-signin {
-            margin: 0 auto 14px;
-            display: flex;
-            justify-content: center;
-        }
-        #site-signin .vh-auth {
-            display: flex; flex-wrap: wrap; align-items: center; gap: 9px;
-            font: 12px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .08em;
-        }
-        #site-signin .vh-auth img { width: 26px; height: 26px; border-radius: 50%; display: block; }
-        #site-signin .vh-auth span { font-weight: 600; color: #cfe4ff; }
-        #site-signin .vh-auth button {
-            font: inherit; letter-spacing: .08em; cursor: pointer; padding: 5px 11px; border-radius: 8px;
-            border: 1px solid rgba(207, 228, 255, .3); background: transparent; color: #cfe4ff;
-        }
-        #site-signin .vh-auth button:hover { border-color: #7cc4ff; color: #7cc4ff; }
-        #site-signin .vh-auth button:disabled { opacity: .6; cursor: progress; }
-        #site-signin .vh-auth .vh-auth-google {
-            background: #1a73e8; border-color: #1a73e8; color: #fff; font-weight: 600;
-        }
-        #site-signin .vh-auth .vh-auth-google:hover { color: #fff; filter: brightness(1.08); }
-        #site-signin .vh-auth[data-error]::after {
-            content: attr(data-error); flex: 1 0 100%; margin-top: 6px; color: #ffb4b4; font-size: 12px;
-        }
-
         /* PLAY art button — sized and glowing exactly like the landing page art */
 
         /* PLAY title art — identical spec to the landing page's art */
@@ -315,9 +285,6 @@
             <img src="anthonitus.png" alt="Anthonitus" id="site-banner-img" />
         </div>
 
-        <!-- Who is signed in. signin.js fills this with the Google name and
-             picture, or leaves it empty — the portal is where people sign in. -->
-        <div id="site-signin" data-vh-auth></div>
         <div class="button-container">
 
             <!-- Sobre El Gelo / Over The Ice — the saucer game -->
