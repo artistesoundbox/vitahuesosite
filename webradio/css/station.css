@@ -132,6 +132,12 @@ a:hover { color: #fff; }
 }
 .site-back span[aria-hidden] { font-size: 13px; line-height: 1; }
 
+@media (max-width: 720px) {
+  .site-back-label { display: none; }
+  .site-banner { padding-top: 10px; }
+  .site-banner img { width: min(230px, 64vw); }
+}
+
 .topbar {
   position: sticky;
   top: 0;

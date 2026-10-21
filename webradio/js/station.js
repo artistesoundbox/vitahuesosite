@@ -47,6 +47,8 @@ const ORIGINALS = TRACKS.filter((t) => !t.guest);
 
 const FUN = new Set(ROTATION.funGenres || []);
 const FUN_WEIGHT = Math.max(1, Math.round(Number(ROTATION.funWeight) || 1));
+const FUN_SHARE = Math.min(0.95, Math.max(0, Number(ROTATION.funShare) || 0));
+const isFun = (track) => track.genres.some((g) => FUN.has(g));
 const IDENT_EVERY = Math.max(0, Number(ROTATION.identEvery) || 0);
 
 /** A bag that repeats the fun genres, so Latin urban / dembow come up more. */
@@ -90,11 +92,15 @@ function buildSequence(pool, guests, rng, length = 96, seedRecent = []) {
 
   /* Take the next bag entry that is out of cooldown; if the whole bag is
      cooling, take the next entry anyway rather than stalling the programme. */
-  const draw = (bank, refill) => {
+  const draw = (bank, refill, preferFun = false) => {
     for (let i = 0; i < bank.bag.length; i++) {
       if (bank.cursor >= bank.bag.length) refill();
       const candidate = bank.bag[bank.cursor++];
-      if (!tooSoon(candidate)) return candidate;
+      if (tooSoon(candidate)) continue;
+      /* Lean fun: usually skip a non-fun guest while the bag still has a fun
+         track to offer. Deterministic, because rng is seeded per programme. */
+      if (preferFun && FUN_SHARE > 0 && !isFun(candidate) && rng() > 1 - FUN_SHARE) continue;
+      return candidate;
     }
     if (bank.cursor >= bank.bag.length) refill();
     return bank.bag[bank.cursor++];
@@ -109,7 +115,7 @@ function buildSequence(pool, guests, rng, length = 96, seedRecent = []) {
   };
 
   while (sequence.length < length) {
-    const guest = draw(guestBank, refillGuests);
+    const guest = draw(guestBank, refillGuests, true);
     sequence.push(guest);
     remember(guest);
     sinceOriginal += 1;
