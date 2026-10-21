@@ -46,19 +46,21 @@ There is no streaming server, so "live" is a deterministic timeline:
    programme boundary. The seed is `UTC date + programme + station epoch`, so
    **every visitor computes the same reel** — including the same guest rotation.
 
-   Both bags reshuffle when exhausted and immediate repeats are prevented, so a
-   given guest song is spaced out rather than repeated back to back. Change
-   `originalEvery` in `js/config.js` to taste (higher = your own songs rarer;
-   `12` is the ceiling).
+   Both bags reshuffle when exhausted, and **no track can return until
+   `noRepeatWindow` other songs have played** (default **12**, carried across
+   programme boundaries). That is what stops a song coming back a couple of
+   places after itself. Change `originalEvery` in `js/config.js` to taste
+   (higher = your own songs rarer; `12` is the ceiling).
 
-   **Fun first:** the guest bag repeats anything in `funGenres`
-   (`Reggaeton`, `Dembow`, `Latin`, `Dancehall`, `Moombahton`, `Urbano`)
-   `funWeight` times (default **6**), so the station leans Latin urban / dembow
-   — roughly three quarters of the songs — while the quiet corners still turn
-   up. **Station ID:** `audio/id/vitahuesoradiopause.mp3` is inserted after
-   every `identEvery` songs (default **5**), so the station announces itself
-   regularly. Both knobs live in `ROTATION` in `js/config.js`; `0` disables the
-   ID.
+   **Fun first:** `funGenres` (`Reggaeton`, `Dembow`, `Latin`, `Dancehall`,
+   `Moombahton`, `Urbano`, `Salsa`, `Timba`) carry `funShare` (default **0.8**)
+   of the guest picks — non-fun candidates get skipped while a fun track is
+   still available — so about 70% of the station is Latin urban / dembow without
+   duplicating songs (duplicates are what made repeats feel too close). Raise
+   `funWeight` only when the guest shelf grows. **Station ID:**
+   `audio/id/vitahuesoradiopause.mp3` is inserted after every `identEvery` songs
+   (default **5**), so the station announces itself regularly. All knobs live in
+   `ROTATION` in `js/config.js`; `0` disables the ID.
 4. The player looks at `Date.now()`, finds the track that should be playing at
    that second, seeks into it, and keeps a loose sync (re-seek only if drift
    exceeds 12 seconds).
@@ -121,10 +123,11 @@ To add a record, add an object to `"albums"` with a `cover` path.
 
 `audio/free/` holds the guest catalogue: **twenty songs with vocals from
 independent artists on ccMixter** — weighted toward Latin urban, dembow,
-reggaeton and dancehall, plus rock, pop, soul, funk, hip-hop, jazz, country,
-folk, blues and electronic — and **two slow instrumentals by Kevin MacLeod**, all
-under **CC BY** licences (per-track: CC BY 3.0 or 4.0). They are hosted here, not
-hotlinked. Every entry carries its own `artist`, `license`,
+reggaeton, dancehall, salsa and timba, plus rock, pop, soul, funk, hip-hop, jazz,
+blues and electronic — and **two slow instrumentals by Kevin MacLeod**. Every
+track carries its own licence: mostly **CC BY 3.0/4.0**, with one **CC BY-NC 3.0**
+(the timba cut, fine while the station stays non-commercial). They are hosted
+here, not hotlinked. Every entry carries its own `artist`, `license`,
 `licenseUrl`, `source` and `credit`, and those are surfaced in `CREDITS.md`, on
 the About page, and under the player. CC BY requires that attribution stays
 visible — keep the credits if you keep the tracks.
@@ -264,7 +267,7 @@ rest of `vitahuesosite`:
 
 ## Verification performed
 
-- Catalogue build: 69 tracks (47 original + 22 guest), 222 minutes, 21 genre
+- Catalogue build: 69 tracks (47 original + 22 guest), 220 minutes, 21 genre
   chips, embedded covers extracted.
 - Local server range request: `206 Partial Content` with correct
   `Content-Range`, so timeline seeking works.
@@ -286,6 +289,12 @@ rest of `vitahuesosite`:
 - Station ID: playing at its scheduled slot loads
   `audio/id/vitahuesoradiopause.mp3`, plays the full 20 s, and the queue tags it
   `Station ID · ID`.
+- No-repeat rule: over 240 upcoming slots the shortest gap between two plays of
+  the same song was 14 slots, with 71% of the songs in the fun genres, 10%
+  originals and 38 station IDs (one every five songs).
+- Station header: the Anthonitus banner loads from `../anthonitus.png` above the
+  station header and links back to `../index.html`; the same goes for the
+  `Back to site` pill that sits beside the on-air chip.
 - Contact form: clipboard path works, with a visible selectable fallback when a
   browser refuses clipboard access.
 - Library: search, genre filter, empty state, sort, favorites-only.
