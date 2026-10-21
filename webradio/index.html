@@ -79,6 +79,7 @@
     <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 019.5 4a8.5 8.5 0 1010.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
     <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v10H9.5L5 19v-3.5H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-emoji" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="9" cy="10" r="1.1" fill="currentColor"/><circle cx="15" cy="10" r="1.1" fill="currentColor"/><path d="M8.4 14.2a4.4 4.4 0 007.2 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
     <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="9" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M16 6.2a3.2 3.2 0 010 5.6M17.5 14.4c2 .6 3.5 2.4 3.5 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
@@ -448,7 +449,7 @@
         <div>
           <p class="eyebrow">Open channel</p>
           <h1>Contact</h1>
-          <p class="lede">Requests, collaborations, licensing, or a note about a song that found you at the right time — it all lands in the same inbox.</p>
+          <p class="lede">Collaborations, licensing, or a note about a song that found you at the right time — it all lands in the same inbox.</p>
         </div>
       </header>
 
@@ -472,22 +473,6 @@
         </form>
 
         <div class="contact-side">
-          <form class="glass form-card" id="request-form" novalidate>
-            <h2>Request a song</h2>
-            <p class="muted small">Requests post into the listener room and are kept for the station. The artist reads them before the next programme block.</p>
-            <div class="field">
-              <label for="request-track">Track or vibe</label>
-              <input id="request-track" name="track" type="text" list="track-options" placeholder="e.g. Still Waters" required />
-              <datalist id="track-options"></datalist>
-            </div>
-            <div class="field">
-              <label for="request-note">Dedication <span class="muted">(optional)</span></label>
-              <input id="request-note" name="note" type="text" placeholder="For someone who needs it" />
-            </div>
-            <button class="btn btn-ghost" type="submit">Queue my request</button>
-            <ul class="request-list" id="request-list"></ul>
-          </form>
-
           <div class="glass side-card contact-links">
             <h3>Direct lines</h3>
             <ul class="link-list">
@@ -566,12 +551,7 @@
       <span class="relay-badge" id="relay-badge">connecting…</span>
     </div>
 
-    <div class="tabs" role="tablist">
-      <button class="tab is-active" id="tab-chat" role="tab" aria-selected="true" aria-controls="chat-pane" type="button">Chat</button>
-      <button class="tab" id="tab-requests" role="tab" aria-selected="false" aria-controls="request-pane" type="button">Requests</button>
-    </div>
-
-    <section class="tab-pane" id="chat-pane" role="tabpanel" aria-labelledby="tab-chat">
+    <section class="tab-pane" id="chat-pane" aria-label="Listener chat">
       <ol class="chat-log" id="chat-log" aria-live="polite"></ol>
       <form class="chat-form" id="chat-form">
         <div class="chat-name-row">
@@ -581,28 +561,15 @@
         </div>
         <div class="chat-input-row">
           <label class="sr-only" for="chat-input">Message</label>
+          <button class="chat-emoji-btn" id="chat-emoji" type="button" aria-label="Add an emoji or a face" aria-expanded="false" aria-controls="chat-emoji-panel">
+            <svg class="icon"><use href="#i-emoji"/></svg>
+          </button>
           <input id="chat-input" type="text" maxlength="280" placeholder="Say something to the room…" autocomplete="off" />
           <button class="btn btn-primary btn-sm" type="submit">Send</button>
         </div>
-        <p class="chat-hint" id="chat-hint">Messages are public to anyone with the room link. Keep it kind.</p>
+        <div class="emoji-panel" id="chat-emoji-panel" role="group" aria-label="Emojis" hidden></div>
+        <p class="chat-hint" id="chat-hint">Messages are public to anyone with the room link. Keep it kind. Emojis welcome — send one on its own and it lands big.</p>
       </form>
-    </section>
-
-    <section class="tab-pane" id="request-pane" role="tabpanel" aria-labelledby="tab-requests" hidden>
-      <form class="chat-form" id="room-request-form">
-        <div class="field">
-          <label for="room-request-track">Song request</label>
-          <input id="room-request-track" type="text" list="track-options-2" placeholder="Which track?" required />
-          <datalist id="track-options-2"></datalist>
-        </div>
-        <div class="field">
-          <label for="room-request-note">Dedication</label>
-          <input id="room-request-note" type="text" placeholder="Optional" />
-        </div>
-        <button class="btn btn-primary btn-sm" type="submit">Send request</button>
-      </form>
-      <ul class="request-list" id="room-request-list"></ul>
-      <p class="chat-hint">Requests post into the room and are kept on this device for the station inbox.</p>
     </section>
   </aside>
 
