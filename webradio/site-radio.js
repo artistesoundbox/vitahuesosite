@@ -349,17 +349,22 @@ function setEnabledUI(active) {
 const KEY_HANDOFF = 'vh.radio.handoff';
 
 function writeHandoff() {
-  try {
-    sessionStorage.setItem(KEY_HANDOFF, JSON.stringify({
-      playing: radio.playing || hasIntent(),
-      at: Date.now(),
-      // what was actually coming out of the speakers, so the station can
-      // continue it instead of snapping back to the live clock
-      trackId: radio.track?.id || '',
-      mode: radio.mode,
-      offset: Math.round(radio.audio.currentTime || 0)
-    }));
-  } catch { /* private mode */ }
+  const note = JSON.stringify({
+    playing: radio.playing || hasIntent(),
+    at: Date.now(),
+    // what was actually coming out of the speakers, so the station can
+    // continue it instead of snapping back to the live clock
+    trackId: radio.track?.id || '',
+    mode: radio.mode,
+    offset: Math.round(radio.audio.currentTime || 0)
+  });
+  /* localStorage, not sessionStorage: sessionStorage is per-tab, so the note
+     vanished whenever the station opened in a NEW tab (ctrl/cmd-click, middle
+     click, "open in new tab") and the station fell back to the live clock —
+     the song appeared to change for no reason. The reader deletes it and
+     ignores anything older than two minutes. */
+  try { localStorage.setItem(KEY_HANDOFF, note); } catch { /* private mode */ }
+  try { sessionStorage.setItem(KEY_HANDOFF, note); } catch { /* private mode */ }
 }
 
 function enable() {

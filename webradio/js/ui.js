@@ -995,11 +995,19 @@ function renderRoute() {
  * the ordinary "tap play once" path takes over.
  */
 function resumeFromSiteHandoff() {
+  /* The dock writes the note to localStorage (shared across tabs) so opening
+     the station in a new tab continues the same song; sessionStorage is still
+     read as a fallback for a page cached before that change. */
+  const take = (store) => {
+    try {
+      const raw = store.getItem('vh.radio.handoff');
+      if (raw) store.removeItem('vh.radio.handoff');
+      return raw;
+    } catch { return null; }
+  };
   let note = null;
-  try {
-    note = JSON.parse(sessionStorage.getItem('vh.radio.handoff') || 'null');
-    sessionStorage.removeItem('vh.radio.handoff');
-  } catch { note = null; }
+  const raw = take(localStorage) || take(sessionStorage);
+  try { note = raw ? JSON.parse(raw) : null; } catch { note = null; }
   if (!note || !note.playing) return;
   if (Date.now() - Number(note.at || 0) > 120000) return;   // stale tab, not a hand-off
 
