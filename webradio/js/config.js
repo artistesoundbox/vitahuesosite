@@ -78,7 +78,7 @@ export const ROTATION = {
      times as often as the rest of the guest shelf, so the station leans
      danceable without losing the quieter corners. */
   funGenres: ['Reggaeton', 'Dembow', 'Latin', 'Dancehall', 'Moombahton', 'Urbano'],
-  funWeight: 3
+  funWeight: 6
 };
 
 export const SLEEP_CHOICES = [15, 30, 45, 60, 90, 120];
