@@ -16,6 +16,7 @@ import * as catalog from './catalog.js';
    the site radio) because STATION_ID did not exist yet. */
 const STATION_ID = catalog.STATION_ID || null;
 import { PROGRAMS, STATION_EPOCH, DAY_MS, ROTATION } from './config.js';
+import { isBlocked, onBlockChange } from './blocklist.js';
 
 const reels = new Map();
 
@@ -48,8 +49,24 @@ function shuffled(list, rng) {
 }
 
 const BLOCK_MS = 3600000;
-const GUESTS = TRACKS.filter((t) => t.guest);
-const ORIGINALS = TRACKS.filter((t) => !t.guest);
+/* Pools are rebuilt whenever the device's blocklist changes: a disliked song
+   leaves the reel entirely, so it cannot come back later in the day either. */
+let GUESTS = [];
+let ORIGINALS = [];
+
+function refreshPools() {
+  GUESTS = TRACKS.filter((t) => t.guest && !isBlocked(t.id));
+  ORIGINALS = TRACKS.filter((t) => !t.guest && !isBlocked(t.id));
+  /* Nothing is allowed to empty a pool — a reel needs both sides to exist. */
+  if (!GUESTS.length) GUESTS = TRACKS.filter((t) => t.guest);
+  if (!ORIGINALS.length) ORIGINALS = TRACKS.filter((t) => !t.guest);
+}
+refreshPools();
+onBlockChange(() => {
+  refreshPools();
+  reels.clear();
+  tails.clear();
+});
 
 const FUN = new Set(ROTATION.funGenres || []);
 const FUN_WEIGHT = Math.max(1, Math.round(Number(ROTATION.funWeight) || 1));
@@ -154,6 +171,9 @@ export function buildReel(dayStartMs, carry = []) {
     const rng = mulberry32(hashString(`${dayKey}|${block.id}|${STATION_EPOCH}`));
     let pool = ORIGINALS.filter((t) => t.genres.some((g) => block.genres.includes(g)));
     if (pool.length < 6) pool = ORIGINALS.slice();
+    /* Everything of the artist's own is hidden: fall back to the whole
+       catalogue rather than building a reel with no originals to draw. */
+    if (!pool.length) pool = TRACKS.filter((t) => !t.guest);
 
     // The free library cycles in full every hour; start each pass with the
     // tracks that fit this programme's mood, then the rest.
