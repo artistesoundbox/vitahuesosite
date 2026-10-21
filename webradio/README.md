@@ -263,10 +263,11 @@ rest of `vitahuesosite`:
 ## Configuration checklist before publishing
 
 - `data/library.json` → `station.name`, `artist`, `tagline`, `contactEmail`,
-  `siteUrl`, socials. `contactEmail` is `artistesoundbox@gmail.com`: the contact
-  form opens a `mailto:` to that inbox and leaves a Gmail compose link on screen
-  for visitors with no mail app, and the address is listed under Contact →
-  Direct lines. Clearing it falls back to copying the message for YouTube/GitHub.
+  `siteUrl`, socials. `contactEmail` is the studio inbox every contact form goes
+  to. **The address is never printed on the page:** it lives in `library.json`
+  and is only written into the `mailto:`/Gmail links at submit time, so the
+  visible copy says "send it straight from Gmail" instead of naming the inbox.
+  Clearing `contactEmail` falls back to copying the message for YouTube/GitHub.
 - `js/config.js` → programme names, hours (UTC), genres, and the community topic.
 - `index.html` → About copy, canonical URL, JSON-LD.
 - `data/library.json` → genres were assigned from titles, not by listening.

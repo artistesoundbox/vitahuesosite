@@ -847,18 +847,6 @@ function bindLibrary() {
   });
 }
 
-/* The studio inbox, rendered from data/library.json so the address lives in one
-   place. Hidden entirely while `contactEmail` is empty. */
-function renderContactEmail() {
-  const line = $('contact-email-line');
-  if (!line || !STATION.contactEmail) return;
-  const link = document.createElement('a');
-  link.href = `mailto:${STATION.contactEmail}`;
-  link.textContent = `Email — ${STATION.contactEmail}`;
-  line.append(link);
-  line.hidden = false;
-}
-
 function bindForms() {
   const form = els['contact-form'];
   form?.addEventListener('submit', async (event) => {
@@ -882,16 +870,18 @@ function bindForms() {
       toast('Opening your mail app…');
 
       /* mailto silently does nothing on machines with no mail app (and on a
-         lot of phones it opens the wrong account), so the address stays on
-         screen with a Gmail compose link as the way through. */
+         lot of phones it opens the wrong account), so offer Gmail as well.
+         The address itself is never printed on the page — it is read from
+         config and put into the links only, so harvesters scraping the HTML
+         get nothing. */
       const note = els['contact-note'];
-      note.textContent = `Sending to ${address} — if your mail app did not open, `;
+      note.textContent = 'If your mail app did not open, ';
       const gmail = document.createElement('a');
       gmail.href = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(address)}&${query}`;
       gmail.target = '_blank';
       gmail.rel = 'noopener';
-      gmail.textContent = 'compose it in Gmail';
-      note.append(gmail, ` or write to ${address} yourself.`);
+      gmail.textContent = 'send it straight from Gmail';
+      note.append(gmail, '.');
       return;
     }
 
@@ -1138,7 +1128,6 @@ function init() {
     if (schedule) schedule.textContent = `Next programme in ${formatCountdown(msUntilNextProgram())}`;
   }, 30000);
 
-  renderContactEmail();
   resumeFromSiteHandoff();
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
