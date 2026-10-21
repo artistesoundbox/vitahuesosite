@@ -101,7 +101,8 @@ export const TRACKS = [
     "credit": "I See God in You — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t02",
@@ -123,7 +124,8 @@ export const TRACKS = [
     "credit": "You're Allowed to Rest — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t03",
@@ -145,7 +147,8 @@ export const TRACKS = [
     "credit": "The Mind Lies, The Heart Knows — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t04",
@@ -167,7 +170,8 @@ export const TRACKS = [
     "credit": "Tell Them While They're Here — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t05",
@@ -189,7 +193,8 @@ export const TRACKS = [
     "credit": "I Forgive You, I Forgive Me — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t06",
@@ -211,7 +216,8 @@ export const TRACKS = [
     "credit": "The Inner Child Still Matters — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t07",
@@ -233,7 +239,8 @@ export const TRACKS = [
     "credit": "You're Not Too Late — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t08",
@@ -255,7 +262,8 @@ export const TRACKS = [
     "credit": "Your Heart Is Still Good — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t09",
@@ -277,7 +285,8 @@ export const TRACKS = [
     "credit": "Thank You for Carrying Me — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t10",
@@ -299,7 +308,8 @@ export const TRACKS = [
     "credit": "I'm Proud of You — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t11",
@@ -321,7 +331,8 @@ export const TRACKS = [
     "credit": "We're All Just Trying to Come Home — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t12",
@@ -343,7 +354,8 @@ export const TRACKS = [
     "credit": "Still Waters — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t13",
@@ -365,7 +377,8 @@ export const TRACKS = [
     "credit": "Echos of Me — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t14",
@@ -387,7 +400,8 @@ export const TRACKS = [
     "credit": "Beneath the Quiet — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t15",
@@ -409,7 +423,8 @@ export const TRACKS = [
     "credit": "The Part I Hid — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t16",
@@ -431,7 +446,8 @@ export const TRACKS = [
     "credit": "When I Finally Let Go — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t17",
@@ -453,7 +469,8 @@ export const TRACKS = [
     "credit": "I See Myself Now — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t18",
@@ -475,7 +492,8 @@ export const TRACKS = [
     "credit": "The Realization — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t19",
@@ -497,7 +515,8 @@ export const TRACKS = [
     "credit": "Resistance — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t20",
@@ -519,7 +538,8 @@ export const TRACKS = [
     "credit": "Reflection — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t21",
@@ -541,7 +561,8 @@ export const TRACKS = [
     "credit": "I Feel It Now — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t22",
@@ -563,7 +584,8 @@ export const TRACKS = [
     "credit": "I Take the Step — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t23",
@@ -585,7 +607,8 @@ export const TRACKS = [
     "credit": "I Stand Here — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t24",
@@ -607,7 +630,8 @@ export const TRACKS = [
     "credit": "I Open Up — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t25",
@@ -629,7 +653,8 @@ export const TRACKS = [
     "credit": "I Reach for You — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t26",
@@ -651,7 +676,8 @@ export const TRACKS = [
     "credit": "Outside Myself — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t27",
@@ -673,7 +699,8 @@ export const TRACKS = [
     "credit": "New Edges — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t28",
@@ -695,7 +722,8 @@ export const TRACKS = [
     "credit": "The Shift — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t29",
@@ -717,7 +745,8 @@ export const TRACKS = [
     "credit": "In My Own Light — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t30",
@@ -739,7 +768,8 @@ export const TRACKS = [
     "credit": "Little Victories — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t31",
@@ -761,7 +791,8 @@ export const TRACKS = [
     "credit": "Choosing Me — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t32",
@@ -783,7 +814,8 @@ export const TRACKS = [
     "credit": "Steady Rise — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t33",
@@ -805,7 +837,8 @@ export const TRACKS = [
     "credit": "Clearer Now — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t34",
@@ -827,7 +860,8 @@ export const TRACKS = [
     "credit": "Here With Myself — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t35",
@@ -849,7 +883,8 @@ export const TRACKS = [
     "credit": "Becoming Still — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t36",
@@ -871,7 +906,8 @@ export const TRACKS = [
     "credit": "Déjalo Fluir (Let It Flow) — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t37",
@@ -893,7 +929,8 @@ export const TRACKS = [
     "credit": "Azul en mis Manos — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t38",
@@ -915,7 +952,8 @@ export const TRACKS = [
     "credit": "Galaxias con Ritmo — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t39",
@@ -937,7 +975,8 @@ export const TRACKS = [
     "credit": "Stretch Like a Cat — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t40",
@@ -959,7 +998,8 @@ export const TRACKS = [
     "credit": "Drifting into Me — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t41",
@@ -981,7 +1021,8 @@ export const TRACKS = [
     "credit": "I Zen-ter Myself — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t42",
@@ -1003,7 +1044,8 @@ export const TRACKS = [
     "credit": "Simply Be — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t43",
@@ -1025,7 +1067,8 @@ export const TRACKS = [
     "credit": "Enough for Now — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t44",
@@ -1047,7 +1090,8 @@ export const TRACKS = [
     "credit": "No More Conflicting Thoughts — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t45",
@@ -1069,7 +1113,8 @@ export const TRACKS = [
     "credit": "Inner Light — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t46",
@@ -1091,7 +1136,8 @@ export const TRACKS = [
     "credit": "A Flame That Doesn't Seem to Move — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "t47",
@@ -1113,7 +1159,8 @@ export const TRACKS = [
     "credit": "Not a Goodbye but a New Welcome — written & performed by Vita Hueso",
     "source": "",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": false
   },
   {
     "id": "f01",
@@ -1135,7 +1182,8 @@ export const TRACKS = [
     "credit": "\"Frozen Star\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0",
     "source": "https://incompetech.com/music/royalty-free/",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": true
   },
   {
     "id": "f02",
@@ -1157,7 +1205,8 @@ export const TRACKS = [
     "credit": "\"Chill Wave\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0",
     "source": "https://incompetech.com/music/royalty-free/",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": true
   },
   {
     "id": "f03",
@@ -1179,7 +1228,8 @@ export const TRACKS = [
     "credit": "\"Water Lily\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0",
     "source": "https://incompetech.com/music/royalty-free/",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": true
   },
   {
     "id": "f04",
@@ -1201,7 +1251,8 @@ export const TRACKS = [
     "credit": "\"Winter Reflections\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0",
     "source": "https://incompetech.com/music/royalty-free/",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": true
   },
   {
     "id": "f05",
@@ -1223,7 +1274,8 @@ export const TRACKS = [
     "credit": "\"Reawakening\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0",
     "source": "https://incompetech.com/music/royalty-free/",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": true
   },
   {
     "id": "f06",
@@ -1245,7 +1297,8 @@ export const TRACKS = [
     "credit": "\"Ascending the Vale\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0",
     "source": "https://incompetech.com/music/royalty-free/",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": true
   },
   {
     "id": "f07",
@@ -1267,6 +1320,7 @@ export const TRACKS = [
     "credit": "\"Touching Moments Two - Higher\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0",
     "source": "https://incompetech.com/music/royalty-free/",
     "downloadable": true,
-    "featured": false
+    "featured": false,
+    "guest": true
   }
 ];

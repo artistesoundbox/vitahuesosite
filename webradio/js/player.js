@@ -82,6 +82,19 @@ export class Radio extends EventTarget {
     this.preload.preload = 'metadata';
     this.preload.muted = true;
 
+    // One speaker per browser: if another instance (main page, widget, second
+    // tab) starts playing, this one steps aside instead of echoing it.
+    this.instanceId = Math.random().toString(36).slice(2, 10);
+    this.transport = null;
+    try {
+      this.transport = new BroadcastChannel('vh-radio-transport');
+      this.transport.onmessage = (event) => {
+        const data = event.data;
+        if (!data || data.from === this.instanceId) return;
+        if (data.type === 'playing' && !this.audio.paused) this.audio.pause();
+      };
+    } catch { this.transport = null; }
+
     if (this.live) {
       this.track = this.live.entry.track;
       this.entry = this.live.entry;
@@ -105,6 +118,7 @@ export class Radio extends EventTarget {
       this.error = '';
       this.setSessionState();
       this.emitState();
+      try { this.transport?.postMessage({ type: 'playing', from: this.instanceId }); } catch { /* ignore */ }
     });
 
     a.addEventListener('pause', () => {

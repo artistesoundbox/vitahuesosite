@@ -56,6 +56,16 @@ export const PROGRAMS = [
 export const STATION_EPOCH = Date.UTC(2026, 0, 1, 0, 0, 0);
 export const DAY_MS = 86400000;
 
+/* Rotation rule for the live reel.
+ *
+ * Your catalogue is shuffled inside each programme, and a guest (Creative
+ * Commons) track is dropped in after every `guestEvery` originals. Raise the
+ * number for fewer guests, lower it for a denser free-music rotation. Set
+ * `guestEvery: 0` to leave the guests in the personal library only. */
+export const ROTATION = {
+  guestEvery: 5
+};
+
 export const SLEEP_CHOICES = [15, 30, 45, 60, 90, 120];
 
 /* Community layer.

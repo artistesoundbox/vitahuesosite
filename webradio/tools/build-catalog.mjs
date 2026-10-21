@@ -103,7 +103,8 @@ for (const file of files) {
     credit: `${meta.title} — written & performed by ${DATA.station.artist}`,
     source: '',
     downloadable: meta.downloadable !== false,
-    featured: !!meta.featured
+    featured: !!meta.featured,
+    guest: false
   });
 }
 
@@ -135,7 +136,8 @@ for (const f of DATA.freeTracks) {
     credit: f.credit,
     source: f.source,
     downloadable: true,
-    featured: false
+    featured: false,
+    guest: true
   });
 }
 

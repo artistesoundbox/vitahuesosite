@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /widget-demo.html
+
+Sitemap: https://artistesoundbox.github.io/vitahuesosite/webradio/sitemap.xml

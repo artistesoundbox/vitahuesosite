@@ -9,7 +9,7 @@
  * Nothing here touches the network; MP3 seeking is handled by the browser.
  */
 import { TRACKS } from './catalog.js';
-import { PROGRAMS, STATION_EPOCH, DAY_MS } from './config.js';
+import { PROGRAMS, STATION_EPOCH, DAY_MS, ROTATION } from './config.js';
 
 const reels = new Map();
 
@@ -42,6 +42,34 @@ function shuffled(list, rng) {
 }
 
 const BLOCK_MS = 3600000;
+const GUESTS = TRACKS.filter((t) => t.guest);
+const ORIGINALS = TRACKS.filter((t) => !t.guest);
+
+/**
+ * Shuffle the catalogue for this programme pass, then slot a guest track in
+ * after every `guestEvery` originals. Guests cycle through their own shuffled
+ * bag, so the same instrumental is spaced out rather than clustered.
+ */
+function buildSequence(pool, guests, rng) {
+  const originals = shuffled(pool, rng);
+  const sequence = [];
+  let guestBag = shuffled(guests, rng);
+  let guestIndex = 0;
+  const every = Math.max(0, Number(ROTATION.guestEvery) || 0);
+
+  originals.forEach((track, index) => {
+    sequence.push(track);
+    if (!every || !guests.length) return;
+    if ((index + 1) % every !== 0) return;
+    if (guestIndex >= guestBag.length) {
+      guestBag = shuffled(guests, rng);
+      guestIndex = 0;
+    }
+    sequence.push(guestBag[guestIndex++]);
+  });
+
+  return sequence;
+}
 
 /** Build one UTC day of programming. Deterministic for a given day. */
 export function buildReel(dayStartMs) {
@@ -51,25 +79,29 @@ export function buildReel(dayStartMs) {
 
   for (const block of PROGRAMS) {
     const rng = mulberry32(hashString(`${dayKey}|${block.id}|${STATION_EPOCH}`));
-    let pool = TRACKS.filter((t) => t.genres.some((g) => block.genres.includes(g)));
-    if (pool.length < 6) pool = TRACKS.slice();
+    let pool = ORIGINALS.filter((t) => t.genres.some((g) => block.genres.includes(g)));
+    if (pool.length < 6) pool = ORIGINALS.slice();
 
-    let bag = shuffled(pool, rng);
-    let bagIndex = 0;
+    let guests = GUESTS.filter((t) => t.genres.some((g) => block.genres.includes(g)));
+    if (guests.length < 2) guests = GUESTS.slice();
+
+    let sequence = buildSequence(pool, guests, rng);
+    let cursorIndex = 0;
+
     const start = block.start * BLOCK_MS;
     const end = block.end * BLOCK_MS;
 
     let cursor = start;
     let guard = 0;
     while (end - cursor > 20000 && guard++ < 600) {
-      if (bagIndex >= bag.length) {
-        bag = shuffled(pool, rng);
-        bagIndex = 0;
+      if (cursorIndex >= sequence.length) {
+        sequence = buildSequence(pool, guests, rng);
+        cursorIndex = 0;
       }
-      let track = bag[bagIndex++];
+      let track = sequence[cursorIndex++];
       const prev = entries[entries.length - 1];
-      if (prev && prev.track.id === track.id && bag.length > 1) {
-        track = bag[bagIndex++ % bag.length];
+      if (prev && prev.track.id === track.id && sequence.length > 1) {
+        track = sequence[cursorIndex++ % sequence.length];
       }
 
       const fullMs = track.duration * 1000;
