@@ -6,7 +6,7 @@
 import { STATION, ALBUMS, GENRES, STATS, TRACKS } from './catalog.js';
 import { PROGRAMS, SLEEP_CHOICES } from './config.js';
 import { radio } from './player.js';
-import { isBlocked, toggleBlocked, onBlockChange } from './blocklist.js';
+import { blockedIds, isBlocked, toggleBlocked, onBlockChange } from './blocklist.js';
 import {
   formatTime, formatDuration, localHourLabel, programAt,
   msUntilNextProgram, formatCountdown
@@ -273,6 +273,17 @@ function renderLibrary() {
   if (empty) empty.hidden = filteredTracks.length > 0;
   syncCardFavorites();
   syncCardBlocks();
+  syncHiddenCount();
+}
+
+/* The pruning ledger: how many songs this device has hidden, and a one-click
+   copy of the list so the admin can hand it over for permanent removal. */
+function syncHiddenCount() {
+  const count = blockedIds().size;
+  const target = els['lib-hidden-count'];
+  if (target) target.textContent = String(count);
+  const button = els['lib-hidden'];
+  if (button) button.classList.toggle('is-empty', count === 0);
 }
 
 function syncCardBlocks() {
@@ -478,6 +489,7 @@ function cacheEls() {
     'dock', 'dock-art', 'dock-title', 'dock-artist', 'dock-mode', 'dock-play', 'dock-play-icon',
     'dock-mute', 'dock-mute-icon', 'dock-fav', 'dock-bar', 'dock-eq', 'dock-open',
     'lib-search', 'lib-sort', 'lib-favorites', 'lib-count', 'lib-grid', 'lib-empty', 'lib-clear',
+    'lib-hidden', 'lib-hidden-count',
     'contact-form', 'contact-note', 'chat-input', 'chat-emoji', 'chat-emoji-panel', 'chat-count',
     'copy-embed', 'embed-code', 'lightbox', 'lightbox-img', 'lightbox-caption', 'lightbox-close',
     'btn-menu', 'nav', 'topbar'
