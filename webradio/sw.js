@@ -1,7 +1,8 @@
 /* Offline shell for Vita Hueso Radio.
  * Caches the interface (HTML/CSS/JS) — never the MP3s, so audio keeps
  * streaming normally and the cache stays small. */
-const VERSION = 'vh-radio-v1';
+/* Bump this whenever the shell changes: install drops the old cache. */
+const VERSION = 'vh-radio-v2';
 const CORE = [
   './',
   './index.html',
@@ -40,12 +41,19 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== location.origin) return;
   if (request.headers.has('range') || /\.(mp3|webm|wav|ogg|m4a)$/i.test(url.pathname)) return;
 
-  if (request.mode === 'navigate') {
+  /* Code is network-first. A stale cached catalog.js is not cosmetic: the live
+     reel is built from the catalogue, so an old copy means a phone and a laptop
+     disagree about what is "on air" right now. Assets stay cache-first. */
+  const isCode = /\.(js|css|html)$/i.test(url.pathname);
+
+  if (request.mode === 'navigate' || isCode) {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(VERSION).then((cache) => cache.put(request, copy)).catch(() => {});
+          if (response && response.status === 200) {
+            const copy = response.clone();
+            caches.open(VERSION).then((cache) => cache.put(request, copy)).catch(() => {});
+          }
           return response;
         })
         .catch(() => caches.match(request).then((hit) => hit || caches.match('./index.html')))
