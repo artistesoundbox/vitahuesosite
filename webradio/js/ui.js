@@ -75,6 +75,11 @@ function setUse(svg, id) {
 
 const isCC = (track) => /^CC/i.test(track.license || '');
 
+/** "https://ccmixter.org/files/…" → "ccmixter.org" (credit links name their host). */
+function sourceHost(url) {
+  try { return new URL(url).host.replace(/^www\./, ''); } catch { return 'source'; }
+}
+
 /** Clipboard that cannot hang the form when permission is refused. */
 async function copyText(text) {
   if (navigator.clipboard?.writeText) {
@@ -298,7 +303,7 @@ function renderAlbums() {
         <p class="album-meta">
           <span>${album.year}</span><span>${tracks.length} tracks</span>
           <span>${formatDuration(albumDuration(album.id))}</span>
-          ${album.external ? '<span class="tag-cc">CC BY 4.0</span>' : '<span>Vita Hueso</span>'}
+          ${album.external ? '<span class="tag-cc">CC BY</span>' : `<span>${esc(STATION.artist)}</span>`}
         </p>
         <p class="album-desc">${esc(album.description || '')}</p>
         <div class="album-actions">
@@ -414,7 +419,7 @@ function renderAbout() {
       div.className = 'credit';
       div.innerHTML = `<strong>${esc(t.title)}</strong> — ${esc(t.artist)}. Licensed
         <a href="${esc(t.licenseUrl)}" target="_blank" rel="noopener noreferrer">${esc(t.license)}</a>.
-        Source: <a href="${esc(t.source)}" target="_blank" rel="noopener noreferrer">incompetech.com</a>.`;
+        Source: <a href="${esc(t.source)}" target="_blank" rel="noopener noreferrer">${esc(sourceHost(t.source))}</a>.`;
       credits.appendChild(div);
     });
   }
@@ -423,7 +428,7 @@ function renderAbout() {
   if (facts) {
     const rows = [
       ['Original tracks', STATS.originals],
-      ['Guest instrumentals', STATS.guest],
+      ['Guest songs', STATS.guest],
       ['Music on rotation', formatDuration(STATS.totalSeconds)],
       ['Records', ALBUMS.length],
       ['Broadcast', '24 / 7 / 365'],
@@ -606,12 +611,12 @@ function updateState(state) {
     credit.textContent = '';
     if (isCC(track)) {
       const span = document.createElement('span');
-      span.textContent = `Guest instrumental · ${track.artist} · ${track.license} · `;
+      span.textContent = `Guest track · ${track.artist} · ${track.license} · `;
       const link = document.createElement('a');
       link.href = track.source;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
-      link.textContent = 'incompetech.com';
+      link.textContent = sourceHost(track.source);
       credit.append(span, link);
     } else {
       credit.textContent = `Original recording · written & performed by ${track.artist}`;
@@ -996,6 +1001,40 @@ function resumeFromSiteHandoff() {
   if (!note || !note.playing) return;
   if (Date.now() - Number(note.at || 0) > 120000) return;   // stale tab, not a hand-off
   radio.start();
+
+  /* Browsers may still refuse sound on a freshly loaded document. Rather than
+     leaving the visitor on a silent, paused player, say what happened and make
+     the one required tap unmissable. */
+  setTimeout(() => {
+    if (radio.playing) return;
+    showResumePrompt();
+  }, 1400);
+}
+
+function showResumePrompt() {
+  if (document.getElementById('resume-prompt')) return;
+  const pill = document.createElement('button');
+  pill.id = 'resume-prompt';
+  pill.type = 'button';
+  pill.textContent = '▶  Tap to keep the radio going';
+  pill.style.cssText = [
+    'position:fixed', 'left:50%', 'bottom:96px', 'transform:translateX(-50%)', 'z-index:9997',
+    'padding:11px 20px', 'border-radius:999px', 'cursor:pointer',
+    'border:1px solid rgba(110,231,255,0.65)', 'color:#03121b',
+    'background:linear-gradient(140deg,#d7f6ff,#6ee7ff 45%,#38b6ff)',
+    'font:700 12px/1 "Segoe UI",system-ui,sans-serif', 'letter-spacing:0.1em',
+    'text-transform:uppercase', 'box-shadow:0 10px 30px rgba(56,182,255,0.4)'
+  ].join(';');
+  const dismiss = () => pill.remove();
+  pill.addEventListener('click', () => {
+    radio.start();
+    dismiss();
+  });
+  radio.addEventListener('state', (event) => {
+    if (event.detail.playing) dismiss();
+  });
+  setTimeout(dismiss, 15000);
+  document.body.appendChild(pill);
 }
 
 function init() {

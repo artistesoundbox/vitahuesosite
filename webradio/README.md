@@ -39,17 +39,17 @@ There is no streaming server, so "live" is a deterministic timeline:
 1. `data/library.json` defines the catalogue; `tools/build-catalog.mjs` writes
    exact track durations into `js/catalog.js`.
 2. `js/config.js` defines the six daily programmes (UTC hours) and their genres.
-3. `js/station.js` builds one day's reel: for each programme, the original
-   catalogue is seeded-shuffled, a guest instrumental is inserted after every
-   `ROTATION.guestEvery` originals (default **5**), and the sequence is laid end
-   to end, cut cleanly at the programme boundary. The seed is
-   `UTC date + programme + station epoch`, so **every visitor computes the same
-   reel** — including the same guest rotation.
+3. `js/station.js` builds one day's reel: for each programme, the guest library
+   is seeded-shuffled and **one of the artist's own songs is dropped in after
+   every `ROTATION.originalEvery` guests** (default **4** = about 20% originals),
+   and the sequence is laid end to end, cut cleanly at the programme boundary.
+   The seed is `UTC date + programme + station epoch`, so **every visitor
+   computes the same reel** — including the same guest rotation.
 
-   Guests cycle through their own shuffled bag, so a given instrumental is
-   spaced out rather than repeated back to back. Change `guestEvery` in
-   `js/config.js` to taste (`0` removes guests from the live reel while keeping
-   them in the library).
+   Both bags reshuffle when exhausted and immediate repeats are prevented, so a
+   given guest song is spaced out rather than repeated back to back. Change
+   `originalEvery` in `js/config.js` to taste (higher = your own songs rarer;
+   `12` is the ceiling).
 4. The player looks at `Date.now()`, finds the track that should be playing at
    that second, seeks into it, and keeps a loose sync (re-seek only if drift
    exceeds 12 seconds).
@@ -110,11 +110,19 @@ To add a record, add an object to `"albums"` with a `cover` path.
 
 ### Guest / Creative Commons tracks
 
-`audio/free/` holds seven instrumentals by **Kevin MacLeod (incompetech.com)**,
-licensed **CC BY 4.0**. They are hosted here (not hotlinked) and credited in
-`CREDITS.md`, on the About page, and under the player. CC BY requires that
-attribution stays visible — keep the credits if you keep the tracks. Delete the
-folder and the `"freeTracks"` block to run a 100% original station.
+`audio/free/` holds the guest catalogue: **twelve songs with vocals from
+independent artists on ccMixter** (rock, pop, soul, funk, hip-hop, jazz, latin,
+country, reggae, folk, blues, electronic) plus **two slow instrumentals by Kevin
+MacLeod**, all under **CC BY** licences (per-track: CC BY 3.0 or 4.0). They are
+hosted here, not hotlinked. Every entry carries its own `artist`, `license`,
+`licenseUrl`, `source` and `credit`, and those are surfaced in `CREDITS.md`, on
+the About page, and under the player. CC BY requires that attribution stays
+visible — keep the credits if you keep the tracks.
+
+To add more, drop the MP3 into `audio/free/` and append an entry to
+`"freeTracks"` in `data/library.json` (an `artist` field is required). Then run
+`node tools/build-catalog.mjs`. Delete the folder and the `"freeTracks"` block
+to run a 100% original station.
 
 The catalogue builder rewrites `CREDITS.md` on every run, so edit attribution in
 `data/library.json`, not in the generated file.
@@ -167,8 +175,8 @@ git push
 ```
 
 No workflow file is needed; GitHub Pages serves static files as-is. The MP3s
-are large — the station adds roughly 230 MB to the repository (47 originals +
-7 guest tracks + artwork). If that becomes a problem, move `anthonitus_songs/`
+are large — the station adds roughly 320 MB to the repository (47 originals,
+14 guest tracks, artwork). If that becomes a problem, move `anthonitus_songs/`
 to a release asset or an object store and update the `src` values in the
 catalogue.
 
@@ -202,6 +210,35 @@ browser never echo each other.
 
 ---
 
+## The radio across the main site
+
+`webradio/site-radio.js` is the one-file hook that carries the station into the
+rest of `vitahuesosite`:
+
+```html
+<script type="module" src="webradio/site-radio.js"></script>
+```
+
+- The portal's top **Enable radio** pill (id `vh-enable-radio`) turns the station
+  on: it silences the portal's welcome loop, remembers the choice in
+  `localStorage`, and opens the compact **dock** at the bottom-left with
+  play/pause, skip, mute, a live/personal badge and a progress bar.
+- The **radio icon card at the bottom of the portal** (`vitahuesoradioicon.png`)
+  links into the full station (customizer, listener room, chat, requests). It is
+  marked `data-radio-open`, so opening it also switches the radio on.
+- A page navigation always destroys the `<audio>` element, so the dock leaves a
+  hand-off note in `sessionStorage`. The station page reads it and rejoins the
+  **same live position immediately**, which is why the song that was playing
+  carries through the jump. If the browser still blocks sound on the new
+  document, a **Tap to keep the radio going** pill appears — one tap, no
+  hunting for the play button.
+- Any element marked `data-radio-open` gets that behaviour, so other pages can
+  add their own door into the station.
+- The PWA install chip (`install.js`) shares the bottom-left corner with the
+  dock, so `site-radio.js` measures the dock and lifts the chip clear of it.
+
+---
+
 ## Configuration checklist before publishing
 
 - `data/library.json` → `station.name`, `artist`, `tagline`, `contactEmail`,
@@ -217,15 +254,22 @@ browser never echo each other.
 
 ## Verification performed
 
-- Catalogue build: 54 tracks (47 original + 7 guest), 163 minutes, 47 embedded
-  covers extracted.
+- Catalogue build: 61 tracks (47 original + 14 guest), 196 minutes, 17 genre
+  chips, embedded covers extracted.
 - Local server range request: `206 Partial Content` with correct
   `Content-Range`, so timeline seeking works.
 - Playback: live start lands within ~0.4 s of the station clock; continuous
   playback confirmed across Home → Library → Radio; skip → Personal mode;
   rejoin live → resynced; sleep timer, favorites, history and queue persist.
-- Rotation: the live reel inserts a guest track after every five originals and
-  the queue tags guest entries with `CC`.
+- Rotation: the live reel drops one original in after every four guest tracks
+  and the queue tags guest entries with `CC`.
+- Guest audio: downloaded ccMixter MP3s play from `audio/free/` (206 range
+  responses), with the correct writer, licence and source in the player credit,
+  the About page and `CREDITS.md`.
+- Site radio: the portal pill opens the dock; the bottom icon card enables the
+  radio and opens `#radio`; the station page rejoined the same track and live
+  position after the jump; the blocked-autoplay prompt appears when the browser
+  refuses sound; the install chip sits above the dock instead of on top of it.
 - Contact form: clipboard path works, with a visible selectable fallback when a
   browser refuses clipboard access.
 - Library: search, genre filter, empty state, sort, favorites-only.
