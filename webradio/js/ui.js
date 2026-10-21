@@ -1002,7 +1002,23 @@ function resumeFromSiteHandoff() {
   } catch { note = null; }
   if (!note || !note.playing) return;
   if (Date.now() - Number(note.at || 0) > 120000) return;   // stale tab, not a hand-off
-  radio.start();
+
+  /* If the visitor had skipped off the live clock, continue THAT track where
+     it was — arriving on the station should never change the song. Live
+     listeners rejoin the broadcast instead, which is the same track anyway. */
+  const track = note.trackId ? TRACKS.find((t) => t.id === note.trackId) : null;
+  if (note.mode === 'personal' && track) {
+    radio.playTrack(track);
+    const offset = Math.max(0, Number(note.offset) || 0);
+    if (offset > 1) {
+      const audio = radio.audio;
+      const seek = () => { try { audio.currentTime = offset; } catch { /* ignore */ } };
+      if (audio.readyState >= 1) seek();
+      else audio.addEventListener('loadedmetadata', seek, { once: true });
+    }
+  } else {
+    radio.start();
+  }
 
   /* Browsers may still refuse sound on a freshly loaded document. Rather than
      leaving the visitor on a silent, paused player, say what happened and make
