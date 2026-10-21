@@ -15,7 +15,7 @@ export const PROGRAMS = [
     end: 10,
     name: 'First Light',
     tagline: 'Soft songs to open the day with.',
-    genres: ['Ambient', 'Piano', 'Soul', 'Folk', 'Country']
+    genres: ['Ambient', 'Piano', 'Soul', 'Jazz']
   },
   {
     id: 'deepfocus',
@@ -31,7 +31,7 @@ export const PROGRAMS = [
     end: 18,
     name: 'Afterglow',
     tagline: 'Warm soul, Spanish verses, and a little daylight left.',
-    genres: ['Soul', 'Latin', 'Piano', 'Funk', 'Reggae', 'Pop']
+    genres: ['Soul', 'Latin', 'Piano', 'Funk', 'Reggae', 'Pop', 'Salsa']
   },
   {
     id: 'nightfrequency',
@@ -39,7 +39,7 @@ export const PROGRAMS = [
     end: 22,
     name: 'Night Frequency',
     tagline: 'Cinematic edges and neon-lit motion.',
-    genres: ['Cinematic', 'Electronic', 'Soul', 'Hip-Hop', 'Rock']
+    genres: ['Cinematic', 'Electronic', 'Soul', 'Hip-Hop', 'Rock', 'Timba']
   },
   {
     id: 'stillwaters',
@@ -47,7 +47,7 @@ export const PROGRAMS = [
     end: 24,
     name: 'Still Waters',
     tagline: 'Winding down, lights low, nothing to prove.',
-    genres: ['Ambient', 'Meditative', 'Piano', 'Jazz', 'Folk']
+    genres: ['Ambient', 'Meditative', 'Piano', 'Jazz', 'Blues']
   }
 ];
 
@@ -68,7 +68,8 @@ export const DAY_MS = 86400000;
  * hard limit). */
 export const ROTATION = {
   originalEvery: 8,
-  noRepeatWindow: 10,
+  /* A track cannot come back until this many other songs have played. */
+  noRepeatWindow: 12,
 
   /* Station ID every N songs (0 = never). The ID is the short "you're listening
      to Vita Hueso Radio" clip in audio/id/. */
@@ -77,7 +78,7 @@ export const ROTATION = {
   /* Fun first: Latin urban, dembow, reggaeton and friends come up `funWeight`
      times as often as the rest of the guest shelf, so the station leans
      danceable without losing the quieter corners. */
-  funGenres: ['Reggaeton', 'Dembow', 'Latin', 'Dancehall', 'Moombahton', 'Urbano'],
+  funGenres: ['Reggaeton', 'Dembow', 'Latin', 'Dancehall', 'Moombahton', 'Urbano', 'Salsa', 'Timba'],
   funWeight: 6
 };
 

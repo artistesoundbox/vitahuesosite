@@ -61,7 +61,7 @@ export const ALBUMS = [
   }
 ];
 
-export const GENRES = ["Soul","Rock","Pop","Funk","Hip-Hop","Jazz","Latin","Country","Reggae","Folk","Blues","Electronic","Ambient","Piano","Cinematic","Lo-Fi","Meditative","Reggaeton","Dembow","Dancehall","Moombahton"];
+export const GENRES = ["Soul","Rock","Pop","Funk","Hip-Hop","Jazz","Latin","Reggae","Blues","Electronic","Ambient","Piano","Cinematic","Lo-Fi","Meditative","Reggaeton","Dembow","Dancehall","Moombahton","Salsa","Timba"];
 
 export const STATS = {
   "tracks": 69,
@@ -75,9 +75,7 @@ export const STATS = {
     "Hip-Hop",
     "Jazz",
     "Latin",
-    "Country",
     "Reggae",
-    "Folk",
     "Blues",
     "Electronic",
     "Ambient",
@@ -88,9 +86,11 @@ export const STATS = {
     "Reggaeton",
     "Dembow",
     "Dancehall",
-    "Moombahton"
+    "Moombahton",
+    "Salsa",
+    "Timba"
   ],
-  "totalSeconds": 13313,
+  "totalSeconds": 13188,
   "albums": 6
 };
 
@@ -1342,29 +1342,6 @@ export const TRACKS = [
   {
     "id": "f08",
     "trackNo": 108,
-    "title": "Recycle This",
-    "artist": "unreal_dm",
-    "albumId": "cc-sessions",
-    "album": "Signal Sessions (CC)",
-    "year": 2026,
-    "genres": [
-      "Country",
-      "Folk"
-    ],
-    "duration": 295,
-    "src": "audio/free/Recycle%20This.mp3",
-    "art": "assets/art/free-cover.svg",
-    "license": "CC BY 3.0",
-    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
-    "credit": "\"Recycle This\" by unreal_dm (ccMixter), licensed CC BY 3.0",
-    "source": "https://ccmixter.org/files/unreal_dm/24664",
-    "downloadable": true,
-    "featured": false,
-    "guest": true
-  },
-  {
-    "id": "f09",
-    "trackNo": 109,
     "title": "Strong Man",
     "artist": "Zep Hurme",
     "albumId": "cc-sessions",
@@ -1385,31 +1362,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f10",
-    "trackNo": 110,
-    "title": "Where the Moon Shines Bright",
-    "artist": "Kara Square",
-    "albumId": "cc-sessions",
-    "album": "Signal Sessions (CC)",
-    "year": 2026,
-    "genres": [
-      "Folk",
-      "Country"
-    ],
-    "duration": 268,
-    "src": "audio/free/Where%20the%20Moon%20Shines%20Bright.mp3",
-    "art": "assets/art/free-cover.svg",
-    "license": "CC BY 3.0",
-    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
-    "credit": "\"Where the Moon Shines Bright\" by Kara Square (ccMixter), licensed CC BY 3.0",
-    "source": "https://ccmixter.org/files/mindmapthat/62227",
-    "downloadable": true,
-    "featured": false,
-    "guest": true
-  },
-  {
-    "id": "f11",
-    "trackNo": 111,
+    "id": "f09",
+    "trackNo": 109,
     "title": "Things Change",
     "artist": "SackJo22",
     "albumId": "cc-sessions",
@@ -1431,8 +1385,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f12",
-    "trackNo": 112,
+    "id": "f10",
+    "trackNo": 110,
     "title": "THIS IS OUR MUSIC (Thruewiddit mix)",
     "artist": "duckett",
     "albumId": "cc-sessions",
@@ -1454,8 +1408,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f13",
-    "trackNo": 113,
+    "id": "f11",
+    "trackNo": 111,
     "title": "Chill Wave",
     "artist": "Kevin MacLeod",
     "albumId": "cc-sessions",
@@ -1477,8 +1431,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f14",
-    "trackNo": 114,
+    "id": "f12",
+    "trackNo": 112,
     "title": "Water Lily",
     "artist": "Kevin MacLeod",
     "albumId": "cc-sessions",
@@ -1500,8 +1454,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f15",
-    "trackNo": 115,
+    "id": "f13",
+    "trackNo": 113,
     "title": "LA TRIPLETA",
     "artist": "virtualdjmax",
     "albumId": "cc-sessions",
@@ -1523,8 +1477,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f16",
-    "trackNo": 116,
+    "id": "f14",
+    "trackNo": 114,
     "title": "SACUDETE",
     "artist": "YUYO MC",
     "albumId": "cc-sessions",
@@ -1546,8 +1500,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f17",
-    "trackNo": 117,
+    "id": "f15",
+    "trackNo": 115,
     "title": "Me robo el Show",
     "artist": "reiswerk",
     "albumId": "cc-sessions",
@@ -1569,8 +1523,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f18",
-    "trackNo": 118,
+    "id": "f16",
+    "trackNo": 116,
     "title": "Beat down Babylon",
     "artist": "reiswerk",
     "albumId": "cc-sessions",
@@ -1592,8 +1546,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f19",
-    "trackNo": 119,
+    "id": "f17",
+    "trackNo": 117,
     "title": "I Rebel want new Stile",
     "artist": "reiswerk",
     "albumId": "cc-sessions",
@@ -1615,8 +1569,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f20",
-    "trackNo": 120,
+    "id": "f18",
+    "trackNo": 118,
     "title": "Minha Sombra Teu Sorriso (My Shadow, your Smile)",
     "artist": "reiswerk",
     "albumId": "cc-sessions",
@@ -1638,8 +1592,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f21",
-    "trackNo": 121,
+    "id": "f19",
+    "trackNo": 119,
     "title": "Put your hands up",
     "artist": "reiswerk",
     "albumId": "cc-sessions",
@@ -1661,8 +1615,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f22",
-    "trackNo": 122,
+    "id": "f20",
+    "trackNo": 120,
     "title": "Hands Up (cdk Island Mix)",
     "artist": "cdk",
     "albumId": "cc-sessions",
@@ -1679,6 +1633,52 @@ export const TRACKS = [
     "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
     "credit": "\"Hands Up (cdk Island Mix)\" by cdk (ccMixter), licensed CC BY 3.0",
     "source": "https://ccmixter.org/files/cdk/39541",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f21",
+    "trackNo": 121,
+    "title": "Lamadio Tiado (Hot Cha Cha Mix)",
+    "artist": "coruscate",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Salsa",
+      "Latin"
+    ],
+    "duration": 174,
+    "src": "audio/free/Lamadio%20Tiado%20(Hot%20Cha%20Cha%20Mix).mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "credit": "\"Lamadio Tiado (Hot Cha Cha Mix)\" by coruscate (ccMixter), licensed CC BY 3.0",
+    "source": "https://ccmixter.org/files/Coruscate/70326",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f22",
+    "trackNo": 122,
+    "title": "Funk You",
+    "artist": "texasradiofish",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Timba",
+      "Latin"
+    ],
+    "duration": 264,
+    "src": "audio/free/Funk%20You.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY-NC 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-nc/3.0/",
+    "credit": "\"Funk You\" by texasradiofish (ccMixter), licensed CC BY-NC 3.0",
+    "source": "https://ccmixter.org/files/texasradiofish/53269",
     "downloadable": true,
     "featured": false,
     "guest": true

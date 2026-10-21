@@ -68,13 +68,37 @@ function guestBagFor(guests, rng) {
  */
 function buildSequence(pool, guests, rng, length = 96) {
   const sequence = [];
-  let guestBag = guestBagFor(guests, rng);
-  let originalBag = shuffled(pool, rng);
-  let guestIndex = 0;
-  let originalIndex = 0;
+  const guestBank = { bag: guestBagFor(guests, rng), cursor: 0 };
+  const originalBank = { bag: shuffled(pool, rng), cursor: 0 };
   let sinceOriginal = 0;
   let sinceIdent = 0;
   const every = Math.min(12, Math.max(1, Number(ROTATION.originalEvery) || 4));
+
+  /* Cooldown: a track cannot come back until `noRepeatWindow` other songs have
+     played. The weighted guest bag holds several copies of each fun track, so
+     without this a song could reappear a couple of places after itself. */
+  const cooldown = Math.max(0, Number(ROTATION.noRepeatWindow) || 0);
+  const recent = [];
+  const tooSoon = (track) => cooldown > 0 && recent.includes(track.id);
+  const remember = (track) => {
+    recent.push(track.id);
+    while (recent.length > cooldown) recent.shift();
+  };
+
+  const refillGuests = () => { guestBank.bag = guestBagFor(guests, rng); guestBank.cursor = 0; };
+  const refillOriginals = () => { originalBank.bag = shuffled(pool, rng); originalBank.cursor = 0; };
+
+  /* Take the next bag entry that is out of cooldown; if the whole bag is
+     cooling, take the next entry anyway rather than stalling the programme. */
+  const draw = (bank, refill) => {
+    for (let i = 0; i < bank.bag.length; i++) {
+      if (bank.cursor >= bank.bag.length) refill();
+      const candidate = bank.bag[bank.cursor++];
+      if (!tooSoon(candidate)) return candidate;
+    }
+    if (bank.cursor >= bank.bag.length) refill();
+    return bank.bag[bank.cursor++];
+  };
 
   /* The station ID drops in after every `identEvery` songs. */
   const maybeIdent = () => {
@@ -85,30 +109,16 @@ function buildSequence(pool, guests, rng, length = 96) {
   };
 
   while (sequence.length < length) {
-    if (guestIndex >= guestBag.length) {
-      guestBag = guestBagFor(guests, rng);
-      guestIndex = 0;
-    }
-    let guest = guestBag[guestIndex++];
-    const previous = sequence[sequence.length - 1];
-    if (previous && guest.id === previous.id && guestBag.length > 1) {
-      guest = guestBag[guestIndex++ % guestBag.length];
-    }
+    const guest = draw(guestBank, refillGuests);
     sequence.push(guest);
+    remember(guest);
     sinceOriginal += 1;
     maybeIdent();
 
     if (sinceOriginal < every) continue;
-    if (originalIndex >= originalBag.length) {
-      originalBag = shuffled(pool, rng);
-      originalIndex = 0;
-    }
-    let original = originalBag[originalIndex++];
-    const last = sequence[sequence.length - 1];
-    if (last && original.id === last.id && originalBag.length > 1) {
-      original = originalBag[originalIndex++ % originalBag.length];
-    }
+    const original = draw(originalBank, refillOriginals);
     sequence.push(original);
+    remember(original);
     sinceOriginal = 0;
     maybeIdent();
   }

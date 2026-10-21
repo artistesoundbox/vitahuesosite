@@ -534,20 +534,6 @@
       "credit": "\"Wayo Wayo-Summer Edition\" by wellman (ccMixter), licensed CC BY 3.0"
     },
     {
-      "file": "Recycle This.mp3",
-      "title": "Recycle This",
-      "artist": "unreal_dm",
-      "album": "cc-sessions",
-      "genres": [
-        "Country",
-        "Folk"
-      ],
-      "license": "CC BY 3.0",
-      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
-      "source": "https://ccmixter.org/files/unreal_dm/24664",
-      "credit": "\"Recycle This\" by unreal_dm (ccMixter), licensed CC BY 3.0"
-    },
-    {
       "file": "Strong Man.mp3",
       "title": "Strong Man",
       "artist": "Zep Hurme",
@@ -559,20 +545,6 @@
       "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
       "source": "https://ccmixter.org/files/zep_hurme/64824",
       "credit": "\"Strong Man\" by Zep Hurme (ccMixter), licensed CC BY 3.0"
-    },
-    {
-      "file": "Where the Moon Shines Bright.mp3",
-      "title": "Where the Moon Shines Bright",
-      "artist": "Kara Square",
-      "album": "cc-sessions",
-      "genres": [
-        "Folk",
-        "Country"
-      ],
-      "license": "CC BY 3.0",
-      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
-      "source": "https://ccmixter.org/files/mindmapthat/62227",
-      "credit": "\"Where the Moon Shines Bright\" by Kara Square (ccMixter), licensed CC BY 3.0"
     },
     {
       "file": "Things Change.mp3",
@@ -741,6 +713,34 @@
       "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
       "source": "https://ccmixter.org/files/cdk/39541",
       "credit": "\"Hands Up (cdk Island Mix)\" by cdk (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "Lamadio Tiado (Hot Cha Cha Mix).mp3",
+      "title": "Lamadio Tiado (Hot Cha Cha Mix)",
+      "artist": "coruscate",
+      "album": "cc-sessions",
+      "genres": [
+        "Salsa",
+        "Latin"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/Coruscate/70326",
+      "credit": "\"Lamadio Tiado (Hot Cha Cha Mix)\" by coruscate (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "Funk You.mp3",
+      "title": "Funk You",
+      "artist": "texasradiofish",
+      "album": "cc-sessions",
+      "genres": [
+        "Timba",
+        "Latin"
+      ],
+      "license": "CC BY-NC 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by-nc/3.0/",
+      "source": "https://ccmixter.org/files/texasradiofish/53269",
+      "credit": "\"Funk You\" by texasradiofish (ccMixter), licensed CC BY-NC 3.0"
     }
   ],
   "stationId": {

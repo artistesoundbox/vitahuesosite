@@ -26,12 +26,8 @@ They appear in the live rotation and in the library alongside the original catal
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/unreal_dm/27669
 - **Wayo Wayo-Summer Edition** — wellman. CC BY 3.0. "Wayo Wayo-Summer Edition" by wellman (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/wellman/22358
-- **Recycle This** — unreal_dm. CC BY 3.0. "Recycle This" by unreal_dm (ccMixter), licensed CC BY 3.0
-  http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/unreal_dm/24664
 - **Strong Man** — Zep Hurme. CC BY 3.0. "Strong Man" by Zep Hurme (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/zep_hurme/64824
-- **Where the Moon Shines Bright** — Kara Square. CC BY 3.0. "Where the Moon Shines Bright" by Kara Square (ccMixter), licensed CC BY 3.0
-  http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/mindmapthat/62227
 - **Things Change** — SackJo22. CC BY 3.0. "Things Change" by SackJo22 (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/SackJo22/64609
 - **THIS IS OUR MUSIC (Thruewiddit mix)** — duckett. CC BY 3.0. "THIS IS OUR MUSIC (Thruewiddit mix)" by duckett (ccMixter), licensed CC BY 3.0
@@ -56,3 +52,7 @@ They appear in the live rotation and in the library alongside the original catal
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/Reiswerk/56836
 - **Hands Up (cdk Island Mix)** — cdk. CC BY 3.0. "Hands Up (cdk Island Mix)" by cdk (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/cdk/39541
+- **Lamadio Tiado (Hot Cha Cha Mix)** — coruscate. CC BY 3.0. "Lamadio Tiado (Hot Cha Cha Mix)" by coruscate (ccMixter), licensed CC BY 3.0
+  http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/Coruscate/70326
+- **Funk You** — texasradiofish. CC BY-NC 3.0. "Funk You" by texasradiofish (ccMixter), licensed CC BY-NC 3.0
+  http://creativecommons.org/licenses/by-nc/3.0/ · https://ccmixter.org/files/texasradiofish/53269
