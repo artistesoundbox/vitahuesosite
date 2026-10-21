@@ -66,7 +66,7 @@ function guestBagFor(guests, rng) {
  * tracks. Both bags reshuffle when exhausted, and immediate repeats are
  * avoided even across a reshuffle.
  */
-function buildSequence(pool, guests, rng, length = 96) {
+function buildSequence(pool, guests, rng, length = 96, seedRecent = []) {
   const sequence = [];
   const guestBank = { bag: guestBagFor(guests, rng), cursor: 0 };
   const originalBank = { bag: shuffled(pool, rng), cursor: 0 };
@@ -78,7 +78,7 @@ function buildSequence(pool, guests, rng, length = 96) {
      played. The weighted guest bag holds several copies of each fun track, so
      without this a song could reappear a couple of places after itself. */
   const cooldown = Math.max(0, Number(ROTATION.noRepeatWindow) || 0);
-  const recent = [];
+  const recent = seedRecent.slice(-Math.max(0, cooldown));
   const tooSoon = (track) => cooldown > 0 && recent.includes(track.id);
   const remember = (track) => {
     recent.push(track.id);
@@ -143,7 +143,12 @@ export function buildReel(dayStartMs) {
     const rest = GUESTS.filter((t) => !matching.includes(t));
     const guests = [...shuffled(matching, rng), ...shuffled(rest, rng)];
 
-    let sequence = buildSequence(pool, guests, rng);
+    /* Carry the cooldown across the programme boundary, otherwise the same
+       song can close one hour and open the next. */
+    const recentSongs = () => entries.filter((e) => !e.track.ident)
+      .slice(-(Number(ROTATION.noRepeatWindow) || 0)).map((e) => e.track.id);
+
+    let sequence = buildSequence(pool, guests, rng, 96, recentSongs());
     let cursorIndex = 0;
 
     const start = block.start * BLOCK_MS;
@@ -153,7 +158,7 @@ export function buildReel(dayStartMs) {
     let guard = 0;
     while (end - cursor > 20000 && guard++ < 600) {
       if (cursorIndex >= sequence.length) {
-        sequence = buildSequence(pool, guests, rng);
+        sequence = buildSequence(pool, guests, rng, 96, recentSongs());
         cursorIndex = 0;
       }
       let track = sequence[cursorIndex++];

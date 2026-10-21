@@ -352,7 +352,12 @@ function writeHandoff() {
   try {
     sessionStorage.setItem(KEY_HANDOFF, JSON.stringify({
       playing: radio.playing || hasIntent(),
-      at: Date.now()
+      at: Date.now(),
+      // what was actually coming out of the speakers, so the station can
+      // continue it instead of snapping back to the live clock
+      trackId: radio.track?.id || '',
+      mode: radio.mode,
+      offset: Math.round(radio.audio.currentTime || 0)
     }));
   } catch { /* private mode */ }
 }
