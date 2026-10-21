@@ -38,7 +38,12 @@ There is no streaming server, so "live" is a deterministic timeline:
 
 1. `data/library.json` defines the catalogue; `tools/build-catalog.mjs` writes
    exact track durations into `js/catalog.js`.
-2. `js/config.js` defines the six daily programmes (UTC hours) and their genres.
+2. `js/config.js` defines the seven daily programmes (UTC hours) and their genres.
+   **`La Hora Caliente` (17:00–18:00 UTC, 1pm in San Juan) is the appointment
+   hour:** its `focus: true` flag makes that block draw guests *only* from the
+   salsa/timba/dembow/reggaetón shelf, so it is a real show rather than a
+   slightly weighted slice of the day. Every hour has to be covered exactly
+   once — contiguous, no gaps, no overlaps.
 3. `js/station.js` builds one day's reel: for each programme, the guest library
    is seeded-shuffled and **one of the artist's own songs is dropped in after
    every `ROTATION.originalEvery` guests** (default **8** = about 10%
@@ -258,9 +263,10 @@ rest of `vitahuesosite`:
 ## Configuration checklist before publishing
 
 - `data/library.json` → `station.name`, `artist`, `tagline`, `contactEmail`,
-  `siteUrl`, socials. **`contactEmail` is intentionally empty**: with no address
-  set, the contact form copies the message so it can be sent via YouTube/GitHub.
-  Add an address to switch it to `mailto:`.
+  `siteUrl`, socials. `contactEmail` is `artistesoundbox@gmail.com`: the contact
+  form opens a `mailto:` to that inbox and leaves a Gmail compose link on screen
+  for visitors with no mail app, and the address is listed under Contact →
+  Direct lines. Clearing it falls back to copying the message for YouTube/GitHub.
 - `js/config.js` → programme names, hours (UTC), genres, and the community topic.
 - `index.html` → About copy, canonical URL, JSON-LD.
 - `data/library.json` → genres were assigned from titles, not by listening.
