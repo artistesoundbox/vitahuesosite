@@ -315,14 +315,20 @@ function silencePortal() {
   try { window.__portalMusic?.silence?.(); } catch { /* not on this page */ }
 }
 
+/* Publish the dock's real height so the install chip (and the portal's tail
+   padding) can clear it. Measured synchronously: reading offsetHeight forces
+   layout, and unlike rAF / ResizeObserver it still works while the tab is in
+   the background — where those callbacks are simply paused. */
+function measureDockHeight() {
+  if (!dock) return;
+  document.documentElement.style.setProperty('--vhr-dock-h', `${dock.offsetHeight}px`);
+}
+
 function setEnabledUI(active) {
   document.documentElement.classList.toggle('vhr-on', active);
   if (dock) {
     dock.classList.toggle('is-on', active);
-    // display flips with the class, so re-measure on the next frame
-    requestAnimationFrame(() => {
-      document.documentElement.style.setProperty('--vhr-dock-h', `${dock.offsetHeight}px`);
-    });
+    measureDockHeight();
   }
   if (toggleButton) {
     toggleButton.classList.toggle('is-on', active);
@@ -418,13 +424,10 @@ function init() {
   });
   radio.addEventListener('trackchange', () => paint(radio.snapshot()));
 
-  /* Keep --vhr-dock-h honest so anything anchored to the dock (the install
-     chip) clears its real height, whatever the track title wraps to. */
-  const measureDock = () => {
-    document.documentElement.style.setProperty('--vhr-dock-h', `${dock.offsetHeight}px`);
-  };
-  measureDock();
-  if ('ResizeObserver' in window) new ResizeObserver(measureDock).observe(dock);
+  /* Keep --vhr-dock-h honest when the dock's own content reflows (a long
+     track title wrapping to two lines moves the install chip with it). */
+  measureDockHeight();
+  if ('ResizeObserver' in window) new ResizeObserver(measureDockHeight).observe(dock);
 
   if (isOn()) {
     silencePortal();

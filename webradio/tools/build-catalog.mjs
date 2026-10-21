@@ -100,7 +100,8 @@ for (const file of files) {
     art,
     license: 'All rights reserved',
     licenseUrl: '',
-    credit: `${meta.title} — written & performed by ${DATA.station.artist}`,
+    credit: `${meta.title} — written & performed by ${DATA.station.artist}` +
+      (DATA.station.aka ? ` (${DATA.station.aka})` : ''),
     source: '',
     downloadable: meta.downloadable !== false,
     featured: !!meta.featured,
@@ -108,7 +109,7 @@ for (const file of files) {
   });
 }
 
-/* ---------------- guest instrumentals (CC BY) ---------------- */
+/* ---------------- guest songs & instrumentals (CC BY) ---------------- */
 const freeTracks = [];
 let fIndex = 0;
 for (const f of DATA.freeTracks) {
@@ -123,7 +124,7 @@ for (const f of DATA.freeTracks) {
     id,
     trackNo: 100 + fIndex,
     title: f.title,
-    artist: 'Kevin MacLeod',
+    artist: f.artist || 'Various artists',
     albumId: album.id,
     album: album.title,
     year: album.year,
@@ -147,7 +148,8 @@ tracks.sort((a, b) => a.trackNo - b.trackNo);
 const all = [...tracks, ...freeTracks];
 if (!all.length) throw new Error('No tracks found — check anthonitus_songs/');
 
-const genreOrder = ['Ambient', 'Soul', 'Piano', 'Cinematic', 'Electronic', 'Latin', 'Lo-Fi', 'Meditative'];
+const genreOrder = ['Soul', 'Rock', 'Pop', 'Funk', 'Hip-Hop', 'Jazz', 'Latin', 'Country', 'Reggae',
+  'Folk', 'Blues', 'Electronic', 'Ambient', 'Piano', 'Cinematic', 'Lo-Fi', 'Meditative'];
 const genreList = genreOrder.filter((g) => genres.has(g))
   .concat([...genres].filter((g) => !genreOrder.includes(g)));
 
@@ -184,12 +186,18 @@ const credits = [
   '',
   '## Original music',
   '',
-  `All tracks by ${DATA.station.artist} (${DATA.station.alias}) are © ${new Date().getFullYear()} ${DATA.station.artist}. All rights reserved.`,
+  `All tracks by ${DATA.station.artist}` +
+    (DATA.station.aka ? ` (${DATA.station.aka})` : '') +
+    `, a.k.a. ${DATA.station.alias}, are © ${new Date().getFullYear()} ${DATA.station.artist}.` +
+    ' All rights reserved.',
   '',
-  '## Guest instrumentals',
+  '## Guest songs & instrumentals',
   '',
-  'The following tracks are hosted on this site under Creative Commons Attribution 4.0.',
-  'They appear in the live rotation and the library alongside the original catalogue.',
+  'The following tracks by independent artists are hosted on this site under',
+  'Creative Commons Attribution licences (CC BY). Each entry credits its author and',
+  'links back to the original upload; the licence permits commercial and',
+  'non-commercial reuse with attribution.',
+  'They appear in the live rotation and in the library alongside the original catalogue.',
   '',
   ...freeTracks.map((t) => `- **${t.title}** — ${t.artist}. ${t.license}. ${t.credit.replace(/"/g, '"')}\n  ${t.licenseUrl} · ${t.source}`),
   ''

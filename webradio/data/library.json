@@ -3,12 +3,13 @@
     "name": "Vita Hueso Radio",
     "callSign": "VH·SIGNAL",
     "tagline": "A 24/7 transmission of original songs, quiet experiments and slow frequencies.",
-    "artist": "Vita Hueso",
+    "artist": "Anthonitus",
     "alias": "artistesoundbox",
     "contactEmail": "",
     "siteUrl": "https://artistesoundbox.github.io/vitahuesosite/webradio/",
     "youtube": "https://www.youtube.com/@AnthonitusArtiste",
-    "github": "https://github.com/artistesoundbox"
+    "github": "https://github.com/artistesoundbox",
+    "aka": "Vita Hueso"
   },
   "albums": [
     {
@@ -51,7 +52,7 @@
       "title": "Signal Sessions (CC)",
       "cover": "assets/art/free-cover.svg",
       "year": 2026,
-      "description": "Guest instrumentals under Creative Commons BY 4.0, hosted on this site and woven through the live rotation.",
+      "description": "Guest songs and instrumentals from independent artists under Creative Commons Attribution licences — rock, pop, soul, funk, hip-hop, jazz, latin, country, reggae, folk, blues and electronic, woven through the live rotation.",
       "external": true
     }
   ],
@@ -435,21 +436,176 @@
   },
   "freeTracks": [
     {
-      "file": "Frozen Star.mp3",
-      "title": "Frozen Star",
+      "file": "It's Deep.mp3",
+      "title": "It's Deep",
+      "artist": "SackJo22",
       "album": "cc-sessions",
       "genres": [
-        "Ambient",
-        "Cinematic"
+        "Rock",
+        "Soul"
       ],
-      "license": "CC BY 4.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-      "source": "https://incompetech.com/music/royalty-free/",
-      "credit": "\"Frozen Star\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0"
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/SackJo22/69490",
+      "credit": "\"It's Deep\" by SackJo22 (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "Girls like you.mp3",
+      "title": "Girls like you",
+      "artist": "Stefan Kartenberg",
+      "album": "cc-sessions",
+      "genres": [
+        "Pop",
+        "Rock"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/JeffSpeed68/44932",
+      "credit": "\"Girls like you\" by Stefan Kartenberg (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "BACK FROM HOLIDAYS.mp3",
+      "title": "BACK FROM HOLIDAYS",
+      "artist": "Bocrew",
+      "album": "cc-sessions",
+      "genres": [
+        "Hip-Hop",
+        "Soul"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/BOCrew/68881",
+      "credit": "\"BACK FROM HOLIDAYS\" by Bocrew (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "PeaceLoveSoul.mp3",
+      "title": "PeaceLoveSoul",
+      "artist": "Jeris",
+      "album": "cc-sessions",
+      "genres": [
+        "Funk",
+        "Soul"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/VJ_Memes/35859",
+      "credit": "\"PeaceLoveSoul\" by Jeris (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "Sola Solita.mp3",
+      "title": "Sola Solita",
+      "artist": "mykleanthony",
+      "album": "cc-sessions",
+      "genres": [
+        "Latin",
+        "Hip-Hop"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/mykleanthony/20638",
+      "credit": "\"Sola Solita\" by mykleanthony (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "It's a Blessing.mp3",
+      "title": "It's a Blessing",
+      "artist": "unreal_dm",
+      "album": "cc-sessions",
+      "genres": [
+        "Jazz",
+        "Soul"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/unreal_dm/27669",
+      "credit": "\"It's a Blessing\" by unreal_dm (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "Wayo Wayo-Summer Edition.mp3",
+      "title": "Wayo Wayo-Summer Edition",
+      "artist": "wellman",
+      "album": "cc-sessions",
+      "genres": [
+        "Latin",
+        "Pop"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/wellman/22358",
+      "credit": "\"Wayo Wayo-Summer Edition\" by wellman (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "Recycle This.mp3",
+      "title": "Recycle This",
+      "artist": "unreal_dm",
+      "album": "cc-sessions",
+      "genres": [
+        "Country",
+        "Folk"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/unreal_dm/24664",
+      "credit": "\"Recycle This\" by unreal_dm (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "Strong Man.mp3",
+      "title": "Strong Man",
+      "artist": "Zep Hurme",
+      "album": "cc-sessions",
+      "genres": [
+        "Reggae"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/zep_hurme/64824",
+      "credit": "\"Strong Man\" by Zep Hurme (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "Where the Moon Shines Bright.mp3",
+      "title": "Where the Moon Shines Bright",
+      "artist": "Kara Square",
+      "album": "cc-sessions",
+      "genres": [
+        "Folk",
+        "Country"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/mindmapthat/62227",
+      "credit": "\"Where the Moon Shines Bright\" by Kara Square (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "Things Change.mp3",
+      "title": "Things Change",
+      "artist": "SackJo22",
+      "album": "cc-sessions",
+      "genres": [
+        "Blues",
+        "Soul"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/SackJo22/64609",
+      "credit": "\"Things Change\" by SackJo22 (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "THIS IS OUR MUSIC (Thruewiddit mix).mp3",
+      "title": "THIS IS OUR MUSIC (Thruewiddit mix)",
+      "artist": "duckett",
+      "album": "cc-sessions",
+      "genres": [
+        "Electronic",
+        "Hip-Hop"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/duckett/15556",
+      "credit": "\"THIS IS OUR MUSIC (Thruewiddit mix)\" by duckett (ccMixter), licensed CC BY 3.0"
     },
     {
       "file": "Chill Wave.mp3",
       "title": "Chill Wave",
+      "artist": "Kevin MacLeod",
       "album": "cc-sessions",
       "genres": [
         "Lo-Fi",
@@ -463,6 +619,7 @@
     {
       "file": "Water Lily.mp3",
       "title": "Water Lily",
+      "artist": "Kevin MacLeod",
       "album": "cc-sessions",
       "genres": [
         "Ambient",
@@ -472,58 +629,6 @@
       "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
       "source": "https://incompetech.com/music/royalty-free/",
       "credit": "\"Water Lily\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0"
-    },
-    {
-      "file": "Winter Reflections.mp3",
-      "title": "Winter Reflections",
-      "album": "cc-sessions",
-      "genres": [
-        "Piano",
-        "Meditative"
-      ],
-      "license": "CC BY 4.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-      "source": "https://incompetech.com/music/royalty-free/",
-      "credit": "\"Winter Reflections\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0"
-    },
-    {
-      "file": "Reawakening.mp3",
-      "title": "Reawakening",
-      "album": "cc-sessions",
-      "genres": [
-        "Cinematic",
-        "Ambient"
-      ],
-      "license": "CC BY 4.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-      "source": "https://incompetech.com/music/royalty-free/",
-      "credit": "\"Reawakening\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0"
-    },
-    {
-      "file": "Ascending the Vale.mp3",
-      "title": "Ascending the Vale",
-      "album": "cc-sessions",
-      "genres": [
-        "Cinematic",
-        "Ambient"
-      ],
-      "license": "CC BY 4.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-      "source": "https://incompetech.com/music/royalty-free/",
-      "credit": "\"Ascending the Vale\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0"
-    },
-    {
-      "file": "Touching Moments Two - Higher.mp3",
-      "title": "Touching Moments Two — Higher",
-      "album": "cc-sessions",
-      "genres": [
-        "Piano",
-        "Ambient"
-      ],
-      "license": "CC BY 4.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-      "source": "https://incompetech.com/music/royalty-free/",
-      "credit": "\"Touching Moments Two - Higher\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0"
     }
   ]
 }

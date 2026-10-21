@@ -7,7 +7,7 @@ export const PROGRAMS = [
     end: 6,
     name: 'Midnight Drift',
     tagline: 'Slow frequencies for the small hours.',
-    genres: ['Meditative', 'Ambient', 'Lo-Fi']
+    genres: ['Meditative', 'Ambient', 'Lo-Fi', 'Jazz', 'Blues']
   },
   {
     id: 'firstlight',
@@ -15,7 +15,7 @@ export const PROGRAMS = [
     end: 10,
     name: 'First Light',
     tagline: 'Soft songs to open the day with.',
-    genres: ['Ambient', 'Piano', 'Soul']
+    genres: ['Ambient', 'Piano', 'Soul', 'Folk', 'Country']
   },
   {
     id: 'deepfocus',
@@ -23,7 +23,7 @@ export const PROGRAMS = [
     end: 14,
     name: 'Deep Focus',
     tagline: 'Textures and instrumentals for the long middle.',
-    genres: ['Lo-Fi', 'Ambient', 'Cinematic']
+    genres: ['Lo-Fi', 'Ambient', 'Cinematic', 'Electronic']
   },
   {
     id: 'afterglow',
@@ -31,7 +31,7 @@ export const PROGRAMS = [
     end: 18,
     name: 'Afterglow',
     tagline: 'Warm soul, Spanish verses, and a little daylight left.',
-    genres: ['Soul', 'Latin', 'Piano']
+    genres: ['Soul', 'Latin', 'Piano', 'Funk', 'Reggae', 'Pop']
   },
   {
     id: 'nightfrequency',
@@ -39,7 +39,7 @@ export const PROGRAMS = [
     end: 22,
     name: 'Night Frequency',
     tagline: 'Cinematic edges and neon-lit motion.',
-    genres: ['Cinematic', 'Electronic', 'Soul']
+    genres: ['Cinematic', 'Electronic', 'Soul', 'Hip-Hop', 'Rock']
   },
   {
     id: 'stillwaters',
@@ -47,7 +47,7 @@ export const PROGRAMS = [
     end: 24,
     name: 'Still Waters',
     tagline: 'Winding down, lights low, nothing to prove.',
-    genres: ['Ambient', 'Meditative', 'Piano']
+    genres: ['Ambient', 'Meditative', 'Piano', 'Jazz', 'Folk']
   }
 ];
 
