@@ -70,6 +70,7 @@
     <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 5.5v13L16 12z" fill="currentColor"/><path d="M17 5h2v14h-2z" fill="currentColor"/></symbol>
     <symbol id="i-prev" viewBox="0 0 24 24"><path d="M18 5.5v13L8 12z" fill="currentColor"/><path d="M5 5h2v14H5z" fill="currentColor"/></symbol>
     <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20S4.6 15.6 4.6 10.6A3.9 3.9 0 0112 8.4a3.9 3.9 0 017.4 2.2C19.4 15.6 12 20 12 20z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-dislike" viewBox="0 0 24 24"><path d="M7 4.6h9.2l2.1 8.4a1.6 1.6 0 01-1.6 2h-4l.9 3.6a1.6 1.6 0 01-1.5 2c-.6 0-1.1-.3-1.4-.9L7 14.4zm-3 0h2.2v9.8H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
     <symbol id="i-heart-fill" viewBox="0 0 24 24"><path d="M12 20S4.6 15.6 4.6 10.6A3.9 3.9 0 0112 8.4a3.9 3.9 0 017.4 2.2C19.4 15.6 12 20 12 20z" fill="currentColor"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v10m0 0l-4-4m4 4l4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4m0 0L8 8m4-4l4 4M5 13v6h14v-6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -266,6 +267,9 @@
               <div class="controls">
                 <button class="icon-btn ctrl-fav" id="np-fav" type="button" aria-label="Favorite this track" aria-pressed="false">
                   <svg class="icon icon-heart"><use href="#i-heart"/></svg>
+                </button>
+                <button class="icon-btn ctrl-block" id="np-block" type="button" aria-label="Never play this again on this device" aria-pressed="false" title="Never play this again on this device">
+                  <svg class="icon"><use href="#i-dislike"/></svg>
                 </button>
                 <button class="icon-btn" id="np-prev" type="button" aria-label="Previous"><svg class="icon"><use href="#i-prev"/></svg></button>
                 <button class="play-btn" id="np-play" type="button" aria-label="Play">

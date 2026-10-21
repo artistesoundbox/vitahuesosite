@@ -12,6 +12,7 @@
  */
 import { TRACKS } from './catalog.js';
 import { getLiveState, programAt, msUntilNextProgram } from './station.js';
+import { isBlocked } from './blocklist.js';
 
 const KEYS = {
   volume: 'vh.volume',
@@ -492,8 +493,10 @@ export class Radio extends EventTarget {
     const recent = new Set(this.history.slice(0, 8).map((h) => h.id));
     if (seed) recent.add(seed.id);
 
+    /* Disliked songs never enter a personal queue either — the blocklist is a
+       playlist rule, not just a live-reel filter. */
     const scored = TRACKS
-      .filter((t) => !recent.has(t.id))
+      .filter((t) => !recent.has(t.id) && !isBlocked(t.id))
       .map((t) => ({
         track: t,
         score: t.genres.filter((g) => seedGenres.has(g)).length * 2 + Math.random() * 3
@@ -501,7 +504,7 @@ export class Radio extends EventTarget {
       .sort((a, b) => b.score - a.score)
       .map((s) => s.track);
 
-    const rest = shuffle(TRACKS.filter((t) => !scored.includes(t)));
+    const rest = shuffle(TRACKS.filter((t) => !scored.includes(t) && !isBlocked(t.id)));
     return [...scored, ...rest].slice(0, size);
   }
 

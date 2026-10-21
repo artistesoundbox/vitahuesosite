@@ -6,6 +6,7 @@
 import { STATION, ALBUMS, GENRES, STATS, TRACKS } from './catalog.js';
 import { PROGRAMS, SLEEP_CHOICES } from './config.js';
 import { radio } from './player.js';
+import { isBlocked, toggleBlocked, onBlockChange } from './blocklist.js';
 import {
   formatTime, formatDuration, localHourLabel, programAt,
   msUntilNextProgram, formatCountdown
@@ -227,10 +228,14 @@ function trackCard(track) {
       <div class="track-meta">
         <span>${esc(track.album)}</span><span>·</span><span>${formatTime(track.duration)}</span>
         ${isCC(track) ? '<span class="tag-cc">CC BY</span>' : ''}
+        <span class="tag-blocked"${isBlocked(track.id) ? '' : ' hidden'}>Hidden</span>
       </div>
       <div class="track-actions">
         <button class="icon-btn" type="button" data-fav="${esc(track.id)}" aria-label="Favorite ${esc(track.title)}" aria-pressed="false">
           <svg class="icon icon-heart"><use href="#i-heart"/></svg>
+        </button>
+        <button class="icon-btn ctrl-block" type="button" data-block="${esc(track.id)}" aria-label="Never play ${esc(track.title)} again on this device" aria-pressed="${isBlocked(track.id)}" title="Never play this again on this device">
+          <svg class="icon"><use href="#i-dislike"/></svg>
         </button>
         <button class="icon-btn" type="button" data-download="${esc(track.id)}" aria-label="Download ${esc(track.title)}">
           <svg class="icon"><use href="#i-download"/></svg>
@@ -267,6 +272,19 @@ function renderLibrary() {
   const empty = $('lib-empty');
   if (empty) empty.hidden = filteredTracks.length > 0;
   syncCardFavorites();
+  syncCardBlocks();
+}
+
+function syncCardBlocks() {
+  $$('[data-block]').forEach((button) => {
+    const id = button.dataset.block;
+    const hidden = isBlocked(id);
+    button.setAttribute('aria-pressed', String(hidden));
+    button.classList.toggle('is-block', hidden);
+    const card = button.closest('.track-card, .track');
+    card?.classList.toggle('is-hidden-track', hidden);
+    card?.querySelector('.tag-blocked')?.toggleAttribute('hidden', !hidden);
+  });
 }
 
 function syncCardFavorites() {
@@ -450,7 +468,7 @@ let lastTrackId = '';
 function cacheEls() {
   [
     'np-art', 'np-title', 'np-artist', 'np-album', 'np-year', 'np-genres', 'np-time', 'np-duration',
-    'np-progress', 'np-mode', 'np-program', 'np-rejoin', 'np-fav', 'np-play', 'np-play-icon',
+    'np-progress', 'np-mode', 'np-program', 'np-rejoin', 'np-fav', 'np-block', 'np-play', 'np-play-icon',
     'np-next', 'np-prev',
     'np-mute', 'np-mute-icon', 'np-volume', 'np-sleep', 'sleep-menu', 'np-mic', 'np-download',
     'np-share', 'np-credit', 'np-live-note', 'sleep-status',
@@ -553,6 +571,15 @@ function updateState(state) {
   els['dock-mode'].textContent = modeText;
   els['dock'].dataset.mode = state.mode;
   els['np-rejoin'].classList.toggle('hidden', live);
+  const blockBtn = els['np-block'];
+  if (blockBtn && radio.track) {
+    const hidden = isBlocked(radio.track.id);
+    blockBtn.setAttribute('aria-pressed', String(hidden));
+    blockBtn.classList.toggle('is-block', hidden);
+    blockBtn.setAttribute('aria-label', hidden
+      ? `“${radio.track.title}” is hidden — click to put it back in rotation`
+      : 'Never play this again on this device');
+  }
 
   els['np-program'].textContent = state.program.name;
   els['home-program'].textContent = state.program.name;
@@ -726,6 +753,23 @@ function bindPlayer() {
     const active = radio.toggleFavorite();
     toast(active ? 'Added to favorites.' : 'Removed from favorites.');
   });
+
+  /* Dislike: hide the song from this device for good, then move on. Blocking
+     the track that is playing has to do something immediate, otherwise the
+     gesture feels broken — live listeners rejoin the rebuilt reel, personal
+     listeners skip forward. */
+  els['np-block'].addEventListener('click', () => {
+    const track = radio.track;
+    if (!track) return;
+    const hidden = toggleBlocked(track.id);
+    if (!hidden) {
+      toast('Back in rotation.');
+      return;
+    }
+    toast(`Hidden — “${track.title}” will not play again on this device.`);
+    if (radio.mode === 'live') radio.rejoinLive();
+    else radio.next();
+  });
   els['dock-fav'].addEventListener('click', () => radio.toggleFavorite());
 
   els['np-mute'].addEventListener('click', () => radio.toggleMute());
@@ -835,6 +879,20 @@ function bindLibrary() {
     const fav = event.target.closest('[data-fav]');
     if (fav) {
       radio.toggleFavorite(byId.get(fav.dataset.fav));
+      return;
+    }
+    const block = event.target.closest('[data-block]');
+    if (block) {
+      const track = byId.get(block.dataset.block);
+      const hidden = toggleBlocked(block.dataset.block);
+      syncCardBlocks();
+      toast(hidden
+        ? `Hidden — “${track?.title || 'that song'}” will not play again on this device.`
+        : `Back in rotation — “${track?.title || 'that song'}”.`);
+      if (hidden && radio.track?.id === block.dataset.block) {
+        if (radio.mode === 'live') radio.rejoinLive();
+        else radio.next();
+      }
       return;
     }
     const dl = event.target.closest('[data-download]');
@@ -1154,6 +1212,13 @@ function init() {
   bindLibrary();
   bindForms();
   bindChatEmoji();
+
+  /* A block can come from the player or from a library card; keep both views
+     in step and let the station rebuild its reel (it subscribes too). */
+  onBlockChange(() => {
+    syncCardBlocks();
+    if (els['np-block']) updateState(radio.snapshot());
+  });
   bindChrome();
 
   const year = $('year');

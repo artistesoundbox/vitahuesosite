@@ -234,6 +234,7 @@ a:hover { color: #fff; }
 .icon-btn:active { transform: scale(0.94); }
 .icon-btn[aria-pressed="true"] { color: var(--neon-hot); border-color: var(--line-strong); background: rgba(56, 182, 255, 0.14); }
 .icon-btn.is-fav { color: var(--pink); }
+.icon-btn.is-block { color: #ff9d92; }
 #btn-menu { display: none; }
 
 /* -------------------------------------------------------------------- main */
@@ -739,6 +740,9 @@ h3 { font-size: 15px; letter-spacing: 0.04em; }
 .track-actions .icon-btn .icon { width: 15px; height: 15px; }
 .track-actions .spacer { flex: 1; }
 .tag-cc { font-size: 8.5px; letter-spacing: 0.1em; color: #7fe7c4; border: 1px solid rgba(80, 220, 170, 0.3); border-radius: 4px; padding: 1px 4px; }
+.tag-blocked { font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #ffb0a8; border: 1px solid rgba(255, 130, 120, 0.35); border-radius: 4px; padding: 1px 4px; }
+.track-card.is-hidden-track { opacity: 0.5; }
+.track-card.is-hidden-track:hover { opacity: 0.9; }
 .empty { padding: 50px 0; text-align: center; color: var(--dim); }
 
 /* --------------------------------------------------------------- releases */

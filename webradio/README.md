@@ -96,6 +96,7 @@ same reel, so they always agree with what is playing.
 | Queue / recently played | `state.queue`, `vh.history` in localStorage |
 | Listener counter | Presence envelopes over the community relay |
 | Favorites, search, genre filters | `js/ui.js`, `vh.favorites` in localStorage |
+| "Never play this again" (per device) | `js/blocklist.js`, `vh.blocked` in localStorage |
 | Sleep timer | `radio.setSleep(minutes)` |
 | Live mic mode | Local monitor + recorded "mic take" (`radio.toggleMic`) |
 | Scheduled playlists | `PROGRAMS` in `js/config.js` |
@@ -182,6 +183,24 @@ and records a take you can download (`Save mic take` appears under the player).
 It does **not** broadcast to other listeners — that requires an audio server,
 which this static setup deliberately avoids. Recording and monitoring are real;
 remote broadcast is the one feature that cannot exist without a backend.
+
+---
+
+## Disliking a song (the admin's pruning ledger)
+
+The thumbs-down in the player — and on every library card — hides that track **on
+this device only**. The station rebuilds today's reel without it, so it vanishes
+from the live clock and from personal queues immediately, and the choice survives
+reloads (`vh.blocked` in localStorage, handled by `js/blocklist.js`).
+
+Library cards for hidden tracks stay visible, dimmed with a **Hidden** chip, and
+the same button puts them back (`Back in rotation`). Nothing is deleted, nothing
+is sent anywhere, and other listeners are unaffected: the broadcast is a shared
+timeline, so one listener's taste must not rewrite what everyone hears.
+
+That is deliberate — the list is the auditioning ledger. Listen through the
+shelf, hide the duds, then prune them for real by deleting the file from
+`audio/free/` and its entry from `data/library.json`, and rebuild.
 
 ---
 
