@@ -41,15 +41,24 @@ There is no streaming server, so "live" is a deterministic timeline:
 2. `js/config.js` defines the six daily programmes (UTC hours) and their genres.
 3. `js/station.js` builds one day's reel: for each programme, the guest library
    is seeded-shuffled and **one of the artist's own songs is dropped in after
-   every `ROTATION.originalEvery` guests** (default **4** = about 20% originals),
-   and the sequence is laid end to end, cut cleanly at the programme boundary.
-   The seed is `UTC date + programme + station epoch`, so **every visitor
-   computes the same reel** — including the same guest rotation.
+   every `ROTATION.originalEvery` guests** (default **8** = about 10%
+   originals), and the sequence is laid end to end, cut cleanly at the
+   programme boundary. The seed is `UTC date + programme + station epoch`, so
+   **every visitor computes the same reel** — including the same guest rotation.
 
    Both bags reshuffle when exhausted and immediate repeats are prevented, so a
    given guest song is spaced out rather than repeated back to back. Change
    `originalEvery` in `js/config.js` to taste (higher = your own songs rarer;
    `12` is the ceiling).
+
+   **Fun first:** the guest bag repeats anything in `funGenres`
+   (`Reggaeton`, `Dembow`, `Latin`, `Dancehall`, `Moombahton`, `Urbano`)
+   `funWeight` times (default **6**), so the station leans Latin urban / dembow
+   — roughly three quarters of the songs — while the quiet corners still turn
+   up. **Station ID:** `audio/id/vitahuesoradiopause.mp3` is inserted after
+   every `identEvery` songs (default **5**), so the station announces itself
+   regularly. Both knobs live in `ROTATION` in `js/config.js`; `0` disables the
+   ID.
 4. The player looks at `Date.now()`, finds the track that should be playing at
    that second, seeks into it, and keeps a loose sync (re-seek only if drift
    exceeds 12 seconds).
@@ -110,11 +119,12 @@ To add a record, add an object to `"albums"` with a `cover` path.
 
 ### Guest / Creative Commons tracks
 
-`audio/free/` holds the guest catalogue: **twelve songs with vocals from
-independent artists on ccMixter** (rock, pop, soul, funk, hip-hop, jazz, latin,
-country, reggae, folk, blues, electronic) plus **two slow instrumentals by Kevin
-MacLeod**, all under **CC BY** licences (per-track: CC BY 3.0 or 4.0). They are
-hosted here, not hotlinked. Every entry carries its own `artist`, `license`,
+`audio/free/` holds the guest catalogue: **twenty songs with vocals from
+independent artists on ccMixter** — weighted toward Latin urban, dembow,
+reggaeton and dancehall, plus rock, pop, soul, funk, hip-hop, jazz, country,
+folk, blues and electronic — and **two slow instrumentals by Kevin MacLeod**, all
+under **CC BY** licences (per-track: CC BY 3.0 or 4.0). They are hosted here, not
+hotlinked. Every entry carries its own `artist`, `license`,
 `licenseUrl`, `source` and `credit`, and those are surfaced in `CREDITS.md`, on
 the About page, and under the player. CC BY requires that attribution stays
 visible — keep the credits if you keep the tracks.
@@ -254,7 +264,7 @@ rest of `vitahuesosite`:
 
 ## Verification performed
 
-- Catalogue build: 61 tracks (47 original + 14 guest), 196 minutes, 17 genre
+- Catalogue build: 69 tracks (47 original + 22 guest), 222 minutes, 21 genre
   chips, embedded covers extracted.
 - Local server range request: `206 Partial Content` with correct
   `Content-Range`, so timeline seeking works.
@@ -270,6 +280,12 @@ rest of `vitahuesosite`:
   radio and opens `#radio`; the station page rejoined the same track and live
   position after the jump; the blocked-autoplay prompt appears when the browser
   refuses sound; the install chip sits above the dock instead of on top of it.
+- Mix: over a 80-entry window the reel ran 48 Latin/dembow/reggaeton/dancehall
+  tracks, 12 other guests, 7 originals and 13 station IDs — i.e. the fun genres
+  dominate, the artist's songs stay rare, and the ID lands every five songs.
+- Station ID: playing at its scheduled slot loads
+  `audio/id/vitahuesoradiopause.mp3`, plays the full 20 s, and the queue tags it
+  `Station ID · ID`.
 - Contact form: clipboard path works, with a visible selectable fallback when a
   browser refuses clipboard access.
 - Library: search, genre filter, empty state, sort, favorites-only.

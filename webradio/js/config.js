@@ -58,16 +58,16 @@ export const DAY_MS = 86400000;
 
 /* Rotation rule for the live reel.
  *
- * The free library is the backbone: it plays in a shuffled cycle, and one of
- * your own songs is dropped in after every `originalEvery` free-library tracks.
- * `4` = 20% originals (rare, scattered). Lower it for more of your music
- * (`3` = 25%, `2` = 33%), raise it to make your songs rarer still.
+ * The guest library is the backbone: it plays in a shuffled cycle, and one of
+ * your own songs is dropped in after every `originalEvery` guest tracks.
+ * `8` = about 11% originals (rare, a treat rather than a habit). Lower it for
+ * more of your music (`4` = 20%, `2` = 33%); raise it to make them rarer still.
  *
  * `noRepeatWindow` stops any track from coming back within that many picks
  * where the pool allows it (the free library is small, so its own cycle is the
  * hard limit). */
 export const ROTATION = {
-  originalEvery: 4,
+  originalEvery: 8,
   noRepeatWindow: 10,
 
   /* Station ID every N songs (0 = never). The ID is the short "you're listening
