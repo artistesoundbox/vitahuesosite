@@ -221,9 +221,13 @@ browser never echo each other.
   covers extracted.
 - Local server range request: `206 Partial Content` with correct
   `Content-Range`, so timeline seeking works.
-- Playback: live start lands within ~0.4 s of the station clock; skip → Personal
-  mode; rejoin live → resynced; sleep timer, favorites, history and queue
-  persist.
+- Playback: live start lands within ~0.4 s of the station clock; continuous
+  playback confirmed across Home → Library → Radio; skip → Personal mode;
+  rejoin live → resynced; sleep timer, favorites, history and queue persist.
+- Rotation: the live reel inserts a guest track after every five originals and
+  the queue tags guest entries with `CC`.
+- Contact form: clipboard path works, with a visible selectable fallback when a
+  browser refuses clipboard access.
 - Library: search, genre filter, empty state, sort, favorites-only.
 - Chat: message sent and received through the relay from a second client;
   presence count updated; local fallback path present.
