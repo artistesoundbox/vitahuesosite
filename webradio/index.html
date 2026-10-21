@@ -89,6 +89,11 @@
     <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 12h2l2-6 3 12 3-15 3 18 2-9h3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   </svg>
 
+  <!-- Site banner, same art as the portal home page. Doubles as the way back. -->
+  <a class="site-banner" href="../index.html" aria-label="Anthonitus — back to the main site">
+    <img src="../anthonitus.png" alt="Anthonitus" width="360" height="120" />
+  </a>
+
   <header class="topbar" id="topbar">
     <a class="brand" href="#home" aria-label="Vita Hueso Radio home">
       <span class="brand-mark"><svg class="icon"><use href="#i-radio"/></svg></span>
@@ -108,6 +113,9 @@
     </nav>
 
     <div class="topbar-actions">
+      <a class="site-back" href="../index.html" title="Back to the main site">
+        <span aria-hidden="true">←</span><span class="site-back-label">Back to site</span>
+      </a>
       <span class="onair" id="top-onair" title="Broadcasting 24/7">
         <span class="dot"></span><b>ON AIR</b>
       </span>

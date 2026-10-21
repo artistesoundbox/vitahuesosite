@@ -95,6 +95,43 @@ a:hover { color: #fff; }
 .skip-link:focus { top: 0; }
 
 /* ------------------------------------------------------------------ header */
+/* Portal banner above the station header — same art as the home page. */
+.site-banner {
+  display: flex;
+  justify-content: center;
+  padding: 14px 16px 0;
+  line-height: 0;
+}
+.site-banner img {
+  width: min(300px, 58vw);
+  height: auto;
+  filter: drop-shadow(0 0 18px rgba(80, 150, 255, 0.35));
+}
+.site-banner:hover img { filter: drop-shadow(0 0 22px rgba(110, 190, 255, 0.5)); }
+
+/* Back to the main site (portal) — sits with the on-air chip. */
+.site-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  background: rgba(10, 18, 32, 0.6);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+.site-back:hover {
+  color: #fff;
+  border-color: rgba(110, 231, 255, 0.72);
+  background: rgba(20, 38, 60, 0.85);
+}
+.site-back span[aria-hidden] { font-size: 13px; line-height: 1; }
+
 .topbar {
   position: sticky;
   top: 0;
