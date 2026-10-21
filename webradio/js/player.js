@@ -87,15 +87,21 @@ export class Radio extends EventTarget {
     this.preload.muted = true;
 
     // One speaker per browser: if another instance (main page, widget, second
-    // tab) starts playing, this one steps aside instead of echoing it.
+    // tab) starts playing, this one steps aside instead of echoing it. It also
+    // stays aside: `yielded` stops the auto-resume paths (pageshow, the dock's
+    // one-tap resume) from snatching the floor back and making the volume
+    // ping-pong between tabs. Any explicit play/pause clears it.
     this.instanceId = Math.random().toString(36).slice(2, 10);
+    this.yielded = false;
     this.transport = null;
     try {
       this.transport = new BroadcastChannel('vh-radio-transport');
       this.transport.onmessage = (event) => {
         const data = event.data;
         if (!data || data.from === this.instanceId) return;
-        if (data.type === 'playing' && !this.audio.paused) this.audio.pause();
+        if (data.type !== 'playing') return;
+        this.yielded = true;
+        if (!this.audio.paused) this.audio.pause();
       };
     } catch { this.transport = null; }
 
@@ -256,6 +262,7 @@ export class Radio extends EventTarget {
   /* ---------------------------------------------------------------- control */
 
   start() {
+    this.yielded = false;   // an explicit play here takes the floor back
     this.started = true;
     if (this.mode === 'personal' && this.track) {
       this.audio.play().catch((err) => this.playFailed(err));
@@ -274,6 +281,7 @@ export class Radio extends EventTarget {
   pause() {
     this.audio.pause();
     this.playing = false;
+    this.yielded = false;
     this.emitState();
   }
 

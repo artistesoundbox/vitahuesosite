@@ -390,7 +390,9 @@ function disable() {
 function armResume() {
   if (!isOn()) return;
   window.addEventListener('pointerdown', () => {
-    if (isOn() && hasIntent() && !radio.playing) radio.start();
+    // `yielded` = the station is already playing in another tab; that tab keeps
+    // the floor until this one is asked to play explicitly.
+    if (isOn() && hasIntent() && !radio.playing && !radio.yielded) radio.start();
   }, { capture: true, once: true });
 }
 
@@ -457,7 +459,7 @@ function init() {
 
   window.addEventListener('pageshow', (event) => {
     if (!isOn()) return;
-    if (event.persisted && hasIntent() && !radio.playing) radio.start();
+    if (event.persisted && hasIntent() && !radio.playing && !radio.yielded) radio.start();
   });
 
   // expose a tiny API for the page (and for debugging)

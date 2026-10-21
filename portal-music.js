@@ -147,6 +147,25 @@
     }
   });
 
+  /* ---------- one speaker per browser ----------
+     The welcome loop is its own <audio>, so nothing was stopping it from
+     humming underneath a station playing in another tab (or an embed), which
+     sounds exactly like "two radios". Any station that starts — here or in
+     another tab — switches the loop off for the rest of the visit. */
+  try {
+    var bus = new BroadcastChannel('vh-radio-transport');
+    bus.onmessage = function (event) {
+      var data = event.data;
+      if (!data || data.type !== 'playing') return;
+      window.__portalMusic.silence();
+    };
+  } catch (e) { /* very old browser: the toggle still works */ }
+
+  window.addEventListener('storage', function (event) {
+    // the radio was switched on in another tab
+    if (event.key === 'vh.site.radio' && event.newValue === '1') window.__portalMusic.silence();
+  });
+
   /* ---------- toggle UI ---------- */
 
   function updateBtn() {
