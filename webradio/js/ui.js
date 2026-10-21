@@ -274,6 +274,8 @@ function renderLibrary() {
   syncCardFavorites();
   syncCardBlocks();
   syncHiddenCount();
+  const favCount = els['lib-fav-count'];
+  if (favCount) favCount.textContent = String(radio.favorites.size);
 }
 
 /* The pruning ledger: how many songs this device has hidden, and a one-click
@@ -489,7 +491,7 @@ function cacheEls() {
     'dock', 'dock-art', 'dock-title', 'dock-artist', 'dock-mode', 'dock-play', 'dock-play-icon',
     'dock-mute', 'dock-mute-icon', 'dock-fav', 'dock-bar', 'dock-eq', 'dock-open',
     'lib-search', 'lib-sort', 'lib-favorites', 'lib-count', 'lib-grid', 'lib-empty', 'lib-clear',
-    'lib-hidden', 'lib-hidden-count',
+    'lib-hidden', 'lib-hidden-count', 'lib-fav-count',
     'contact-form', 'contact-note', 'chat-input', 'chat-emoji', 'chat-emoji-panel', 'chat-count',
     'copy-embed', 'embed-code', 'lightbox', 'lightbox-img', 'lightbox-caption', 'lightbox-close',
     'btn-menu', 'nav', 'topbar'
@@ -763,7 +765,11 @@ function bindPlayer() {
 
   els['np-fav'].addEventListener('click', () => {
     const active = radio.toggleFavorite();
-    toast(active ? 'Added to favorites.' : 'Removed from favorites.');
+    if (active) {
+      toast(`Added to favorites — ${radio.favorites.size} saved. Browse them under Favorites in the Library.`);
+    } else {
+      toast('Removed from favorites.');
+    }
   });
 
   /* Dislike: hide the song from this device for good, then move on. Blocking
