@@ -629,6 +629,125 @@
       "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
       "source": "https://incompetech.com/music/royalty-free/",
       "credit": "\"Water Lily\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0"
+    },
+    {
+      "file": "LA TRIPLETA.mp3",
+      "title": "LA TRIPLETA",
+      "artist": "virtualdjmax",
+      "album": "cc-sessions",
+      "genres": [
+        "Reggaeton",
+        "Latin"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/virtualdjmax/16150",
+      "credit": "\"LA TRIPLETA\" by virtualdjmax (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "SACUDETE.mp3",
+      "title": "SACUDETE",
+      "artist": "YUYO MC",
+      "album": "cc-sessions",
+      "genres": [
+        "Reggaeton",
+        "Dembow"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/2.5/",
+      "source": "https://ccmixter.org/files/yuyomc/3428",
+      "credit": "\"SACUDETE\" by YUYO MC (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "Me robo el Show.mp3",
+      "title": "Me robo el Show",
+      "artist": "reiswerk",
+      "album": "cc-sessions",
+      "genres": [
+        "Reggaeton",
+        "Latin"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/Reiswerk/56201",
+      "credit": "\"Me robo el Show\" by reiswerk (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "Beat down Babylon.mp3",
+      "title": "Beat down Babylon",
+      "artist": "reiswerk",
+      "album": "cc-sessions",
+      "genres": [
+        "Dancehall",
+        "Reggae"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/Reiswerk/51905",
+      "credit": "\"Beat down Babylon\" by reiswerk (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "I Rebel want new Stile.mp3",
+      "title": "I Rebel want new Stile",
+      "artist": "reiswerk",
+      "album": "cc-sessions",
+      "genres": [
+        "Dancehall",
+        "Reggae"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/Reiswerk/50907",
+      "credit": "\"I Rebel want new Stile\" by reiswerk (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "Minha Sombra Teu Sorriso (My Shadow, your Smile).mp3",
+      "title": "Minha Sombra Teu Sorriso (My Shadow, your Smile)",
+      "artist": "reiswerk",
+      "album": "cc-sessions",
+      "genres": [
+        "Latin",
+        "Pop"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/Reiswerk/59167",
+      "credit": "\"Minha Sombra Teu Sorriso (My Shadow, your Smile)\" by reiswerk (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "Put your hands up.mp3",
+      "title": "Put your hands up",
+      "artist": "reiswerk",
+      "album": "cc-sessions",
+      "genres": [
+        "Moombahton",
+        "Latin"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/Reiswerk/56836",
+      "credit": "\"Put your hands up\" by reiswerk (ccMixter), licensed CC BY 3.0"
+    },
+    {
+      "file": "Hands Up (cdk Island Mix).mp3",
+      "title": "Hands Up (cdk Island Mix)",
+      "artist": "cdk",
+      "album": "cc-sessions",
+      "genres": [
+        "Reggaeton",
+        "Dancehall"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/cdk/39541",
+      "credit": "\"Hands Up (cdk Island Mix)\" by cdk (ccMixter), licensed CC BY 3.0"
     }
-  ]
+  ],
+  "stationId": {
+    "file": "audio/id/vitahuesoradiopause.mp3",
+    "title": "Vita Hueso Radio",
+    "artist": "Station ID",
+    "album": "Signal",
+    "art": "vitahuesoradioicon.png"
+  }
 }

@@ -40,3 +40,19 @@ They appear in the live rotation and in the library alongside the original catal
   https://creativecommons.org/licenses/by/4.0/ · https://incompetech.com/music/royalty-free/
 - **Water Lily** — Kevin MacLeod. CC BY 4.0. "Water Lily" Kevin MacLeod (incompetech.com), licensed CC BY 4.0
   https://creativecommons.org/licenses/by/4.0/ · https://incompetech.com/music/royalty-free/
+- **LA TRIPLETA** — virtualdjmax. CC BY 3.0. "LA TRIPLETA" by virtualdjmax (ccMixter), licensed CC BY 3.0
+  http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/virtualdjmax/16150
+- **SACUDETE** — YUYO MC. CC BY 3.0. "SACUDETE" by YUYO MC (ccMixter), licensed CC BY 3.0
+  http://creativecommons.org/licenses/by/2.5/ · https://ccmixter.org/files/yuyomc/3428
+- **Me robo el Show** — reiswerk. CC BY 3.0. "Me robo el Show" by reiswerk (ccMixter), licensed CC BY 3.0
+  http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/Reiswerk/56201
+- **Beat down Babylon** — reiswerk. CC BY 3.0. "Beat down Babylon" by reiswerk (ccMixter), licensed CC BY 3.0
+  http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/Reiswerk/51905
+- **I Rebel want new Stile** — reiswerk. CC BY 3.0. "I Rebel want new Stile" by reiswerk (ccMixter), licensed CC BY 3.0
+  http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/Reiswerk/50907
+- **Minha Sombra Teu Sorriso (My Shadow, your Smile)** — reiswerk. CC BY 3.0. "Minha Sombra Teu Sorriso (My Shadow, your Smile)" by reiswerk (ccMixter), licensed CC BY 3.0
+  http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/Reiswerk/59167
+- **Put your hands up** — reiswerk. CC BY 3.0. "Put your hands up" by reiswerk (ccMixter), licensed CC BY 3.0
+  http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/Reiswerk/56836
+- **Hands Up (cdk Island Mix)** — cdk. CC BY 3.0. "Hands Up (cdk Island Mix)" by cdk (ccMixter), licensed CC BY 3.0
+  http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/cdk/39541

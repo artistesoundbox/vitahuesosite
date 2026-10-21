@@ -8,7 +8,7 @@
  *
  * Nothing here touches the network; MP3 seeking is handled by the browser.
  */
-import { TRACKS } from './catalog.js';
+import { TRACKS, STATION_ID } from './catalog.js';
 import { PROGRAMS, STATION_EPOCH, DAY_MS, ROTATION } from './config.js';
 
 const reels = new Map();
@@ -45,6 +45,21 @@ const BLOCK_MS = 3600000;
 const GUESTS = TRACKS.filter((t) => t.guest);
 const ORIGINALS = TRACKS.filter((t) => !t.guest);
 
+const FUN = new Set(ROTATION.funGenres || []);
+const FUN_WEIGHT = Math.max(1, Math.round(Number(ROTATION.funWeight) || 1));
+const IDENT_EVERY = Math.max(0, Number(ROTATION.identEvery) || 0);
+
+/** A bag that repeats the fun genres, so Latin urban / dembow come up more. */
+function guestBagFor(guests, rng) {
+  const bag = [];
+  for (const track of guests) {
+    const fun = track.genres.some((g) => FUN.has(g));
+    const copies = fun ? FUN_WEIGHT : 1;
+    for (let i = 0; i < copies; i++) bag.push(track);
+  }
+  return shuffled(bag, rng);
+}
+
 /**
  * One long pass of the rotation: cycle the free library in shuffled order and
  * drop one of the artist's own songs in after every `originalEvery` guest
@@ -53,16 +68,25 @@ const ORIGINALS = TRACKS.filter((t) => !t.guest);
  */
 function buildSequence(pool, guests, rng, length = 96) {
   const sequence = [];
-  let guestBag = shuffled(guests, rng);
+  let guestBag = guestBagFor(guests, rng);
   let originalBag = shuffled(pool, rng);
   let guestIndex = 0;
   let originalIndex = 0;
   let sinceOriginal = 0;
+  let sinceIdent = 0;
   const every = Math.min(12, Math.max(1, Number(ROTATION.originalEvery) || 4));
+
+  /* The station ID drops in after every `identEvery` songs. */
+  const maybeIdent = () => {
+    if (!IDENT_EVERY || !STATION_ID) return;
+    if (++sinceIdent < IDENT_EVERY) return;
+    sequence.push(STATION_ID);
+    sinceIdent = 0;
+  };
 
   while (sequence.length < length) {
     if (guestIndex >= guestBag.length) {
-      guestBag = shuffled(guests, rng);
+      guestBag = guestBagFor(guests, rng);
       guestIndex = 0;
     }
     let guest = guestBag[guestIndex++];
@@ -72,6 +96,7 @@ function buildSequence(pool, guests, rng, length = 96) {
     }
     sequence.push(guest);
     sinceOriginal += 1;
+    maybeIdent();
 
     if (sinceOriginal < every) continue;
     if (originalIndex >= originalBag.length) {
@@ -85,6 +110,7 @@ function buildSequence(pool, guests, rng, length = 96) {
     }
     sequence.push(original);
     sinceOriginal = 0;
+    maybeIdent();
   }
 
   return sequence;

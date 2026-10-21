@@ -61,12 +61,12 @@ export const ALBUMS = [
   }
 ];
 
-export const GENRES = ["Soul","Rock","Pop","Funk","Hip-Hop","Jazz","Latin","Country","Reggae","Folk","Blues","Electronic","Ambient","Piano","Cinematic","Lo-Fi","Meditative"];
+export const GENRES = ["Soul","Rock","Pop","Funk","Hip-Hop","Jazz","Latin","Country","Reggae","Folk","Blues","Electronic","Ambient","Piano","Cinematic","Lo-Fi","Meditative","Reggaeton","Dembow","Dancehall","Moombahton"];
 
 export const STATS = {
-  "tracks": 61,
+  "tracks": 69,
   "originals": 47,
-  "guest": 14,
+  "guest": 22,
   "genres": [
     "Soul",
     "Rock",
@@ -84,11 +84,17 @@ export const STATS = {
     "Piano",
     "Cinematic",
     "Lo-Fi",
-    "Meditative"
+    "Meditative",
+    "Reggaeton",
+    "Dembow",
+    "Dancehall",
+    "Moombahton"
   ],
-  "totalSeconds": 11732,
+  "totalSeconds": 13313,
   "albums": 6
 };
+
+export const STATION_ID = {"id":"station-id","title":"Vita Hueso Radio","artist":"Station ID","albumId":"station","album":"Signal","year":2026,"genres":[],"duration":20,"src":"audio/id/vitahuesoradiopause.mp3","art":"vitahuesoradioicon.png","license":"","licenseUrl":"","credit":"Station identification","source":"","downloadable":false,"featured":false,"guest":false,"ident":true};
 
 export const TRACKS = [
   {
@@ -1489,6 +1495,190 @@ export const TRACKS = [
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
     "credit": "\"Water Lily\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0",
     "source": "https://incompetech.com/music/royalty-free/",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f15",
+    "trackNo": 115,
+    "title": "LA TRIPLETA",
+    "artist": "virtualdjmax",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Reggaeton",
+      "Latin"
+    ],
+    "duration": 200,
+    "src": "audio/free/LA%20TRIPLETA.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "credit": "\"LA TRIPLETA\" by virtualdjmax (ccMixter), licensed CC BY 3.0",
+    "source": "https://ccmixter.org/files/virtualdjmax/16150",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f16",
+    "trackNo": 116,
+    "title": "SACUDETE",
+    "artist": "YUYO MC",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Reggaeton",
+      "Dembow"
+    ],
+    "duration": 138,
+    "src": "audio/free/SACUDETE.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/2.5/",
+    "credit": "\"SACUDETE\" by YUYO MC (ccMixter), licensed CC BY 3.0",
+    "source": "https://ccmixter.org/files/yuyomc/3428",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f17",
+    "trackNo": 117,
+    "title": "Me robo el Show",
+    "artist": "reiswerk",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Reggaeton",
+      "Latin"
+    ],
+    "duration": 181,
+    "src": "audio/free/Me%20robo%20el%20Show.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "credit": "\"Me robo el Show\" by reiswerk (ccMixter), licensed CC BY 3.0",
+    "source": "https://ccmixter.org/files/Reiswerk/56201",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f18",
+    "trackNo": 118,
+    "title": "Beat down Babylon",
+    "artist": "reiswerk",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Dancehall",
+      "Reggae"
+    ],
+    "duration": 218,
+    "src": "audio/free/Beat%20down%20Babylon.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "credit": "\"Beat down Babylon\" by reiswerk (ccMixter), licensed CC BY 3.0",
+    "source": "https://ccmixter.org/files/Reiswerk/51905",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f19",
+    "trackNo": 119,
+    "title": "I Rebel want new Stile",
+    "artist": "reiswerk",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Dancehall",
+      "Reggae"
+    ],
+    "duration": 192,
+    "src": "audio/free/I%20Rebel%20want%20new%20Stile.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "credit": "\"I Rebel want new Stile\" by reiswerk (ccMixter), licensed CC BY 3.0",
+    "source": "https://ccmixter.org/files/Reiswerk/50907",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f20",
+    "trackNo": 120,
+    "title": "Minha Sombra Teu Sorriso (My Shadow, your Smile)",
+    "artist": "reiswerk",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Latin",
+      "Pop"
+    ],
+    "duration": 211,
+    "src": "audio/free/Minha%20Sombra%20Teu%20Sorriso%20(My%20Shadow%2C%20your%20Smile).mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "credit": "\"Minha Sombra Teu Sorriso (My Shadow, your Smile)\" by reiswerk (ccMixter), licensed CC BY 3.0",
+    "source": "https://ccmixter.org/files/Reiswerk/59167",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f21",
+    "trackNo": 121,
+    "title": "Put your hands up",
+    "artist": "reiswerk",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Moombahton",
+      "Latin"
+    ],
+    "duration": 228,
+    "src": "audio/free/Put%20your%20hands%20up.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "credit": "\"Put your hands up\" by reiswerk (ccMixter), licensed CC BY 3.0",
+    "source": "https://ccmixter.org/files/Reiswerk/56836",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f22",
+    "trackNo": 122,
+    "title": "Hands Up (cdk Island Mix)",
+    "artist": "cdk",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Reggaeton",
+      "Dancehall"
+    ],
+    "duration": 213,
+    "src": "audio/free/Hands%20Up%20(cdk%20Island%20Mix).mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "credit": "\"Hands Up (cdk Island Mix)\" by cdk (ccMixter), licensed CC BY 3.0",
+    "source": "https://ccmixter.org/files/cdk/39541",
     "downloadable": true,
     "featured": false,
     "guest": true

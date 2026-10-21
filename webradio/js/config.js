@@ -68,7 +68,17 @@ export const DAY_MS = 86400000;
  * hard limit). */
 export const ROTATION = {
   originalEvery: 4,
-  noRepeatWindow: 10
+  noRepeatWindow: 10,
+
+  /* Station ID every N songs (0 = never). The ID is the short "you're listening
+     to Vita Hueso Radio" clip in audio/id/. */
+  identEvery: 5,
+
+  /* Fun first: Latin urban, dembow, reggaeton and friends come up `funWeight`
+     times as often as the rest of the guest shelf, so the station leans
+     danceable without losing the quieter corners. */
+  funGenres: ['Reggaeton', 'Dembow', 'Latin', 'Dancehall', 'Moombahton', 'Urbano'],
+  funWeight: 3
 };
 
 export const SLEEP_CHOICES = [15, 30, 45, 60, 90, 120];

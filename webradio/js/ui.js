@@ -485,7 +485,7 @@ function renderQueueList(listEl, tracks, options = {}) {
       <img src="${esc(track.art)}" alt="" loading="lazy" width="40" height="40" />
       <span>
         <span class="q-title">${esc(track.title)}</span>
-        <span class="q-sub">${esc(track.album)} · ${esc(track.genres[0] || '')}${track.guest ? ' · <span class="tag-cc">CC</span>' : ''}</span>
+        <span class="q-sub">${track.ident ? 'Station ID' : `${esc(track.album)} · ${esc(track.genres[0] || '')}`}${track.guest ? ' · <span class="tag-cc">CC</span>' : ''}${track.ident ? ' · <span class="tag-cc">ID</span>' : ''}</span>
       </span>
       <time>${formatTime(track.duration)}</time>`;
     button.addEventListener('click', () => playPersonal(track, [track]));
@@ -618,6 +618,8 @@ function updateState(state) {
       link.rel = 'noopener noreferrer';
       link.textContent = sourceHost(track.source);
       credit.append(span, link);
+    } else if (track.ident) {
+      credit.textContent = 'Station identification — Vita Hueso Radio';
     } else {
       credit.textContent = `Original recording · written & performed by ${track.artist}`;
     }

@@ -142,6 +142,37 @@ for (const f of DATA.freeTracks) {
   });
 }
 
+/* ---------------- station identification (not part of the library) ---------------- */
+let stationId = null;
+if (DATA.stationId) {
+  const full = join(ROOT, DATA.stationId.file);
+  if (existsSync(full)) {
+    const { duration } = probe(full);
+    stationId = {
+      id: 'station-id',
+      title: DATA.stationId.title || 'Vita Hueso Radio',
+      artist: DATA.stationId.artist || 'Station ID',
+      albumId: 'station',
+      album: DATA.stationId.album || 'Signal',
+      year: new Date().getFullYear(),
+      genres: [],
+      duration,
+      src: enc(DATA.stationId.file),
+      art: enc(DATA.stationId.art || 'vitahuesoradioicon.png'),
+      license: '',
+      licenseUrl: '',
+      credit: 'Station identification',
+      source: '',
+      downloadable: false,
+      featured: false,
+      guest: false,
+      ident: true
+    };
+  } else {
+    console.warn(`  ! missing station ID: ${DATA.stationId.file}`);
+  }
+}
+
 // Track numbers, not filenames: "010-…" must sit after "02-…".
 tracks.sort((a, b) => a.trackNo - b.trackNo);
 
@@ -174,6 +205,8 @@ export const ALBUMS = ${JSON.stringify(albums, null, 2)};
 export const GENRES = ${JSON.stringify(genreList)};
 
 export const STATS = ${JSON.stringify(stats, null, 2)};
+
+export const STATION_ID = ${JSON.stringify(stationId)};
 
 export const TRACKS = ${JSON.stringify(all, null, 2)};
 `;
