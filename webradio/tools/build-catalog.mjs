@@ -134,7 +134,7 @@ for (const f of DATA.freeTracks) {
     art: album.cover,
     license: f.license,
     licenseUrl: f.licenseUrl,
-    credit: f.credit,
+    credit: f.credit || `"${f.title}" by ${f.artist} (ccMixter), licensed ${f.license}`,
     source: f.source,
     downloadable: true,
     featured: false,
