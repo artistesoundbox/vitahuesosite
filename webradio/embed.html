@@ -78,6 +78,16 @@
     .play svg { width: 17px; height: 17px; }
     .open { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; color: #647a99; text-decoration: none; font-size: 13px; }
     .open:hover { color: #fff; background: rgba(120, 180, 255, 0.1); }
+    .standalone { display: none; }
+    body.is-standalone { flex-direction: column; gap: 6px; }
+    body.is-standalone .standalone {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 6px 10px; border-radius: 10px;
+      border: 1px dashed rgba(120, 190, 255, 0.3);
+      font-size: 10.5px; color: #8fa5c2;
+    }
+    body.is-standalone .standalone a { color: #6ee7ff; text-decoration: none; white-space: nowrap; }
+    body.is-standalone .standalone a:hover { text-decoration: underline; }
     @media (max-width: 520px) {
       .embed { grid-template-columns: 46px minmax(0, 1fr) auto; gap: 9px; padding: 9px 10px; }
       .art { width: 46px; height: 46px; }
@@ -87,6 +97,10 @@
   </style>
 </head>
 <body>
+  <div class="standalone" id="standalone">
+    <span>Mini player — the full station lives on the site.</span>
+    <a href="index.html#radio">Open the full station →</a>
+  </div>
   <div class="embed" role="region" aria-label="Vita Hueso Radio player">
     <img class="art" id="art" src="assets/art/t01.jpg" alt="" width="54" height="54" />
     <div class="meta">
@@ -115,6 +129,12 @@
     <symbol id="embed-play" viewBox="0 0 24 24"><path d="M8 5.2v13.6L19 12z" fill="currentColor"/></symbol>
     <symbol id="embed-pause" viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"/></symbol>
   </svg>
+
+  <script>
+    /* Opened directly (not inside someone's iframe)? Say so, and offer the real
+       station — same tab, so the broadcast hand-off keeps the current song. */
+    if (window.self === window.top) document.body.classList.add('is-standalone');
+  </script>
 
   <script type="module">
     import { radio } from './js/player.js';

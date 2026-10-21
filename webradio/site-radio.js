@@ -223,7 +223,7 @@ function buildDock() {
   dock.setAttribute('role', 'region');
   dock.setAttribute('aria-label', 'Vita Hueso Radio');
   dock.innerHTML = `
-    <a class="vhr-art" id="vhr-open" href="${STATION_BASE}#radio" target="_blank" rel="noopener" aria-label="Open the full radio station">
+    <a class="vhr-art" id="vhr-open" href="${STATION_BASE}#radio" data-radio-open aria-label="Open the full radio station">
       <img id="vhr-art" alt="" width="46" height="46" />
     </a>
     <div class="vhr-meta">
