@@ -880,6 +880,24 @@ function bindLibrary() {
     renderLibrary();
   });
 
+  /* Copy the pruning ledger: \"Artist — Title (id)\" per line, ready to hand
+     over for permanent removal. Nothing is uploaded anywhere. */
+  els['lib-hidden']?.addEventListener('click', async () => {
+    const ids = [...blockedIds()];
+    if (!ids.length) {
+      toast('Nothing hidden yet — use the thumbs-down while listening.');
+      return;
+    }
+    const lines = ids.map((id) => {
+      const track = byId.get(id);
+      return track ? `${track.artist} — ${track.title} (${id})` : id;
+    });
+    const copied = await copyText(`Hidden on my station:\n${lines.join('\n')}`);
+    toast(copied
+      ? `Copied ${lines.length} hidden track${lines.length === 1 ? '' : 's'} — send it over for removal.`
+      : `Hidden: ${lines.join(' · ')}`);
+  });
+
   els['lib-grid']?.addEventListener('click', (event) => {
     const play = event.target.closest('[data-play]');
     if (play) {
@@ -1229,6 +1247,7 @@ function init() {
      in step and let the station rebuild its reel (it subscribes too). */
   onBlockChange(() => {
     syncCardBlocks();
+    syncHiddenCount();
     if (els['np-block']) updateState(radio.snapshot());
   });
   bindChrome();
