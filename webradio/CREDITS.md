@@ -48,39 +48,39 @@ They appear in the live rotation and in the library alongside the original catal
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/cdk/39541
 - **Funk You** — texasradiofish. CC BY-NC 3.0. "Funk You" by texasradiofish (ccMixter), licensed CC BY-NC 3.0
   http://creativecommons.org/licenses/by-nc/3.0/ · https://ccmixter.org/files/texasradiofish/53269
-- **Ahi Vienen** — Andres Franco. CC BY 3.0. Ahi Vienen by Andres Franco
+- **Ahi Vienen** — Andres Franco. CC BY 3.0. "Ahi Vienen" by Andres Franco (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/andrewfranco/45003
-- **Jhonblack Wayo Wayo** — Andres Franco. CC BY 3.0. Jhonblack Wayo Wayo by Andres Franco
+- **Jhonblack Wayo Wayo** — Andres Franco. CC BY 3.0. "Jhonblack Wayo Wayo" by Andres Franco (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/andrewfranco/21090
-- **Brake Dance** — Andres Franco. CC BY 3.0. Brake Dance by Andres Franco
+- **Brake Dance** — Andres Franco. CC BY 3.0. "Brake Dance" by Andres Franco (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/andrewfranco/33929
-- **Put U Hands Up** — Anth Crunk. CC BY 3.0. Put U Hands Up by Anth Crunk
+- **Put U Hands Up** — Anth Crunk. CC BY 3.0. "Put U Hands Up" by Anth Crunk (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/Crunkster/38231
-- **Bailemos Together** — hidalgoantonio. CC BY 3.0. Bailemos Together by hidalgoantonio
+- **Bailemos Together** — hidalgoantonio. CC BY 3.0. "Bailemos Together" by hidalgoantonio (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/hidalgoantonio/43714
-- **Beckfords and the Bocrew** — Bocrew. CC BY 3.0. Beckfords and the Bocrew by Bocrew
+- **Beckfords and the Bocrew** — Bocrew. CC BY 3.0. "Beckfords and the Bocrew" by Bocrew (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/BOCrew/22904
-- **Leaving Babylon (Catch the Train Mix)** — dotjot. CC BY 3.0. Leaving Babylon (Catch the Train Mix) by dotjot
+- **Leaving Babylon (Catch the Train Mix)** — dotjot. CC BY 3.0. "Leaving Babylon (Catch the Train Mix)" by dotjot (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/dotjot/61742
-- **Don't Worry** — DanScrew. CC BY 3.0. Don't Worry by DanScrew
+- **Don't Worry** — DanScrew. CC BY 3.0. "Don't Worry" by DanScrew (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/DanScrew/40426
-- **Come** — Bocrew. CC BY 3.0. Come by Bocrew
+- **Come** — Bocrew. CC BY 3.0. "Come" by Bocrew (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/BOCrew/66165
-- **Dirtbag (Club Mix)** — ScOmBer. CC BY 2.5. Dirtbag (Club Mix) by ScOmBer
+- **Dirtbag (Club Mix)** — ScOmBer. CC BY 2.5. "Dirtbag (Club Mix)" by ScOmBer (ccMixter), licensed CC BY 2.5
   http://creativecommons.org/licenses/by/2.5/ · https://ccmixter.org/files/scomber/17734
-- **Like a Rapper** — Donnie Ozone. CC BY 3.0. Like a Rapper by Donnie Ozone
+- **Like a Rapper** — Donnie Ozone. CC BY 3.0. "Like a Rapper" by Donnie Ozone (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/donnieozone/36041
-- **Bounce** — reiswerk. CC BY 3.0. Bounce by reiswerk
+- **Bounce** — reiswerk. CC BY 3.0. "Bounce" by reiswerk (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/Reiswerk/53117
-- **Tell Somebody** — Zep Hurme. CC BY 3.0. Tell Somebody by Zep Hurme
+- **Tell Somebody** — Zep Hurme. CC BY 3.0. "Tell Somebody" by Zep Hurme (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/zep_hurme/39918
-- **Too Late** — Stefan Kartenberg. CC BY 3.0. Too Late by Stefan Kartenberg
+- **Too Late** — Stefan Kartenberg. CC BY 3.0. "Too Late" by Stefan Kartenberg (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/JeffSpeed68/51988
-- **Toronto Is My Beat** — Whitewolf. CC BY 3.0. Toronto Is My Beat by Whitewolf
+- **Toronto Is My Beat** — Whitewolf. CC BY 3.0. "Toronto Is My Beat" by Whitewolf (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/Whitewolf225/60181
-- **Soul Sister** — Robbero. CC BY 3.0. Soul Sister by Robbero
+- **Soul Sister** — Robbero. CC BY 3.0. "Soul Sister" by Robbero (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/Robbero/41686
-- **Slippin' & Slidin'** — SackJo22. CC BY 3.0. Slippin' & Slidin' by SackJo22
+- **Slippin' & Slidin'** — SackJo22. CC BY 3.0. "Slippin' & Slidin'" by SackJo22 (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/SackJo22/30330
-- **Salsa** — Gshepherd. CC BY 3.0. Salsa by Gshepherd
+- **Salsa** — Gshepherd. CC BY 3.0. "Salsa" by Gshepherd (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/Gshepherd/49375

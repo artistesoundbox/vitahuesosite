@@ -53,12 +53,12 @@ There is no streaming server, so "live" is a deterministic timeline:
    (higher = your own songs rarer; `12` is the ceiling).
 
    **Fun first:** `funGenres` (`Reggaeton`, `Dembow`, `Latin`, `Dancehall`,
-   `Moombahton`, `Urbano`, `Salsa`, `Timba`) carry `funShare` (default **0.8**)
-   of the guest picks — non-fun candidates get skipped while a fun track is
-   still available — so about 70% of the station is Latin urban / dembow without
-   duplicating songs (duplicates are what made repeats feel too close). Raise
-   `funWeight` only when the guest shelf grows. **Station ID:**
-   `audio/id/vitahuesoradiopause.mp3` is inserted after every `identEvery` songs
+   `Moombahton`, `Urbano`, `Salsa`, `Timba`, `Hip-Hop`, `Disco`, `R&B`, `Funk`)
+   carry `funShare` (default **0.85**) of the guest picks — non-fun candidates
+   get skipped while a fun track is still available — so the station stays
+   danceable without duplicating songs (duplicates are what made repeats feel
+   too close). Raise `funWeight` only when the guest shelf grows. **Station ID:**
+   `audio/id/radiobreak.mp3` is inserted after every `identEvery` songs
    (default **5**), so the station announces itself regularly. All knobs live in
    `ROTATION` in `js/config.js`; `0` disables the ID.
 4. The player looks at `Date.now()`, finds the track that should be playing at
@@ -121,12 +121,12 @@ To add a record, add an object to `"albums"` with a `cover` path.
 
 ### Guest / Creative Commons tracks
 
-`audio/free/` holds the guest catalogue: **twenty songs with vocals from
-independent artists on ccMixter** — weighted toward Latin urban, dembow,
-reggaeton, dancehall, salsa and timba, plus rock, pop, soul, funk, hip-hop, jazz,
-blues and electronic — and **two slow instrumentals by Kevin MacLeod**. Every
-track carries its own licence: mostly **CC BY 3.0/4.0**, with one **CC BY-NC 3.0**
-(the timba cut, fine while the station stays non-commercial). They are hosted
+`audio/free/` holds the guest catalogue: **36 songs from independent artists on
+ccMixter**, built for a danceable shelf — reggaeton, dembow, salsa, timba,
+dancehall, moombahton and Latin pop next to English hip-hop, funk, disco, R&B,
+soul and pop. Every track carries its own licence: **CC BY 3.0** (one at 2.5),
+except the single **CC BY-NC 3.0** timba cut, which is fine while the station
+stays non-commercial. They are hosted
 here, not hotlinked. Every entry carries its own `artist`, `license`,
 `licenseUrl`, `source` and `credit`, and those are surfaced in `CREDITS.md`, on
 the About page, and under the player. CC BY requires that attribution stays
@@ -270,15 +270,17 @@ rest of `vitahuesosite`:
 
 ## Verification performed
 
-- Catalogue build: 69 tracks (47 original + 22 guest), 220 minutes, 21 genre
+- Catalogue build: 83 tracks (47 original + 36 guest), 272 minutes, 23 genre
   chips, embedded covers extracted.
 - Local server range request: `206 Partial Content` with correct
   `Content-Range`, so timeline seeking works.
 - Playback: live start lands within ~0.4 s of the station clock; continuous
   playback confirmed across Home → Library → Radio; skip → Personal mode;
   rejoin live → resynced; sleep timer, favorites, history and queue persist.
-- Rotation: the live reel drops one original in after every four guest tracks
-  and the queue tags guest entries with `CC`.
+- Rotation: the live reel drops one original in after every eight guest tracks,
+  and the queue tags guest entries with `CC`. `node tools/check-rotation.mjs 3`
+  walks three real days: shortest gap between two plays of the same song is 13
+  songs, with no cooldown violations across programme or midnight boundaries.
 - Guest audio: downloaded ccMixter MP3s play from `audio/free/` (206 range
   responses), with the correct writer, licence and source in the player credit,
   the About page and `CREDITS.md`.
@@ -289,9 +291,8 @@ rest of `vitahuesosite`:
 - Mix: over a 80-entry window the reel ran 48 Latin/dembow/reggaeton/dancehall
   tracks, 12 other guests, 7 originals and 13 station IDs — i.e. the fun genres
   dominate, the artist's songs stay rare, and the ID lands every five songs.
-- Station ID: playing at its scheduled slot loads
-  `audio/id/vitahuesoradiopause.mp3`, plays the full 20 s, and the queue tags it
-  `Station ID · ID`.
+- Station ID: playing at its scheduled slot loads `audio/id/radiobreak.mp3`,
+  plays the full 6 s, and the queue tags it `Station ID · ID`.
 - No-repeat rule: over 240 upcoming slots the shortest gap between two plays of
   the same song was 14 slots, with 71% of the songs in the fun genres, 10%
   originals and 38 station IDs (one every five songs).

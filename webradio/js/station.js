@@ -138,8 +138,14 @@ function buildSequence(pool, guests, rng, length = 96, seedRecent = []) {
   return sequence;
 }
 
-/** Build one UTC day of programming. Deterministic for a given day. */
-export function buildReel(dayStartMs) {
+/**
+ * Build one UTC day of programming. Deterministic for a given day.
+ *
+ * `carry` is the tail of the previous day's songs, so the no-repeat window also
+ * holds across midnight — otherwise a song could close the night and open the
+ * new day three slots later.
+ */
+export function buildReel(dayStartMs, carry = []) {
   const dayKey = new Date(dayStartMs).toISOString().slice(0, 10);
   const entries = [];
   let seq = 0;
@@ -156,9 +162,13 @@ export function buildReel(dayStartMs) {
     const guests = [...shuffled(matching, rng), ...shuffled(rest, rng)];
 
     /* Carry the cooldown across the programme boundary, otherwise the same
-       song can close one hour and open the next. */
-    const recentSongs = () => entries.filter((e) => !e.track.ident)
-      .slice(-(Number(ROTATION.noRepeatWindow) || 0)).map((e) => e.track.id);
+       song can close one hour and open the next. The first programme of the
+       day falls back to yesterday's tail for the same reason. */
+    const recentSongs = () => {
+      const tail = entries.filter((e) => !e.track.ident)
+        .slice(-(Number(ROTATION.noRepeatWindow) || 0)).map((e) => e.track.id);
+      return tail.length ? tail : carry;
+    };
 
     let sequence = buildSequence(pool, guests, rng, 96, recentSongs());
     let cursorIndex = 0;
@@ -196,11 +206,24 @@ export function buildReel(dayStartMs) {
   return { dayKey, dayStartMs, entries };
 }
 
+const tails = new Map();
+
+function previousTail(dayStartMs) {
+  const cached = tails.get(dayStartMs);
+  if (cached) return cached;
+  const window = Number(ROTATION.noRepeatWindow) || 0;
+  const before = buildReel(dayStartMs - DAY_MS);
+  const tail = before.entries.filter((e) => !e.track.ident).slice(-window).map((e) => e.track.id);
+  tails.set(dayStartMs, tail);
+  if (tails.size > 4) tails.delete(tails.keys().next().value);
+  return tail;
+}
+
 export function getReel(now = Date.now()) {
   const dayStartMs = Math.floor(now / DAY_MS) * DAY_MS;
   let reel = reels.get(dayStartMs);
   if (!reel) {
-    reel = buildReel(dayStartMs);
+    reel = buildReel(dayStartMs, previousTail(dayStartMs));
     reels.set(dayStartMs, reel);
     for (const key of reels.keys()) {
       if (key !== dayStartMs) reels.delete(key);

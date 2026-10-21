@@ -22,3 +22,7 @@ auth/.local-auth.sqlite
 # the repository: the Sites tools cannot see outside it, so the built bundle
 # is copied next to the manifest. A copy of auth/worker.js, never a source.
 3rdshooter-abootonthebrave/vh-auth-deploy/
+
+# Scratch space for sourcing/downloading audio (never commit these).
+.cache-audio/
+*.tmp.mp3
