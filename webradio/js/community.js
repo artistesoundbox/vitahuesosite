@@ -159,7 +159,7 @@ export function createCommunity({ toast }) {
     if (state.seen.size > 600) state.seen = new Set([...state.seen].slice(-300));
 
     const now = Date.now();
-    if (env.client) state.peers.set(env.client, now);
+    if (env.type === 'presence' && env.client) state.peers.set(env.client, now);
     if (env.type === 'gone' && env.client) state.peers.delete(env.client);
 
     if (env.type === 'chat') {
@@ -171,12 +171,12 @@ export function createCommunity({ toast }) {
         at: Number(env.at) || now
       };
       if (!msg.text) return;
+      // The relay replays the last couple of minutes on connect; the log is
+      // persisted, so ignore anything already on screen.
+      if (state.messages.some((m) => m.id === msg.id)) return;
       state.messages = [...state.messages, msg].slice(-MAX_CHAT);
       write(STORE.chat, state.messages);
       appendMessage(msg);
-      if (!state.panelOpen && !fromChannel && msg.client !== clientId) {
-        // keep the counter warm but do not nag
-      }
     }
 
     if (env.type === 'request') {
