@@ -58,12 +58,17 @@ export const DAY_MS = 86400000;
 
 /* Rotation rule for the live reel.
  *
- * Your catalogue is shuffled inside each programme, and a guest (Creative
- * Commons) track is dropped in after every `guestEvery` originals. Raise the
- * number for fewer guests, lower it for a denser free-music rotation. Set
- * `guestEvery: 0` to leave the guests in the personal library only. */
+ * The free library is the backbone: it plays in a shuffled cycle, and one of
+ * your own songs is dropped in after every `originalEvery` free-library tracks.
+ * `4` = 20% originals (rare, scattered). Lower it for more of your music
+ * (`3` = 25%, `2` = 33%), raise it to make your songs rarer still.
+ *
+ * `noRepeatWindow` stops any track from coming back within that many picks
+ * where the pool allows it (the free library is small, so its own cycle is the
+ * hard limit). */
 export const ROTATION = {
-  guestEvery: 5
+  originalEvery: 4,
+  noRepeatWindow: 10
 };
 
 export const SLEEP_CHOICES = [15, 30, 45, 60, 90, 120];

@@ -46,27 +46,46 @@ const GUESTS = TRACKS.filter((t) => t.guest);
 const ORIGINALS = TRACKS.filter((t) => !t.guest);
 
 /**
- * Shuffle the catalogue for this programme pass, then slot a guest track in
- * after every `guestEvery` originals. Guests cycle through their own shuffled
- * bag, so the same instrumental is spaced out rather than clustered.
+ * One long pass of the rotation: cycle the free library in shuffled order and
+ * drop one of the artist's own songs in after every `originalEvery` guest
+ * tracks. Both bags reshuffle when exhausted, and immediate repeats are
+ * avoided even across a reshuffle.
  */
-function buildSequence(pool, guests, rng) {
-  const originals = shuffled(pool, rng);
+function buildSequence(pool, guests, rng, length = 96) {
   const sequence = [];
   let guestBag = shuffled(guests, rng);
+  let originalBag = shuffled(pool, rng);
   let guestIndex = 0;
-  const every = Math.max(0, Number(ROTATION.guestEvery) || 0);
+  let originalIndex = 0;
+  let sinceOriginal = 0;
+  const every = Math.min(12, Math.max(1, Number(ROTATION.originalEvery) || 4));
 
-  originals.forEach((track, index) => {
-    sequence.push(track);
-    if (!every || !guests.length) return;
-    if ((index + 1) % every !== 0) return;
+  while (sequence.length < length) {
     if (guestIndex >= guestBag.length) {
       guestBag = shuffled(guests, rng);
       guestIndex = 0;
     }
-    sequence.push(guestBag[guestIndex++]);
-  });
+    let guest = guestBag[guestIndex++];
+    const previous = sequence[sequence.length - 1];
+    if (previous && guest.id === previous.id && guestBag.length > 1) {
+      guest = guestBag[guestIndex++ % guestBag.length];
+    }
+    sequence.push(guest);
+    sinceOriginal += 1;
+
+    if (sinceOriginal < every) continue;
+    if (originalIndex >= originalBag.length) {
+      originalBag = shuffled(pool, rng);
+      originalIndex = 0;
+    }
+    let original = originalBag[originalIndex++];
+    const last = sequence[sequence.length - 1];
+    if (last && original.id === last.id && originalBag.length > 1) {
+      original = originalBag[originalIndex++ % originalBag.length];
+    }
+    sequence.push(original);
+    sinceOriginal = 0;
+  }
 
   return sequence;
 }
@@ -82,8 +101,11 @@ export function buildReel(dayStartMs) {
     let pool = ORIGINALS.filter((t) => t.genres.some((g) => block.genres.includes(g)));
     if (pool.length < 6) pool = ORIGINALS.slice();
 
-    let guests = GUESTS.filter((t) => t.genres.some((g) => block.genres.includes(g)));
-    if (guests.length < 2) guests = GUESTS.slice();
+    // The free library cycles in full every hour; start each pass with the
+    // tracks that fit this programme's mood, then the rest.
+    const matching = GUESTS.filter((t) => t.genres.some((g) => block.genres.includes(g)));
+    const rest = GUESTS.filter((t) => !matching.includes(t));
+    const guests = [...shuffled(matching, rng), ...shuffled(rest, rng)];
 
     let sequence = buildSequence(pool, guests, rng);
     let cursorIndex = 0;
