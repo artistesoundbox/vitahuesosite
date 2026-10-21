@@ -1,4 +1,4 @@
-/* Offline shell for Vita Hues Radio.
+/* Offline shell for Vita Hueso Radio.
  * Caches the interface (HTML/CSS/JS) — never the MP3s, so audio keeps
  * streaming normally and the cache stays small. */
 const VERSION = 'vh-radio-v1';

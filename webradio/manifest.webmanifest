@@ -1,7 +1,7 @@
 {
-  "name": "Vita Hues Radio",
+  "name": "Vita Hueso Radio",
   "short_name": "VH Radio",
-  "description": "A 24/7 online radio station streaming the original music of Vita Hues.",
+  "description": "A 24/7 online radio station streaming the original music of Vita Hueso.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

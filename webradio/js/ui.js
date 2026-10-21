@@ -25,12 +25,12 @@ const albumTracks = (albumId) => TRACKS.filter((t) => t.albumId === albumId);
 
 const ROUTES = ['home', 'radio', 'library', 'releases', 'about', 'contact'];
 const TITLES = {
-  home: 'Vita Hues Radio — 24/7 original music',
-  radio: 'The Radio — Vita Hues Radio',
-  library: 'Music Library — Vita Hues Radio',
-  releases: 'Latest Releases — Vita Hues Radio',
-  about: 'About the Artist — Vita Hues Radio',
-  contact: 'Contact — Vita Hues Radio'
+  home: 'Vita Hueso Radio — 24/7 original music',
+  radio: 'The Radio — Vita Hueso Radio',
+  library: 'Music Library — Vita Hueso Radio',
+  releases: 'Latest Releases — Vita Hueso Radio',
+  about: 'About the Artist — Vita Hueso Radio',
+  contact: 'Contact — Vita Hueso Radio'
 };
 const VIEWS = {};
 
@@ -273,7 +273,7 @@ function renderAlbums() {
         <p class="album-meta">
           <span>${album.year}</span><span>${tracks.length} tracks</span>
           <span>${formatDuration(albumDuration(album.id))}</span>
-          ${album.external ? '<span class="tag-cc">CC BY 4.0</span>' : '<span>Vita Hues</span>'}
+          ${album.external ? '<span class="tag-cc">CC BY 4.0</span>' : '<span>Vita Hueso</span>'}
         </p>
         <p class="album-desc">${esc(album.description || '')}</p>
         <div class="album-actions">
@@ -660,7 +660,7 @@ async function shareTrack(track) {
   url.hash = 'radio';
   const data = {
     title: `${track.title} — ${track.artist}`,
-    text: `Listening to “${track.title}” on Vita Hues Radio`,
+    text: `Listening to “${track.title}” on Vita Hueso Radio`,
     url: url.toString()
   };
   if (navigator.share) {
@@ -759,7 +759,7 @@ function bindPlayer() {
   });
   radio.addEventListener('trackchange', (event) => {
     const track = event.detail;
-    document.title = `${track.title} · Vita Hues Radio`;
+    document.title = `${track.title} · Vita Hueso Radio`;
   });
 }
 
@@ -828,7 +828,7 @@ function bindForms() {
     }
 
     const body = `${message}\n\n— ${name || 'A listener'}${email ? ` (${email})` : ''}`;
-    const subject = `Vita Hues Radio — message from ${name || 'a listener'}`;
+    const subject = `Vita Hueso Radio — message from ${name || 'a listener'}`;
 
     if (STATION.contactEmail) {
       const href = `mailto:${STATION.contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;

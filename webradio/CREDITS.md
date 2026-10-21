@@ -2,7 +2,7 @@
 
 ## Original music
 
-All tracks by Vita Hues (artistesoundbox) are © 2026 Vita Hues. All rights reserved.
+All tracks by Vita Hueso (artistesoundbox) are © 2026 Vita Hueso. All rights reserved.
 
 ## Guest instrumentals
 

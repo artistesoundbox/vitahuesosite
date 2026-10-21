@@ -1,4 +1,4 @@
-/* Vita Hues Radio — floating widget.
+/* Vita Hueso Radio — floating widget.
  *
  * Drop this on any page:
  *   <script src="https://artistesoundbox.github.io/vitahuesosite/webradio/widget.js" defer></script>
@@ -41,13 +41,13 @@
     var panel = document.createElement('div');
     panel.className = 'vhw-panel';
     panel.innerHTML =
-      '<iframe title="Vita Hues Radio" src="' + base + 'embed.html" loading="lazy" allow="autoplay"></iframe>' +
+      '<iframe title="Vita Hueso Radio" src="' + base + 'embed.html" loading="lazy" allow="autoplay"></iframe>' +
       '<button class="vhw-close" type="button" aria-label="Close radio player">×</button>';
 
     var launcher = document.createElement('button');
     launcher.type = 'button';
     launcher.className = 'vhw-launcher';
-    launcher.setAttribute('aria-label', 'Open Vita Hues Radio');
+    launcher.setAttribute('aria-label', 'Open Vita Hueso Radio');
     launcher.setAttribute('aria-expanded', 'false');
     launcher.innerHTML =
       '<span class="vhw-dot" aria-hidden="true"></span>' +

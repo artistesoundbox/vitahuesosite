@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Vita Hues Radio — embeddable player</title>
+  <title>Vita Hueso Radio — embeddable player</title>
   <meta name="robots" content="noindex, follow" />
   <meta name="theme-color" content="#04060d" />
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
@@ -87,12 +87,12 @@
   </style>
 </head>
 <body>
-  <div class="embed" role="region" aria-label="Vita Hues Radio player">
+  <div class="embed" role="region" aria-label="Vita Hueso Radio player">
     <img class="art" id="art" src="assets/art/t01.jpg" alt="" width="54" height="54" />
     <div class="meta">
       <div class="row">
         <span class="mode" id="mode">LIVE</span>
-        <a class="title" id="title" href="index.html#radio" target="_blank" rel="noopener">Vita Hues Radio</a>
+        <a class="title" id="title" href="index.html#radio" target="_blank" rel="noopener">Vita Hueso Radio</a>
       </div>
       <div class="sub" id="sub">Loading the broadcast…</div>
       <div class="bar" aria-hidden="true"><span id="bar"></span></div>
@@ -136,7 +136,7 @@
       if (art.getAttribute('src') !== track.art) art.src = track.art;
       if (title.textContent !== track.title) {
         title.textContent = track.title;
-        document.title = `${track.title} — Vita Hues Radio`;
+        document.title = `${track.title} — Vita Hueso Radio`;
       }
       sub.textContent = `${track.artist} · ${track.album} · ${formatTime(state.position)} / ${formatTime(track.duration)}`;
       mode.textContent = state.mode === 'live' ? 'LIVE' : 'PERSONAL';
