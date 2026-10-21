@@ -99,7 +99,7 @@ same reel, so they always agree with what is playing.
 | Sleep timer | `radio.setSleep(minutes)` |
 | Live mic mode | Local monitor + recorded "mic take" (`radio.toggleMic`) |
 | Scheduled playlists | `PROGRAMS` in `js/config.js` |
-| Chat + song requests | `js/community.js` |
+| Chat + emoji | `js/community.js`, `js/ui.js` (`CHAT_EMOJI`) |
 | Embeddable widget | `embed.html`, `widget.js`, `widget-demo.html` |
 | SEO | Meta/OG/Twitter tags, JSON-LD `RadioStation`, `sitemap.xml`, `robots.txt` |
 | Fast repeat loads | `sw.js` caches the shell (never the MP3s) |
@@ -147,7 +147,7 @@ The catalogue builder rewrites `CREDITS.md` on every run, so edit attribution in
 
 ---
 
-## The listener room (chat, presence, requests)
+## The listener room (chat, emoji, presence)
 
 `js/community.js` uses a **free public ntfy.sh topic** (`vh-radio-7d2c91a4` by
 default) as a relay. It needs no account, key or server. Messages are:
@@ -169,7 +169,11 @@ Ways to change it:
   replace `publish()` / `openRelay()` with your backend. Only those two
   functions touch the network.
 
-Requests are also written to `localStorage` and listed on the Contact page.
+**Emoji:** the smiley button next to the message box opens a picker (`CHAT_EMOJI`
+in `js/ui.js`) that drops an emoji in at the caret. A message made only of emoji
+renders large, as the room's sticker — no image assets, nothing to moderate.
+There are **no song requests**: the room is chat plus presence, and the station
+picks its own music.
 
 ### Microphone
 
@@ -242,7 +246,7 @@ rest of `vitahuesosite`:
   `localStorage`, and opens the compact **dock** at the bottom-left with
   play/pause, skip, mute, a live/personal badge and a progress bar.
 - The **radio icon card at the bottom of the portal** (`vitahuesoradioicon.png`)
-  links into the full station (customizer, listener room, chat, requests). It is
+  links into the full station (customizer, listener room, chat). It is
   marked `data-radio-open`, so opening it also switches the radio on.
 - A page navigation always destroys the `<audio>` element, so the dock leaves a
   hand-off note in `sessionStorage` with the **track id, playback mode and
