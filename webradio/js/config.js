@@ -1,5 +1,10 @@
 /* Station rules: the programme clock and small shared constants.
- * Edit this file to change the 24/7 schedule. Hours are UTC, 0–24. */
+ * Edit this file to change the 24/7 schedule. Hours are UTC, 0–24 and every
+ * hour must be covered exactly once (contiguous, no gaps, no overlaps).
+ *
+ * `focus: true` makes a show play ONLY the guests that match its genres — that
+ * is what turns an hour into appointment listening instead of a slightly
+ * weighted slice of the same day. */
 export const PROGRAMS = [
   {
     id: 'midnight',
@@ -28,10 +33,20 @@ export const PROGRAMS = [
   {
     id: 'afterglow',
     start: 14,
-    end: 18,
+    end: 17,
     name: 'Afterglow',
     tagline: 'Salsa, dembow and Spanish verses while there is still daylight.',
     genres: ['Latin', 'Salsa', 'Reggaeton', 'Dembow', 'Dancehall', 'Hip-Hop', 'Funk', 'Soul', 'Pop']
+  },
+  {
+    /* 17:00 UTC = 1pm in San Juan: the lunchtime salsa hour, every day. */
+    id: 'lahora',
+    start: 17,
+    end: 18,
+    name: 'La Hora Caliente',
+    tagline: 'One hour of salsa, timba, dembow y reggaetón — every single day.',
+    genres: ['Salsa', 'Timba', 'Dembow', 'Reggaeton', 'Latin', 'Dancehall', 'Moombahton'],
+    focus: true
   },
   {
     id: 'nightfrequency',

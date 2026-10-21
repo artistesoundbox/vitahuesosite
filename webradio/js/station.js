@@ -159,7 +159,12 @@ export function buildReel(dayStartMs, carry = []) {
     // tracks that fit this programme's mood, then the rest.
     const matching = GUESTS.filter((t) => t.genres.some((g) => block.genres.includes(g)));
     const rest = GUESTS.filter((t) => !matching.includes(t));
-    const guests = [...shuffled(matching, rng), ...shuffled(rest, rng)];
+    /* A focused show runs on its own shelf alone (with a floor so a thin
+       genre list cannot make the hour repeat itself); everything else keeps
+       the friendly mix with the matching tracks first. */
+    const guests = block.focus && matching.length >= 12
+      ? shuffled(matching, rng)
+      : [...shuffled(matching, rng), ...shuffled(rest, rng)];
 
     /* Carry the cooldown across the programme boundary, otherwise the same
        song can close one hour and open the next. The first programme of the
