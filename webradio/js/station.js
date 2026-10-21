@@ -8,7 +8,13 @@
  *
  * Nothing here touches the network; MP3 seeking is handled by the browser.
  */
-import { TRACKS, STATION_ID } from './catalog.js';
+import { TRACKS } from './catalog.js';
+import * as catalog from './catalog.js';
+
+/* Namespace lookup, not a named import: a visitor whose browser still holds an
+   older cached catalog.js would otherwise fail the whole module (and with it
+   the site radio) because STATION_ID did not exist yet. */
+const STATION_ID = catalog.STATION_ID || null;
 import { PROGRAMS, STATION_EPOCH, DAY_MS, ROTATION } from './config.js';
 
 const reels = new Map();
