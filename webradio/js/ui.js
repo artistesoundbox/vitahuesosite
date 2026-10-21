@@ -75,6 +75,31 @@ function setUse(svg, id) {
 
 const isCC = (track) => /^CC/i.test(track.license || '');
 
+/** Clipboard that cannot hang the form when permission is refused. */
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      return await Promise.race([
+        navigator.clipboard.writeText(text).then(() => true),
+        new Promise((resolve) => setTimeout(() => resolve(false), 1200))
+      ]);
+    } catch { /* fall through */ }
+  }
+  try {
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand('copy');
+    area.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 /* ------------------------------------------------------------- data lists */
 
 function renderStats() {
@@ -819,9 +844,9 @@ function bindForms() {
   const form = els['contact-form'];
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const name = $('#contact-name').value.trim();
-    const email = $('#contact-email').value.trim();
-    const message = $('#contact-message').value.trim();
+    const name = $('contact-name').value.trim();
+    const email = $('contact-email').value.trim();
+    const message = $('contact-message').value.trim();
     if (message.length < 4) {
       toast('Write a little more first.');
       return;
@@ -837,14 +862,29 @@ function bindForms() {
       return;
     }
 
-    try {
-      await navigator.clipboard.writeText(`${subject}\n\n${body}`);
+    const text = `${subject}\n\n${body}`;
+    const copied = await copyText(text);
+    if (copied) {
       els['contact-note'].textContent = 'Copied to your clipboard — paste it into a message on YouTube or GitHub.';
       toast('Message copied. Paste it into a DM or comment.');
-    } catch {
-      els['contact-note'].textContent = 'Copy your message manually, then send it via YouTube or GitHub.';
-      toast('Could not copy automatically — select and copy the text.');
+      return;
     }
+
+    // Clipboard refused (or timed out): show the finished message so it can
+    // still be selected and sent.
+    let box = document.getElementById('contact-copy');
+    if (!box) {
+      box = document.createElement('textarea');
+      box.id = 'contact-copy';
+      box.className = 'copy-box';
+      box.readOnly = true;
+      form.appendChild(box);
+    }
+    box.value = text;
+    box.focus();
+    box.select();
+    els['contact-note'].textContent = 'Clipboard is blocked — your message is below. Select it and send it via YouTube or GitHub.';
+    toast('Select the message below to copy it.');
   });
 
   els['request-form']?.addEventListener('submit', (event) => {
@@ -879,7 +919,7 @@ function bindChrome() {
     menu?.setAttribute('aria-expanded', 'false');
   }));
 
-  $('#lightbox-close')?.addEventListener('click', closeLightbox);
+  $('lightbox-close')?.addEventListener('click', closeLightbox);
   els['lightbox']?.addEventListener('click', (event) => {
     if (event.target === els['lightbox']) closeLightbox();
   });

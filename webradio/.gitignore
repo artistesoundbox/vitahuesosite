@@ -1,0 +1,8 @@
+# local verification captures (not part of the station)
+screenshots/
+
+# tool metadata
+.freebuff/
+
+# dependencies, if a tool is ever added
+node_modules/

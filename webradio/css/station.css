@@ -791,6 +791,13 @@ h3 { font-size: 15px; letter-spacing: 0.04em; }
   outline: none; border-color: var(--neon); box-shadow: 0 0 0 3px rgba(56, 182, 255, 0.15);
 }
 .form-note { margin: 0; font-size: 11px; color: var(--dim); }
+.copy-box {
+  width: 100%; min-height: 120px; resize: vertical;
+  padding: 11px 13px; border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: rgba(2, 6, 13, 0.85);
+  color: var(--ink-soft); font-size: 12px; line-height: 1.6;
+}
 .request-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .request-list li {
   display: flex; justify-content: space-between; gap: 10px;
@@ -1016,9 +1023,13 @@ h3 { font-size: 15px; letter-spacing: 0.04em; }
   .hero { gap: 24px; }
   .stat-row { grid-template-columns: repeat(2, 1fr); gap: 14px; }
   .stat-row div:nth-child(3) { border-left: 0; padding-left: 0; }
+  .view-head { padding-top: 22px; padding-bottom: 18px; margin-bottom: 20px; }
+  .view-head .lede { font-size: 14px; }
   .player-card { padding: 16px; }
-  .player-main { grid-template-columns: minmax(0, 1fr); gap: 16px; }
-  .player-art-wrap { width: min(100%, 212px); margin: 0 auto; border-radius: 14px; }
+  .player-main { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .player-art-wrap { width: min(100%, 176px); margin: 0 auto; border-radius: 14px; }
+  .chips { margin-top: 10px; }
+  .controls { margin-top: 14px; }
   .player-title { text-align: left; font-size: clamp(24px, 7vw, 30px); }
   .progress-row { margin-top: 14px; }
   .player-sub { font-size: 12px; }

@@ -474,7 +474,7 @@ export class Radio extends EventTarget {
 
   upNext(count = 5) {
     if (this.mode === 'live') {
-      const state = getLiveState();
+      const state = getLiveState(Date.now(), Math.max(count, 6));
       return (state?.queue || []).slice(0, count).map((e) => e.track);
     }
     return this.personalQueue.slice(0, count);
