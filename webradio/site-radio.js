@@ -183,6 +183,14 @@ function injectStyles() {
     }
     @keyframes vhr-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
+    /* The PWA install chip (install.js) is fixed to the same bottom-left
+       corner as the dock, so it used to sit on top of the player. Lift it
+       clear of the dock while the radio is on — the inline style in
+       install.js is why this rule needs !important. */
+    html.vhr-on #vh-install-chip {
+      bottom: calc(16px + var(--vhr-dock-h, 76px) + 10px) !important;
+    }
+
     @media (max-width: 520px) {
       #vhr-dock {
         left: 10px; right: 10px; bottom: 10px;
@@ -304,7 +312,13 @@ function silencePortal() {
 
 function setEnabledUI(active) {
   document.documentElement.classList.toggle('vhr-on', active);
-  if (dock) dock.classList.toggle('is-on', active);
+  if (dock) {
+    dock.classList.toggle('is-on', active);
+    // display flips with the class, so re-measure on the next frame
+    requestAnimationFrame(() => {
+      document.documentElement.style.setProperty('--vhr-dock-h', `${dock.offsetHeight}px`);
+    });
+  }
   if (toggleButton) {
     toggleButton.classList.toggle('is-on', active);
     toggleButton.setAttribute('aria-pressed', String(active));
@@ -378,6 +392,14 @@ function init() {
     els.bar.style.width = `${pct}%`;
   });
   radio.addEventListener('trackchange', () => paint(radio.snapshot()));
+
+  /* Keep --vhr-dock-h honest so anything anchored to the dock (the install
+     chip) clears its real height, whatever the track title wraps to. */
+  const measureDock = () => {
+    document.documentElement.style.setProperty('--vhr-dock-h', `${dock.offsetHeight}px`);
+  };
+  measureDock();
+  if ('ResizeObserver' in window) new ResizeObserver(measureDock).observe(dock);
 
   if (isOn()) {
     silencePortal();
