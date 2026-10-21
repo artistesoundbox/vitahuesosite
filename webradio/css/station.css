@@ -1014,9 +1014,14 @@ h3 { font-size: 15px; letter-spacing: 0.04em; }
   .hero { gap: 24px; }
   .stat-row { grid-template-columns: repeat(2, 1fr); gap: 14px; }
   .stat-row div:nth-child(3) { border-left: 0; padding-left: 0; }
-  .player-main { grid-template-columns: minmax(0, 1fr); }
-  .player-art-wrap { width: min(100%, 280px); margin: 0 auto; }
-  .player-title { text-align: left; }
+  .player-card { padding: 16px; }
+  .player-main { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .player-art-wrap { width: min(100%, 212px); margin: 0 auto; border-radius: 14px; }
+  .player-title { text-align: left; font-size: clamp(24px, 7vw, 30px); }
+  .progress-row { margin-top: 14px; }
+  .player-sub { font-size: 12px; }
+  .player-credit { display: none; }
+  .player-topline { gap: 8px; }
   .player-info { min-width: 0; }
   .player-topline { justify-content: flex-start; }
   .tool-group { width: 100%; justify-content: space-between; border-left: 0; padding-left: 0; margin-top: 6px; }
