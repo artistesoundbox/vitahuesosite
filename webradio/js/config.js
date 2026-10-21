@@ -30,16 +30,16 @@ export const PROGRAMS = [
     start: 14,
     end: 18,
     name: 'Afterglow',
-    tagline: 'Warm soul, Spanish verses, and a little daylight left.',
-    genres: ['Soul', 'Latin', 'Piano', 'Funk', 'Reggae', 'Pop', 'Salsa']
+    tagline: 'Salsa, dembow and Spanish verses while there is still daylight.',
+    genres: ['Latin', 'Salsa', 'Reggaeton', 'Dembow', 'Dancehall', 'Hip-Hop', 'Funk', 'Soul', 'Pop']
   },
   {
     id: 'nightfrequency',
     start: 18,
     end: 22,
     name: 'Night Frequency',
-    tagline: 'Cinematic edges and neon-lit motion.',
-    genres: ['Cinematic', 'Electronic', 'Soul', 'Hip-Hop', 'Rock', 'Timba']
+    tagline: 'Reggaeton, timba and neon-lit motion until lights out.',
+    genres: ['Reggaeton', 'Dembow', 'Dancehall', 'Moombahton', 'Timba', 'Hip-Hop', 'Latin', 'Disco', 'Electronic']
   },
   {
     id: 'stillwaters',
@@ -75,18 +75,20 @@ export const ROTATION = {
      to Vita Hueso Radio" clip in audio/id/. */
   identEvery: 5,
 
-  /* Fun first: the guest shelf itself is weighted toward Latin urban, dembow
-     and reggaeton (15 of 22 tracks), and `funGenres` marks them. `funWeight`
-     repeats them in the draw bag — kept at 1 so songs stay far apart; raise it
-     only if you add more tracks (duplicates shorten the gap between repeats). */
-  funGenres: ['Reggaeton', 'Dembow', 'Latin', 'Dancehall', 'Moombahton', 'Urbano', 'Salsa', 'Timba'],
+  /* Fun first: the guest shelf is mostly Latin urban, salsa, dembow plus
+     English hip-hop / funk / disco, and `funGenres` marks what counts as fun.
+     `funWeight` repeats them in the draw bag — kept at 1 so songs stay far
+     apart; raise it only if you add more tracks (duplicates are what makes a
+     track come back too soon). */
+  funGenres: ['Reggaeton', 'Dembow', 'Latin', 'Dancehall', 'Moombahton', 'Urbano',
+    'Salsa', 'Timba', 'Hip-Hop', 'Disco', 'R&B', 'Funk'],
   funWeight: 1,
 
   /* Share of the guest picks that should be fun genres. A non-fun candidate is
      skipped this often while an out-of-cooldown fun track is still available,
      so the station leans danceable WITHOUT duplicating songs (duplicates are
      what makes tracks come back too soon). */
-  funShare: 0.8
+  funShare: 0.85
 };
 
 export const SLEEP_CHOICES = [15, 30, 45, 60, 90, 120];

@@ -179,8 +179,9 @@ tracks.sort((a, b) => a.trackNo - b.trackNo);
 const all = [...tracks, ...freeTracks];
 if (!all.length) throw new Error('No tracks found — check anthonitus_songs/');
 
-const genreOrder = ['Soul', 'Rock', 'Pop', 'Funk', 'Hip-Hop', 'Jazz', 'Latin', 'Country', 'Reggae',
-  'Folk', 'Blues', 'Electronic', 'Ambient', 'Piano', 'Cinematic', 'Lo-Fi', 'Meditative'];
+const genreOrder = ['Reggaeton', 'Dembow', 'Salsa', 'Timba', 'Latin', 'Dancehall', 'Moombahton',
+  'Hip-Hop', 'R&B', 'Funk', 'Disco', 'Soul', 'Pop', 'Rock', 'Jazz', 'Reggae', 'Country', 'Folk',
+  'Blues', 'Electronic', 'Ambient', 'Piano', 'Cinematic', 'Lo-Fi', 'Meditative'];
 const genreList = genreOrder.filter((g) => genres.has(g))
   .concat([...genres].filter((g) => !genreOrder.includes(g)));
 

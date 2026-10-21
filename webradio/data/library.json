@@ -575,48 +575,6 @@
       "credit": "\"THIS IS OUR MUSIC (Thruewiddit mix)\" by duckett (ccMixter), licensed CC BY 3.0"
     },
     {
-      "file": "Chill Wave.mp3",
-      "title": "Chill Wave",
-      "artist": "Kevin MacLeod",
-      "album": "cc-sessions",
-      "genres": [
-        "Lo-Fi",
-        "Ambient"
-      ],
-      "license": "CC BY 4.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-      "source": "https://incompetech.com/music/royalty-free/",
-      "credit": "\"Chill Wave\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0"
-    },
-    {
-      "file": "Water Lily.mp3",
-      "title": "Water Lily",
-      "artist": "Kevin MacLeod",
-      "album": "cc-sessions",
-      "genres": [
-        "Ambient",
-        "Piano"
-      ],
-      "license": "CC BY 4.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-      "source": "https://incompetech.com/music/royalty-free/",
-      "credit": "\"Water Lily\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0"
-    },
-    {
-      "file": "LA TRIPLETA.mp3",
-      "title": "LA TRIPLETA",
-      "artist": "virtualdjmax",
-      "album": "cc-sessions",
-      "genres": [
-        "Reggaeton",
-        "Latin"
-      ],
-      "license": "CC BY 3.0",
-      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
-      "source": "https://ccmixter.org/files/virtualdjmax/16150",
-      "credit": "\"LA TRIPLETA\" by virtualdjmax (ccMixter), licensed CC BY 3.0"
-    },
-    {
       "file": "SACUDETE.mp3",
       "title": "SACUDETE",
       "artist": "YUYO MC",
@@ -715,20 +673,6 @@
       "credit": "\"Hands Up (cdk Island Mix)\" by cdk (ccMixter), licensed CC BY 3.0"
     },
     {
-      "file": "Lamadio Tiado (Hot Cha Cha Mix).mp3",
-      "title": "Lamadio Tiado (Hot Cha Cha Mix)",
-      "artist": "coruscate",
-      "album": "cc-sessions",
-      "genres": [
-        "Salsa",
-        "Latin"
-      ],
-      "license": "CC BY 3.0",
-      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
-      "source": "https://ccmixter.org/files/Coruscate/70326",
-      "credit": "\"Lamadio Tiado (Hot Cha Cha Mix)\" by coruscate (ccMixter), licensed CC BY 3.0"
-    },
-    {
       "file": "Funk You.mp3",
       "title": "Funk You",
       "artist": "texasradiofish",
@@ -741,6 +685,238 @@
       "licenseUrl": "http://creativecommons.org/licenses/by-nc/3.0/",
       "source": "https://ccmixter.org/files/texasradiofish/53269",
       "credit": "\"Funk You\" by texasradiofish (ccMixter), licensed CC BY-NC 3.0"
+    },
+    {
+      "file": "Andres Franco - Ahi Vienen.mp3",
+      "title": "Ahi Vienen",
+      "artist": "Andres Franco",
+      "genres": [
+        "Moombahton",
+        "Latin"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/andrewfranco/45003",
+      "album": "cc-sessions"
+    },
+    {
+      "file": "Andres Franco - Jhonblack Wayo Wayo.mp3",
+      "title": "Jhonblack Wayo Wayo",
+      "artist": "Andres Franco",
+      "genres": [
+        "Dembow",
+        "Latin"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/andrewfranco/21090",
+      "album": "cc-sessions"
+    },
+    {
+      "file": "Andres Franco - Brake Dance.mp3",
+      "title": "Brake Dance",
+      "artist": "Andres Franco",
+      "genres": [
+        "Dancehall",
+        "Latin"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/andrewfranco/33929",
+      "album": "cc-sessions"
+    },
+    {
+      "file": "Anth Crunk - Put U Hands Up.mp3",
+      "title": "Put U Hands Up",
+      "artist": "Anth Crunk",
+      "genres": [
+        "Reggaeton",
+        "Hip-Hop"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/Crunkster/38231",
+      "album": "cc-sessions"
+    },
+    {
+      "file": "hidalgoantonio - Bailemos Together.mp3",
+      "title": "Bailemos Together",
+      "artist": "hidalgoantonio",
+      "genres": [
+        "Latin",
+        "Pop"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/hidalgoantonio/43714",
+      "album": "cc-sessions"
+    },
+    {
+      "file": "BOCrew - Beckfords and the Bocrew.mp3",
+      "title": "Beckfords and the Bocrew",
+      "artist": "Bocrew",
+      "genres": [
+        "Dancehall",
+        "Hip-Hop"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/BOCrew/22904",
+      "album": "cc-sessions"
+    },
+    {
+      "file": "dotjot - Leaving Babylon (Catch the Train Mix).mp3",
+      "title": "Leaving Babylon (Catch the Train Mix)",
+      "artist": "dotjot",
+      "genres": [
+        "Reggaeton",
+        "Dancehall"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/dotjot/61742",
+      "album": "cc-sessions"
+    },
+    {
+      "file": "DanScrew - Don't Worry.mp3",
+      "title": "Don't Worry",
+      "artist": "DanScrew",
+      "genres": [
+        "Dancehall",
+        "Pop"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/DanScrew/40426",
+      "album": "cc-sessions"
+    },
+    {
+      "file": "BOCrew - Come.mp3",
+      "title": "Come",
+      "artist": "Bocrew",
+      "genres": [
+        "Disco",
+        "Dancehall"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/BOCrew/66165",
+      "album": "cc-sessions"
+    },
+    {
+      "file": "ScOmBer - Dirtbag (Club Mix).mp3",
+      "title": "Dirtbag (Club Mix)",
+      "artist": "ScOmBer",
+      "genres": [
+        "Disco",
+        "Electronic"
+      ],
+      "license": "CC BY 2.5",
+      "licenseUrl": "http://creativecommons.org/licenses/by/2.5/",
+      "source": "https://ccmixter.org/files/scomber/17734",
+      "album": "cc-sessions"
+    },
+    {
+      "file": "Donnie Ozone - Like a Rapper.mp3",
+      "title": "Like a Rapper",
+      "artist": "Donnie Ozone",
+      "genres": [
+        "Hip-Hop"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/donnieozone/36041",
+      "album": "cc-sessions"
+    },
+    {
+      "file": "reiswerk - Bounce.mp3",
+      "title": "Bounce",
+      "artist": "reiswerk",
+      "genres": [
+        "Hip-Hop"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/Reiswerk/53117",
+      "album": "cc-sessions"
+    },
+    {
+      "file": "Zep Hurme - Tell Somebody.mp3",
+      "title": "Tell Somebody",
+      "artist": "Zep Hurme",
+      "genres": [
+        "Soul",
+        "Pop"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/zep_hurme/39918",
+      "album": "cc-sessions"
+    },
+    {
+      "file": "Stefan Kartenberg - Too Late.mp3",
+      "title": "Too Late",
+      "artist": "Stefan Kartenberg",
+      "genres": [
+        "R&B",
+        "Soul"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/JeffSpeed68/51988",
+      "album": "cc-sessions"
+    },
+    {
+      "file": "Whitewolf - Toronto Is My Beat.mp3",
+      "title": "Toronto Is My Beat",
+      "artist": "Whitewolf",
+      "genres": [
+        "Electronic",
+        "Hip-Hop"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/Whitewolf225/60181",
+      "album": "cc-sessions"
+    },
+    {
+      "file": "Robbero - Soul Sister.mp3",
+      "title": "Soul Sister",
+      "artist": "Robbero",
+      "genres": [
+        "Disco",
+        "Funk"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/Robbero/41686",
+      "album": "cc-sessions"
+    },
+    {
+      "file": "SackJo22 - Slippin and Slidin.mp3",
+      "title": "Slippin' & Slidin'",
+      "artist": "SackJo22",
+      "genres": [
+        "R&B",
+        "Blues"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/SackJo22/30330",
+      "album": "cc-sessions"
+    },
+    {
+      "file": "Gshepherd - Salsa.mp3",
+      "title": "Salsa",
+      "artist": "Gshepherd",
+      "genres": [
+        "Salsa",
+        "Latin"
+      ],
+      "license": "CC BY 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+      "source": "https://ccmixter.org/files/Gshepherd/49375",
+      "album": "cc-sessions"
     }
   ],
   "stationId": {

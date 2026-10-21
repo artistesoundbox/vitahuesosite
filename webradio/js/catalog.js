@@ -61,20 +61,28 @@ export const ALBUMS = [
   }
 ];
 
-export const GENRES = ["Soul","Rock","Pop","Funk","Hip-Hop","Jazz","Latin","Reggae","Blues","Electronic","Ambient","Piano","Cinematic","Lo-Fi","Meditative","Reggaeton","Dembow","Dancehall","Moombahton","Salsa","Timba"];
+export const GENRES = ["Reggaeton","Dembow","Salsa","Timba","Latin","Dancehall","Moombahton","Hip-Hop","R&B","Funk","Disco","Soul","Pop","Rock","Jazz","Reggae","Blues","Electronic","Ambient","Piano","Cinematic","Lo-Fi","Meditative"];
 
 export const STATS = {
-  "tracks": 69,
+  "tracks": 83,
   "originals": 47,
-  "guest": 22,
+  "guest": 36,
   "genres": [
-    "Soul",
-    "Rock",
-    "Pop",
-    "Funk",
-    "Hip-Hop",
-    "Jazz",
+    "Reggaeton",
+    "Dembow",
+    "Salsa",
+    "Timba",
     "Latin",
+    "Dancehall",
+    "Moombahton",
+    "Hip-Hop",
+    "R&B",
+    "Funk",
+    "Disco",
+    "Soul",
+    "Pop",
+    "Rock",
+    "Jazz",
     "Reggae",
     "Blues",
     "Electronic",
@@ -82,15 +90,9 @@ export const STATS = {
     "Piano",
     "Cinematic",
     "Lo-Fi",
-    "Meditative",
-    "Reggaeton",
-    "Dembow",
-    "Dancehall",
-    "Moombahton",
-    "Salsa",
-    "Timba"
+    "Meditative"
   ],
-  "totalSeconds": 13188,
+  "totalSeconds": 16295,
   "albums": 6
 };
 
@@ -1410,75 +1412,6 @@ export const TRACKS = [
   {
     "id": "f11",
     "trackNo": 111,
-    "title": "Chill Wave",
-    "artist": "Kevin MacLeod",
-    "albumId": "cc-sessions",
-    "album": "Signal Sessions (CC)",
-    "year": 2026,
-    "genres": [
-      "Lo-Fi",
-      "Ambient"
-    ],
-    "duration": 240,
-    "src": "audio/free/Chill%20Wave.mp3",
-    "art": "assets/art/free-cover.svg",
-    "license": "CC BY 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-    "credit": "\"Chill Wave\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0",
-    "source": "https://incompetech.com/music/royalty-free/",
-    "downloadable": true,
-    "featured": false,
-    "guest": true
-  },
-  {
-    "id": "f12",
-    "trackNo": 112,
-    "title": "Water Lily",
-    "artist": "Kevin MacLeod",
-    "albumId": "cc-sessions",
-    "album": "Signal Sessions (CC)",
-    "year": 2026,
-    "genres": [
-      "Ambient",
-      "Piano"
-    ],
-    "duration": 144,
-    "src": "audio/free/Water%20Lily.mp3",
-    "art": "assets/art/free-cover.svg",
-    "license": "CC BY 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-    "credit": "\"Water Lily\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0",
-    "source": "https://incompetech.com/music/royalty-free/",
-    "downloadable": true,
-    "featured": false,
-    "guest": true
-  },
-  {
-    "id": "f13",
-    "trackNo": 113,
-    "title": "LA TRIPLETA",
-    "artist": "virtualdjmax",
-    "albumId": "cc-sessions",
-    "album": "Signal Sessions (CC)",
-    "year": 2026,
-    "genres": [
-      "Reggaeton",
-      "Latin"
-    ],
-    "duration": 200,
-    "src": "audio/free/LA%20TRIPLETA.mp3",
-    "art": "assets/art/free-cover.svg",
-    "license": "CC BY 3.0",
-    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
-    "credit": "\"LA TRIPLETA\" by virtualdjmax (ccMixter), licensed CC BY 3.0",
-    "source": "https://ccmixter.org/files/virtualdjmax/16150",
-    "downloadable": true,
-    "featured": false,
-    "guest": true
-  },
-  {
-    "id": "f14",
-    "trackNo": 114,
     "title": "SACUDETE",
     "artist": "YUYO MC",
     "albumId": "cc-sessions",
@@ -1500,8 +1433,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f15",
-    "trackNo": 115,
+    "id": "f12",
+    "trackNo": 112,
     "title": "Me robo el Show",
     "artist": "reiswerk",
     "albumId": "cc-sessions",
@@ -1523,8 +1456,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f16",
-    "trackNo": 116,
+    "id": "f13",
+    "trackNo": 113,
     "title": "Beat down Babylon",
     "artist": "reiswerk",
     "albumId": "cc-sessions",
@@ -1546,8 +1479,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f17",
-    "trackNo": 117,
+    "id": "f14",
+    "trackNo": 114,
     "title": "I Rebel want new Stile",
     "artist": "reiswerk",
     "albumId": "cc-sessions",
@@ -1569,8 +1502,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f18",
-    "trackNo": 118,
+    "id": "f15",
+    "trackNo": 115,
     "title": "Minha Sombra Teu Sorriso (My Shadow, your Smile)",
     "artist": "reiswerk",
     "albumId": "cc-sessions",
@@ -1592,8 +1525,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f19",
-    "trackNo": 119,
+    "id": "f16",
+    "trackNo": 116,
     "title": "Put your hands up",
     "artist": "reiswerk",
     "albumId": "cc-sessions",
@@ -1615,8 +1548,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f20",
-    "trackNo": 120,
+    "id": "f17",
+    "trackNo": 117,
     "title": "Hands Up (cdk Island Mix)",
     "artist": "cdk",
     "albumId": "cc-sessions",
@@ -1638,31 +1571,8 @@ export const TRACKS = [
     "guest": true
   },
   {
-    "id": "f21",
-    "trackNo": 121,
-    "title": "Lamadio Tiado (Hot Cha Cha Mix)",
-    "artist": "coruscate",
-    "albumId": "cc-sessions",
-    "album": "Signal Sessions (CC)",
-    "year": 2026,
-    "genres": [
-      "Salsa",
-      "Latin"
-    ],
-    "duration": 174,
-    "src": "audio/free/Lamadio%20Tiado%20(Hot%20Cha%20Cha%20Mix).mp3",
-    "art": "assets/art/free-cover.svg",
-    "license": "CC BY 3.0",
-    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
-    "credit": "\"Lamadio Tiado (Hot Cha Cha Mix)\" by coruscate (ccMixter), licensed CC BY 3.0",
-    "source": "https://ccmixter.org/files/Coruscate/70326",
-    "downloadable": true,
-    "featured": false,
-    "guest": true
-  },
-  {
-    "id": "f22",
-    "trackNo": 122,
+    "id": "f18",
+    "trackNo": 118,
     "title": "Funk You",
     "artist": "texasradiofish",
     "albumId": "cc-sessions",
@@ -1679,6 +1589,400 @@ export const TRACKS = [
     "licenseUrl": "http://creativecommons.org/licenses/by-nc/3.0/",
     "credit": "\"Funk You\" by texasradiofish (ccMixter), licensed CC BY-NC 3.0",
     "source": "https://ccmixter.org/files/texasradiofish/53269",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f19",
+    "trackNo": 119,
+    "title": "Ahi Vienen",
+    "artist": "Andres Franco",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Moombahton",
+      "Latin"
+    ],
+    "duration": 197,
+    "src": "audio/free/Andres%20Franco%20-%20Ahi%20Vienen.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "source": "https://ccmixter.org/files/andrewfranco/45003",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f20",
+    "trackNo": 120,
+    "title": "Jhonblack Wayo Wayo",
+    "artist": "Andres Franco",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Dembow",
+      "Latin"
+    ],
+    "duration": 226,
+    "src": "audio/free/Andres%20Franco%20-%20Jhonblack%20Wayo%20Wayo.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "source": "https://ccmixter.org/files/andrewfranco/21090",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f21",
+    "trackNo": 121,
+    "title": "Brake Dance",
+    "artist": "Andres Franco",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Dancehall",
+      "Latin"
+    ],
+    "duration": 200,
+    "src": "audio/free/Andres%20Franco%20-%20Brake%20Dance.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "source": "https://ccmixter.org/files/andrewfranco/33929",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f22",
+    "trackNo": 122,
+    "title": "Put U Hands Up",
+    "artist": "Anth Crunk",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Reggaeton",
+      "Hip-Hop"
+    ],
+    "duration": 218,
+    "src": "audio/free/Anth%20Crunk%20-%20Put%20U%20Hands%20Up.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "source": "https://ccmixter.org/files/Crunkster/38231",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f23",
+    "trackNo": 123,
+    "title": "Bailemos Together",
+    "artist": "hidalgoantonio",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Latin",
+      "Pop"
+    ],
+    "duration": 171,
+    "src": "audio/free/hidalgoantonio%20-%20Bailemos%20Together.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "source": "https://ccmixter.org/files/hidalgoantonio/43714",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f24",
+    "trackNo": 124,
+    "title": "Beckfords and the Bocrew",
+    "artist": "Bocrew",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Dancehall",
+      "Hip-Hop"
+    ],
+    "duration": 166,
+    "src": "audio/free/BOCrew%20-%20Beckfords%20and%20the%20Bocrew.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "source": "https://ccmixter.org/files/BOCrew/22904",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f25",
+    "trackNo": 125,
+    "title": "Leaving Babylon (Catch the Train Mix)",
+    "artist": "dotjot",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Reggaeton",
+      "Dancehall"
+    ],
+    "duration": 272,
+    "src": "audio/free/dotjot%20-%20Leaving%20Babylon%20(Catch%20the%20Train%20Mix).mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "source": "https://ccmixter.org/files/dotjot/61742",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f26",
+    "trackNo": 126,
+    "title": "Don't Worry",
+    "artist": "DanScrew",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Dancehall",
+      "Pop"
+    ],
+    "duration": 210,
+    "src": "audio/free/DanScrew%20-%20Don't%20Worry.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "source": "https://ccmixter.org/files/DanScrew/40426",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f27",
+    "trackNo": 127,
+    "title": "Come",
+    "artist": "Bocrew",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Disco",
+      "Dancehall"
+    ],
+    "duration": 209,
+    "src": "audio/free/BOCrew%20-%20Come.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "source": "https://ccmixter.org/files/BOCrew/66165",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f28",
+    "trackNo": 128,
+    "title": "Dirtbag (Club Mix)",
+    "artist": "ScOmBer",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Disco",
+      "Electronic"
+    ],
+    "duration": 172,
+    "src": "audio/free/ScOmBer%20-%20Dirtbag%20(Club%20Mix).mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 2.5",
+    "licenseUrl": "http://creativecommons.org/licenses/by/2.5/",
+    "source": "https://ccmixter.org/files/scomber/17734",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f29",
+    "trackNo": 129,
+    "title": "Like a Rapper",
+    "artist": "Donnie Ozone",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Hip-Hop"
+    ],
+    "duration": 185,
+    "src": "audio/free/Donnie%20Ozone%20-%20Like%20a%20Rapper.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "source": "https://ccmixter.org/files/donnieozone/36041",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f30",
+    "trackNo": 130,
+    "title": "Bounce",
+    "artist": "reiswerk",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Hip-Hop"
+    ],
+    "duration": 315,
+    "src": "audio/free/reiswerk%20-%20Bounce.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "source": "https://ccmixter.org/files/Reiswerk/53117",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f31",
+    "trackNo": 131,
+    "title": "Tell Somebody",
+    "artist": "Zep Hurme",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Soul",
+      "Pop"
+    ],
+    "duration": 202,
+    "src": "audio/free/Zep%20Hurme%20-%20Tell%20Somebody.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "source": "https://ccmixter.org/files/zep_hurme/39918",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f32",
+    "trackNo": 132,
+    "title": "Too Late",
+    "artist": "Stefan Kartenberg",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "R&B",
+      "Soul"
+    ],
+    "duration": 260,
+    "src": "audio/free/Stefan%20Kartenberg%20-%20Too%20Late.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "source": "https://ccmixter.org/files/JeffSpeed68/51988",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f33",
+    "trackNo": 133,
+    "title": "Toronto Is My Beat",
+    "artist": "Whitewolf",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Electronic",
+      "Hip-Hop"
+    ],
+    "duration": 202,
+    "src": "audio/free/Whitewolf%20-%20Toronto%20Is%20My%20Beat.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "source": "https://ccmixter.org/files/Whitewolf225/60181",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f34",
+    "trackNo": 134,
+    "title": "Soul Sister",
+    "artist": "Robbero",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Disco",
+      "Funk"
+    ],
+    "duration": 199,
+    "src": "audio/free/Robbero%20-%20Soul%20Sister.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "source": "https://ccmixter.org/files/Robbero/41686",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f35",
+    "trackNo": 135,
+    "title": "Slippin' & Slidin'",
+    "artist": "SackJo22",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "R&B",
+      "Blues"
+    ],
+    "duration": 348,
+    "src": "audio/free/SackJo22%20-%20Slippin%20and%20Slidin.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "source": "https://ccmixter.org/files/SackJo22/30330",
+    "downloadable": true,
+    "featured": false,
+    "guest": true
+  },
+  {
+    "id": "f36",
+    "trackNo": 136,
+    "title": "Salsa",
+    "artist": "Gshepherd",
+    "albumId": "cc-sessions",
+    "album": "Signal Sessions (CC)",
+    "year": 2026,
+    "genres": [
+      "Salsa",
+      "Latin"
+    ],
+    "duration": 113,
+    "src": "audio/free/Gshepherd%20-%20Salsa.mp3",
+    "art": "assets/art/free-cover.svg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
+    "source": "https://ccmixter.org/files/Gshepherd/49375",
     "downloadable": true,
     "featured": false,
     "guest": true
