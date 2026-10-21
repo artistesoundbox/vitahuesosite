@@ -880,8 +880,8 @@ function bindLibrary() {
     renderLibrary();
   });
 
-  /* Copy the pruning ledger: \"Artist — Title (id)\" per line, ready to hand
-     over for permanent removal. Nothing is uploaded anywhere. */
+  /* Copy the pruning ledger — one "Artist — Title (id)" per line, ready to
+     hand over for permanent removal. Nothing is uploaded anywhere. */
   els['lib-hidden']?.addEventListener('click', async () => {
     const ids = [...blockedIds()];
     if (!ids.length) {

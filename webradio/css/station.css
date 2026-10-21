@@ -235,6 +235,7 @@ a:hover { color: #fff; }
 .icon-btn[aria-pressed="true"] { color: var(--neon-hot); border-color: var(--line-strong); background: rgba(56, 182, 255, 0.14); }
 .icon-btn.is-fav { color: var(--pink); }
 .icon-btn.is-block { color: #ff9d92; }
+#lib-hidden.is-empty { opacity: 0.55; }
 #btn-menu { display: none; }
 
 /* -------------------------------------------------------------------- main */
