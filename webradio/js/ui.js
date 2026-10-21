@@ -460,7 +460,7 @@ function cacheEls() {
     'dock', 'dock-art', 'dock-title', 'dock-artist', 'dock-mode', 'dock-play', 'dock-play-icon',
     'dock-mute', 'dock-mute-icon', 'dock-fav', 'dock-bar', 'dock-eq', 'dock-open',
     'lib-search', 'lib-sort', 'lib-favorites', 'lib-count', 'lib-grid', 'lib-empty', 'lib-clear',
-    'contact-form', 'contact-note', 'request-form', 'request-track', 'request-note',
+    'contact-form', 'contact-note', 'chat-input', 'chat-emoji', 'chat-emoji-panel', 'chat-count',
     'copy-embed', 'embed-code', 'lightbox', 'lightbox-img', 'lightbox-caption', 'lightbox-close',
     'btn-menu', 'nav', 'topbar'
   ].forEach((id) => { els[id] = $(id); });
@@ -847,6 +847,63 @@ function bindLibrary() {
   });
 }
 
+/* The chat picker: a grid of emoji that drops into the message at the caret.
+   Sending one on its own renders it large (see .chat-text.is-emoji), which is
+   the room's no-asset "sticker" — nothing to download, nothing to moderate. */
+const CHAT_EMOJI = [
+  '\u{1F600}', '\u{1F604}', '\u{1F601}', '\u{1F60A}', '\u{1F609}', '\u{1F60D}', '\u{1F929}', '\u{1F60E}',
+  '\u{1F973}', '\u{1F602}', '\u{1F923}', '\u{1F605}', '\u{1F643}', '\u{1F634}', '\u{1F914}', '\u{1F62E}',
+  '\u{1F979}', '\u{1F62D}', '\u{1F624}', '\u{1F44F}', '\u{1F64C}', '\u{1F64F}', '\u{1F44D}', '\u{1F91D}',
+  '\u{1F525}', '\u{2728}', '\u{1F4AB}', '\u{2B50}', '\u{1F389}', '\u{1F38A}', '\u{1F57A}', '\u{1F483}',
+  '\u{1FA69}', '\u{1F3B6}', '\u{1F3B5}', '\u{1F3A7}', '\u{1F4FB}', '\u{1F496}', '\u{1F49C}', '\u{2764}',
+  '\u{1F334}', '\u{1F30A}', '\u{1F379}', '\u{2615}', '\u{1F32E}', '\u{1F941}', '\u{1F3B8}'
+];
+
+function bindChatEmoji() {
+  const button = els['chat-emoji'];
+  const panel = els['chat-emoji-panel'];
+  const input = els['chat-input'];
+  if (!button || !panel || !input) return;
+
+  CHAT_EMOJI.forEach((emoji) => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.textContent = emoji;
+    item.setAttribute('aria-label', `Insert ${emoji}`);
+    item.addEventListener('click', () => {
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? start;
+      input.value = input.value.slice(0, start) + emoji + input.value.slice(end);
+      const caret = start + emoji.length;
+      input.focus({ preventScroll: true });
+      try { input.setSelectionRange(caret, caret); } catch { /* ignore */ }
+      if (els['chat-count']) els['chat-count'].textContent = String(input.value.length);
+    });
+    panel.appendChild(item);
+  });
+
+  const close = () => {
+    panel.hidden = true;
+    button.setAttribute('aria-expanded', 'false');
+  };
+
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const opening = panel.hidden;
+    panel.hidden = !opening;
+    button.setAttribute('aria-expanded', String(opening));
+    if (opening) panel.querySelector('button')?.focus({ preventScroll: true });
+  });
+  panel.addEventListener('click', (event) => event.stopPropagation());
+  document.addEventListener('click', () => { if (!panel.hidden) close(); });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !panel.hidden) {
+      close();
+      button.focus({ preventScroll: true });
+    }
+  });
+}
+
 function bindForms() {
   const form = els['contact-form'];
   form?.addEventListener('submit', async (event) => {
@@ -908,15 +965,6 @@ function bindForms() {
     box.select();
     els['contact-note'].textContent = 'Clipboard is blocked — your message is below. Select it and send it via YouTube or GitHub.';
     toast('Select the message below to copy it.');
-  });
-
-  els['request-form']?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const track = els['request-track'].value.trim();
-    if (!track) return;
-    community.requestSong(track, els['request-note'].value.trim());
-    els['request-track'].value = '';
-    els['request-note'].value = '';
   });
 
   els['copy-embed']?.addEventListener('click', async () => {
@@ -1105,6 +1153,7 @@ function init() {
   bindPlayer();
   bindLibrary();
   bindForms();
+  bindChatEmoji();
   bindChrome();
 
   const year = $('year');
