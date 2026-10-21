@@ -1,4 +1,4 @@
-/* Listener room — chat, presence and song requests.
+/* Listener room — chat (text and emoji) plus presence.
  *
  * Transport: a free public ntfy.sh topic (no account, no key). If it is
  * unreachable, everything degrades to this device: tabs still talk to each
@@ -8,17 +8,19 @@
  * No user text is ever written as HTML — messages are built as text nodes.
  */
 import { COMMUNITY } from './config.js';
-import { TRACKS } from './catalog.js';
 
 const STORE = {
   client: 'vh.client',
   name: 'vh.name',
-  chat: 'vh.chat',
-  requests: 'vh.requests'
+  chat: 'vh.chat'
 };
 
 const MAX_CHAT = 60;
-const MAX_REQUESTS = 25;
+
+/* Emoji-only messages are the room's "cartoons": they render big instead of
+   looking like a tiny word in a paragraph. */
+const EMOJI_ONLY = /^[\p{Extended_Pictographic}\p{Emoji_Component}\uFE0F\u200D\s]{1,12}$/u;
+const isEmojiOnly = (text) => EMOJI_ONLY.test(text) && /\p{Extended_Pictographic}/u.test(text);
 
 function read(key, fallback) {
   try {
@@ -53,16 +55,7 @@ export function createCommunity({ toast }) {
     relayBadge: $('relay-badge'),
     counts: [$('presence-count'), $('radio-presence'), $('room-count'), $('community-count')],
     roomMode: $('room-mode'),
-    tabChat: $('tab-chat'),
-    tabRequests: $('tab-requests'),
-    chatPane: $('chat-pane'),
-    requestPane: $('request-pane'),
-    roomRequestForm: $('room-request-form'),
-    roomRequestTrack: $('room-request-track'),
-    roomRequestNote: $('room-request-note'),
-    roomRequestList: $('room-request-list'),
-    contactRequestList: $('request-list'),
-    trackOptions: [$('track-options'), $('track-options-2')]
+    chatPane: $('chat-pane')
   };
 
   const clientId = (() => {
@@ -74,7 +67,6 @@ export function createCommunity({ toast }) {
   const state = {
     peers: new Map(),
     messages: read(STORE.chat, []),
-    requests: read(STORE.requests, []),
     seen: new Set(),
     localMode: COMMUNITY.mode === 'local',
     relay: 'connecting',
@@ -179,32 +171,6 @@ export function createCommunity({ toast }) {
       appendMessage(msg);
     }
 
-    if (env.type === 'request') {
-      const request = {
-        id: env.id,
-        client: env.client,
-        name: escapeText(env.name) || 'Listener',
-        track: escapeText(env.track),
-        note: escapeText(env.note),
-        at: Number(env.at) || now
-      };
-      if (!request.track) return;
-      const exists = state.requests.some((r) => r.id === request.id);
-      if (!exists) {
-        state.requests = [request, ...state.requests].slice(0, MAX_REQUESTS);
-        write(STORE.requests, state.requests);
-        renderRequests();
-      }
-      appendMessage({
-        id: `${request.id}-sys`,
-        client: 'system',
-        name: 'Request',
-        text: `${request.name} asked for “${request.track}”${request.note ? ` — ${request.note}` : ''}`,
-        at: request.at,
-        system: true
-      });
-    }
-
     updateCounts();
   }
 
@@ -285,7 +251,7 @@ export function createCommunity({ toast }) {
     }
 
     const text = document.createElement('p');
-    text.className = 'chat-text';
+    text.className = 'chat-text' + (!msg.system && isEmojiOnly(msg.text) ? ' is-emoji' : '');
     text.textContent = msg.text;
     body.appendChild(text);
     li.appendChild(body);
@@ -331,73 +297,16 @@ export function createCommunity({ toast }) {
     }
   }
 
-  /* ------------------------------------------------------------- requests */
+  /* ----------------------------------------------------------------- panel */
 
-  function requestSong(track, note) {
-    const cleanTrack = escapeText(track);
-    if (!cleanTrack) return false;
-    const env = {
-      id: makeId(),
-      type: 'request',
-      client: clientId,
-      name: currentName(),
-      track: cleanTrack,
-      note: escapeText(note),
-      at: Date.now()
-    };
-    handleEnvelope(env);
-    broadcast(env);
-    publish(env);
-    toast(`Request sent — “${cleanTrack}”`);
-    return true;
-  }
-
-  function renderRequests() {
-    const lists = [els.roomRequestList, els.contactRequestList].filter(Boolean);
-    lists.forEach((list) => {
-      list.textContent = '';
-      state.requests.slice(0, 12).forEach((r) => {
-        const li = document.createElement('li');
-        const span = document.createElement('span');
-        span.textContent = r.track;
-        const meta = document.createElement('span');
-        meta.className = 'rq-note';
-        meta.textContent = r.note ? `${r.name} · ${r.note}` : r.name;
-        li.append(span, meta);
-        list.appendChild(li);
-      });
-      if (!state.requests.length) {
-        const li = document.createElement('li');
-        li.className = 'rq-note';
-        li.textContent = 'No requests yet — the AutoDJ is choosing.';
-        list.appendChild(li);
-      }
-    });
-  }
-
-  /* ----------------------------------------------------------------- tabs */
-
-  function selectTab(which) {
-    const chat = which === 'chat';
-    els.tabChat?.classList.toggle('is-active', chat);
-    els.tabRequests?.classList.toggle('is-active', !chat);
-    els.tabChat?.setAttribute('aria-selected', String(chat));
-    els.tabRequests?.setAttribute('aria-selected', String(!chat));
-    if (els.chatPane) els.chatPane.hidden = !chat;
-    if (els.requestPane) els.requestPane.hidden = chat;
-    if (chat) els.chatInput?.focus({ preventScroll: true });
-  }
-
-  function openPanel(which = 'chat') {
+  function openPanel() {
     if (!els.panel) return;
     els.panel.hidden = false;
     els.scrim.hidden = false;
     state.panelOpen = true;
     document.body.style.overflow = 'hidden';
-    selectTab(which);
     renderChat();
-    renderRequests();
-    els.close?.focus({ preventScroll: true });
+    els.chatInput?.focus({ preventScroll: true });
   }
 
   function closePanel() {
@@ -437,40 +346,18 @@ export function createCommunity({ toast }) {
       els.chatInput.focus();
     });
 
-    els.roomRequestForm?.addEventListener('submit', (event) => {
-      event.preventDefault();
-      if (requestSong(els.roomRequestTrack.value, els.roomRequestNote.value)) {
-        els.roomRequestForm.reset();
-      }
-    });
-
-    els.tabChat?.addEventListener('click', () => selectTab('chat'));
-    els.tabRequests?.addEventListener('click', () => selectTab('requests'));
     els.close?.addEventListener('click', closePanel);
     els.scrim?.addEventListener('click', closePanel);
 
     ['btn-listeners', 'radio-chat', 'radio-chat-2'].forEach((id) => {
-      document.getElementById(id)?.addEventListener('click', () => openPanel('chat'));
+      document.getElementById(id)?.addEventListener('click', () => openPanel());
     });
 
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && state.panelOpen) closePanel();
     });
 
-    if (els.trackOptions) {
-      els.trackOptions.filter(Boolean).forEach((datalist) => {
-        const frag = document.createDocumentFragment();
-        TRACKS.forEach((t) => {
-          const option = document.createElement('option');
-          option.value = t.title;
-          frag.appendChild(option);
-        });
-        datalist.appendChild(frag);
-      });
-    }
-
     renderChat();
-    renderRequests();
     updateCounts();
     openRelay();
 
@@ -500,5 +387,5 @@ export function createCommunity({ toast }) {
     });
   }
 
-  return { init, openPanel, closePanel, requestSong, currentName };
+  return { init, openPanel, closePanel, currentName };
 }
