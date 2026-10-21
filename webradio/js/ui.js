@@ -1007,9 +1007,18 @@ function resumeFromSiteHandoff() {
      it was — arriving on the station should never change the song. Live
      listeners rejoin the broadcast instead, which is the same track anyway. */
   const track = note.trackId ? TRACKS.find((t) => t.id === note.trackId) : null;
-  if (note.mode === 'personal' && track) {
+
+  /* Continue what the visitor was actually hearing whenever it differs from
+     what this page's clock says is live. That happens after a skip, and it
+     also covers a stale cached catalogue on the old page (different reel =
+     different "now"); arriving must never change the song under them. */
+  const liveNow = radio.track;      // set from the live reel at module load
+  const sameAsLive = track && liveNow && liveNow.id === track.id;
+
+  if (track && !sameAsLive) {
     radio.playTrack(track);
-    const offset = Math.max(0, Number(note.offset) || 0);
+    const elapsed = Math.max(0, (Date.now() - Number(note.at || Date.now())) / 1000);
+    const offset = Math.max(0, Number(note.offset) || 0) + Math.min(5, elapsed);
     if (offset > 1) {
       const audio = radio.audio;
       const seek = () => { try { audio.currentTime = offset; } catch { /* ignore */ } };

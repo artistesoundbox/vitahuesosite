@@ -240,11 +240,14 @@ rest of `vitahuesosite`:
   links into the full station (customizer, listener room, chat, requests). It is
   marked `data-radio-open`, so opening it also switches the radio on.
 - A page navigation always destroys the `<audio>` element, so the dock leaves a
-  hand-off note in `sessionStorage`. The station page reads it and rejoins the
-  **same live position immediately**, which is why the song that was playing
-  carries through the jump. If the browser still blocks sound on the new
-  document, a **Tap to keep the radio going** pill appears — one tap, no
-  hunting for the play button.
+  hand-off note in `sessionStorage` with the **track id, playback mode and
+  position**. The station page continues exactly that song where it was — a live
+  listener rejoins the same live entry, a listener who had skipped stays on the
+  skipped track, and even a page holding a stale cached catalogue continues what
+  was audible instead of switching to a different "now". Arriving never changes
+  the song under the visitor. If the browser still blocks sound on the new
+  document, a **Tap to keep the radio going** pill appears — one tap, no hunting
+  for the play button.
 - Any element marked `data-radio-open` gets that behaviour, so other pages can
   add their own door into the station.
 - The PWA install chip (`install.js`) shares the bottom-left corner with the
