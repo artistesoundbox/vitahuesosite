@@ -328,9 +328,28 @@ function setEnabledUI(active) {
   }
 }
 
+/**
+ * A normal page navigation always tears the <audio> element down with the
+ * document, so the station cannot literally keep singing across it. This
+ * note is the next best thing: the station page reads it on load and rejoins
+ * the SAME live position straight away, so the broadcast picks up where the
+ * previous page left it instead of waiting for another tap.
+ */
+const KEY_HANDOFF = 'vh.radio.handoff';
+
+function writeHandoff() {
+  try {
+    sessionStorage.setItem(KEY_HANDOFF, JSON.stringify({
+      playing: radio.playing || hasIntent(),
+      at: Date.now()
+    }));
+  } catch { /* private mode */ }
+}
+
 function enable() {
   write(KEY_ON, '1');
   write(KEY_INTENT, '1');
+  writeHandoff();
   silencePortal();
   setEnabledUI(true);
   paint(radio.snapshot());
@@ -378,6 +397,7 @@ function init() {
     link.addEventListener('click', () => {
       if (!isOn()) enable();
       else if (hasIntent() && !radio.playing) radio.start();
+      writeHandoff();
     });
   });
 

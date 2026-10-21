@@ -977,6 +977,27 @@ function renderRoute() {
 
 /* -------------------------------------------------------------------- init */
 
+/**
+ * Continue the broadcast across the portal → station navigation.
+ *
+ * Browsers destroy the <audio> element with the document, so no static site
+ * can keep one stream running through a real page change. The site dock
+ * (site-radio.js) therefore leaves a hand-off note; here we rejoin the SAME
+ * live position at once, so the song that was playing keeps playing instead
+ * of stopping at the door. If the browser blocks autoplay after a navigation,
+ * the ordinary "tap play once" path takes over.
+ */
+function resumeFromSiteHandoff() {
+  let note = null;
+  try {
+    note = JSON.parse(sessionStorage.getItem('vh.radio.handoff') || 'null');
+    sessionStorage.removeItem('vh.radio.handoff');
+  } catch { note = null; }
+  if (!note || !note.playing) return;
+  if (Date.now() - Number(note.at || 0) > 120000) return;   // stale tab, not a hand-off
+  radio.start();
+}
+
 function init() {
   cacheEls();
   ROUTES.forEach((route) => {
@@ -1016,6 +1037,8 @@ function init() {
     const schedule = $('schedule-next');
     if (schedule) schedule.textContent = `Next programme in ${formatCountdown(msUntilNextProgram())}`;
   }, 30000);
+
+  resumeFromSiteHandoff();
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('sw.js').catch(() => { /* offline cache is optional */ });
