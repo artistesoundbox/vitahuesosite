@@ -317,11 +317,26 @@
            clipping. The Spotify chip uses the SAME sizing as the buttons so
            it matches them on every device. */
         #landing-page {
-            max-height: 100vh;
-            max-height: 100dvh;   /* mobile: excludes the URL bar */
+            /* Centered while the column fits, scrollable from the TOP when it
+               does not. The old top:50% / translate(-50%,-50%) centre clipped
+               the start of the stack on short screens — the "Enable radio"
+               pill sat half off-screen and could not be reached. `safe center`
+               falls back to flex-start on overflow, so nothing is cut off. */
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            transform: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            justify-content: safe center;
+            box-sizing: border-box;
+            max-height: none;
             overflow-y: auto;
             scrollbar-width: none;
-            padding: 10px 6px 22px;   /* tail room under the radio card */
+            padding: 14px 8px 24px;   /* tail room under the radio card */
         }
         #landing-page::-webkit-scrollbar { display: none; }
         .button-container { gap: 30px 26px; }
