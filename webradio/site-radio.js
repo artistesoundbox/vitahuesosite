@@ -356,6 +356,17 @@ function init() {
     toggleButton.addEventListener('click', toggle);
   }
 
+  /* Doors into the station (the portal footer card is one). Opening the
+     station turns the site radio on first, so it is already live when the
+     visitor comes back to the rest of the site — no re-tuning needed. The
+     navigation itself is never blocked. */
+  document.querySelectorAll('[data-radio-open]').forEach((link) => {
+    link.addEventListener('click', () => {
+      if (!isOn()) enable();
+      else if (hasIntent() && !radio.playing) radio.start();
+    });
+  });
+
   radio.addEventListener('state', (event) => {
     paint(event.detail);
     if (event.detail.playing) write(KEY_INTENT, '1');

@@ -165,6 +165,95 @@
             box-shadow: 0 0 26px rgba(255, 205, 140, 0.6);
         }
 
+        /* RADIO FOOTER — vitahuesoradioicon.png at the bottom of the portal
+           column. It is the doorway into the live station (customizer,
+           listener room, chat, requests) and doubles as the site-wide radio
+           switch: site-radio.js turns the dock on when it is opened. */
+        .radio-footer {
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            width: min(560px, 100%);
+            margin: 26px auto 8px;
+            padding: 12px 16px 12px 12px;
+            border-radius: 16px;
+            border: 1px solid rgba(90, 180, 255, 0.42);
+            background: linear-gradient(140deg, rgba(90, 175, 255, 0.14), rgba(6, 12, 24, 0.9) 58%);
+            box-shadow: 0 0 20px rgba(56, 160, 255, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            text-decoration: none;
+            text-align: left;
+            transition: border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
+        }
+        .radio-footer:hover,
+        .radio-footer:focus-visible {
+            border-color: rgba(140, 225, 255, 0.9);
+            box-shadow: 0 0 30px rgba(80, 190, 255, 0.4);
+            transform: translateY(-2px);
+            outline: none;
+        }
+        #radio-footer-img {
+            flex: none;
+            display: block;
+            width: clamp(52px, 8vh, 78px);
+            height: auto;
+            border-radius: 12px;
+            filter: drop-shadow(0 0 10px rgba(80, 170, 255, 0.4));
+        }
+        .radio-footer-copy {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .radio-footer-kicker {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 9.5px;
+            font-weight: 700;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: #6ee7ff;
+        }
+        .radio-footer-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #6ee7ff;
+            box-shadow: 0 0 8px #38b6ff;
+        }
+        html.vhr-on .radio-footer-dot {
+            background: #ff4d7d;
+            box-shadow: 0 0 9px #ff4d7d;
+            animation: radio-footer-pulse 1.8s ease-in-out infinite;
+        }
+        @keyframes radio-footer-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+        .radio-footer-title {
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 18px;
+            letter-spacing: 0.02em;
+            color: #f2f7ff;
+            text-shadow: 0 0 10px rgba(10, 22, 48, 0.9);
+        }
+        .radio-footer-sub {
+            font-family: "Courier New", Courier, monospace;
+            font-size: 10.5px;
+            line-height: 1.45;
+            letter-spacing: 0.03em;
+            color: #93a9c6;
+        }
+        .radio-footer-go {
+            flex: none;
+            margin-left: auto;
+            padding-left: 6px;
+            font-size: 20px;
+            color: #8fd8ff;
+            transition: transform 0.22s ease, color 0.22s ease;
+        }
+        .radio-footer:hover .radio-footer-go { transform: translateX(3px); color: #eaf7ff; }
+
         /* MY MUSIC link — chip under the buttons (BandLab albums page) */
         .music-link {
             pointer-events: auto;
@@ -274,6 +363,10 @@
                 max-height: clamp(110px, 19vh, 190px);
             }
             .art-label { font-size: 11px; letter-spacing: 0.04em; }
+            .radio-footer { gap: 11px; padding: 10px 12px 10px 10px; margin-top: 20px; }
+            .radio-footer-title { font-size: 15.5px; }
+            .radio-footer-sub { font-size: 9.5px; }
+            .radio-footer-go { font-size: 17px; }
         }
     </style>
 </head>
@@ -379,6 +472,22 @@
             <span class="art-label">My Music</span>
         </a>
         </div>
+
+        <!-- VITA HUESO RADIO — the door into the 24/7 station: customize it,
+             chat in the listener room, request a song. Opening it also turns
+             the site radio on (site-radio.js), so the station keeps playing
+             as you move around the site. -->
+        <a class="radio-footer" id="vh-radio-footer" href="webradio/index.html#radio"
+           data-radio-open aria-label="Vita Hueso Radio — open the 24/7 station to customize, chat and request songs"
+           title="Vita Hueso Radio — 24/7 station, customizer, listener room">
+            <img src="vitahuesoradioicon.png" alt="Vita Hueso Radio" id="radio-footer-img" />
+            <span class="radio-footer-copy">
+                <span class="radio-footer-kicker"><i class="radio-footer-dot" aria-hidden="true"></i>24/7 · Live</span>
+                <span class="radio-footer-title">Vita Hueso Radio</span>
+                <span class="radio-footer-sub">Open the station — customize it, chat in the listener room, request a song</span>
+            </span>
+            <span class="radio-footer-go" aria-hidden="true">→</span>
+        </a>
     </div>
 	<div style="max-width: 900px; margin: 42px auto 26px; padding: 0 6vw; text-align: center; color: #7f6f7d; font-size: 13px; letter-spacing: .14em; text-transform: uppercase;">Under Development</div>
 	<script src="signin.js"></script>
