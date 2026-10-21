@@ -611,6 +611,8 @@ function updateState(state) {
 
   els['np-fav'].setAttribute('aria-pressed', String(state.favorite));
   els['np-fav'].classList.toggle('is-fav', state.favorite);
+  const favCount = els['lib-fav-count'];
+  if (favCount) favCount.textContent = String(radio.favorites.size);
   setUse(els['np-fav'].querySelector('svg'), state.favorite ? 'i-heart-fill' : 'i-heart');
   els['dock-fav'].setAttribute('aria-pressed', String(state.favorite));
   els['dock-fav'].classList.toggle('is-fav', state.favorite);
