@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vita Hues Radio — embeddable player</title>
+  <meta name="robots" content="noindex, follow" />
+  <meta name="theme-color" content="#04060d" />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: transparent; }
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      color: #eaf2ff;
+      display: flex; align-items: stretch;
+      padding: 6px;
+    }
+    .embed {
+      position: relative;
+      display: grid;
+      grid-template-columns: 54px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 11px;
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(120, 190, 255, 0.32);
+      background:
+        radial-gradient(420px 120px at 20% 0%, rgba(56, 182, 255, 0.16), transparent 70%),
+        rgba(6, 12, 22, 0.94);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      overflow: hidden;
+    }
+    .art {
+      width: 54px; height: 54px; border-radius: 10px; object-fit: cover;
+      border: 1px solid rgba(120, 190, 255, 0.25);
+      background: #050a13;
+    }
+    .meta { min-width: 0; }
+    .row { display: flex; align-items: center; gap: 7px; min-width: 0; }
+    .mode {
+      flex: none;
+      font-size: 8px; font-weight: 700; letter-spacing: 0.14em;
+      padding: 2px 6px; border-radius: 4px;
+      color: #6ee7ff; border: 1px solid rgba(56, 182, 255, 0.4);
+      background: rgba(56, 182, 255, 0.1);
+    }
+    .mode.personal { color: #c9bcff; border-color: rgba(124, 92, 255, 0.45); background: rgba(124, 92, 255, 0.12); }
+    .title {
+      font-size: 13px; font-weight: 600; color: #fff; text-decoration: none;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .title:hover { color: #9fe6ff; }
+    .sub {
+      margin-top: 2px; font-size: 10.5px; color: #8fa5c2;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .bar { margin-top: 7px; height: 2px; border-radius: 99px; background: rgba(120, 180, 255, 0.12); overflow: hidden; }
+    .bar span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #38b6ff, #6ee7ff); transition: width 0.4s linear; }
+    .controls { display: flex; align-items: center; gap: 2px; }
+    button {
+      display: grid; place-items: center;
+      width: 34px; height: 34px; border: 0; border-radius: 50%;
+      background: transparent; color: #c7d7ea; cursor: pointer;
+      transition: background 0.18s ease, color 0.18s ease;
+    }
+    button:hover { background: rgba(120, 180, 255, 0.12); color: #fff; }
+    button:focus-visible { outline: 2px solid #6ee7ff; outline-offset: 1px; }
+    .play {
+      width: 38px; height: 38px; color: #021019;
+      background: linear-gradient(140deg, #d7f6ff, #6ee7ff 42%, #38b6ff 78%);
+      box-shadow: 0 4px 16px rgba(56, 182, 255, 0.45);
+    }
+    .play:hover { background: linear-gradient(140deg, #fff, #9feaff 42%, #38b6ff 78%); }
+    svg { width: 16px; height: 16px; fill: none; }
+    .play svg { width: 17px; height: 17px; }
+    .open { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; color: #647a99; text-decoration: none; font-size: 13px; }
+    .open:hover { color: #fff; background: rgba(120, 180, 255, 0.1); }
+    @media (max-width: 520px) {
+      .embed { grid-template-columns: 46px minmax(0, 1fr) auto; gap: 9px; padding: 9px 10px; }
+      .art { width: 46px; height: 46px; }
+      .volume, .open { display: none; }
+      .title { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="embed" role="region" aria-label="Vita Hues Radio player">
+    <img class="art" id="art" src="assets/art/t01.jpg" alt="" width="54" height="54" />
+    <div class="meta">
+      <div class="row">
+        <span class="mode" id="mode">LIVE</span>
+        <a class="title" id="title" href="index.html#radio" target="_blank" rel="noopener">Vita Hues Radio</a>
+      </div>
+      <div class="sub" id="sub">Loading the broadcast…</div>
+      <div class="bar" aria-hidden="true"><span id="bar"></span></div>
+    </div>
+    <div class="controls">
+      <button class="play" id="play" type="button" aria-label="Play the radio">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use id="play-icon" href="#embed-play"/></svg>
+      </button>
+      <button id="next" type="button" aria-label="Skip">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5.5v13L16 12z" fill="currentColor"/><path d="M17 5h2v14h-2z" fill="currentColor"/></svg>
+      </button>
+      <button class="volume" id="mute" type="button" aria-label="Mute">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3l4-3.5v12l-4-3.5H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M15 9a4 4 0 010 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+      <a class="open" id="open" href="index.html#radio" target="_blank" rel="noopener" aria-label="Open the full station">↗</a>
+    </div>
+  </div>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="embed-play" viewBox="0 0 24 24"><path d="M8 5.2v13.6L19 12z" fill="currentColor"/></symbol>
+    <symbol id="embed-pause" viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"/></symbol>
+  </svg>
+
+  <script type="module">
+    import { radio } from './player.js';
+    import { formatTime } from './station.js';
+
+    const $ = (id) => document.getElementById(id);
+    const art = $('art');
+    const title = $('title');
+    const sub = $('sub');
+    const mode = $('mode');
+    const bar = $('bar');
+    const play = $('play');
+    const playIcon = $('play-icon');
+    const mute = $('mute');
+
+    function render(state) {
+      if (!state.track) return;
+      const track = state.track;
+      if (art.getAttribute('src') !== track.art) art.src = track.art;
+      if (title.textContent !== track.title) {
+        title.textContent = track.title;
+        document.title = `${track.title} — Vita Hues Radio`;
+      }
+      sub.textContent = `${track.artist} · ${track.album} · ${formatTime(state.position)} / ${formatTime(track.duration)}`;
+      mode.textContent = state.mode === 'live' ? 'LIVE' : 'PERSONAL';
+      mode.classList.toggle('personal', state.mode !== 'live');
+      const pct = track.duration ? Math.min(100, (state.position / track.duration) * 100) : 0;
+      bar.style.width = pct + '%';
+      play.setAttribute('aria-label', state.playing ? 'Pause' : 'Play');
+      playIcon.setAttribute('href', state.playing ? '#embed-pause' : '#embed-play');
+      mute.setAttribute('aria-label', state.muted ? 'Unmute' : 'Mute');
+    }
+
+    radio.addEventListener('state', (event) => render(event.detail));
+    radio.addEventListener('time', (event) => {
+      const state = radio.snapshot();
+      state.position = event.detail.position;
+      render(state);
+    });
+    radio.addEventListener('notice', (event) => { sub.textContent = event.detail; });
+
+    play.addEventListener('click', () => radio.toggle());
+    $('next').addEventListener('click', () => radio.next());
+    mute.addEventListener('click', () => radio.toggleMute());
+
+    render(radio.snapshot());
+  </script>
+</body>
+</html>

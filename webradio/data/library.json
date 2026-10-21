@@ -1,0 +1,529 @@
+{
+  "station": {
+    "name": "Vita Hues Radio",
+    "callSign": "VH·SIGNAL",
+    "tagline": "A 24/7 transmission of original songs, quiet experiments and slow frequencies.",
+    "artist": "Vita Hues",
+    "alias": "artistesoundbox",
+    "contactEmail": "",
+    "siteUrl": "https://artistesoundbox.github.io/vitahuesosite/webradio/",
+    "youtube": "https://www.youtube.com/@AnthonitusArtiste",
+    "github": "https://github.com/artistesoundbox"
+  },
+  "albums": [
+    {
+      "id": "vol1",
+      "title": "I See God in You",
+      "cover": "assets/covers/album1.jpg",
+      "year": 2025,
+      "description": "The first transmission. Eleven songs about being seen, being held, and coming back to yourself."
+    },
+    {
+      "id": "vol2",
+      "title": "Still Waters",
+      "cover": "assets/covers/album2.jpg",
+      "year": 2025,
+      "description": "A quieter room. Slow water, reflections, forgiveness, and the parts of you that waited."
+    },
+    {
+      "id": "vol3",
+      "title": "New Edges",
+      "cover": "assets/covers/album3.jpg",
+      "year": 2026,
+      "description": "Movement and momentum. Choosing yourself, again and again, in a slightly firmer voice."
+    },
+    {
+      "id": "vol4",
+      "title": "En Español",
+      "cover": "assets/covers/album4.jpg",
+      "year": 2026,
+      "description": "Tres canciones en español. Flow, blue light, and galaxies that keep a beat."
+    },
+    {
+      "id": "vol5",
+      "title": "Simply Be",
+      "cover": "assets/covers/album5.jpg",
+      "year": 2026,
+      "description": "Lo-fi mantras and small victories. Music for the soft hour before sleep."
+    },
+    {
+      "id": "cc-sessions",
+      "title": "Signal Sessions (CC)",
+      "cover": "assets/art/free-cover.svg",
+      "year": 2026,
+      "description": "Guest instrumentals under Creative Commons BY 4.0, hosted on this site and woven through the live rotation.",
+      "external": true
+    }
+  ],
+  "tracks": {
+    "1": {
+      "title": "I See God in You",
+      "album": "vol1",
+      "genres": [
+        "Soul",
+        "Ambient"
+      ]
+    },
+    "2": {
+      "title": "You're Allowed to Rest",
+      "album": "vol1",
+      "genres": [
+        "Ambient",
+        "Piano"
+      ]
+    },
+    "3": {
+      "title": "The Mind Lies, The Heart Knows",
+      "album": "vol1",
+      "genres": [
+        "Piano",
+        "Cinematic"
+      ]
+    },
+    "4": {
+      "title": "Tell Them While They're Here",
+      "album": "vol1",
+      "genres": [
+        "Soul",
+        "Piano"
+      ]
+    },
+    "5": {
+      "title": "I Forgive You, I Forgive Me",
+      "album": "vol1",
+      "genres": [
+        "Soul",
+        "Piano"
+      ]
+    },
+    "6": {
+      "title": "The Inner Child Still Matters",
+      "album": "vol1",
+      "genres": [
+        "Ambient",
+        "Piano"
+      ]
+    },
+    "7": {
+      "title": "You're Not Too Late",
+      "album": "vol1",
+      "genres": [
+        "Soul",
+        "Cinematic"
+      ]
+    },
+    "8": {
+      "title": "Your Heart Is Still Good",
+      "album": "vol1",
+      "genres": [
+        "Soul",
+        "Ambient"
+      ]
+    },
+    "9": {
+      "title": "Thank You for Carrying Me",
+      "album": "vol1",
+      "genres": [
+        "Cinematic",
+        "Piano"
+      ]
+    },
+    "10": {
+      "title": "I'm Proud of You",
+      "album": "vol1",
+      "genres": [
+        "Soul",
+        "Piano"
+      ]
+    },
+    "11": {
+      "title": "We're All Just Trying to Come Home",
+      "album": "vol1",
+      "genres": [
+        "Cinematic",
+        "Ambient"
+      ]
+    },
+    "12": {
+      "title": "Still Waters",
+      "album": "vol2",
+      "genres": [
+        "Ambient",
+        "Meditative"
+      ]
+    },
+    "13": {
+      "title": "Echos of Me",
+      "album": "vol2",
+      "genres": [
+        "Ambient",
+        "Electronic"
+      ]
+    },
+    "14": {
+      "title": "Beneath the Quiet",
+      "album": "vol2",
+      "genres": [
+        "Meditative",
+        "Ambient"
+      ]
+    },
+    "15": {
+      "title": "The Part I Hid",
+      "album": "vol2",
+      "genres": [
+        "Piano",
+        "Cinematic"
+      ]
+    },
+    "16": {
+      "title": "When I Finally Let Go",
+      "album": "vol2",
+      "genres": [
+        "Ambient",
+        "Soul"
+      ]
+    },
+    "17": {
+      "title": "I See Myself Now",
+      "album": "vol2",
+      "genres": [
+        "Cinematic",
+        "Soul"
+      ]
+    },
+    "18": {
+      "title": "The Realization",
+      "album": "vol2",
+      "genres": [
+        "Cinematic",
+        "Piano"
+      ]
+    },
+    "19": {
+      "title": "Resistance",
+      "album": "vol2",
+      "genres": [
+        "Electronic",
+        "Cinematic"
+      ]
+    },
+    "20": {
+      "title": "Reflection",
+      "album": "vol2",
+      "genres": [
+        "Ambient",
+        "Piano"
+      ]
+    },
+    "21": {
+      "title": "I Feel It Now",
+      "album": "vol2",
+      "genres": [
+        "Soul",
+        "Ambient"
+      ]
+    },
+    "22": {
+      "title": "I Take the Step",
+      "album": "vol2",
+      "genres": [
+        "Cinematic",
+        "Electronic"
+      ]
+    },
+    "23": {
+      "title": "I Stand Here",
+      "album": "vol2",
+      "genres": [
+        "Soul",
+        "Cinematic"
+      ]
+    },
+    "24": {
+      "title": "I Open Up",
+      "album": "vol2",
+      "genres": [
+        "Ambient",
+        "Soul"
+      ]
+    },
+    "25": {
+      "title": "I Reach for You",
+      "album": "vol3",
+      "genres": [
+        "Soul",
+        "Ambient"
+      ]
+    },
+    "26": {
+      "title": "Outside Myself",
+      "album": "vol3",
+      "genres": [
+        "Electronic",
+        "Ambient"
+      ]
+    },
+    "27": {
+      "title": "New Edges",
+      "album": "vol3",
+      "genres": [
+        "Electronic",
+        "Cinematic"
+      ]
+    },
+    "28": {
+      "title": "The Shift",
+      "album": "vol3",
+      "genres": [
+        "Electronic",
+        "Cinematic"
+      ]
+    },
+    "29": {
+      "title": "In My Own Light",
+      "album": "vol3",
+      "genres": [
+        "Soul",
+        "Ambient"
+      ]
+    },
+    "30": {
+      "title": "Little Victories",
+      "album": "vol3",
+      "genres": [
+        "Soul",
+        "Piano"
+      ]
+    },
+    "31": {
+      "title": "Choosing Me",
+      "album": "vol3",
+      "genres": [
+        "Soul",
+        "Piano"
+      ]
+    },
+    "32": {
+      "title": "Steady Rise",
+      "album": "vol3",
+      "genres": [
+        "Cinematic",
+        "Electronic"
+      ]
+    },
+    "33": {
+      "title": "Clearer Now",
+      "album": "vol3",
+      "genres": [
+        "Ambient",
+        "Piano"
+      ]
+    },
+    "34": {
+      "title": "Here With Myself",
+      "album": "vol3",
+      "genres": [
+        "Ambient",
+        "Meditative"
+      ]
+    },
+    "35": {
+      "title": "Becoming Still",
+      "album": "vol3",
+      "genres": [
+        "Meditative",
+        "Ambient"
+      ]
+    },
+    "36": {
+      "title": "Déjalo Fluir (Let It Flow)",
+      "album": "vol4",
+      "genres": [
+        "Latin",
+        "Soul"
+      ]
+    },
+    "37": {
+      "title": "Azul en mis Manos",
+      "album": "vol4",
+      "genres": [
+        "Latin",
+        "Ambient"
+      ]
+    },
+    "38": {
+      "title": "Galaxias con Ritmo",
+      "album": "vol4",
+      "genres": [
+        "Latin",
+        "Electronic"
+      ]
+    },
+    "39": {
+      "title": "Stretch Like a Cat",
+      "album": "vol5",
+      "genres": [
+        "Lo-Fi",
+        "Ambient"
+      ]
+    },
+    "40": {
+      "title": "Drifting into Me",
+      "album": "vol5",
+      "genres": [
+        "Lo-Fi",
+        "Ambient"
+      ]
+    },
+    "41": {
+      "title": "I Zen-ter Myself",
+      "album": "vol5",
+      "genres": [
+        "Meditative",
+        "Lo-Fi"
+      ]
+    },
+    "42": {
+      "title": "Simply Be",
+      "album": "vol5",
+      "genres": [
+        "Ambient",
+        "Meditative"
+      ]
+    },
+    "43": {
+      "title": "Enough for Now",
+      "album": "vol5",
+      "genres": [
+        "Lo-Fi",
+        "Ambient"
+      ]
+    },
+    "44": {
+      "title": "No More Conflicting Thoughts",
+      "album": "vol5",
+      "genres": [
+        "Meditative",
+        "Ambient"
+      ]
+    },
+    "45": {
+      "title": "Inner Light",
+      "album": "vol5",
+      "genres": [
+        "Soul",
+        "Ambient"
+      ]
+    },
+    "46": {
+      "title": "A Flame That Doesn't Seem to Move",
+      "album": "vol5",
+      "genres": [
+        "Meditative",
+        "Ambient"
+      ]
+    },
+    "47": {
+      "title": "Not a Goodbye but a New Welcome",
+      "album": "vol5",
+      "genres": [
+        "Cinematic",
+        "Ambient"
+      ]
+    }
+  },
+  "freeTracks": [
+    {
+      "file": "Frozen Star.mp3",
+      "title": "Frozen Star",
+      "album": "cc-sessions",
+      "genres": [
+        "Ambient",
+        "Cinematic"
+      ],
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com/music/royalty-free/",
+      "credit": "\"Frozen Star\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0"
+    },
+    {
+      "file": "Chill Wave.mp3",
+      "title": "Chill Wave",
+      "album": "cc-sessions",
+      "genres": [
+        "Lo-Fi",
+        "Ambient"
+      ],
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com/music/royalty-free/",
+      "credit": "\"Chill Wave\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0"
+    },
+    {
+      "file": "Water Lily.mp3",
+      "title": "Water Lily",
+      "album": "cc-sessions",
+      "genres": [
+        "Ambient",
+        "Piano"
+      ],
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com/music/royalty-free/",
+      "credit": "\"Water Lily\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0"
+    },
+    {
+      "file": "Winter Reflections.mp3",
+      "title": "Winter Reflections",
+      "album": "cc-sessions",
+      "genres": [
+        "Piano",
+        "Meditative"
+      ],
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com/music/royalty-free/",
+      "credit": "\"Winter Reflections\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0"
+    },
+    {
+      "file": "Reawakening.mp3",
+      "title": "Reawakening",
+      "album": "cc-sessions",
+      "genres": [
+        "Cinematic",
+        "Ambient"
+      ],
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com/music/royalty-free/",
+      "credit": "\"Reawakening\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0"
+    },
+    {
+      "file": "Ascending the Vale.mp3",
+      "title": "Ascending the Vale",
+      "album": "cc-sessions",
+      "genres": [
+        "Cinematic",
+        "Ambient"
+      ],
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com/music/royalty-free/",
+      "credit": "\"Ascending the Vale\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0"
+    },
+    {
+      "file": "Touching Moments Two - Higher.mp3",
+      "title": "Touching Moments Two — Higher",
+      "album": "cc-sessions",
+      "genres": [
+        "Piano",
+        "Ambient"
+      ],
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://incompetech.com/music/royalty-free/",
+      "credit": "\"Touching Moments Two - Higher\" Kevin MacLeod (incompetech.com), licensed CC BY 4.0"
+    }
+  ]
+}

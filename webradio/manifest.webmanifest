@@ -1,0 +1,26 @@
+{
+  "name": "Vita Hues Radio",
+  "short_name": "VH Radio",
+  "description": "A 24/7 online radio station streaming the original music of Vita Hues.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#04060d",
+  "theme_color": "#04060d",
+  "categories": ["music", "entertainment"],
+  "icons": [
+    {
+      "src": "assets/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/art/t01.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
+}
