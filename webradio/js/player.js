@@ -53,6 +53,10 @@ export class Radio extends EventTarget {
     this.audio = new Audio();
     this.audio.preload = 'auto';
     this.audio.setAttribute('playsinline', '');
+
+    // Pages outside webradio/ (the main site) prefix catalogue paths with the
+    // station folder; inside webradio/ the base stays empty.
+    this.base = '';
     this.audio.volume = clamp01(read(KEYS.volume, 0.8));
     this.muted = !!read(KEYS.muted, false);
     this.audio.muted = this.muted;
@@ -179,7 +183,7 @@ export class Radio extends EventTarget {
         artist: t.artist,
         album: t.album,
         artwork: [
-          { src: new URL(t.art, location.href).href, sizes: '512x512', type: t.art.endsWith('.svg') ? 'image/svg+xml' : 'image/jpeg' }
+          { src: this.artFor(t), sizes: '512x512', type: t.art.endsWith('.svg') ? 'image/svg+xml' : 'image/jpeg' }
         ]
       });
       this.setSessionState();
@@ -301,8 +305,8 @@ export class Radio extends EventTarget {
       this.pendingSeek = null;
     };
 
-    if (a.getAttribute('src') !== entry.track.src) {
-      a.src = entry.track.src;
+    if (a.getAttribute('src') !== this.srcFor(entry.track)) {
+      a.src = this.srcFor(entry.track);
       a.addEventListener('loadedmetadata', applySeek, { once: true });
     } else if (a.readyState >= 1) {
       applySeek();
@@ -331,7 +335,7 @@ export class Radio extends EventTarget {
     if (options.queue && options.queue.length) this.personalQueue = options.queue.slice();
     else if (!this.personalQueue.length) this.personalQueue = this.buildQueue(track);
 
-    a.src = track.src;
+    a.src = this.srcFor(track);
     const applySeek = () => {
       if (this.pendingSeek == null) return;
       try { a.currentTime = this.pendingSeek; } catch { /* ignore */ }
@@ -452,6 +456,27 @@ export class Radio extends EventTarget {
     return !!(track && this.favorites.has(track.id));
   }
 
+  /* ------------------------------------------------------------ asset base */
+
+  /** Prefix catalogue paths when the player is embedded outside webradio/. */
+  setBase(base) {
+    this.base = base ? String(base).replace(/\/?$/, '/') : '';
+  }
+
+  resolve(path) {
+    if (!path) return path;
+    if (/^(https?:)?\/\//i.test(path) || path.startsWith('/')) return path;
+    return this.base + path;
+  }
+
+  srcFor(track) {
+    return track ? this.resolve(track.src) : '';
+  }
+
+  artFor(track) {
+    return track ? this.resolve(track.art) : '';
+  }
+
   /* ---------------------------------------------------------------- queue */
 
   buildQueue(seed, size = 40) {
@@ -495,7 +520,7 @@ export class Radio extends EventTarget {
     const next = this.upNext(1)[0];
     if (!next) return;
     try {
-      if (this.preload.getAttribute('src') !== next.src) this.preload.src = next.src;
+      if (this.preload.getAttribute('src') !== this.srcFor(next)) this.preload.src = this.srcFor(next);
     } catch { /* ignore */ }
   }
 

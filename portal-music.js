@@ -32,11 +32,29 @@
   var btn = null;
   var fadeTimer = null;
 
-  // diagnostics handle
+  // diagnostics handle + the small control surface used by the site radio
   window.__portalMusic = {
     get ready() { return !!audio && audio.readyState >= 2; },
     get playing() { return isLive(); },
     get silentStart() { return !!(audio && audio.muted); }, // parked muted, waiting for a gesture
+
+    /* Called when the 24/7 radio is enabled: stop the welcome loop for good
+       (userMuted also blocks the first-gesture unmute). */
+    silence: function () {
+      userMuted = true;
+      if (fadeTimer) { clearInterval(fadeTimer); fadeTimer = null; }
+      if (audio) {
+        try { audio.pause(); } catch (e) { /* ignore */ }
+        audio.muted = true;
+      }
+      updateBtn();
+    },
+
+    /* Reveal the corner speaker again after the radio is turned off. */
+    showToggle: function () {
+      if (btn) btn.style.display = '';
+      updateBtn();
+    },
   };
 
   function isLive() {
@@ -106,7 +124,7 @@
     window.removeEventListener('touchstart', onFirst, OPTS);
   }
   function onFirst() {
-    if (userMuted) { if (isLive()) detachFirst(); return; }
+    if (userMuted) { detachFirst(); return; }
     if (isLive() && !audio.muted) { detachFirst(); return; }  // autoplay already won
     if (isLive() && audio.muted) { audibleFromMuted(); detachFirst(); return; }
     tryStart();   // this gesture makes audible playback legal
@@ -169,6 +187,12 @@
   }
 
   /* ---------- boot ---------- */
+
+  // If the 24/7 station was enabled on a previous page, never start the
+  // welcome loop at all (avoids a one-second overlap while the dock boots).
+  try {
+    if (localStorage.getItem('vh.site.radio') === '1') userMuted = true;
+  } catch (e) { /* private mode */ }
 
   ensureAudio();            // streaming download starts at page open
   tryStart();               // audible attempt now; muted parking on refusal

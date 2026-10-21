@@ -281,6 +281,13 @@
     <canvas id="vh-canvas"></canvas>
 
     <div id="landing-page">
+        <!-- 24/7 station: mutes the welcome loop and hands over to the site-wide
+             radio dock. Styles are injected by webradio/site-radio.js. -->
+        <button id="vh-enable-radio" type="button" aria-pressed="false" title="Enable the 24/7 radio">
+            <span class="vhr-btn-dot" aria-hidden="true"></span>
+            <span class="vhr-btn-label">Enable radio</span>
+        </button>
+
         <div class="site-banner">
             <img src="anthonitus.png" alt="Anthonitus" id="site-banner-img" />
         </div>
@@ -376,7 +383,8 @@
 	<div style="max-width: 900px; margin: 42px auto 26px; padding: 0 6vw; text-align: center; color: #7f6f7d; font-size: 13px; letter-spacing: .14em; text-transform: uppercase;">Under Development</div>
 	<script src="signin.js"></script>
 	<script type="module" src="main.js"></script>
-	<script src="portal-music.js?v=5"></script>
+	<script src="portal-music.js?v=6"></script>
 	<script src="install.js?v=1"></script>
+	<script type="module" src="webradio/site-radio.js"></script>
 </body>
 </html>

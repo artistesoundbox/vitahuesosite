@@ -10,7 +10,9 @@ import { createReadStream, statSync } from 'node:fs';
 import { extname, resolve, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = process.env.ROOT
+  ? resolve(process.env.ROOT)
+  : resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT) || 4180;
 
 const MIME = {
