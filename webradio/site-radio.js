@@ -191,6 +191,11 @@ function injectStyles() {
       bottom: calc(16px + var(--vhr-dock-h, 76px) + 10px) !important;
     }
 
+    /* A scrolling portal page keeps its last card clear of the dock too. */
+    html.vhr-on #landing-page {
+      padding-bottom: calc(24px + var(--vhr-dock-h, 70px) + 20px);
+    }
+
     @media (max-width: 520px) {
       #vhr-dock {
         left: 10px; right: 10px; bottom: 10px;
