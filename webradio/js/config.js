@@ -110,20 +110,22 @@ export const ROTATION = {
 
 export const SLEEP_CHOICES = [15, 30, 45, 60, 90, 120];
 
-/* Community layer.
+/* Listener count.
  *
- * 'auto' uses a free public ntfy.sh topic so listeners on different devices
- * can chat and be counted. Set mode to 'local' to keep every message on the
- * visitor's own device (tabs still talk to each other). Changing `topic`
- * makes a fresh, unlisted room. See README for the privacy note. */
+ * 'auto' uses a free public ntfy.sh topic so devices can count each other.
+ * Set mode to 'local' to count only this device. Changing `topic` makes a
+ * fresh, unlisted channel.
+ *
+ * The heartbeat is deliberately slow. ntfy's free tier allows roughly 250
+ * messages per visitor per day, so a one-a-minute ping (1,440 by midnight) is
+ * what exhausted the quota and froze the count. Ten minutes keeps a listener
+ * at 144/day, and the TTL keeps a number on screen between pings. That makes
+ * the count accurate to about ten minutes — for second-level accuracy the
+ * station needs a presence service instead (see README). */
 export const COMMUNITY = {
   mode: 'auto',
   relayBase: 'https://ntfy.sh',
   topic: 'vh-radio-7d2c91a4',
-  maxLength: 280,
-  /* Presence is announced only while the room is open, and slowly: the free
-     public relay has a daily message quota and a 25s heartbeat per listener
-     exhausted it, which silently killed the room. */
-  presenceEveryMs: 60000,
-  presenceTtlMs: 150000
+  presenceEveryMs: 600000,
+  presenceTtlMs: 1800000
 };

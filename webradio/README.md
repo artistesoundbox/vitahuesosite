@@ -166,44 +166,37 @@ The catalogue builder rewrites `CREDITS.md` on every run, so edit attribution in
 
 ---
 
-## The listener room (chat, emoji, presence)
+## The listener count
 
-`js/community.js` uses a **free public ntfy.sh topic** (`vh-radio-7d2c91a4` by
-default) as a relay. It needs no account, key or server. Messages are:
+The station has **no chat**: there is nothing to moderate, nothing to store, and
+no conversation waiting for you when you come back. All that is left is a count
+of how many devices are on the broadcast — in the header chip, on the radio page,
+and in the side card.
 
-- public to anyone who knows or guesses the topic;
-- rate-limited by ntfy's free tier;
-- retained briefly, not archived.
+`js/community.js` announces the current page to a **free public ntfy.sh topic**
+(`vh-radio-7d2c91a4` by default) and counts the other announcements it sees.
+There is no account, key or server. Each browser gets a random id in
+`localStorage`, so several tabs of the same browser count once; a different
+phone or laptop counts separately. Tabs on one device also talk directly over
+`BroadcastChannel`, so the number works even with the relay blocked.
 
-If the relay is unreachable — or ntfy's daily message quota is used up — the UI
-switches to **Local only**: messages still work between tabs on the same device,
-and the badge says so instead of pretending.
+The heartbeat is **one message every ten minutes** (`COMMUNITY.presenceEveryMs`)
+and an entry expires after thirty (`presenceTtlMs`). That is a deliberate
+trade-off: ntfy's free tier allows roughly 250 messages per visitor per day, and
+the 25-second heartbeat the room used to run burned through that quota and left
+the count frozen on a stale number. Ten minutes costs 144 messages a day per
+listener and keeps the count honest to within about ten minutes.
 
-Chat is **per visit**: the room opens empty every time, and the relay is read
-without a replay, so an old conversation never reappears. Nothing is stored on
-the device.
-
-Presence is only announced while the room is open (one ping a minute), so the
-count is "people sitting in the room now". It is not identity-verified, and each
-browser/tab counts once.
-
-Everything in the room is **public**: there are no private messages. Anyone who
-knows the topic can read what is sent, and the topic is in `js/config.js` in the
-page source. Treat it like a shout across a small room, not a DM.
+For a second-accurate count on a static host you need a presence service rather
+than a message relay (Supabase Realtime and Firebase both do join/leave with
+server-side disconnect detection). The transport is confined to `publish()` and
+`openRelay()` in `js/community.js`, so swapping it touches nothing else.
 
 Ways to change it:
 
-- **New room:** edit `COMMUNITY.topic` in `js/config.js`.
+- **New channel:** edit `COMMUNITY.topic` in `js/config.js`.
 - **Device-only:** set `COMMUNITY.mode = 'local'`.
-- **Own relay:** point `COMMUNITY.relayBase` at your own ntfy instance, or
-  replace `publish()` / `openRelay()` with your backend. Only those two
-  functions touch the network.
-
-**Emoji:** the smiley button next to the message box opens a picker (`CHAT_EMOJI`
-in `js/ui.js`) that drops an emoji in at the caret. A message made only of emoji
-renders large, as the room's sticker — no image assets, nothing to moderate.
-There are **no song requests**: the room is chat plus presence, and the station
-picks its own music.
+- **Own relay:** point `COMMUNITY.relayBase` at your own ntfy instance.
 
 ### Microphone
 
@@ -296,7 +289,7 @@ rest of `vitahuesosite`:
   `localStorage`, and opens the compact **dock** at the bottom-left with
   play/pause, skip, mute, a live/personal badge and a progress bar.
 - The **radio icon card at the bottom of the portal** (`vitahuesoradioicon.png`)
-  links into the full station (customizer, listener room, chat). It is
+  links into the full station (player, library, listener count). It is
   marked `data-radio-open`, so opening it also switches the radio on.
 - A page navigation always destroys the `<audio>` element, so the dock leaves a
   hand-off note in `sessionStorage` with the **track id, playback mode and
@@ -364,11 +357,13 @@ rest of `vitahuesosite`:
 - Contact form: clipboard path works, with a visible selectable fallback when a
   browser refuses clipboard access.
 - Library: search, genre filter, empty state, sort, favorites-only.
-- Chat: message sent and received through the relay from a second client;
-  presence count updated; local fallback path present.
+- Listener count: two clients on the same topic each see 2; a stale check-in
+  (older than the TTL) is not counted; the count drops back to 1 after a
+  client's `gone` message or when the heartbeat expires.
 - Widget/embed: inline player and floating launcher both play the live feed.
 - Layout checked at 1440×900, 1200×900 and 390×844.
 
 Not verified in this environment: real iOS/Android lock-screen behaviour,
-Safari autoplay edge cases, and ntfy under heavy chat traffic. See the notes in
-the verification list above.
+Safari autoplay edge cases, and ntfy's per-visitor daily message quota (which
+is why the heartbeat is ten minutes). See the notes in the verification list
+above.
