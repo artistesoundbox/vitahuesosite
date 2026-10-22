@@ -2,7 +2,7 @@
  * Caches the interface (HTML/CSS/JS) — never the MP3s, so audio keeps
  * streaming normally and the cache stays small. */
 /* Bump this whenever the shell changes: install drops the old cache. */
-const VERSION = 'vh-radio-v2';
+const VERSION = 'vh-radio-v3';
 const CORE = [
   './',
   './index.html',

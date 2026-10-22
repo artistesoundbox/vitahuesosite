@@ -34,11 +34,16 @@ html {
   scroll-behavior: smooth;
   scroll-padding-top: calc(var(--header-h) + 18px);
   -webkit-text-size-adjust: 100%;
+  /* Guard rail: one wide child must never make the whole page pan sideways on
+     phones, which is what pushes fixed / right-aligned chrome off screen. */
+  overflow-x: clip;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+  /* svh excludes the phone browser's collapsing toolbars; vh does not. */
+  min-height: 100svh;
   padding-bottom: calc(var(--dock-h) + 22px);
   font-family: var(--font);
   color: var(--ink);
@@ -444,9 +449,16 @@ h3 { font-size: 15px; letter-spacing: 0.04em; }
 }
 .cta-band h2 { font-size: clamp(20px, 2.2vw, 24px); }
 .cta-band .muted { margin: 8px 0 0; font-size: 13.5px; max-width: 46ch; }
-.embed-box { display: flex; flex-direction: column; gap: 10px; flex: 1 1 380px; max-width: 560px; }
+.embed-box {
+  display: flex; flex-direction: column; gap: 10px;
+  flex: 1 1 380px; max-width: min(560px, 100%);
+  /* Without this the nowrap snippet sets a ~560px floor and the whole page
+     grows wider than a phone screen. */
+  min-width: 0;
+}
 .embed-box code {
   display: block; padding: 12px 14px; border-radius: 12px;
+  min-width: 0; max-width: 100%;
   background: rgba(2, 6, 14, 0.85);
   border: 1px solid var(--line);
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
@@ -864,7 +876,11 @@ h3 { font-size: 15px; letter-spacing: 0.04em; }
 
 /* -------------------------------------------------------------------- dock */
 .dock {
-  position: fixed; left: 50%; bottom: max(14px, env(safe-area-inset-bottom));
+  /* --dock-lift is set from the visual viewport (js/ui.js): 0 everywhere
+     except iPhone Safari, where the bottom toolbar overlays the page and would
+     otherwise cover the dock. */
+  position: fixed; left: 50%;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px) + var(--dock-lift, 0px));
   transform: translateX(-50%);
   z-index: 70;
   width: min(980px, calc(100% - 28px));
@@ -1107,13 +1123,26 @@ h3 { font-size: 15px; letter-spacing: 0.04em; }
   .dock-art-btn { width: 46px; height: 46px; }
   .view-head { padding-top: 28px; }
   .cta-band { padding: 22px; }
-  .embed-box { flex-basis: 100%; }
+  .embed-box { flex-basis: 100%; max-width: 100%; }
   .popover { right: 10px; left: 10px; width: auto; bottom: 110px; }
   .community-panel { top: 0; right: 0; bottom: 0; width: 100%; border-radius: 0; }
   .toasts { bottom: calc(var(--dock-h) + 34px); }
 }
 
 @media (max-width: 430px) {
+  /* The header must never push its last icon off screen: at 320–390px the
+     brand, the listener chip and the menu button have to share one row. */
+  .topbar { gap: 10px; padding: 0 14px; }
+  .brand { min-width: 0; gap: 9px; }
+  .brand-mark { width: 32px; height: 32px; }
+  .brand-mark .icon { width: 18px; height: 18px; }
+  .brand-text { min-width: 0; }
+  .brand-text strong {
+    font-size: 13px; letter-spacing: 0.12em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .topbar-actions { margin-left: auto; gap: 6px; }
+  .listeners-chip { padding: 0 9px; }
   .stat-row dd { font-size: 19px; }
   .controls { gap: 6px; }
   .play-btn { width: 54px; height: 54px; }

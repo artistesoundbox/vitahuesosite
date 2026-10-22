@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Vita Hueso Radio — 24/7 original music, live from the studio</title>
-  <meta name="description" content="Vita Hueso Radio is a 24/7 online station streaming original songs by Anthonitus plus guest voices from independent artists — soul, rock, pop, hip-hop, jazz, latin and more. Live AutoDJ, full music library, album art, and listener chat — all from the artist's own site." />
+  <meta name="description" content="Vita Hueso Radio is a 24/7 online station streaming original songs by Anthonitus plus guest voices from independent artists — soul, rock, pop, hip-hop, jazz, latin and more. Live AutoDJ, full music library and album art — all from the artist's own site." />
   <meta name="keywords" content="Vita Hueso, Anthonitus, artistesoundbox, online radio, independent music, soul, rock, pop, hip-hop, jazz, latin, ambient, lo-fi, 24/7 radio, original songs" />
   <meta name="author" content="Anthonitus (Vita Hueso)" />
   <meta name="theme-color" content="#04060d" />
@@ -121,11 +121,11 @@
       <span class="onair" id="top-onair" title="Broadcasting 24/7">
         <span class="dot"></span><b>ON AIR</b>
       </span>
-      <button class="listeners-chip" id="btn-listeners" type="button" aria-haspopup="dialog">
+      <span class="listeners-chip" id="listeners-chip" title="People listening right now" aria-live="polite">
         <svg class="icon"><use href="#i-users"/></svg>
-        <span id="presence-count">1</span>
+        <span id="presence-count">—</span>
         <span class="listeners-label">listening</span>
-      </button>
+      </span>
       <button class="icon-btn" id="btn-menu" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="nav">
         <svg class="icon"><use href="#i-menu"/></svg>
       </button>
@@ -223,10 +223,9 @@
           <h1>The Radio</h1>
           <p class="lede">A single continuous broadcast. Skip and you step off the timeline — jump back in whenever you like.</p>
         </div>
-        <button class="btn btn-ghost btn-sm" id="radio-chat" type="button">
-          <svg class="icon"><use href="#i-chat"/></svg> Listener room
-          <span class="pill-count" id="radio-presence">1</span>
-        </button>
+        <span class="badge badge-live" id="radio-listeners" title="People listening right now" aria-live="polite">
+          <span class="dot"></span><b id="radio-presence">—</b> listening
+        </span>
       </header>
 
       <div class="radio-layout">
@@ -319,11 +318,10 @@
 
           <section class="side-card glass community-card">
             <header class="side-head">
-              <h3><svg class="icon"><use href="#i-users"/></svg> In the room</h3>
-              <span class="side-meta" id="room-mode">Live</span>
+              <h3><svg class="icon"><use href="#i-users"/></svg> On the station</h3>
+              <span class="side-meta">Live</span>
             </header>
-            <p class="community-copy"><b id="room-count">1</b> listening right now. Say hello, drop an emoji, or just lurk in the glow.</p>
-            <button class="btn btn-ghost btn-sm full" id="radio-chat-2" type="button">Open listener room</button>
+            <p class="community-copy"><b id="room-count">—</b> listening right now — the same broadcast on every device, so nobody is ahead and nobody is behind.</p>
           </section>
         </aside>
       </div>
@@ -539,46 +537,6 @@
       <button class="icon-btn dock-mute" id="dock-mute" type="button" aria-label="Mute"><svg class="icon" id="dock-mute-icon"><use href="#i-volume"/></svg></button>
     </div>
   </div>
-
-  <!-- ====================================================== COMMUNITY -->
-  <div class="panel-scrim" id="panel-scrim" hidden></div>
-  <aside class="community-panel glass" id="community" role="dialog" aria-modal="true" aria-labelledby="community-title" hidden>
-    <header class="community-head">
-      <div>
-        <p class="eyebrow">Listener room</p>
-        <h2 id="community-title">Signal Chat</h2>
-      </div>
-      <button class="icon-btn" id="community-close" type="button" aria-label="Close listener room">
-        <svg class="icon"><use href="#i-close"/></svg>
-      </button>
-    </header>
-
-    <div class="community-status">
-      <span class="badge badge-live"><span class="dot"></span><b id="community-count">1</b> in the room</span>
-      <span class="relay-badge" id="relay-badge">connecting…</span>
-    </div>
-
-    <section class="tab-pane" id="chat-pane" aria-label="Listener chat">
-      <ol class="chat-log" id="chat-log" aria-live="polite"></ol>
-      <form class="chat-form" id="chat-form">
-        <div class="chat-name-row">
-          <label class="sr-only" for="chat-name">Display name</label>
-          <input id="chat-name" type="text" maxlength="24" placeholder="Your name" autocomplete="nickname" />
-          <span class="char-count"><span id="chat-count">0</span>/280</span>
-        </div>
-        <div class="chat-input-row">
-          <label class="sr-only" for="chat-input">Message</label>
-          <button class="chat-emoji-btn" id="chat-emoji" type="button" aria-label="Add an emoji or a face" aria-expanded="false" aria-controls="chat-emoji-panel">
-            <svg class="icon"><use href="#i-emoji"/></svg>
-          </button>
-          <input id="chat-input" type="text" maxlength="280" placeholder="Say something to the room…" autocomplete="off" />
-          <button class="btn btn-primary btn-sm" type="submit">Send</button>
-        </div>
-        <div class="emoji-panel" id="chat-emoji-panel" role="group" aria-label="Emojis" hidden></div>
-        <p class="chat-hint" id="chat-hint">Messages are public to anyone with the room link. Keep it kind. Emojis welcome — send one on its own and it lands big.</p>
-      </form>
-    </section>
-  </aside>
 
   <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
 

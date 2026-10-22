@@ -121,5 +121,9 @@ export const COMMUNITY = {
   relayBase: 'https://ntfy.sh',
   topic: 'vh-radio-7d2c91a4',
   maxLength: 280,
-  presenceTtlMs: 75000
+  /* Presence is announced only while the room is open, and slowly: the free
+     public relay has a daily message quota and a 25s heartbeat per listener
+     exhausted it, which silently killed the room. */
+  presenceEveryMs: 60000,
+  presenceTtlMs: 150000
 };

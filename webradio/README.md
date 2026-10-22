@@ -175,10 +175,21 @@ default) as a relay. It needs no account, key or server. Messages are:
 - rate-limited by ntfy's free tier;
 - retained briefly, not archived.
 
-If the relay is unreachable, the UI switches to **Local only**: messages still
-work between tabs on the same device and persist locally, and the badge says so
-instead of pretending. Counts come from presence pings, so "listening now" means
-"radios open in the last 75 seconds", not verified listeners.
+If the relay is unreachable — or ntfy's daily message quota is used up — the UI
+switches to **Local only**: messages still work between tabs on the same device,
+and the badge says so instead of pretending.
+
+Chat is **per visit**: the room opens empty every time, and the relay is read
+without a replay, so an old conversation never reappears. Nothing is stored on
+the device.
+
+Presence is only announced while the room is open (one ping a minute), so the
+count is "people sitting in the room now". It is not identity-verified, and each
+browser/tab counts once.
+
+Everything in the room is **public**: there are no private messages. Anyone who
+knows the topic can read what is sent, and the topic is in `js/config.js` in the
+page source. Treat it like a shout across a small room, not a DM.
 
 Ways to change it:
 
