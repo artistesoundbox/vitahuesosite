@@ -112,20 +112,21 @@ export const SLEEP_CHOICES = [15, 30, 45, 60, 90, 120];
 
 /* Listener count.
  *
- * 'auto' uses a free public ntfy.sh topic so devices can count each other.
- * Set mode to 'local' to count only this device. Changing `topic` makes a
- * fresh, unlisted channel.
+ * Supabase Realtime presence: every open page joins one public presence
+ * channel under a random per-browser id, and Supabase reports joins and
+ * leaves within seconds. Fill in the two values from your project
+ * (Supabase dashboard → Project Settings → API):
  *
- * The heartbeat is deliberately slow. ntfy's free tier allows roughly 250
- * messages per visitor per day, so a one-a-minute ping (1,440 by midnight) is
- * what exhausted the quota and froze the count. Ten minutes keeps a listener
- * at 144/day, and the TTL keeps a number on screen between pings. That makes
- * the count accurate to about ten minutes — for second-level accuracy the
- * station needs a presence service instead (see README). */
+ *   url      "https://<project-ref>.supabase.co"
+ *   anonKey  the publishable / anon key — public by design; it can only join
+ *            this presence channel, never read a table.
+ *
+ * Leave them empty and the station simply shows you alone; it never makes a
+ * number up. No tables, policies or SQL are needed for presence. */
 export const COMMUNITY = {
-  mode: 'auto',
-  relayBase: 'https://ntfy.sh',
-  topic: 'vh-radio-7d2c91a4',
-  presenceEveryMs: 600000,
-  presenceTtlMs: 1800000
+  realtime: {
+    url: '',
+    anonKey: '',
+    channel: 'vh-radio-listeners'
+  }
 };

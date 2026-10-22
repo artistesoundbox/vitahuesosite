@@ -173,30 +173,29 @@ no conversation waiting for you when you come back. All that is left is a count
 of how many devices are on the broadcast — in the header chip, on the radio page,
 and in the side card.
 
-`js/community.js` announces the current page to a **free public ntfy.sh topic**
-(`vh-radio-7d2c91a4` by default) and counts the other announcements it sees.
-There is no account, key or server. Each browser gets a random id in
-`localStorage`, so several tabs of the same browser count once; a different
-phone or laptop counts separately. Tabs on one device also talk directly over
-`BroadcastChannel`, so the number works even with the relay blocked.
+`js/community.js` uses **Supabase Realtime presence**: each open page joins one
+public presence channel under a random per-browser id in `localStorage`, and
+Supabase reports who is present and when they leave — including a tab closed
+without warning — so the number moves within seconds. Several tabs of the same
+browser share one id and count once; a different phone counts separately. No
+tables, SQL or policies are involved: presence is a realtime channel, not data.
 
-The heartbeat is **one message every ten minutes** (`COMMUNITY.presenceEveryMs`)
-and an entry expires after thirty (`presenceTtlMs`). That is a deliberate
-trade-off: ntfy's free tier allows roughly 250 messages per visitor per day, and
-the 25-second heartbeat the room used to run burned through that quota and left
-the count frozen on a stale number. Ten minutes costs 144 messages a day per
-listener and keeps the count honest to within about ten minutes.
+Setup (once):
 
-For a second-accurate count on a static host you need a presence service rather
-than a message relay (Supabase Realtime and Firebase both do join/leave with
-server-side disconnect detection). The transport is confined to `publish()` and
-`openRelay()` in `js/community.js`, so swapping it touches nothing else.
+1. Create a free project at [supabase.com](https://supabase.com).
+2. **Project Settings → API**: copy the **Project URL** and the
+   **publishable / anon key**.
+3. Paste them into `COMMUNITY.realtime` in `js/config.js` (they are safe in the
+   page source: the anon key can only join this channel).
 
-Ways to change it:
+Until those two values are filled in, the station shows **1** — you, alone —
+rather than a number it cannot back up. If the SDK cannot load (offline, blocked
+CDN), it also falls back to 1.
 
-- **New channel:** edit `COMMUNITY.topic` in `js/config.js`.
-- **Device-only:** set `COMMUNITY.mode = 'local'`.
-- **Own relay:** point `COMMUNITY.relayBase` at your own ntfy instance.
+The SDK is imported from jsDelivr at runtime (`js/community.js`), so there is
+still no build step and no `node_modules`. Free Supabase projects pause after a
+week with no traffic; if the count ever sticks at 1 with visitors around, check
+the project is awake in the dashboard.
 
 ### Microphone
 

@@ -1,18 +1,20 @@
 /* Listener count — how many devices are on the station right now.
  *
- * Transport: a free public ntfy.sh topic (no account, no key). Each open page
- * announces itself on a slow heartbeat and reads everybody else's, so the
- * number is devices that checked in recently rather than page views.
+ * Transport: Supabase Realtime presence. Each open page joins one presence
+ * channel under a random per-browser id, and Supabase tells every member who
+ * else is present and when they leave (including a tab that is closed without
+ * warning), so the number moves within seconds instead of minutes.
  *
- * Quota note: ntfy's free tier allows ~250 messages per visitor per day, so the
- * heartbeat is minutes apart, not seconds. A single listener at one message a
- * minute would exhaust the day in four hours. Tabs on the same device share a
- * client id and therefore count once.
+ * The anon/publishable key used here is meant to live in the browser: it can
+ * only join a public presence channel, it cannot read or write any table. If
+ * the project is not configured yet, or the SDK cannot be loaded, the count
+ * falls back to this device alone rather than showing a made-up number.
  */
 import { COMMUNITY } from './config.js';
 
 const STORE = { client: 'vh.client' };
 const COUNT_IDS = ['presence-count', 'radio-presence', 'room-count'];
+const SDK_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 function read(key, fallback) {
   try {
@@ -37,129 +39,78 @@ export function createCommunity() {
     return id;
   })();
 
-  const state = {
-    peers: new Map(),
-    seen: new Set(),
-    localMode: COMMUNITY.mode === 'local',
-    started: false
-  };
-
+  const realtime = COMMUNITY.realtime || {};
   let channel = null;
-  let source = null;
-  let presenceTimer = null;
+  let client = null;
+  let staged = false;
 
-  function paint() {
-    for (const [id, at] of state.peers) {
-      if (Date.now() - at > COMMUNITY.presenceTtlMs) state.peers.delete(id);
-    }
-    state.peers.set(clientId, Date.now());
-    const n = state.peers.size;
+  function paint(n) {
+    const total = Math.max(1, Number(n) || 0);
     for (const id of COUNT_IDS) {
       const el = document.getElementById(id);
-      if (el) el.textContent = String(n);
+      if (el) el.textContent = String(total);
     }
     const chip = document.getElementById('listeners-chip');
     if (chip) {
-      chip.classList.toggle('is-live', state.peers.size > 1);
-      chip.title = n === 1 ? 'You are the only one listening right now' : `${n} devices listening right now`;
+      chip.classList.toggle('is-live', total > 1);
+      chip.title = total === 1
+        ? 'You are the only one listening right now'
+        : `${total} devices listening right now`;
     }
   }
 
-  function publish(envelope) {
-    if (state.localMode || !navigator.onLine) return;
-    const url = `${COMMUNITY.relayBase}/${encodeURIComponent(COMMUNITY.topic)}`;
-    fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(envelope),
-      keepalive: true
-    }).then((response) => {
-      /* Out of quota for the day: stop spending it and let the count fall back
-         to this device instead of pretending people are here. */
-      if (response.status === 429) state.localMode = true;
-    }).catch(() => { state.localMode = true; });
-  }
-
-  function handle(env) {
-    if (!env || typeof env !== 'object' || !env.id) return;
-    if (state.seen.has(env.id)) return;
-    state.seen.add(env.id);
-    if (state.seen.size > 600) state.seen = new Set([...state.seen].slice(-300));
-
-    const now = Date.now();
-    if (env.type === 'presence' && env.client) {
-      const stamp = Math.min(Number(env.at) || now, now);
-      if (now - stamp < COMMUNITY.presenceTtlMs && env.client !== clientId) {
-        state.peers.set(env.client, stamp);
-      }
-    }
-    if (env.type === 'gone' && env.client) state.peers.delete(env.client);
-    paint();
-  }
-
-  function announce() {
-    const env = { id: makeId(), type: 'presence', client: clientId, at: Date.now() };
-    try { channel?.postMessage(env); } catch { /* ignore */ }
-    publish(env);
-    paint();
-  }
-
-  function openRelay() {
-    if (state.localMode || !('EventSource' in window)) return;
+  /* Presence state: one entry per tracked key (our id), each holding the metas
+     of every open connection using it. Counting keys counts devices, not tabs. */
+  function sync() {
+    if (!channel) return;
     try {
-      // No `since=` replay: only live checks-ins count, so somebody who left
-      // before this page opened is never shown as "listening".
-      source = new EventSource(`${COMMUNITY.relayBase}/${encodeURIComponent(COMMUNITY.topic)}/sse`);
-      source.onmessage = (event) => {
-        let payload;
-        try { payload = JSON.parse(event.data); } catch { return; }
-        if (!payload || payload.event !== 'message' || !payload.message) return;
-        try { handle(JSON.parse(payload.message)); } catch { /* not ours */ }
-      };
-      source.onerror = () => { /* the browser reconnects by itself */ };
-    } catch { state.localMode = true; }
+      const state = channel.presenceState() || {};
+      paint(Object.keys(state).length);
+    } catch { /* channel not ready */ }
+  }
+
+  async function connect() {
+    if (!realtime.url || !realtime.anonKey) {
+      // Not configured yet — be honest instead of inventing a number.
+      paint(1);
+      return;
+    }
+    try {
+      const sdk = await import(/* @vite-ignore */ SDK_URL);
+      client = sdk.createClient(realtime.url, realtime.anonKey, {
+        auth: { persistSession: false, autoRefreshToken: false }
+      });
+      channel = client.channel(realtime.channel || 'vh-radio-listeners', {
+        config: { presence: { key: clientId } }
+      });
+      channel.on('presence', { event: 'sync' }, sync);
+      channel.on('presence', { event: 'join' }, sync);
+      channel.on('presence', { event: 'leave' }, sync);
+      channel.subscribe((status) => {
+        if (status !== 'SUBSCRIBED' || staged) return;
+        staged = true;
+        channel.track({ at: Date.now() }).then(sync).catch(() => {});
+      });
+    } catch {
+      // Offline, blocked CDN or a bad key: still show this listener.
+      paint(1);
+    }
   }
 
   function start() {
-    if (state.started) return;
-    state.started = true;
+    paint(1);
+    connect();
 
-    if ('BroadcastChannel' in window) {
-      try {
-        channel = new BroadcastChannel('vh-radio-presence');
-        channel.onmessage = (event) => handle(event.data);
-      } catch { channel = null; }
-    }
-
-    openRelay();
-    // Stagger the first check-in so a crowd does not announce in lockstep.
-    setTimeout(announce, 600 + Math.random() * 2400);
-    presenceTimer = setInterval(announce, COMMUNITY.presenceEveryMs);
-
+    /* A phone that comes back from the lock screen can lose the socket without
+       the SDK noticing immediately; nudge it when the page is visible again. */
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) {
-        announce();
-        if (!state.localMode && source && source.readyState === EventSource.CLOSED) openRelay();
-      }
+      if (document.hidden || !channel || !staged) return;
+      channel.track({ at: Date.now() }).then(sync).catch(() => {});
     });
 
     window.addEventListener('online', () => {
-      if (state.localMode) {
-        state.localMode = false;
-        openRelay();
-        announce();
-      }
+      if (!channel || !staged) connect();
     });
-
-    window.addEventListener('pagehide', () => {
-      const gone = { id: makeId(), type: 'gone', client: clientId, at: Date.now() };
-      try { channel?.postMessage(gone); } catch { /* ignore */ }
-      publish(gone);
-      clearInterval(presenceTimer);
-      source?.close();
-    });
-
-    paint();
   }
 
   return { start };
