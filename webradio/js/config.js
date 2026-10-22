@@ -90,13 +90,15 @@ export const ROTATION = {
      to Vita Hueso Radio" clip in audio/id/. */
   identEvery: 5,
 
-  /* Fun first: the guest shelf is mostly Latin urban, salsa, dembow plus
-     English hip-hop / funk / disco, and `funGenres` marks what counts as fun.
-     `funWeight` repeats them in the draw bag — kept at 1 so songs stay far
-     apart; raise it only if you add more tracks (duplicates are what makes a
-     track come back too soon). */
+  /* Fun first: the guest shelf is mostly Latin urban, salsa, dembow, the
+     afro/dance side of the Open Shelf (afrobeat, amapiano, afro house, tropical
+     house) plus English hip-hop / funk / disco, and `funGenres` marks what
+     counts as fun. `funWeight` repeats them in the draw bag — kept at 1 so
+     songs stay far apart; raise it only if you add more tracks (duplicates are
+     what makes a track come back too soon). */
   funGenres: ['Reggaeton', 'Dembow', 'Latin', 'Dancehall', 'Moombahton', 'Urbano',
-    'Salsa', 'Timba', 'Hip-Hop', 'Disco', 'R&B', 'Funk'],
+    'Salsa', 'Timba', 'Hip-Hop', 'Disco', 'R&B', 'Funk',
+    'Afrobeat', 'Afro House', 'Amapiano', 'Tropical House'],
   funWeight: 1,
 
   /* Share of the guest picks that should be fun genres. A non-fun candidate is

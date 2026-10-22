@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Open Shelf — guest songs under Creative Commons Attribution licences">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="36%" r="76%">
+      <stop offset="0%" stop-color="#3b1f08"/>
+      <stop offset="52%" stop-color="#140a04"/>
+      <stop offset="100%" stop-color="#080403"/>
+    </radialGradient>
+    <linearGradient id="neon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffd79a"/>
+      <stop offset="48%" stop-color="#ff9d3c"/>
+      <stop offset="100%" stop-color="#ff5d3a"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g fill="none" stroke="url(#neon)" opacity="0.5">
+    <circle cx="256" cy="212" r="150" stroke-width="1"/>
+    <circle cx="256" cy="212" r="112" stroke-width="1"/>
+    <circle cx="256" cy="212" r="74" stroke-width="1"/>
+  </g>
+  <g filter="url(#glow)">
+    <path d="M148 244c30 0 30-40 60-40s30 84 60 84 30-104 60-104 30 62 60 62" fill="none"
+      stroke="url(#neon)" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <g fill="#f6eaDE" font-family="Helvetica, Arial, sans-serif" text-anchor="middle">
+    <text x="256" y="392" font-size="30" letter-spacing="9" font-weight="300">OPEN</text>
+    <text x="256" y="428" font-size="15" letter-spacing="7" fill="#d9a173">SHELF · CC BY</text>
+  </g>
+  <g fill="#ff9d3c" opacity="0.9" font-family="Helvetica, Arial, sans-serif" text-anchor="middle">
+    <text x="256" y="466" font-size="11" letter-spacing="4">FREE MUSIC ARCHIVE</text>
+  </g>
+</svg>

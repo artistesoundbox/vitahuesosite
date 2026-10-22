@@ -54,6 +54,14 @@
       "year": 2026,
       "description": "Guest songs and instrumentals from independent artists under Creative Commons Attribution licences — rock, pop, soul, funk, hip-hop, jazz, latin, country, reggae, folk, blues and electronic, woven through the live rotation.",
       "external": true
+    },
+    {
+      "id": "open-shelf",
+      "title": "Open Shelf",
+      "cover": "assets/art/open-shelf-cover.svg",
+      "year": 2026,
+      "description": "Afrobeat, amapiano, boogie and latin instrumentals picked from the Free Music Archive — CC BY and CC BY-SA, so the station can broadcast them with credit.",
+      "external": true
     }
   ],
   "tracks": {
@@ -905,6 +913,149 @@
       "licenseUrl": "http://creativecommons.org/licenses/by/3.0/",
       "source": "https://ccmixter.org/files/Gshepherd/49375",
       "album": "cc-sessions"
+    },
+    {
+      "file": "Juanitos - Soul Africa.mp3",
+      "title": "Soul Africa",
+      "artist": "Juanitos",
+      "genres": ["Afrobeat", "Funk", "Soul"],
+      "license": "CC BY-SA 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0/",
+      "source": "https://freemusicarchive.org/music/Juanitos/Soul_Africa/01_-_Soul_Africa/",
+      "credit": "\"Soul Africa\" by Juanitos (Free Music Archive), licensed CC BY-SA 2.0",
+      "album": "open-shelf"
+    },
+    {
+      "file": "Juanitos - Ooh La La Boogaloo.mp3",
+      "title": "Ooh La La Boogaloo",
+      "artist": "Juanitos",
+      "genres": ["Afrobeat", "Funk", "Soul"],
+      "license": "CC BY-SA 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0/",
+      "source": "https://freemusicarchive.org/music/Juanitos/Soul_Africa/05_-_Ooh_La_La_Boogaloo/",
+      "credit": "\"Ooh La La Boogaloo\" by Juanitos (Free Music Archive), licensed CC BY-SA 2.0",
+      "album": "open-shelf"
+    },
+    {
+      "file": "Juanitos - Black Samba.mp3",
+      "title": "Black Samba",
+      "artist": "Juanitos",
+      "genres": ["Afrobeat", "Latin", "Funk"],
+      "license": "CC BY-SA 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0/",
+      "source": "https://freemusicarchive.org/music/Juanitos/Soul_Africa/03_-_Black_Samba/",
+      "credit": "\"Black Samba\" by Juanitos (Free Music Archive), licensed CC BY-SA 2.0",
+      "album": "open-shelf"
+    },
+    {
+      "file": "Juanitos - Brasilian Reggae.mp3",
+      "title": "Brasilian Reggae",
+      "artist": "Juanitos",
+      "genres": ["Reggae", "Latin", "Afrobeat"],
+      "license": "CC BY-SA 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0/",
+      "source": "https://freemusicarchive.org/music/Juanitos/Soul_Africa/08_-_Brasilian_Reggae/",
+      "credit": "\"Brasilian Reggae\" by Juanitos (Free Music Archive), licensed CC BY-SA 2.0",
+      "album": "open-shelf"
+    },
+    {
+      "file": "1000 Handz - Agua.mp3",
+      "title": "Agua",
+      "artist": "1000 Handz",
+      "genres": ["Tropical House", "Latin", "Electronic"],
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://freemusicarchive.org/music/1000-handz/cc-by-free-to-use-tropical-vibes/agua-1/",
+      "credit": "\"Agua\" by 1000 Handz (Free Music Archive), licensed CC BY 4.0",
+      "album": "open-shelf"
+    },
+    {
+      "file": "1000 Handz - Big Ting.mp3",
+      "title": "Big Ting",
+      "artist": "1000 Handz",
+      "genres": ["Dancehall", "Tropical House", "Electronic"],
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://freemusicarchive.org/music/1000-handz/cc-by-free-to-use-tropical-vibes/big-ting/",
+      "credit": "\"Big Ting\" by 1000 Handz (Free Music Archive), licensed CC BY 4.0",
+      "album": "open-shelf"
+    },
+    {
+      "file": "Alex Morgan - Hot Amapiano Beats.mp3",
+      "title": "Hot Amapiano Beats",
+      "artist": "Alex Morgan",
+      "genres": ["Amapiano", "Afro House", "Electronic"],
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://freemusicarchive.org/music/alex-morgan/pop-afro-party-instrumentals/hot-amapiano-beats/",
+      "credit": "\"Hot Amapiano Beats\" by Alex Morgan (Free Music Archive), licensed CC BY 4.0",
+      "album": "open-shelf"
+    },
+    {
+      "file": "Alex Morgan - Afro House.mp3",
+      "title": "Afro House",
+      "artist": "Alex Morgan",
+      "genres": ["Afro House", "Dancehall", "Electronic"],
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://freemusicarchive.org/music/alex-morgan/pop-afro-party-instrumentals/afro-house/",
+      "credit": "\"Afro House\" by Alex Morgan (Free Music Archive), licensed CC BY 4.0",
+      "album": "open-shelf"
+    },
+    {
+      "file": "Ketsa - Cuban Crunch.mp3",
+      "title": "Cuban Crunch",
+      "artist": "Ketsa",
+      "genres": ["Latin", "Jazz", "Lo-Fi"],
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://freemusicarchive.org/music/Ketsa/upbeat-street/cuban-crunch/",
+      "credit": "\"Cuban Crunch\" by Ketsa (Free Music Archive), licensed CC BY 4.0",
+      "album": "open-shelf"
+    },
+    {
+      "file": "Ketsa - Latin Life.mp3",
+      "title": "Latin Life",
+      "artist": "Ketsa",
+      "genres": ["Latin", "Jazz", "Funk"],
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://freemusicarchive.org/music/Ketsa/upbeat-street/latin-life/",
+      "credit": "\"Latin Life\" by Ketsa (Free Music Archive), licensed CC BY 4.0",
+      "album": "open-shelf"
+    },
+    {
+      "file": "John Bartmann - Nothin But The Boogie.mp3",
+      "title": "Nothin But The Boogie",
+      "artist": "John Bartmann",
+      "genres": ["Disco", "Funk", "Soul"],
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://freemusicarchive.org/music/John_Bartmann/retro-boogie/nothin-but-the-boogie/",
+      "credit": "\"Nothin But The Boogie\" by John Bartmann (Free Music Archive), licensed CC BY 4.0",
+      "album": "open-shelf"
+    },
+    {
+      "file": "John Bartmann - Rainbow Boogie Space Funk.mp3",
+      "title": "Rainbow Boogie Space Funk",
+      "artist": "John Bartmann",
+      "genres": ["Disco", "Funk", "Electronic"],
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://freemusicarchive.org/music/John_Bartmann/retro-boogie/rainbow-boogie-space-funk/",
+      "credit": "\"Rainbow Boogie Space Funk\" by John Bartmann (Free Music Archive), licensed CC BY 4.0",
+      "album": "open-shelf"
+    },
+    {
+      "file": "Jean Toba - Latin Bosporus.mp3",
+      "title": "Latin Bosporus",
+      "artist": "Jean Toba",
+      "genres": ["Latin", "Afrobeat", "Funk"],
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "source": "https://freemusicarchive.org/music/jean-toba/on-the-rocks/latin-bosporus/",
+      "credit": "\"Latin Bosporus\" by Jean Toba (Free Music Archive), licensed CC BY-SA 4.0",
+      "album": "open-shelf"
     }
   ],
   "stationId": {

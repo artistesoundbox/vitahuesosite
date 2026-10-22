@@ -7,9 +7,9 @@ All tracks by Anthonitus (Vita Hueso), a.k.a. artistesoundbox, are © 2026 Antho
 ## Guest songs & instrumentals
 
 The following tracks by independent artists are hosted on this site under
-Creative Commons Attribution licences (CC BY). Each entry credits its author and
-links back to the original upload; the licence permits commercial and
-non-commercial reuse with attribution.
+Creative Commons Attribution (CC BY) and Attribution-ShareAlike (CC BY-SA)
+licences. Each entry credits its author and links back to the original upload;
+these licences permit commercial and non-commercial reuse with attribution.
 They appear in the live rotation and in the library alongside the original catalogue.
 
 - **It's Deep** — SackJo22. CC BY 3.0. "It's Deep" by SackJo22 (ccMixter), licensed CC BY 3.0
@@ -82,3 +82,29 @@ They appear in the live rotation and in the library alongside the original catal
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/SackJo22/30330
 - **Salsa** — Gshepherd. CC BY 3.0. "Salsa" by Gshepherd (ccMixter), licensed CC BY 3.0
   http://creativecommons.org/licenses/by/3.0/ · https://ccmixter.org/files/Gshepherd/49375
+- **Soul Africa** — Juanitos. CC BY-SA 2.0. "Soul Africa" by Juanitos (Free Music Archive), licensed CC BY-SA 2.0
+  https://creativecommons.org/licenses/by-sa/2.0/ · https://freemusicarchive.org/music/Juanitos/Soul_Africa/01_-_Soul_Africa/
+- **Ooh La La Boogaloo** — Juanitos. CC BY-SA 2.0. "Ooh La La Boogaloo" by Juanitos (Free Music Archive), licensed CC BY-SA 2.0
+  https://creativecommons.org/licenses/by-sa/2.0/ · https://freemusicarchive.org/music/Juanitos/Soul_Africa/05_-_Ooh_La_La_Boogaloo/
+- **Black Samba** — Juanitos. CC BY-SA 2.0. "Black Samba" by Juanitos (Free Music Archive), licensed CC BY-SA 2.0
+  https://creativecommons.org/licenses/by-sa/2.0/ · https://freemusicarchive.org/music/Juanitos/Soul_Africa/03_-_Black_Samba/
+- **Brasilian Reggae** — Juanitos. CC BY-SA 2.0. "Brasilian Reggae" by Juanitos (Free Music Archive), licensed CC BY-SA 2.0
+  https://creativecommons.org/licenses/by-sa/2.0/ · https://freemusicarchive.org/music/Juanitos/Soul_Africa/08_-_Brasilian_Reggae/
+- **Agua** — 1000 Handz. CC BY 4.0. "Agua" by 1000 Handz (Free Music Archive), licensed CC BY 4.0
+  https://creativecommons.org/licenses/by/4.0/ · https://freemusicarchive.org/music/1000-handz/cc-by-free-to-use-tropical-vibes/agua-1/
+- **Big Ting** — 1000 Handz. CC BY 4.0. "Big Ting" by 1000 Handz (Free Music Archive), licensed CC BY 4.0
+  https://creativecommons.org/licenses/by/4.0/ · https://freemusicarchive.org/music/1000-handz/cc-by-free-to-use-tropical-vibes/big-ting/
+- **Hot Amapiano Beats** — Alex Morgan. CC BY 4.0. "Hot Amapiano Beats" by Alex Morgan (Free Music Archive), licensed CC BY 4.0
+  https://creativecommons.org/licenses/by/4.0/ · https://freemusicarchive.org/music/alex-morgan/pop-afro-party-instrumentals/hot-amapiano-beats/
+- **Afro House** — Alex Morgan. CC BY 4.0. "Afro House" by Alex Morgan (Free Music Archive), licensed CC BY 4.0
+  https://creativecommons.org/licenses/by/4.0/ · https://freemusicarchive.org/music/alex-morgan/pop-afro-party-instrumentals/afro-house/
+- **Cuban Crunch** — Ketsa. CC BY 4.0. "Cuban Crunch" by Ketsa (Free Music Archive), licensed CC BY 4.0
+  https://creativecommons.org/licenses/by/4.0/ · https://freemusicarchive.org/music/Ketsa/upbeat-street/cuban-crunch/
+- **Latin Life** — Ketsa. CC BY 4.0. "Latin Life" by Ketsa (Free Music Archive), licensed CC BY 4.0
+  https://creativecommons.org/licenses/by/4.0/ · https://freemusicarchive.org/music/Ketsa/upbeat-street/latin-life/
+- **Nothin But The Boogie** — John Bartmann. CC BY 4.0. "Nothin But The Boogie" by John Bartmann (Free Music Archive), licensed CC BY 4.0
+  https://creativecommons.org/licenses/by/4.0/ · https://freemusicarchive.org/music/John_Bartmann/retro-boogie/nothin-but-the-boogie/
+- **Rainbow Boogie Space Funk** — John Bartmann. CC BY 4.0. "Rainbow Boogie Space Funk" by John Bartmann (Free Music Archive), licensed CC BY 4.0
+  https://creativecommons.org/licenses/by/4.0/ · https://freemusicarchive.org/music/John_Bartmann/retro-boogie/rainbow-boogie-space-funk/
+- **Latin Bosporus** — Jean Toba. CC BY-SA 4.0. "Latin Bosporus" by Jean Toba (Free Music Archive), licensed CC BY-SA 4.0
+  https://creativecommons.org/licenses/by-sa/4.0/ · https://freemusicarchive.org/music/jean-toba/on-the-rocks/latin-bosporus/

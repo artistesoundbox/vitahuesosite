@@ -127,16 +127,34 @@ To add a record, add an object to `"albums"` with a `cover` path.
 
 ### Guest / Creative Commons tracks
 
-`audio/free/` holds the guest catalogue: **36 songs from independent artists on
-ccMixter**, built for a danceable shelf — reggaeton, dembow, salsa, timba,
-dancehall, moombahton and Latin pop next to English hip-hop, funk, disco, R&B,
-soul and pop. Every track carries its own licence: **CC BY 3.0** (one at 2.5),
-except the single **CC BY-NC 3.0** timba cut, which is fine while the station
-stays non-commercial. They are hosted
-here, not hotlinked. Every entry carries its own `artist`, `license`,
-`licenseUrl`, `source` and `credit`, and those are surfaced in `CREDITS.md`, on
-the About page, and under the player. CC BY requires that attribution stays
-visible — keep the credits if you keep the tracks.
+`audio/free/` holds the guest catalogue: **48 songs**, all held to CC BY or
+CC BY-SA (never NC or ND), built for a danceable shelf — reggaeton, dembow,
+salsa, timba, dancehall and moombahton next to English hip-hop, funk, disco, R&B,
+soul and pop.
+
+Two shelves sit in there:
+
+- **Signal Sessions (CC)** — 35 tracks from [ccMixter](https://ccmixter.org)
+  (33 × CC BY 3.0, one CC BY 2.5, one CC BY-NC 3.0 that is fine while the
+  station stays non-commercial).
+- **Open Shelf** — 13 tracks from the [Free Music Archive](https://freemusicarchive.org):
+  Juanitos, 1000 Handz, Alex Morgan, Ketsa, John Bartmann and Jean Toba, under
+  CC BY 4.0 / CC BY-SA 4.0 / CC BY-SA 2.0 — afrobeat, amapiano, afro house,
+tropical, boogie and latin. All instrumental-led, so nothing explicit slips in.
+
+Why these and not a streaming service: **Jango, AccuRadio and TuneIn licence
+listening, not re-broadcasting** — their terms forbid copying or relaying their
+audio, so they can never feed this reel (TuneIn stays usable only as its own
+embedded player for other stations). **Pixabay** forbids distributing content
+"on a standalone basis", which is exactly what a music-only station does, and
+**Uppbeat** excludes radio from its standard licences and sells broadcast
+separately. CC BY material from ccMixter / FMA / Jamendo is the route that
+actually permits a 24/7 self-hosted stream, provided the credit stays visible.
+
+They are hosted here, not hotlinked. Every entry carries its own `artist`,
+`license`, `licenseUrl`, `source` and `credit`, and those are surfaced in
+`CREDITS.md`, on the About page, and under the player. CC BY requires that
+attribution stays visible — keep the credits if you keep the tracks.
 
 To add more, drop the MP3 into `audio/free/` and append an entry to
 `"freeTracks"` in `data/library.json` (an `artist` field is required). Then run
@@ -216,10 +234,12 @@ git push
 ```
 
 No workflow file is needed; GitHub Pages serves static files as-is. The MP3s
-are large — the station adds roughly 320 MB to the repository (47 originals,
-14 guest tracks, artwork). If that becomes a problem, move `anthonitus_songs/`
-to a release asset or an object store and update the `src` values in the
-catalogue.
+are large — the station adds roughly 470 MB to the repository (177 MB of
+originals, 286 MB of guest audio, artwork). The Open Shelf MP3s arrive at
+320 kbps, so 13 tracks cost 71 MB; re-encoding them to 192 kbps would recover
+about 45 MB without a noticeable loss on phone speakers. If the size becomes a
+problem, move `anthonitus_songs/` or `audio/free/` to a release asset or an
+object store and update the `src` values in the catalogue.
 
 ---
 
@@ -300,7 +320,7 @@ rest of `vitahuesosite`:
 
 ## Verification performed
 
-- Catalogue build: 83 tracks (47 original + 36 guest), 272 minutes, 23 genre
+- Catalogue build: 95 tracks (47 original + 48 guest), 306 minutes, 27 genre
   chips, embedded covers extracted.
 - Local server range request: `206 Partial Content` with correct
   `Content-Range`, so timeline seeking works.
@@ -311,9 +331,10 @@ rest of `vitahuesosite`:
   and the queue tags guest entries with `CC`. `node tools/check-rotation.mjs 3`
   walks three real days: shortest gap between two plays of the same song is 13
   songs, with no cooldown violations across programme or midnight boundaries.
-- Guest audio: downloaded ccMixter MP3s play from `audio/free/` (206 range
-  responses), with the correct writer, licence and source in the player credit,
-  the About page and `CREDITS.md`.
+- Guest audio: ccMixter and Free Music Archive MP3s play from `audio/free/`
+  (206 range responses), with the correct writer, licence and source in the
+  player credit, the About page and `CREDITS.md`. Every Open Shelf track was
+  licence-checked on its own FMA page before download (BY or BY-SA only).
 - Site radio: the portal pill opens the dock; the bottom icon card enables the
   radio and opens `#radio`; the station page rejoined the same track and live
   position after the jump; the blocked-autoplay prompt appears when the browser
