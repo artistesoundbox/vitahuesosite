@@ -13,7 +13,7 @@ const DEG = Math.PI / 180;
 const RAD = 180 / Math.PI;
 
 export function createGlobe(canvas) {
-  const noop = { setPoints() {}, setFocus() {}, resize() {}, ensureSize() {}, destroy() {} };
+  const noop = { setPoints() {}, setFocus() {}, setYou() {}, resize() {}, ensureSize() {}, destroy() {} };
   if (!canvas || !canvas.getContext) return noop;
   const ctx = canvas.getContext('2d');
   if (!ctx) return noop;
@@ -22,6 +22,8 @@ export function createGlobe(canvas) {
 
   let points = [];
   let active = null;
+  /* The listener's own position, once the browser has granted it. */
+  let you = null;
 
   let width = 0;
   let height = 0;
@@ -160,6 +162,32 @@ export function createGlobe(canvas) {
       }
     }
 
+    /* The listener: a warm dot with a dark rim, clearly not a station. */
+    if (you) {
+      const phi = (90 - you.lat) * DEG;
+      const theta = you.lon * DEG + rot;
+      const x = Math.sin(phi) * Math.cos(theta);
+      const y = Math.cos(phi);
+      const z = Math.sin(phi) * Math.sin(theta);
+      if (z > 0) {
+        const sx = cx + x * radius;
+        const sy = cy - y * radius;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 8, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 212, 121, 0.16)';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(sx, sy, 2.8, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffd479';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(sx, sy, 2.8, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(4, 8, 16, 0.85)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+
     /* Rim light last, so it sits above the dots. */
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
@@ -184,6 +212,13 @@ export function createGlobe(canvas) {
     points = (Array.isArray(list) ? list : [])
       .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon))
       .map((p) => ({ id: p.id, lat: p.lat, lon: p.lon }));
+    draw(performance.now(), true);
+  }
+
+  /** Mark the listener's position; `null` clears it. */
+  function setYou(lat, lon) {
+    you = Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null;
+    ensureSize();
     draw(performance.now(), true);
   }
 
@@ -228,6 +263,7 @@ export function createGlobe(canvas) {
   return {
     setPoints,
     setFocus,
+    setYou,
     resize,
     ensureSize,
     stats,
