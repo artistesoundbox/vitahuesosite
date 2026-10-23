@@ -130,7 +130,10 @@ export const WORLD = {
   slotMinutes: 10,
   homeEveryHour: 1,
   homeShare: 0.85,
-  identEveryHours: 3,
+
+  /* A branded break into the world feed every N hours, on top of the one that
+     opens every home segment. 2 = twelve world idents a day. */
+  identEveryHours: 2,
   avoidSameCountry: true,
 
   /* Share of the slots that follow a listener's chosen region once they turn
