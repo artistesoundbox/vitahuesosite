@@ -531,6 +531,26 @@
       "lufs": -14.8,
       "url": "https://cast6.asurahosting.com/proxy/irfradio/stream",
       "at": 1792739126
+    },
+    "w103": {
+      "lufs": -14,
+      "url": "https://n-11-21.dcs.redcdn.pl/sc/o2/radio357/live/radio357_pr.livx?preroll=0",
+      "at": 1792739128
+    },
+    "w109": {
+      "lufs": null,
+      "url": "https://mdstrm.com/audio/5fada514fc16c006bd63370f/icecast.audio",
+      "at": 1792739129
+    },
+    "w101": {
+      "lufs": -6.9,
+      "url": "https://le306.euddn.net/63dad6426736298e2810593142c250443b2273c549b762cac469be691b3ccdb80f37d10fb5ecc876a76bf3366bd1f71dcd7b59cd61b3b02f7591fa208e240dbd8b587c274ba828a6a65d9c3ae8101ae5942025a674c8a446511e6a46e26efdcd6ca26fa506858379da7e3c6d52fbd632cedde6c57b98c8b42ee0e68c98e0a3a54ca1fa8b5c47ebca90ba71d221789fe9bbe36828facc1437b2dca4e0ed741846043a66047b3342e574bb56def800325c/kuku_high.mp3",
+      "at": 1792739130
+    },
+    "w104": {
+      "lufs": -15.9,
+      "url": "https://onair.armisa.it/listen/armisa/radio.mp3",
+      "at": 1792739131
     }
   },
   "localLufs": [
