@@ -141,6 +141,12 @@ body.is-ready #room-canvas { opacity: 1; }
 
 .hud[hidden] { display: none; }
 
+.hud.is-dimmed {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
 .hud-top,
 .hud-bottom {
   display: flex;
