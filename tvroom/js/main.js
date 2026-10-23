@@ -128,13 +128,7 @@ player.mount(stage);
 $('open-viewer').addEventListener('click', () => viewer.open());
 
 $('random-channel').addEventListener('click', () => {
-  if (viewer.catalog) {
-    viewer.zap(1);
-  } else {
-    const next = FEATURED[Math.floor(Math.random() * FEATURED.length)];
-    player.play(next);
-  }
-  viewer.showToast('Zapping…');
+  viewer.zapFromRoom();
 });
 
 /* ── Start ────────────────────────────────────────────────────────────── */

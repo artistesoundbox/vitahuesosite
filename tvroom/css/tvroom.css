@@ -551,9 +551,10 @@ body.is-ready #room-canvas { opacity: 1; }
   flex-wrap: wrap;
 }
 
-.viewer.is-idle .viewer-top { opacity: 0; transform: translateY(-10px); pointer-events: none; }
+/* Only the transport controls fade: Back and Home are navigation and stay. */
 .viewer.is-idle .viewer-controls { opacity: 0; transform: translateY(10px); pointer-events: none; }
 .viewer.is-idle .video-frame { cursor: none; }
+.viewer.is-idle .viewer-top .vbtn { opacity: 0.7; }
 
 .viewer-nav {
   display: flex;
@@ -1230,6 +1231,11 @@ body.is-ready #room-canvas { opacity: 1; }
 }
 
 @media (max-width: 640px) {
+  .hud { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .hint-sep,
+  .hint-second { display: none; }
+  .hud-hint { font-size: 9px; }
+  .hud-hint::before { margin-bottom: 5px; }
   .hud-brand { font-size: 9px; letter-spacing: 0.16em; }
   .hud-back-label, .hud-btn-label { display: none; }
   .now-card { max-width: 56vw; padding: 9px 12px; }

@@ -728,14 +728,35 @@ export class Viewer {
     this.select(pick);
   }
 
-  /** Used by the room's Zap button while the viewer is closed. */
+  /**
+   * Used by the room's Zap button while the viewer is closed. It deliberately
+   * ignores the drawer's search and filters — the room zaps across everything
+   * playable, not across whatever was last typed in the list.
+   */
   zapFromRoom() {
-    if (!this.catalog) {
-      this._ensureCatalog().then((catalog) => {
-        if (catalog) this.zap(1);
-      });
+    const pick = () => {
+      const pool = this.catalog
+        ? this.catalog.channels.filter((ch) => ch.playable && !this.health.isDead(ch.url))
+        : [];
+      if (!pool.length) {
+        this.showToast('No playable channels found yet.');
+        return;
+      }
+      const current = this.player.channel;
+      let next = pool[Math.floor(Math.random() * pool.length)];
+      if (pool.length > 1 && current && next.url === current.url) {
+        next = pool[(pool.indexOf(next) + 1) % pool.length];
+      }
+      this.select(next);
+    };
+
+    if (this.catalog) {
+      pick();
       return;
     }
-    this.zap(1);
+    this.showToast('Loading the channel list…');
+    this._ensureCatalog().then((catalog) => {
+      if (catalog) pick();
+    });
   }
 }
