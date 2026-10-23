@@ -112,6 +112,15 @@ catalogue cuts in once an hour.
   stations that did not answer, skips to the next scheduled segment, and falls
   back to the next home segment if the next cities are dead too. A 12-second
   watchdog catches a stream that hangs without ever erroring.
+- **Picking a place.** The card carries two dropdowns — **State / region**
+  (grouped by country, built from the directory's `state` field) and **Town /
+  station** (the stations in that region). Choosing a town tunes it. The open
+  directory publishes a region for every station and street coordinates for
+  only some, so the second list is the station itself rather than an invented
+  town name.
+- **Near me.** The locator button asks the browser for a position and tunes the
+  closest station in the list (great-circle distance over station coordinates,
+  falling back to country centres), then marks you in amber on the globe.
 - **Off the clock.** Next, "Spin the dial", and clicking any city in the queue
   hand-tune a station without leaving the feed; **Rejoin live** puts you back on
   the shared clock. A hand-tuned stream shows the slot length when it came from
@@ -138,6 +147,32 @@ Set `WORLD.enabled = false` in `js/config.js` to go back to the all-local reel;
 `ROTATION` then applies to the whole day again.
 
 ---
+
+## Loudness levelling
+
+The world feed and the studio catalogue are mastered differently, so the
+handoff at the top of an hour used to jump. `js/loudness.js` carries one static
+gain per track and per station, measured with ffmpeg's EBU R128 scanner against
+the local catalogue's **median integrated loudness** (currently −13.2 LUFS).
+
+```bash
+node tools/build-loudness.mjs              # measure what is missing
+node tools/build-loudness.mjs --force      # re-measure everything
+node tools/build-loudness.mjs --stations   # world stations only
+```
+
+- Local songs are measured over up to 150 s each; streams get a 12 s sample.
+  Measurements are cached in `data/loudness.json` by file mtime and by stream
+  URL, so a rerun only touches new music and new stations.
+- Gains are clamped (tracks −12…+4 dB, stations −18…+6 dB) and anything outside
+  −45…−3 LUFS is treated as an unreadable sample and left alone.
+- The player applies the gain to `<audio>.volume` at the single `applyVolume()`
+  point. No Web Audio graph is involved, so lock-screen and background playback
+  keep working. The volume slider always shows the listener's level, not the
+  trim.
+- **iOS Safari ignores programmatic `audio.volume`.** On an iPhone the trims do
+  nothing; the streams and songs play at their own levels. Desktop and Android
+  Chrome/Firefox are where levelling actually applies.
 
 ## Features → where they live
 
@@ -375,6 +410,8 @@ rest of `vitahuesosite`:
   values in `COMMUNITY`.
 - `js/world-stations.js` → generated. Rebuild with
   `node tools/build-world-radio.mjs` rather than editing by hand.
+- `js/loudness.js` → generated. Rebuild with `node tools/build-loudness.mjs`
+  after adding music or refreshing the station list.
 - `index.html` → About copy, canonical URL, JSON-LD.
 - `data/library.json` → genres were assigned from titles, not by listening.
   Adjust them to match how the records actually feel.
@@ -435,7 +472,18 @@ rest of `vitahuesosite`:
   it back on the world feed at the right offset. Skip → next city → pause →
   resume → rejoin all behaved.
 - Globe: canvas is 231×132 CSS / 231×132 backing pixels, all painted pixels
-  inside the 61 px sphere radius, no paint outside the rim.
+  inside the 61 px sphere radius, no paint outside the rim; the listener dot
+  paints on the front face and is hidden on the back.
+- Loudness: 96/96 local files and 160/169 stations measured; target −13.2 LUFS
+  (catalogue median). A station measured 7.9 dB hotter than the target played at
+  `audio.volume` 0.322 with the slider at 0.8, and a studio song at 0.908 — the
+  trim follows the track. The 9 unreadable samples play untrimmed.
+- Tuner picker: 61 country groups and 105 regions; changing the region tunes its
+  first station, changing the town tunes that station, and both selects follow
+  whatever is on the air without fighting the user.
+- Near me: with a mocked San Juan position the locator tuned the San Juan
+  station (1 km), synced both dropdowns to Puerto Rico → San Juan PR, and marked
+  the listener in amber on the globe.
 - Widget/embed: inline player and floating launcher both play the live feed and
   show the world station's title, place and slot timer.
 - Layout checked at 390×844 and 320×720 with the tuner card and globe: no

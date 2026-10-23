@@ -685,8 +685,15 @@ h3 { font-size: 15px; letter-spacing: 0.04em; }
 .tuner-flag-sm { font-size: 13px; line-height: 1; }
 .tuner-next-place { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tuner-next time { font-size: 10px; color: var(--dim); font-variant-numeric: tabular-nums; }
-.tuner-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.tuner-link { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.tuner-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.locate-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #ffd479; box-shadow: 0 0 8px rgba(255, 212, 121, 0.65);
+  display: inline-block; margin-right: 2px;
+}
+#tuner-locate.is-busy .locate-dot { animation: pulse 1s ease-in-out infinite; }
+#tuner-locate[disabled] { opacity: 0.6; cursor: progress; }
+.tuner-link { display: inline-block; margin-top: 10px; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 .tuner-link:hover { color: var(--neon); }
 .tag-world { font-size: 8.5px; letter-spacing: 0.1em; color: #9fd4ff; border: 1px solid rgba(90, 170, 255, 0.3); border-radius: 4px; padding: 1px 4px; }
 

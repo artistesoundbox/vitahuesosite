@@ -11,7 +11,7 @@ import {
   formatTime, formatDuration, localHourLabel, programAt,
   msUntilNextProgram, formatCountdown, upcomingCities
 } from './station.js';
-import { randomStation, WORLD_STATIONS, WORLD_COUNTRIES, WORLD_SOURCE } from './world.js';
+import { randomStation, nearestStation, WORLD_STATIONS, WORLD_COUNTRIES, WORLD_SOURCE } from './world.js';
 import { createGlobe } from './globe.js';
 import { createVisualizer } from './visualizer.js';
 import { createCommunity } from './community.js';
@@ -494,6 +494,7 @@ function cacheEls() {
     'np-share', 'np-credit', 'np-live-note', 'sleep-status',
     'tuner-card', 'tuner-flag', 'tuner-name', 'tuner-place', 'tuner-note',
     'tuner-next', 'tuner-slot', 'tuner-link', 'tuner-spin', 'tuner-globe', 'tuner-globe-meta',
+    'tuner-region', 'tuner-town', 'tuner-locate',
     'home-art', 'home-title', 'home-artist', 'home-album', 'home-mode', 'home-program', 'home-play',
     'home-play-label', 'home-queue', 'home-next-program',
     'queue', 'queue-count', 'recent', 'schedule-next',
@@ -542,6 +543,90 @@ function renderQueueList(listEl, tracks, options = {}) {
 
 const localClock = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+/* Country → state/region → station, built once from the static list. The
+   directory publishes a region for every station and a street-level position
+   for only some, so the second level is the station itself. */
+const tunerCountries = (() => {
+  const countries = new Map();
+  for (const station of WORLD_STATIONS) {
+    const cc = station.countrycode;
+    if (!countries.has(cc)) {
+      countries.set(cc, { cc, country: station.country, flag: station.flag, places: new Map() });
+    }
+    const country = countries.get(cc);
+    const key = `${cc}|${station.place}`;
+    if (!country.places.has(key)) country.places.set(key, { key, place: station.place, stations: [] });
+    country.places.get(key).stations.push(station);
+  }
+  const list = [...countries.values()].sort((a, b) => a.country.localeCompare(b.country));
+  for (const country of list) {
+    country.places = [...country.places.values()].sort((a, b) => a.place.localeCompare(b.place));
+    country.places.forEach((place) => place.stations.sort((a, b) => a.name.localeCompare(b.name)));
+  }
+  return list;
+})();
+
+const tunerSync = { region: '', station: '' };
+
+function fillTunerRegions() {
+  const select = els['tuner-region'];
+  if (!select || select.options.length) return;
+  for (const country of tunerCountries) {
+    const group = document.createElement('optgroup');
+    group.label = `${country.flag || ''} ${country.country}`.trim();
+    for (const place of country.places) {
+      const option = document.createElement('option');
+      option.value = place.key;
+      option.textContent = place.stations.length > 1
+        ? `${place.place} (${place.stations.length})`
+        : place.place;
+      group.appendChild(option);
+    }
+    select.appendChild(group);
+  }
+}
+
+function tunerPlace(key) {
+  for (const country of tunerCountries) {
+    const place = country.places.find((p) => p.key === key);
+    if (place) return place;
+  }
+  return null;
+}
+
+function fillTunerTowns(key, selectedId = '') {
+  const select = els['tuner-town'];
+  if (!select) return;
+  const place = tunerPlace(key);
+  select.textContent = '';
+  for (const station of place?.stations || []) {
+    const option = document.createElement('option');
+    option.value = station.id;
+    option.textContent = station.name;
+    select.appendChild(option);
+  }
+  if (selectedId && [...select.options].some((o) => o.value === selectedId)) select.value = selectedId;
+  if (!select.value && select.options.length) select.value = select.options[0].value;
+}
+
+/** Keep both selects pointed at whatever is on air — without fighting the user. */
+function syncTuner(state) {
+  const region = els['tuner-region'];
+  const town = els['tuner-town'];
+  if (!region || !town || !state.station) return;
+  fillTunerRegions();
+  if (document.activeElement === region || document.activeElement === town) return;
+
+  const station = state.station;
+  const key = `${station.countrycode}|${station.place}`;
+  const changed = key !== tunerSync.region;
+  tunerSync.region = key;
+  if ([...region.options].some((o) => o.value === key)) region.value = key;
+  if (changed) fillTunerTowns(key, station.id);
+  if ([...town.options].some((o) => o.value === station.id)) town.value = station.id;
+  tunerSync.station = station.id;
+}
+
 /** The "World feed" card: where we are, and the next few cities. */
 function updateTuner(state) {
   const name = els['tuner-name'];
@@ -560,6 +645,7 @@ function updateTuner(state) {
   }
 
   globe?.setFocus(station);
+  syncTuner(state);
   if (els['tuner-globe-meta']) {
     els['tuner-globe-meta'].textContent = `${WORLD_STATIONS.length} stations · ${WORLD_COUNTRIES} countries`;
   }
@@ -592,6 +678,58 @@ function updateTuner(state) {
 }
 
 function bindTuner() {
+  const region = els['tuner-region'];
+  const town = els['tuner-town'];
+
+  fillTunerRegions();
+  if (region && region.value) fillTunerTowns(region.value);
+
+  region?.addEventListener('change', () => {
+    const key = region.value;
+    tunerSync.region = key;
+    fillTunerTowns(key);
+    const station = WORLD_STATIONS.find((s) => s.id === town?.value);
+    if (!station) return;
+    tunerSync.station = station.id;
+    radio.tuneWorld(station);
+  });
+
+  town?.addEventListener('change', () => {
+    const station = WORLD_STATIONS.find((s) => s.id === town.value);
+    if (!station) return;
+    tunerSync.station = station.id;
+    radio.tuneWorld(station);
+  });
+
+  els['tuner-locate']?.addEventListener('click', () => {
+    const button = els['tuner-locate'];
+    if (!navigator.geolocation) {
+      toast('This browser has no location support — pick a state instead.');
+      return;
+    }
+    button.classList.add('is-busy');
+    button.disabled = true;
+    navigator.geolocation.getCurrentPosition((position) => {
+      button.classList.remove('is-busy');
+      button.disabled = false;
+      const { latitude, longitude } = position.coords;
+      globe?.setYou(latitude, longitude);
+      const near = nearestStation(latitude, longitude);
+      if (!near) {
+        toast('No station in the directory has a location yet.');
+        return;
+      }
+      radio.tuneWorld(near.station);
+      toast(`${near.station.name} · ${near.station.place} — ${near.km.toLocaleString()} km away.`);
+    }, (error) => {
+      button.classList.remove('is-busy');
+      button.disabled = false;
+      toast(error && error.code === 1
+        ? 'Location permission denied — pick a state instead.'
+        : 'Could not read your location — pick a state instead.');
+    }, { enableHighAccuracy: false, timeout: 12000, maximumAge: 900000 });
+  });
+
   const spin = els['tuner-spin'];
   if (!spin) return;
   spin.addEventListener('click', () => {
