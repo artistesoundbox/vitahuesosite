@@ -93,6 +93,16 @@ same reel, so they always agree with what is playing.
 The radio page is driven by live stations around the world; the artist's own
 catalogue cuts in once an hour.
 
+- **Opens on the home station.** A first-time listener lands on `WORLD.home` —
+  **Salseo Radio, Quebradillas, Puerto Rico**, the town the station is run
+  from — instead of on whichever city the clock happens to be in. The card says
+  *Home station*, the picker starts on 🇵🇷 Puerto Rico → Quebradillas, and the
+  first play opens that stream. Nothing autoplays (browsers block it), so this
+  is what the play button starts. **Rejoin live** — or choosing the studio feed
+  — hands the listener to the shared clock and is remembered per device
+  (`vh.live.home`); clearing that key (or `WORLD.home: null`) opens on the
+  world clock again. The home station is matched by country + place, so a
+  rebuilt directory does not lose it.
 - **Slot grid.** The UTC day is cut into ten-minute slots (`WORLD.slotMinutes`).
   Slot boundaries are absolute, so every listener is in the same slot at the
   same second — and because the streams themselves are live, nobody is ahead of
@@ -108,7 +118,7 @@ catalogue cuts in once an hour.
   music is the visiting hour.
 - **IDs.** Every home segment opens with `audio/id/radiobreak.mp3`; one world
   slot every `WORLD.identEveryHours` hours (default **2**, twelve a day) opens
-  with it too, for 36 IDs across the day.
+  with it too, for roughly 34–36 IDs across the day.
 - **When a stream dies.** Routine on an open directory. The player remembers
   stations that did not answer, skips to the next scheduled segment, and falls
   back to the next home segment if the next cities are dead too. A 12-second
@@ -156,11 +166,14 @@ catalogue cuts in once an hour.
 
 **Where the stations come from.** [Radio Browser](https://www.radio-browser.info),
 a free and open directory of public internet radio streams. No key, no account,
-no server. Radio Garden publishes no API or embed of its own — its site talks to
-undocumented internal endpoints — so the same content is assembled here from the
-open directory instead of borrowed from them. Every stream is the broadcaster's
-own, played directly by the browser: nothing is recorded, relayed or
-re-encoded. Each station's name links back to its own website.
+no server. The directory does not carry a stream for Quebradillas, so the home
+frequency is listed explicitly in the builder's `CURATED` list (Salseo Radio,
+streamed by the station's own host) and survives a rebuild. Radio Garden
+publishes no API or embed of its own — its site talks to undocumented internal
+endpoints — so the same content is assembled here from the open directory
+instead of borrowed from them. Every stream is the broadcaster's own, played
+directly by the browser: nothing is recorded, relayed or re-encoded. Each
+station's name links back to its own website.
 
 Rebuild the list (this also re-probes every stream and rewrites the module):
 
@@ -209,6 +222,7 @@ node tools/build-loudness.mjs --stations   # world stations only
 | Large player, play/pause/skip/volume/mute | `index.html` `#np`, `js/player.js`, `js/ui.js` |
 | Continuous playback across sections | Single-page hash router; one persistent `<audio>` element |
 | World feed: slots, city pick, home segments | `js/station.js`, `js/world.js`, `js/world-stations.js` |
+| Default/home station (Quebradillas) | `WORLD.home` in `js/config.js`, `radio.primeHome()` in `js/player.js` |
 | Station list builder + stream probe | `tools/build-world-radio.mjs` |
 | Tuner card, next cities, spin the dial | `js/ui.js`, `index.html` |
 | Little live globe | `js/globe.js` (canvas, no assets) |
@@ -486,12 +500,22 @@ rest of `vitahuesosite`:
   inventing a number. A genuine two-device count still needs a Supabase project
   (the config values were never supplied).
 - World feed timeline: one seeded UTC day is 246 entries — 120 live-station
-  slots, 90 home songs and 36 station IDs, tiling the 24 hours with **zero gaps
-  and zero overlaps**; 83.3% world airtime, 16.5% home, 87 different cities in
-  the day.
-- World streams: the built list is 169 stations in 61 countries, every one probed
-  for audio at build time (HTTPS, MP3/AAC, no HLS/Ogg, no talk/news tags); a
-  browser played a real station to `readyState 3` with `currentTime` advancing.
+  slots, 92 home songs and 34 station IDs, tiling the 24 hours with **zero gaps
+  and zero overlaps**; 89 different cities in the day.
+- World streams: the built list is 170 stations in 61 countries, every one probed
+  for audio at build time (HTTPS, MP3/AAC, no HLS/Ogg, no talk/news tags) plus
+  the hand-listed Quebradillas station; a browser played a real station to
+  `readyState 3` with `currentTime` advancing.
+- Default station: a fresh profile opened on **Salseo Radio · Quebradillas ·
+  Puerto Rico** (`mode: world`, card slot *Home station*, picker on Puerto Rico
+  → Quebradillas) and pressing play streamed
+  `listen.radioking.com/radio/399811/stream/452110` at `readyState 3` with
+  `currentTime` advancing. **Rejoin live** moved to the
+  clock (`mode: live`), stored `vh.live.home = false`, and a reload stayed on
+  the clock; clearing the key opened on Quebradillas again. A studio-feed
+  preference won over the home default on reload. The portal dock
+  (`site-radio.js`) opened on the same station, played it on **Enable radio**,
+  showed the LIVE badge, and its **Rejoin** switched to the clock and stuck.
 - Dead station: tuning to an unreachable stream failed over to the scheduled
   broadcast within a few seconds, logged the station as dead, and returned to
   `mode: live` at the correct slot offset.
@@ -502,12 +526,14 @@ rest of `vitahuesosite`:
 - Globe: canvas is 231×132 CSS / 231×132 backing pixels, all painted pixels
   inside the 61 px sphere radius, no paint outside the rim; the listener dot
   paints on the front face and is hidden on the back.
-- Loudness: 96/96 local files and 160/169 stations measured; target −13.2 LUFS
+- Loudness: 96/96 local files and 160/170 stations measured; target −13.2 LUFS
   (catalogue median). A station measured 7.9 dB hotter than the target played at
   `audio.volume` 0.322 with the slider at 0.8, and a studio song at 0.908 — the
   trim follows the track. The 9 unreadable samples play untrimmed.
-- Tuner picker: 61 country groups and 166 rows (105 regions + an **All of …**
-  row per country); the United States group lists all three of its stations, and
+- Tuner picker: 61 country groups and 167 rows (106 regions + an **All of …**
+  row per country); the United States group lists all three of its stations,
+  Puerto Rico now lists Quebradillas next to San Juan PR (searching "quebrad"
+  narrows to it), and
   changing the region or town tunes the first station in it. The selection
   stays where it was chosen while the clock moves inside that scope, and the
   search box filters to country, state and station names ("united" → US + UK,
@@ -519,7 +545,7 @@ rest of `vitahuesosite`:
   station (1 km), synced both dropdowns to Puerto Rico → San Juan PR, and marked
   the listener in amber on the globe.
 - Leaning: with `WORLD.leanShare = 0.6`, a 20-day build put 61.4% of world slots
-  in the chosen region (baseline 1/169 for a single station); the same lean
+  in the chosen region (baseline 1/170 for a single station); the same lean
   built twice produced identical cities, clearing it restored the shared picks
   exactly, and adjacent slots in one station were merged instead of restarting
   the stream.

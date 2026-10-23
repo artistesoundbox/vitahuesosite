@@ -106,6 +106,31 @@ const COUNTRY_GEO = {
   YE: [15.6, 48.5], ZA: [-30.6, 22.9], ZM: [-13.1, 27.8], ZW: [-19.0, 29.2]
 };
 
+/* Stations added by hand, in the same shape as the records below.
+ *
+ * The open directory does not carry a stream for every station: Salseo Radio
+ * broadcasts from Quebradillas, Puerto Rico — the station's home frequency —
+ * and the directory has no entry for it. Curated records survive a rebuild; a
+ * curated URL that the directory has since picked up is not listed twice. */
+const CURATED = [
+  {
+    name: 'Salseo Radio',
+    country: 'Puerto Rico',
+    countrycode: 'PR',
+    flag: '🇵🇷',
+    place: 'Quebradillas',
+    tags: ['salsa', 'latin', 'tropical'],
+    url: 'https://listen.radioking.com/radio/399811/stream/452110',
+    codec: 'MP3',
+    bitrate: 192,
+    homepage: 'https://www.salseoradio.com/',
+    lat: 18.4736,
+    lon: -66.9385,
+    geo: 'station',
+    votes: 0
+  }
+];
+
 const BAD_URL = /\.(m3u8|m3u|pls|xspf)(\?|$)/i;
 const GOOD_CODEC = /^(mp3|aac|aac\+|mpeg)$/i;
 /* Names and tags that read as a directory entry, a talk station, or a test
@@ -259,9 +284,9 @@ async function main() {
     chosen.push(station);
   }
 
-  const stations = chosen
+  const listed = chosen
     .sort((a, b) => String(a.name).localeCompare(String(b.name)))
-    .map((s, index) => {
+    .map((s) => {
       const cc = String(s.countrycode).toUpperCase();
       const lat = Number(s.geo_lat);
       const lon = Number(s.geo_long);
@@ -269,7 +294,6 @@ async function main() {
         && Number.isFinite(lat) && Math.abs(lat) <= 90
         && Number.isFinite(lon) && Math.abs(lon) <= 180;
       return {
-        id: `w${String(index + 1).padStart(2, '0')}`,
         name: stationName(s.name),
         country: clean(s.country, 60),
         countrycode: cc,
@@ -286,6 +310,10 @@ async function main() {
         votes: Number(s.votes) || 0
       };
     });
+
+  const stations = [...listed, ...CURATED.filter((c) => !listed.some((s) => s.url === c.url))]
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+    .map((s, index) => ({ id: `w${String(index + 1).padStart(2, '0')}`, ...s }));
 
   const payload = {
     source: 'Radio Browser (radio-browser.info)',

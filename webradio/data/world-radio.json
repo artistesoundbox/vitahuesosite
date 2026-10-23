@@ -2,7 +2,7 @@
   "source": "Radio Browser (radio-browser.info)",
   "note": "Public internet radio streams. Each station is owned by its broadcaster; the station name links back to its homepage.",
   "generated": "2026-10-23",
-  "count": 169,
+  "count": 170,
   "stations": [
     {
       "id": "w01",
@@ -3330,6 +3330,27 @@
       "lon": 174.9,
       "geo": "country",
       "votes": 524
+    },
+    {
+      "id": "w170",
+      "name": "Salseo Radio",
+      "country": "Puerto Rico",
+      "countrycode": "PR",
+      "flag": "🇵🇷",
+      "place": "Quebradillas",
+      "tags": [
+        "salsa",
+        "latin",
+        "tropical"
+      ],
+      "url": "https://listen.radioking.com/radio/399811/stream/452110",
+      "codec": "MP3",
+      "bitrate": 192,
+      "homepage": "https://www.salseoradio.com/",
+      "lat": 18.4736,
+      "lon": -66.9385,
+      "geo": "station",
+      "votes": 0
     }
   ]
 }

@@ -9,6 +9,7 @@
  * slot actually starts, so importing this file costs one JSON-shaped read.
  */
 import { WORLD_FEED } from './world-stations.js';
+import { WORLD } from './config.js';
 
 export const WORLD_STATIONS = Array.isArray(WORLD_FEED?.stations) ? WORLD_FEED.stations : [];
 export const WORLD_SOURCE = WORLD_FEED?.source || 'Radio Browser';
@@ -115,6 +116,23 @@ export function randomStation(exclude = []) {
 
 export function stationById(id) {
   return WORLD_STATIONS.find((s) => s.id === id) || null;
+}
+
+/**
+ * The frequency the radio opens on (`WORLD.home`).
+ *
+ * Located by country + place rather than by id: a rebuild of the directory
+ * renumbers every station, and the home station must not follow the numbering.
+ * Falls back to another station in the same country, then to nothing.
+ */
+export function homeStation() {
+  const key = WORLD.home;
+  if (!key || !WORLD_STATIONS.length) return null;
+  const cc = String(key.countrycode || '').toUpperCase();
+  return WORLD_STATIONS.find((s) => s.countrycode === cc
+      && (!key.place || s.place === key.place))
+    || WORLD_STATIONS.find((s) => s.countrycode === cc)
+    || null;
 }
 
 /** Great-circle distance in km, for "the station nearest me". */

@@ -292,9 +292,12 @@ function paint(state) {
   const sub = `${track.artist} · ${track.album}`;
   if (els.sub.textContent !== sub) els.sub.textContent = sub;
 
+  /* A hand-tuned station (the home frequency included) is still live radio;
+     only the catalogue is "personal". */
   const live = state.mode === 'live';
-  els.badge.textContent = live ? 'LIVE' : 'PERSONAL';
-  els.badge.classList.toggle('is-personal', !live);
+  const personal = state.mode === 'personal';
+  els.badge.textContent = personal ? 'PERSONAL' : 'LIVE';
+  els.badge.classList.toggle('is-personal', personal);
   els.rejoin.hidden = live;
 
   els.play.innerHTML = state.playing ? ICON.pause : ICON.play;
@@ -406,6 +409,10 @@ function toggle() {
 function init() {
   injectStyles();
   buildDock();
+
+  /* The dock opens on the station's home frequency (Quebradillas) until the
+     listener asks for the shared clock. */
+  radio.primeHome();
 
   toggleButton = document.getElementById('vh-enable-radio');
   if (toggleButton) {

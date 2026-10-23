@@ -12,7 +12,7 @@ import {
   msUntilNextProgram, formatCountdown, upcomingCities,
   setWorldLean, getWorldLean, getLiveSource
 } from './station.js';
-import { randomStation, nearestStation, WORLD_STATIONS, WORLD_COUNTRIES, WORLD_SOURCE } from './world.js';
+import { randomStation, nearestStation, homeStation, stationById, WORLD_STATIONS, WORLD_COUNTRIES, WORLD_SOURCE } from './world.js';
 import { createGlobe } from './globe.js';
 import { createVisualizer } from './visualizer.js';
 import { createCommunity } from './community.js';
@@ -545,6 +545,11 @@ function renderQueueList(listEl, tracks, options = {}) {
 
 const localClock = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+/* The frequency the radio opens on (WORLD.home) — the town the station is run
+   from. The player owns the tuning; this is only for the labels. */
+const HOME_STATION = homeStation();
+const isHomeStation = (station) => !!station && station.id === HOME_STATION?.id;
+
 /* Common names for the directory's long political labels, keyed by ISO code
    so the grouping never depends on the wording. */
 const SHORT_COUNTRY = {
@@ -829,7 +834,9 @@ function updateTuner(state) {
   const next = upcomingCities(3);
   if (els['tuner-slot']) {
     if (studio && state.mode === 'live') els['tuner-slot'].textContent = 'Studio live';
-    else if (station && state.mode === 'world') els['tuner-slot'].textContent = 'Hand-tuned';
+    else if (station && state.mode === 'world') {
+      els['tuner-slot'].textContent = isHomeStation(station) ? 'Home station' : 'Hand-tuned';
+    }
     else if (next.length) els['tuner-slot'].textContent = `Next city ${localClock(next[0].startMs)}`;
     else els['tuner-slot'].textContent = 'Live';
   }
@@ -841,7 +848,9 @@ function updateTuner(state) {
       parts.push(state.mode === 'live' ? 'on the clock' : 'paused');
     } else if (station) {
       parts.push(`${station.codec}${station.bitrate ? ` ${station.bitrate} kbps` : ''}`);
-      parts.push(state.mode === 'live' ? 'on the clock' : 'hand-tuned');
+      parts.push(state.mode === 'live'
+        ? 'on the clock'
+        : isHomeStation(station) ? 'home frequency' : 'hand-tuned');
     } else {
       parts.push(`${WORLD_STATIONS.length} live stations in ${WORLD_COUNTRIES} countries`);
     }
@@ -1107,7 +1116,9 @@ function updateState(state) {
   els['np-live-note'].textContent = world
     ? (live
       ? `Live from ${track.station.place} — a real broadcast from ${track.station.country}. There is no rewind on a live stream; the next city arrives at the end of this slot.`
-      : `Hand-tuned to ${track.station.name}, live from ${track.station.country}. Rejoin the broadcast whenever you like.`)
+      : isHomeStation(track.station)
+        ? `The station's home frequency — ${track.station.name}, live from ${track.station.place}, ${track.station.country}. Rejoin the broadcast whenever you like.`
+        : `Hand-tuned to ${track.station.name}, live from ${track.station.country}. Rejoin the broadcast whenever you like.`)
     : live
       ? 'Live broadcast — position follows the station clock.'
       : 'Library playback — drag to seek, skip as you like.';
@@ -1663,7 +1674,17 @@ function resumeFromSiteHandoff() {
   const liveNow = radio.track;      // set from the live reel at module load
   const sameAsLive = track && liveNow && liveNow.id === track.id;
 
-  if (track && !sameAsLive) {
+  /* A live station playing hand-tuned on the portal (the home frequency
+     included) is the stream to keep, not the clock: continuing the clock
+     would swap the station the listener was just hearing. */
+  const worldId = String(note.trackId || '');
+  const dockStation = !track && note.mode === 'world' && worldId.startsWith('world:')
+    ? stationById(worldId.slice('world:'.length))
+    : null;
+
+  if (dockStation) {
+    radio.tuneWorld(dockStation);
+  } else if (track && !sameAsLive) {
     radio.playTrack(track);
     const elapsed = Math.max(0, (Date.now() - Number(note.at || Date.now())) / 1000);
     const offset = Math.max(0, Number(note.offset) || 0) + Math.min(5, elapsed);
@@ -1793,6 +1814,10 @@ function init() {
   }, 30000);
 
   resumeFromSiteHandoff();
+  /* Nothing resumed: open on the station's home frequency (Quebradillas).
+     A hand-off or a play already in progress takes precedence, and a listener
+     who chose the shared clock keeps it. */
+  radio.primeHome();
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('sw.js').catch(() => { /* offline cache is optional */ });

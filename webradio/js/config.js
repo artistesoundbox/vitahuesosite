@@ -140,7 +140,15 @@ export const WORLD = {
      on "Lean the feed here". 0.6 = three slots in five stay in the chosen
      region, two in five still travel the world. 0 makes the picker hand-tune
      only, 1 makes it a regional station. */
-  leanShare: 0.6
+  leanShare: 0.6,
+
+  /* The station the radio opens on — the frequency of the town the station is
+     run from. A first-time listener lands here instead of on whichever city
+     the world clock happens to be in; "Rejoin live" hands them to the shared
+     clock from then on. Matched on the published location rather than an id,
+     because the directory is rebuilt with fresh ids. Set `home: null` to open
+     on the world clock. */
+  home: { countrycode: 'PR', place: 'Quebradillas' }
 };
 
 export const SLEEP_CHOICES = [15, 30, 45, 60, 90, 120];

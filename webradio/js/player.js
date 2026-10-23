@@ -11,16 +11,19 @@
  * lock-screen playback keeps working. Mic monitoring uses its own graph.
  */
 import { TRACKS } from './catalog.js';
-import { getLiveState, programAt, msUntilNextProgram, setLiveSource } from './station.js';
+import { getLiveState, getLiveSource, programAt, msUntilNextProgram, setLiveSource } from './station.js';
 import { isBlocked } from './blocklist.js';
-import { worldTrack } from './world.js';
+import { worldTrack, homeStation } from './world.js';
 import { LOUDNESS } from './loudness.js';
 
 const KEYS = {
   volume: 'vh.volume',
   muted: 'vh.muted',
   favorites: 'vh.favorites',
-  history: 'vh.history'
+  history: 'vh.history',
+  /* `false` once the listener has rejoined the shared clock: the radio then
+     opens on the clock instead of the home station. */
+  home: 'vh.live.home'
 };
 
 function read(key, fallback) {
@@ -310,6 +313,13 @@ export class Radio extends EventTarget {
   start() {
     this.yielded = false;   // an explicit play here takes the floor back
     this.started = true;
+    /* Primed on the home station (see primeHome): the stream was never opened,
+       so open it now instead of falling through to the live clock. */
+    if (this.mode === 'world' && this.track?.world
+      && this.audio.getAttribute('src') !== this.srcFor(this.track)) {
+      this.playWorld(this.track, null, 0);
+      return;
+    }
     if (this.mode !== 'live' && this.track) {
       this.audio.play().catch((err) => this.playFailed(err));
       return;
@@ -431,7 +441,7 @@ export class Radio extends EventTarget {
     }
 
     if (this.mode !== 'live') {
-      this.rejoinLive();
+      this.rejoinLive({ keepHome: true });
       return;
     }
 
@@ -461,6 +471,7 @@ export class Radio extends EventTarget {
     this.live = state;
     if (this.mode === 'personal') return true;   // the clock changes underneath
     if (!this.started) {
+      this.mode = 'live';
       this.entry = state.entry;
       this.track = state.entry.track;
       this.emitState();
@@ -484,6 +495,30 @@ export class Radio extends EventTarget {
     this.failedWorld.delete(station.id);
     this.playWorld(worldTrack(station, 0), null, 0);
     this.notice(`Off the clock — tuned to ${station.name}, ${station.place}.`);
+  }
+
+  /**
+   * Open on the home station (`WORLD.home`): the frequency of the town the
+   * station is run from. The page calls this before anything plays, so a
+   * first-time listener finds Quebradillas, Puerto Rico, on the dial instead
+   * of whichever city the shared clock happens to be in.
+   *
+   * It never plays by itself — the first play still depends on the browser's
+   * autoplay rules — and it stays out of the way of a listener who has already
+   * chosen the world clock ("Rejoin live") or the studio feed on this device.
+   */
+  primeHome() {
+    if (this.started) return false;
+    if (read(KEYS.home, true) === false) return false;
+    if (getLiveSource() === 'studio') return false;
+    const station = homeStation();
+    if (!station) return false;
+    this.mode = 'world';
+    this.entry = null;
+    this.track = worldTrack(station, 0);
+    this.worldJoinedAt = Date.now();
+    this.emitState();
+    return true;
   }
 
   /** Skip to another city without leaving the world feed. */
@@ -599,9 +634,12 @@ export class Radio extends EventTarget {
     this.playTrack(next, { queue: this.personalQueue });
   }
 
-  rejoinLive() {
+  rejoinLive({ keepHome = false } = {}) {
     const state = getLiveState();
     if (!state) return;
+    /* Choosing the shared clock sticks: the next visit opens on the clock
+       rather than back on the home station. */
+    if (!keepHome) write(KEYS.home, false);
     this.personalQueue = [];
     this.personalPast = [];
     this.playLive(state.entry, state.offset);
