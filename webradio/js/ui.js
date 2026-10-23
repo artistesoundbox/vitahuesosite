@@ -545,15 +545,39 @@ function renderQueueList(listEl, tracks, options = {}) {
 
 const localClock = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+/* Common names for the directory's long political labels, keyed by ISO code
+   so the grouping never depends on the wording. */
+const SHORT_COUNTRY = {
+  US: 'United States',
+  GB: 'United Kingdom',
+  KR: 'South Korea',
+  RU: 'Russia',
+  NL: 'Netherlands',
+  PH: 'Philippines',
+  DO: 'Dominican Republic',
+  VE: 'Venezuela'
+};
+
+const byStationName = (a, b) => a.name.localeCompare(b.name);
+
 /* Country → state/region → station, built once from the static list. The
    directory publishes a region for every station and a street-level position
-   for only some, so the second level is the station itself. */
+   for only some, so the second level is the station itself.
+
+   Every country also gets an "All of …" row: several broadcasters report the
+   country as their region, and without it those stations sit in a one-item
+   bucket while the rest of the country hides in the neighbouring row. */
 const tunerCountries = (() => {
   const countries = new Map();
   for (const station of WORLD_STATIONS) {
     const cc = station.countrycode;
     if (!countries.has(cc)) {
-      countries.set(cc, { cc, country: station.country, flag: station.flag, places: new Map() });
+      countries.set(cc, {
+        cc,
+        country: SHORT_COUNTRY[cc] || station.country,
+        flag: station.flag,
+        places: new Map()
+      });
     }
     const country = countries.get(cc);
     const key = `${cc}|${station.place}`;
@@ -563,39 +587,71 @@ const tunerCountries = (() => {
   const list = [...countries.values()].sort((a, b) => a.country.localeCompare(b.country));
   for (const country of list) {
     country.places = [...country.places.values()].sort((a, b) => a.place.localeCompare(b.place));
-    country.places.forEach((place) => place.stations.sort((a, b) => a.name.localeCompare(b.name)));
+    country.places.forEach((place) => place.stations.sort(byStationName));
+    country.all = {
+      key: country.cc,
+      all: true,
+      label: country.country,
+      place: `All of ${country.country}`,
+      stations: country.places.flatMap((place) => place.stations).sort(byStationName)
+    };
   }
   return list;
 })();
 
+const tunerIndex = new Map();
+for (const country of tunerCountries) {
+  tunerIndex.set(country.all.key, country.all);
+  for (const place of country.places) tunerIndex.set(place.key, place);
+}
+
 const tunerSync = { region: '', station: '' };
+/* The search box narrows the country/region list; empty means everything. */
+let tunerQuery = '';
+
+function regionOption(place) {
+  const option = document.createElement('option');
+  option.value = place.key;
+  option.textContent = place.stations.length > 1
+    ? `${place.place} (${place.stations.length})`
+    : place.place;
+  return option;
+}
 
 function fillTunerRegions() {
   const select = els['tuner-region'];
-  if (!select || select.dataset.filled) return;
+  if (!select) return;
+  if (select.dataset.query === tunerQuery) return;
+  select.dataset.query = tunerQuery;
   select.textContent = '';
+
+  const q = normalize(tunerQuery).trim();
+  let shown = 0;
   for (const country of tunerCountries) {
+    const countryHit = !!q && (normalize(country.country).includes(q) || normalize(country.cc).includes(q));
+    const places = country.places.filter((place) => !q || countryHit
+      || normalize(place.place).includes(q)
+      || place.stations.some((station) => normalize(station.name).includes(q)));
+    if (!places.length && !countryHit) continue;
+
     const group = document.createElement('optgroup');
     group.label = `${country.flag || ''} ${country.country}`.trim();
-    for (const place of country.places) {
-      const option = document.createElement('option');
-      option.value = place.key;
-      option.textContent = place.stations.length > 1
-        ? `${place.place} (${place.stations.length})`
-        : place.place;
-      group.appendChild(option);
-    }
+    if (!q || countryHit) group.appendChild(regionOption(country.all));
+    for (const place of places) group.appendChild(regionOption(place));
     select.appendChild(group);
+    shown += group.children.length;
   }
-  select.dataset.filled = '1';
+
+  if (!shown) {
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = `No match for “${tunerQuery.trim()}”`;
+    select.appendChild(empty);
+  }
 }
 
 function tunerPlace(key) {
-  for (const country of tunerCountries) {
-    const place = country.places.find((p) => p.key === key);
-    if (place) return place;
-  }
-  return null;
+  return tunerIndex.get(key) || null;
 }
 
 /* --------------------------------------------------------- leaning the feed */
@@ -619,7 +675,9 @@ function writeLeanPreference(key) {
 
 function leanPlaceName() {
   const lean = getWorldLean();
-  return lean ? (tunerPlace(lean.key)?.place || '') : '';
+  if (!lean) return '';
+  const place = tunerPlace(lean.key);
+  return place ? (place.all ? place.label : place.place) : '';
 }
 
 function refreshLeanHints() {
@@ -715,16 +773,24 @@ function syncTuner(state) {
   fillTunerRegions();
   if (document.activeElement === region || document.activeElement === town) return;
 
+  /* A search owns the list while it is open: the clock must not move the
+     selection under the pointer. */
+  if (tunerQuery) return;
+
   const station = state.station;
   const stationKey = `${station.countrycode}|${station.place}`;
   /* While leaning, the region select is the listener's choice, not a readout:
      keep it on that region even when the clock is visiting another one. */
-  const key = getWorldLean()?.key || stationKey;
+  const lean = getWorldLean();
+  const key = lean?.key || stationKey;
+  const onKey = lean && !key.includes('|')
+    ? station.countrycode === key     // whole-country lean
+    : stationKey === key;
   const changed = key !== tunerSync.region;
   tunerSync.region = key;
   if ([...region.options].some((o) => o.value === key)) region.value = key;
-  if (changed) fillTunerTowns(key, stationKey === key ? station.id : '');
-  if (stationKey === key && [...town.options].some((o) => o.value === station.id)) town.value = station.id;
+  if (changed) fillTunerTowns(key, onKey ? station.id : '');
+  if (onKey && [...town.options].some((o) => o.value === station.id)) town.value = station.id;
   tunerSync.station = station.id;
 }
 
@@ -794,12 +860,46 @@ function updateTuner(state) {
   }
 }
 
+/* Typing narrows the country/region list by country, state or station name.
+   It never tunes anything by itself — choosing a region is still the action. */
+function bindTunerSearch() {
+  const search = els['tuner-search'];
+  const region = els['tuner-region'];
+  if (!search || !region) return;
+
+  const apply = () => {
+    if (search.value === tunerQuery) return;
+    tunerQuery = search.value;
+    const previous = region.value;
+    fillTunerRegions();
+    const options = [...region.options];
+    const lean = getWorldLean()?.key;
+    const onAir = radio.track?.station
+      ? `${radio.track.station.countrycode}|${radio.track.station.place}`
+      : '';
+    const preferred = [previous, lean, onAir].find((key) => key && options.some((o) => o.value === key));
+    region.value = preferred || (options[0]?.value || '');
+    tunerSync.region = region.value;
+    fillTunerTowns(region.value, '');
+  };
+
+  search.addEventListener('input', apply);
+  search.addEventListener('search', apply);   // the native clear button
+  search.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    search.value = '';
+    apply();
+  });
+}
+
 function bindTuner() {
   const region = els['tuner-region'];
   const town = els['tuner-town'];
 
   fillTunerRegions();
   if (region && region.value) fillTunerTowns(region.value);
+  bindTunerSearch();
 
   /* Restore the feed last used on this device before anything plays. */
   const savedFeed = readFeed();

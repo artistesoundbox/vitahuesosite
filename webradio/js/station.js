@@ -238,8 +238,11 @@ export function setWorldLean(key) {
   const next = key ? String(key) : null;
   if (next === leanKey) return leanPool;
   leanKey = next;
+  /* `cc|place` is one region, a bare `cc` is the whole country. */
   leanPool = next
-    ? WORLD_STATIONS.filter((s) => `${s.countrycode}|${s.place}` === next)
+    ? WORLD_STATIONS.filter((s) => (next.includes('|')
+      ? `${s.countrycode}|${s.place}` === next
+      : s.countrycode === next))
     : [];
   reels.clear();
   tails.clear();
