@@ -1150,7 +1150,12 @@ body.is-ready #room-canvas { opacity: 1; }
 
   /* Drawer becomes a sheet sliding up from the bottom */
   .viewer { --panel-w: 0px; }
-  .viewer-main { inset: 0; }
+  .viewer-main {
+    inset: 0;
+    transition: bottom 0.32s cubic-bezier(0.4, 0, 0.2, 1), right 0.32s ease;
+  }
+  /* Keep the picture in sight above the open sheet */
+  .viewer:not(.browser-closed) .viewer-main { bottom: min(74vh, 620px); }
   .browser {
     width: 100%;
     top: auto;
