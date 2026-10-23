@@ -572,7 +572,8 @@ const tunerSync = { region: '', station: '' };
 
 function fillTunerRegions() {
   const select = els['tuner-region'];
-  if (!select || select.options.length) return;
+  if (!select || select.dataset.filled) return;
+  select.textContent = '';
   for (const country of tunerCountries) {
     const group = document.createElement('optgroup');
     group.label = `${country.flag || ''} ${country.country}`.trim();
@@ -586,6 +587,7 @@ function fillTunerRegions() {
     }
     select.appendChild(group);
   }
+  select.dataset.filled = '1';
 }
 
 function tunerPlace(key) {
@@ -1635,6 +1637,10 @@ function init() {
     VIEWS[route] = $(`view-${route}`);
   });
 
+  /* The tuner is filled before the catalogue renders: the picker is the one
+     control that looks broken while it is empty, and a hundred library cards
+     take long enough on a phone to leave it blank for a beat. */
+  bindTuner();
   renderStats();
   renderGenreChips();
   renderLibrary();
@@ -1644,7 +1650,6 @@ function init() {
   renderGallery();
   renderAbout();
   bindPlayer();
-  bindTuner();
   bindLibrary();
   bindForms();
 
