@@ -1120,6 +1120,51 @@
       "lufs": -9,
       "url": "https://radio.dominiserver.com/proxy/topmerengueradio?mp=/stream",
       "at": 1792739245
+    },
+    "w149": {
+      "lufs": -9.9,
+      "url": "https://stream.audioxi.com/TD",
+      "at": 1792739247
+    },
+    "w154": {
+      "lufs": -10.5,
+      "url": "https://radio.dominiserver.com/proxy/topsalsaradio?mp=/stream",
+      "at": 1792739248
+    },
+    "w145": {
+      "lufs": -16.2,
+      "url": "https://live1.sr.se/p4plus-aac-320",
+      "at": 1792739248
+    },
+    "w144": {
+      "lufs": -15.8,
+      "url": "https://live1.sr.se/p3-aac-320",
+      "at": 1792739249
+    },
+    "w151": {
+      "lufs": -15.1,
+      "url": "https://playerservices.streamtheworld.com/api/livestream-redirect/OWR_INTERNATIONAL_ADP.aac",
+      "at": 1792739250
+    },
+    "w153": {
+      "lufs": -11,
+      "url": "https://topradio.live.advailo.com/topradio/mp3/icecast.audio",
+      "at": 1792739250
+    },
+    "w155": {
+      "lufs": -9.6,
+      "url": "https://radio.dominiserver.com/proxy/topurbano?mp=/stream",
+      "at": 1792739251
+    },
+    "w150": {
+      "lufs": -12.4,
+      "url": "https://radiostream.pl/tuba10-1.mp3#TOK_FM",
+      "at": 1792739252
+    },
+    "w160": {
+      "lufs": -17.1,
+      "url": "https://icecast.walmradio.com:8443/walm",
+      "at": 1792739254
     }
   },
   "localLufs": [
