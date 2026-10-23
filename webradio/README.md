@@ -107,7 +107,8 @@ catalogue cuts in once an hour.
   ten-minute slots that is about **16% of the day** — the world leads, your
   music is the visiting hour.
 - **IDs.** Every home segment opens with `audio/id/radiobreak.mp3`; one world
-  slot every `WORLD.identEveryHours` hours (default **3**) opens with it too.
+  slot every `WORLD.identEveryHours` hours (default **2**, twelve a day) opens
+  with it too, for 36 IDs across the day.
 - **When a stream dies.** Routine on an open directory. The player remembers
   stations that did not answer, skips to the next scheduled segment, and falls
   back to the next home segment if the next cities are dead too. A 12-second
@@ -472,8 +473,8 @@ rest of `vitahuesosite`:
   random per-browser id; with no keys configured the page shows 1 rather than
   inventing a number. A genuine two-device count still needs a Supabase project
   (the config values were never supplied).
-- World feed timeline: one seeded UTC day is 241 entries — 120 live-station
-  slots, 90 home songs and 31 station IDs, tiling the 24 hours with **zero gaps
+- World feed timeline: one seeded UTC day is 246 entries — 120 live-station
+  slots, 90 home songs and 36 station IDs, tiling the 24 hours with **zero gaps
   and zero overlaps**; 83.3% world airtime, 16.5% home, 87 different cities in
   the day.
 - World streams: the built list is 169 stations in 61 countries, every one probed
