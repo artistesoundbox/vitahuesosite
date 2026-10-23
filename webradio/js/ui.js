@@ -890,12 +890,8 @@ function bindTunerSearch() {
 
   search.addEventListener('input', apply);
   search.addEventListener('search', apply);   // the native clear button
-  search.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape') return;
-    event.preventDefault();
-    search.value = '';
-    apply();
-  });
+  /* Escape is left to the browser: overriding it turned closing an autofill
+     suggestion into a wiped query. */
 }
 
 function bindTuner() {
