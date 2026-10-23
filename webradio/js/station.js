@@ -171,8 +171,11 @@ function buildSequence(pool, guests, rng, length = 96, seedRecent = []) {
  * reel, so a song that just played in the last home segment does not return.
  */
 function homeSequence(program, rng, length, recent) {
+  /* The programme's genres are weighted, not enforced: a home segment is only
+     two or three songs long, so restricting it to five matching tracks would
+     repeat them every hour. Matching tracks simply appear twice in the pool. */
   const own = ORIGINALS.filter((t) => t.genres.some((g) => program.genres.includes(g)));
-  const ownPool = own.length >= 4 ? own : ORIGINALS;
+  const ownPool = own.length ? [...ORIGINALS, ...own] : ORIGINALS;
   const guestPool = GUESTS.length ? GUESTS : ownPool;
   if (!ownPool.length) return [];
 
