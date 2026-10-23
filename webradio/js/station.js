@@ -170,7 +170,7 @@ function buildSequence(pool, guests, rng, length = 96, seedRecent = []) {
  * a guest every few songs. Shares the day's cooldown list with the rest of the
  * reel, so a song that just played in the last home segment does not return.
  */
-function homeSequence(program, rng, length, recent) {
+function homeSequence(program, rng, recent, maxMs) {
   /* The programme's genres are weighted, not enforced: a home segment is only
      two or three songs long, so restricting it to five matching tracks would
      repeat them every hour. Matching tracks simply appear twice in the pool. */
@@ -193,14 +193,19 @@ function homeSequence(program, rng, length, recent) {
     return pool[Math.floor(rng() * pool.length)];
   };
 
+  /* Only fill the segment, not a fixed count: tracks generated past the end of
+     the slot would sit in the cooldown list without ever being heard, evicting
+     songs that *did* play and letting them come back an hour later. */
   let guard = 0;
-  while (out.length < length && guard++ < length * 6) {
+  let totalMs = 0;
+  while (totalMs < maxMs && guard++ < 40) {
     const pool = rng() < share ? ownPool : guestPool;
     const track = pick(pool);
     if (!track) break;
     out.push(track);
     recent.push(track.id);
     while (recent.length > cooldown) recent.shift();
+    totalMs += track.duration * 1000;
   }
   return out;
 }
@@ -347,7 +352,7 @@ function buildWorldReel(dayStartMs, carry = []) {
       }
 
       const rng = mulberry32(hashString(`${dayKey}|home-set|${hour}|${inHour}|${STATION_EPOCH}`));
-      const sequence = homeSequence(program, rng, 24, recent);
+      const sequence = homeSequence(program, rng, recent, endMs - cursor);
       let i = 0;
       while (endMs - cursor > 12000 && guard++ < 60 && i < sequence.length) {
         const track = sequence[i++];
