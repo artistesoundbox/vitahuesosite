@@ -131,7 +131,13 @@ export const WORLD = {
   homeEveryHour: 1,
   homeShare: 0.85,
   identEveryHours: 3,
-  avoidSameCountry: true
+  avoidSameCountry: true,
+
+  /* Share of the slots that follow a listener's chosen region once they turn
+     on "Lean the feed here". 0.6 = three slots in five stay in the chosen
+     region, two in five still travel the world. 0 makes the picker hand-tune
+     only, 1 makes it a regional station. */
+  leanShare: 0.6
 };
 
 export const SLEEP_CHOICES = [15, 30, 45, 60, 90, 120];

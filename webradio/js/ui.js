@@ -4,12 +4,13 @@
  * keeps playing while you move between Home, Library and Releases.
  */
 import { STATION, ALBUMS, GENRES, STATS, TRACKS } from './catalog.js';
-import { PROGRAMS, SLEEP_CHOICES } from './config.js';
+import { PROGRAMS, SLEEP_CHOICES, WORLD } from './config.js';
 import { radio } from './player.js';
 import { blockedIds, isBlocked, toggleBlocked, onBlockChange } from './blocklist.js';
 import {
   formatTime, formatDuration, localHourLabel, programAt,
-  msUntilNextProgram, formatCountdown, upcomingCities
+  msUntilNextProgram, formatCountdown, upcomingCities,
+  setWorldLean, getWorldLean
 } from './station.js';
 import { randomStation, nearestStation, WORLD_STATIONS, WORLD_COUNTRIES, WORLD_SOURCE } from './world.js';
 import { createGlobe } from './globe.js';
@@ -494,7 +495,7 @@ function cacheEls() {
     'np-share', 'np-credit', 'np-live-note', 'sleep-status',
     'tuner-card', 'tuner-flag', 'tuner-name', 'tuner-place', 'tuner-note',
     'tuner-next', 'tuner-slot', 'tuner-link', 'tuner-spin', 'tuner-globe', 'tuner-globe-meta',
-    'tuner-region', 'tuner-town', 'tuner-locate',
+    'tuner-region', 'tuner-town', 'tuner-locate', 'tuner-lean', 'tuner-lean-hint',
     'home-art', 'home-title', 'home-artist', 'home-album', 'home-mode', 'home-program', 'home-play',
     'home-play-label', 'home-queue', 'home-next-program',
     'queue', 'queue-count', 'recent', 'schedule-next',
@@ -594,6 +595,59 @@ function tunerPlace(key) {
   return null;
 }
 
+/* --------------------------------------------------------- leaning the feed */
+
+/* The preference is per device, so a shared link still opens the shared world
+   feed; only this browser's clock is biased toward the chosen region. */
+const LEAN_KEY = 'vh.world.lean';
+
+const leanPercent = () => Math.round(Math.min(1, Math.max(0, Number(WORLD.leanShare) || 0)) * 100);
+
+function readLeanPreference() {
+  try { return localStorage.getItem(LEAN_KEY) || ''; } catch { return ''; }
+}
+
+function writeLeanPreference(key) {
+  try {
+    if (key) localStorage.setItem(LEAN_KEY, key);
+    else localStorage.removeItem(LEAN_KEY);
+  } catch { /* private mode: the preference will not survive a reload */ }
+}
+
+function leanPlaceName() {
+  const lean = getWorldLean();
+  return lean ? (tunerPlace(lean.key)?.place || '') : '';
+}
+
+function refreshLeanHints() {
+  const hint = els['tuner-lean-hint'];
+  if (!hint) return;
+  const place = leanPlaceName();
+  hint.textContent = place
+    ? `Leaning ${place} · ${leanPercent()}% of slots`
+    : 'Most slots come from this region';
+}
+
+/** Persist and apply the lean, without tuning anything by itself. */
+function setLean(key) {
+  const place = tunerPlace(key);
+  if (!place) return false;
+  setWorldLean(key);
+  writeLeanPreference(key);
+  const follow = els['tuner-lean'];
+  if (follow) follow.checked = true;
+  refreshLeanHints();
+  return true;
+}
+
+function clearLean() {
+  setWorldLean(null);
+  writeLeanPreference('');
+  const follow = els['tuner-lean'];
+  if (follow) follow.checked = false;
+  refreshLeanHints();
+}
+
 function fillTunerTowns(key, selectedId = '') {
   const select = els['tuner-town'];
   if (!select) return;
@@ -618,12 +672,15 @@ function syncTuner(state) {
   if (document.activeElement === region || document.activeElement === town) return;
 
   const station = state.station;
-  const key = `${station.countrycode}|${station.place}`;
+  const stationKey = `${station.countrycode}|${station.place}`;
+  /* While leaning, the region select is the listener's choice, not a readout:
+     keep it on that region even when the clock is visiting another one. */
+  const key = getWorldLean()?.key || stationKey;
   const changed = key !== tunerSync.region;
   tunerSync.region = key;
   if ([...region.options].some((o) => o.value === key)) region.value = key;
-  if (changed) fillTunerTowns(key, station.id);
-  if ([...town.options].some((o) => o.value === station.id)) town.value = station.id;
+  if (changed) fillTunerTowns(key, stationKey === key ? station.id : '');
+  if (stationKey === key && [...town.options].some((o) => o.value === station.id)) town.value = station.id;
   tunerSync.station = station.id;
 }
 
@@ -657,10 +714,18 @@ function updateTuner(state) {
     else els['tuner-slot'].textContent = 'Live';
   }
   if (els['tuner-note']) {
-    els['tuner-note'].textContent = station
-      ? `${station.codec}${station.bitrate ? ` ${station.bitrate} kbps` : ''} · ${state.mode === 'live' ? 'on the clock' : 'hand-tuned'}`
-      : `${WORLD_STATIONS.length} live stations in ${WORLD_COUNTRIES} countries`;
+    const lean = leanPlaceName();
+    const parts = [];
+    if (station) {
+      parts.push(`${station.codec}${station.bitrate ? ` ${station.bitrate} kbps` : ''}`);
+      parts.push(state.mode === 'live' ? 'on the clock' : 'hand-tuned');
+    } else {
+      parts.push(`${WORLD_STATIONS.length} live stations in ${WORLD_COUNTRIES} countries`);
+    }
+    if (lean) parts.push(`leaning ${lean}`);
+    els['tuner-note'].textContent = parts.join(' · ');
   }
+  refreshLeanHints();
   const listKey = next.map((c) => `${c.station.id}@${c.startMs}`).join('|');
   if (els['tuner-next'] && listKey !== lastTunerKey) {
     lastTunerKey = listKey;
@@ -684,14 +749,50 @@ function bindTuner() {
   fillTunerRegions();
   if (region && region.value) fillTunerTowns(region.value);
 
+  /* Restore a lean saved on this device. A station list rebuild can drop a
+     region, so only a key that still exists is honoured. */
+  const savedLean = readLeanPreference();
+  if (savedLean && region && [...region.options].some((o) => o.value === savedLean)) {
+    region.value = savedLean;
+    tunerSync.region = savedLean;
+    fillTunerTowns(savedLean, radio.track?.station?.id);
+    setLean(savedLean);
+  } else if (savedLean) {
+    writeLeanPreference('');
+  }
+
   region?.addEventListener('change', () => {
     const key = region.value;
     tunerSync.region = key;
     fillTunerTowns(key);
+    if (els['tuner-lean']?.checked) setLean(key);
     const station = WORLD_STATIONS.find((s) => s.id === town?.value);
     if (!station) return;
     tunerSync.station = station.id;
     radio.tuneWorld(station);
+  });
+
+  els['tuner-lean']?.addEventListener('change', (event) => {
+    if (!event.target.checked) {
+      clearLean();
+      radio.rejoinLive();
+      toast('Back on the shared world clock.');
+      updateTuner(radio.snapshot());
+      return;
+    }
+    if (!setLean(region?.value)) {
+      event.target.checked = false;
+      return;
+    }
+    /* Tune the region right away so the switch has an audible answer; the
+       clock itself picks it up from the next slot boundary. */
+    const first = tunerPlace(region?.value)?.stations[0];
+    if (first) {
+      tunerSync.station = first.id;
+      radio.tuneWorld(first);
+    }
+    toast(`World feed leaning toward ${leanPlaceName()} — most of the next cities come from here.`);
+    updateTuner(radio.snapshot());
   });
 
   town?.addEventListener('change', () => {

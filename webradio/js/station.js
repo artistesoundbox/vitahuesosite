@@ -222,9 +222,57 @@ function homeSlotsFor(dayKey, hour, slotsPerHour) {
   return set;
 }
 
+/* ------------------------------------------------------------ regional lean */
+
+/* A listener can lean the feed toward the region they pick in the tuner. The
+   preference lives on the device (ui.js persists it); it only changes *which*
+   station fills a slot — the slot grid stays on the shared UTC clock, so a
+   leaning listener still crosses a city boundary at :00, :10, :20, :30. */
+let leanKey = null;
+let leanPool = [];
+
+export function setWorldLean(key) {
+  const next = key ? String(key) : null;
+  if (next === leanKey) return leanPool;
+  leanKey = next;
+  leanPool = next
+    ? WORLD_STATIONS.filter((s) => `${s.countrycode}|${s.place}` === next)
+    : [];
+  reels.clear();
+  tails.clear();
+  return leanPool;
+}
+
+export function getWorldLean() {
+  return leanKey ? { key: leanKey, stations: leanPool.slice() } : null;
+}
+
+const leanShare = () => Math.min(1, Math.max(0, Number(WORLD.leanShare) || 0));
+
+/** A leaning slot, or null when this slot should travel the world as usual. */
+function leanedStation(dayKey, slot, previous) {
+  if (!leanPool.length || leanPool.length >= WORLD_STATIONS.length) return null;
+  const share = leanShare();
+  if (share <= 0) return null;
+  const roll = hashString(`${dayKey}|lean|${slot}|${STATION_EPOCH}`) % 10000;
+  if (roll >= share * 10000) return null;
+  const count = leanPool.length;
+  const start = hashString(`${dayKey}|lean-city|${slot}|${STATION_EPOCH}`) % count;
+  for (let step = 0; step < count; step++) {
+    const candidate = leanPool[(start + step) % count];
+    if (previous && candidate.id === previous.id) continue;
+    return candidate;
+  }
+  /* A region with a single station: stay tuned. The reel merges the two slots
+     into one entry, so the stream is never restarted. */
+  return leanPool[start];
+}
+
 /** Deterministic city for a slot, never the same station or country twice in a row. */
 function worldStationFor(dayKey, slot, previous) {
   if (!WORLD_STATIONS.length) return null;
+  const local = leanedStation(dayKey, slot, previous);
+  if (local) return local;
   const count = WORLD_STATIONS.length;
   const start = hashString(`${dayKey}|city|${slot}|${STATION_EPOCH}`) % count;
   for (let step = 0; step < count; step++) {
@@ -399,6 +447,15 @@ function buildWorldReel(dayStartMs, carry = []) {
     const station = worldStationFor(dayKey, slot, previousStation);
     if (!station) continue;
     previousStation = station;
+
+    /* The same station two slots running (a one-station region leaning, or a
+       plain repeat) is one continuous listen, not two reconnects. */
+    const last = entries[entries.length - 1];
+    if (last && last.kind === 'world' && last.track.station?.id === station.id && last.endMs === cursor) {
+      last.endMs = endMs;
+      last.track = worldTrack(station, (endMs - last.startMs) / 1000);
+      continue;
+    }
 
     entries.push({
       key: `${dayKey}#${seq++}`,
