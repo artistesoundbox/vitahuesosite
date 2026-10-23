@@ -21,7 +21,6 @@ export function createGlobe(canvas) {
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || false;
 
   let points = [];
-  let focus = null;
   let active = null;
 
   let width = 0;
@@ -43,8 +42,7 @@ export function createGlobe(canvas) {
       grid.push({
         x: Math.sin(phi) * Math.cos(theta),
         y: Math.cos(phi),
-        z: Math.sin(phi) * Math.sin(theta),
-        lat
+        z: Math.sin(phi) * Math.sin(theta)
       });
     }
   }
@@ -74,7 +72,10 @@ export function createGlobe(canvas) {
     if (!width || !height) return;
     const cx = width / 2;
     const cy = height / 2;
-    const rot = rotation * DEG;
+    /* A slow breathing turn keeps the globe alive without ever carrying the
+       city on air off the front of the sphere. */
+    const drift = still || reduceMotion ? 0 : Math.sin(now / 9000) * 3.5;
+    const rot = (rotation + drift) * DEG;
 
     ctx.clearRect(0, 0, width, height);
 
@@ -157,19 +158,8 @@ export function createGlobe(canvas) {
     if (now - lastFrame < 33) return;   // ~30 fps is plenty for this
     lastFrame = now;
     rotation += (target - rotation) * 0.08;
-    const drift = reduceMotion ? 0 : Math.sin(now / 9000) * 3.5;
-    draw(now, false, drift);
+    draw(now, false);
   }
-
-  /* `draw` takes its rotation from module state; the drift is applied by
-     nudging the resting angle just before painting. */
-  const baseDraw = draw;
-  draw = function (now, still) {
-    const resting = rotation;
-    if (!still) rotation += Math.sin(now / 9000) * (reduceMotion ? 0 : 0.02);
-    baseDraw(now, still);
-    if (!still) rotation = resting;
-  };
 
   function setPoints(list) {
     points = (Array.isArray(list) ? list : [])
@@ -183,7 +173,6 @@ export function createGlobe(canvas) {
       ? { id: station.id, lat: station.lat, lon: station.lon }
       : null;
     if (active) {
-      focus = active;
       target = angleTo(active.lon);
       if (reduceMotion) {
         rotation = target;
