@@ -704,6 +704,7 @@ function setLean(key) {
 function clearLean() {
   setWorldLean(null);
   writeLeanPreference('');
+  tunerSync.pin = '';
   const follow = els['tuner-lean'];
   if (follow) follow.checked = false;
   refreshLeanHints();
@@ -779,13 +780,17 @@ function syncTuner(state) {
 
   const station = state.station;
   const stationKey = `${station.countrycode}|${station.place}`;
-  /* While leaning, the region select is the listener's choice, not a readout:
-     keep it on that region even when the clock is visiting another one. */
+  const inScope = (scope) => !scope
+    ? false
+    : scope.includes('|') ? stationKey === scope : station.countrycode === scope;
+
+  /* The region select shows the listener's choice while it still applies:
+     that is the lean, or the country/region they just picked to browse. Once
+     the clock leaves that scope it goes back to following the broadcast. */
   const lean = getWorldLean();
-  const key = lean?.key || stationKey;
-  const onKey = lean && !key.includes('|')
-    ? station.countrycode === key     // whole-country lean
-    : stationKey === key;
+  if (!lean && tunerSync.pin && !inScope(tunerSync.pin)) tunerSync.pin = '';
+  const key = lean?.key || (inScope(tunerSync.pin) ? tunerSync.pin : stationKey);
+  const onKey = inScope(key);
   const changed = key !== tunerSync.region;
   tunerSync.region = key;
   if ([...region.options].some((o) => o.value === key)) region.value = key;
@@ -923,6 +928,7 @@ function bindTuner() {
   region?.addEventListener('change', () => {
     const key = region.value;
     tunerSync.region = key;
+    tunerSync.pin = key;
     fillTunerTowns(key);
     if (els['tuner-lean']?.checked) setLean(key);
     /* On the studio feed the region picker is a preference, not a tuner: it
