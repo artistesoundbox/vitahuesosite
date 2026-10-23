@@ -227,7 +227,8 @@ export class TvRoom {
 
     const geometry = new THREE.PlaneGeometry(width * 0.988, height * 0.985);
     const material = new THREE.MeshBasicMaterial({
-      map: this.noiseTexture,
+      // The feed may already be playing by the time the model lands.
+      map: this.signal === 'live' ? this.videoTexture : this.noiseTexture,
       toneMapped: false,
     });
     const screen = new THREE.Mesh(geometry, material);
@@ -340,11 +341,11 @@ export class TvRoom {
     this.camera.aspect = aspect;
     // On tall screens a fixed vertical FOV would crop the room down to the
     // television, so keep a usable horizontal field of view instead.
-    const targetHorizontal = THREE.MathUtils.degToRad(68);
+    const targetHorizontal = THREE.MathUtils.degToRad(66);
     const verticalForWidth = THREE.MathUtils.radToDeg(
       2 * Math.atan(Math.tan(targetHorizontal / 2) / aspect)
     );
-    this.camera.fov = Math.min(82, Math.max(44, verticalForWidth));
+    this.camera.fov = Math.min(80, Math.max(44, verticalForWidth));
     this.camera.updateProjectionMatrix();
   }
 

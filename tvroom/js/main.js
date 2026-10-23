@@ -216,6 +216,7 @@ async function boot() {
   }
 
   player.mount(stage);
+  room.setSignal(player.state === 'playing' ? 'live' : 'offline');
   await new Promise((resolve) => setTimeout(resolve, 180));
   document.body.classList.add('is-ready');
   document.body.classList.remove('is-booting');
@@ -238,5 +239,9 @@ document.addEventListener('keydown', (ev) => {
     ev.preventDefault();
   }
 });
+
+// A small handle for debugging from the console (and for the odd spot-check
+// with the browser tools). Nothing else depends on it.
+window.__tvroom = { player, viewer, get room() { return room; } };
 
 boot();
