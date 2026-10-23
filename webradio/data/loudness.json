@@ -1165,6 +1165,11 @@
       "lufs": -17.1,
       "url": "https://icecast.walmradio.com:8443/walm",
       "at": 1792739254
+    },
+    "w161": {
+      "lufs": -8,
+      "url": "https://stream-31.zeno.fm/2ss1hgnu6hhvv",
+      "at": 1792739254
     }
   },
   "localLufs": [
