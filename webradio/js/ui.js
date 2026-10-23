@@ -495,7 +495,7 @@ function cacheEls() {
     'np-share', 'np-credit', 'np-live-note', 'sleep-status',
     'tuner-card', 'tuner-flag', 'tuner-name', 'tuner-place', 'tuner-note',
     'tuner-next', 'tuner-slot', 'tuner-link', 'tuner-spin', 'tuner-globe', 'tuner-globe-meta',
-    'tuner-region', 'tuner-town', 'tuner-locate', 'tuner-lean', 'tuner-lean-hint',
+    'tuner-region', 'tuner-town', 'tuner-locate', 'tuner-lean', 'tuner-lean-hint', 'tuner-search',
     'tuner-src-world', 'tuner-src-studio',
     'home-art', 'home-title', 'home-artist', 'home-album', 'home-mode', 'home-program', 'home-play',
     'home-play-label', 'home-queue', 'home-next-program',

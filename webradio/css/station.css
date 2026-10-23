@@ -680,6 +680,23 @@ h3 { font-size: 15px; letter-spacing: 0.04em; }
 .tuner-live { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 9px; letter-spacing: 0.14em; color: #ffb3c6; }
 .tuner-live .dot { width: 6px; height: 6px; border-radius: 50%; background: #ff4d7d; box-shadow: 0 0 8px #ff4d7d; animation: pulse 1.8s ease-in-out infinite; }
 .tuner-note { margin: 12px 0 10px; font-size: 10.5px; letter-spacing: 0.04em; color: var(--dim); }
+.tuner-search {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 9px; padding: 0 10px;
+  border-radius: 9px; border: 1px solid var(--line);
+  background: rgba(8, 16, 28, 0.92);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.tuner-search .icon { flex: 0 0 auto; width: 13px; height: 13px; color: var(--dim); }
+.tuner-search input {
+  flex: 1; min-width: 0; padding: 8px 0;
+  border: 0; background: transparent; color: var(--ink-soft);
+  font-family: inherit; font-size: 12px;
+}
+.tuner-search input::placeholder { color: var(--dim); }
+.tuner-search input:focus { outline: none; }
+.tuner-search:focus-within { border-color: var(--neon); box-shadow: 0 0 0 2px rgba(56, 182, 255, 0.18); }
+.tuner-search input::-webkit-search-cancel-button { filter: invert(0.55); cursor: pointer; }
 .tuner-picker { display: grid; gap: 8px; margin: 0 0 12px; }
 .tuner-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .tuner-field > span { font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
