@@ -238,8 +238,6 @@ function worldStationFor(dayKey, slot, previous) {
 
 /* ---------------------------------------------------------------- day reels */
 
-const homeSlotCache = new Map();
-
 function buildLocalReel(dayStartMs, carry = []) {
   const dayKey = new Date(dayStartMs).toISOString().slice(0, 10);
   const entries = [];

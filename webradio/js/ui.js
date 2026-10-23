@@ -483,6 +483,7 @@ let lastRecentKey = '';
 let lastProgramId = '';
 let lastArt = '';
 let lastTrackId = '';
+let lastTunerKey = '';
 
 function cacheEls() {
   [
@@ -574,7 +575,9 @@ function updateTuner(state) {
       ? `${station.codec}${station.bitrate ? ` ${station.bitrate} kbps` : ''} · ${state.mode === 'live' ? 'on the clock' : 'hand-tuned'}`
       : `${WORLD_STATIONS.length} live stations in ${WORLD_COUNTRIES} countries`;
   }
-  if (els['tuner-next']) {
+  const listKey = next.map((c) => `${c.station.id}@${c.startMs}`).join('|');
+  if (els['tuner-next'] && listKey !== lastTunerKey) {
+    lastTunerKey = listKey;
     els['tuner-next'].innerHTML = next.map(({ station: s, startMs }) => `
       <li><span class="tuner-flag-sm">${esc(s.flag)}</span>
       <span class="tuner-next-place">${esc(s.place)}</span>

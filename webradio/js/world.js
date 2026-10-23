@@ -77,11 +77,15 @@ export function worldTrack(station, seconds = 0) {
   const place = station.place && station.place !== station.country
     ? `${station.place}, ${station.country}`
     : station.country;
+  /* The album line carries the station's own first tag — "Reggae", "Jazz" —
+     so the artist · album pair never just repeats the country twice. */
+  const tag = (station.tags || [])[0];
+  const album = tag ? tag.charAt(0).toUpperCase() + tag.slice(1) : 'World feed';
   return {
     id: `world:${station.id}`,
     title: station.name,
     artist: `Live from ${place}`,
-    album: station.country,
+    album,
     year: null,
     genres: (station.tags || []).slice(0, 3),
     duration: Math.round(seconds) || 0,
