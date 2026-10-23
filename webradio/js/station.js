@@ -378,7 +378,7 @@ function buildWorldReel(dayStartMs, carry = []) {
   const slotMs = slotMinutes * 60000;
   const slotsPerHour = Math.max(1, Math.round(BLOCK_MS / slotMs));
   const slots = Math.ceil(DAY_MS / slotMs);
-  const identHours = Math.max(1, Math.round(Number(WORLD.identEveryHours) || 3));
+  const identHours = Math.max(1, Math.round(Number(WORLD.identEveryHours) || 2));
 
   const entries = [];
   const recent = carry.slice();
