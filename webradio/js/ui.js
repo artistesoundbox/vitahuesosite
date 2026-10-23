@@ -1363,6 +1363,7 @@ function init() {
 
   globe = createGlobe($('tuner-globe'));
   globe.setPoints(WORLD_STATIONS.map((s) => ({ id: s.id, lat: s.lat, lon: s.lon })));
+  window.__vhGlobe = globe;   // debug handle, same as __vhRadio
 
   createVisualizer($('viz-hero'), () => ({ track: radio.track, playing: radio.playing }), { bars: 72 });
   createVisualizer($('viz-radio'), () => ({ track: radio.track, playing: radio.playing }), { bars: 48 });

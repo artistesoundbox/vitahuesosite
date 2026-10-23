@@ -13,7 +13,7 @@ const DEG = Math.PI / 180;
 const RAD = 180 / Math.PI;
 
 export function createGlobe(canvas) {
-  const noop = { setPoints() {}, setFocus() {}, resize() {}, destroy() {} };
+  const noop = { setPoints() {}, setFocus() {}, resize() {}, ensureSize() {}, destroy() {} };
   if (!canvas || !canvas.getContext) return noop;
   const ctx = canvas.getContext('2d');
   if (!ctx) return noop;
@@ -57,15 +57,30 @@ export function createGlobe(canvas) {
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
+    if (!rect.width || !rect.height) return false;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     width = rect.width;
     height = rect.height;
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
+    if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+    }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     radius = Math.max(10, Math.min(width, height) * 0.46);
     draw(performance.now(), true);
+    return true;
+  }
+
+  /* The card lives in a view that starts hidden, so the first measurement can
+     be 0×0. Any update that arrives later re-measures before painting. */
+  function ensureSize() {
+    if (!width || !height) return resize();
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (Math.round(rect.width * dpr) !== canvas.width || Math.round(rect.height * dpr) !== canvas.height) {
+      return resize();
+    }
+    return true;
   }
 
   function draw(now, still = false) {
@@ -162,6 +177,7 @@ export function createGlobe(canvas) {
   }
 
   function setPoints(list) {
+    ensureSize();
     points = (Array.isArray(list) ? list : [])
       .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon))
       .map((p) => ({ id: p.id, lat: p.lat, lon: p.lon }));
@@ -169,6 +185,7 @@ export function createGlobe(canvas) {
   }
 
   function setFocus(station) {
+    ensureSize();
     active = station && Number.isFinite(station.lat) && Number.isFinite(station.lon)
       ? { id: station.id, lat: station.lat, lon: station.lon }
       : null;
@@ -209,6 +226,7 @@ export function createGlobe(canvas) {
     setPoints,
     setFocus,
     resize,
+    ensureSize,
     destroy() {
       cancelAnimationFrame(raf);
       observer?.disconnect();
