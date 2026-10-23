@@ -14,6 +14,7 @@ import { TRACKS } from './catalog.js';
 import { getLiveState, programAt, msUntilNextProgram } from './station.js';
 import { isBlocked } from './blocklist.js';
 import { worldTrack } from './world.js';
+import { LOUDNESS } from './loudness.js';
 
 const KEYS = {
   volume: 'vh.volume',
@@ -38,6 +39,7 @@ function write(key, value) {
 }
 
 const clamp01 = (n) => Math.min(1, Math.max(0, Number(n) || 0));
+const dBtoGain = (db) => (Number.isFinite(Number(db)) ? Math.pow(10, Number(db) / 20) : 1);
 
 function shuffle(list) {
   const a = list.slice();
@@ -59,7 +61,10 @@ export class Radio extends EventTarget {
     // Pages outside webradio/ (the main site) prefix catalogue paths with the
     // station folder; inside webradio/ the base stays empty.
     this.base = '';
-    this.audio.volume = clamp01(read(KEYS.volume, 0.8));
+    /* `volume` is the listener's level. What actually reaches the element is
+       that level times the track's loudness trim (see applyVolume). */
+    this.volume = clamp01(read(KEYS.volume, 0.8));
+    this.audio.volume = this.volume;
     this.muted = !!read(KEYS.muted, false);
     this.audio.muted = this.muted;
 
@@ -124,6 +129,7 @@ export class Radio extends EventTarget {
     this.bindMediaSession();
 
     this.pollTimer = setInterval(() => this.poll(), 500);
+    this.applyVolume();
     this.emitState();
   }
 
@@ -578,18 +584,35 @@ export class Radio extends EventTarget {
     this.emitTime();
   }
 
+  /* --------------------------------------------------------------- levels */
+
+  /** The loudness trim for a track or live station, as a linear gain. */
+  gainFor(track = this.track) {
+    if (!track) return 1;
+    const db = track.world
+      ? LOUDNESS.stations?.[track.station?.id]
+      : LOUDNESS.tracks?.[track.id];
+    return dBtoGain(db);
+  }
+
+  /** The single place the output level is written. */
+  applyVolume() {
+    const duck = this.mic?.on ? 0.25 : 1;
+    this.audio.volume = clamp01(this.volume * this.gainFor() * duck);
+  }
+
   setVolume(value) {
-    const v = clamp01(value);
-    this.audio.volume = v;
+    this.volume = clamp01(value);
     this.audio.muted = false;
     this.muted = false;
-    write(KEYS.volume, v);
+    this.applyVolume();
+    write(KEYS.volume, this.volume);
     write(KEYS.muted, false);
     this.emitState();
   }
 
   adjustVolume(delta) {
-    this.setVolume(this.audio.volume + delta);
+    this.setVolume(this.volume + delta);
   }
 
   toggleMute() {
@@ -670,6 +693,9 @@ export class Radio extends EventTarget {
 
   onTrackChange() {
     if (!this.track) return;
+    /* Every track and station carries its own trim, so the handoff between a
+       live stream and a studio song stays at one level. */
+    this.applyVolume();
     /* Live stations are not library history — "recently played" stays songs. */
     if (!this.track.world) {
       const h = this.history.filter((x) => x.id !== this.track.id);
@@ -757,10 +783,9 @@ export class Radio extends EventTarget {
         gain,
         recorder,
         chunks,
-        url: '',
-        volume: this.audio.volume
+        url: ''
       };
-      this.audio.volume = Math.max(0.04, this.audio.volume * 0.25);
+      this.applyVolume();
       this.notice('Mic open — headphones recommended to avoid feedback.');
       this.emitState();
     } catch (err) {
@@ -783,8 +808,8 @@ export class Radio extends EventTarget {
     }
     mic.stream?.getTracks().forEach((t) => t.stop());
     try { mic.ctx?.close(); } catch { /* ignore */ }
-    if (mic.volume != null) this.audio.volume = mic.volume;
-    this.mic = { on: false, stream: null, ctx: null, recorder: null, chunks: [], url: mic.url || '', volume: null };
+    this.mic = { on: false, stream: null, ctx: null, recorder: null, chunks: [], url: mic.url || '' };
+    this.applyVolume();
     this.notice('Mic closed.');
     this.emitState();
   }
@@ -816,7 +841,7 @@ export class Radio extends EventTarget {
         : (this.track?.duration || 0),
       world,
       station: world ? this.track.station : null,
-      volume: this.audio.volume,
+      volume: this.volume,
       muted: this.muted,
       favorite: world ? false : this.isFavorite(this.track),
       queue: this.upNext(6),

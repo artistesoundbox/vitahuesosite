@@ -1,0 +1,543 @@
+{
+  "tracks": {
+    "station-id": {
+      "lufs": -16.3,
+      "at": 1792560320777
+    },
+    "f11": {
+      "lufs": -9.7,
+      "at": 1792554228038
+    },
+    "t19": {
+      "lufs": -14,
+      "at": 1789968180755
+    },
+    "f04": {
+      "lufs": -10.1,
+      "at": 1792552576929
+    },
+    "t20": {
+      "lufs": -13.1,
+      "at": 1789968198562
+    }
+  },
+  "stations": {
+    "w03": {
+      "lufs": -13.3,
+      "url": "https://qurango.net/radio/mishary_alafasi",
+      "at": 1792739035
+    },
+    "w01": {
+      "lufs": -14.5,
+      "url": "https://cast1.torontocast.com:4610/stream",
+      "at": 1792739035
+    },
+    "w04": {
+      "lufs": -17.1,
+      "url": "https://80sexitos.stream.laut.fm/80sexitos",
+      "at": 1792739037
+    },
+    "w09": {
+      "lufs": -13.5,
+      "url": "https://s4.myradiostream.com:7344/listen.mp3?",
+      "at": 1792739040
+    },
+    "w02": {
+      "lufs": -14.1,
+      "url": "https://stream-icy.bauermedia.pt/m8080.aac",
+      "at": 1792739040
+    },
+    "w07": {
+      "lufs": -18.1,
+      "url": "https://playerservices.streamtheworld.com/api/livestream-redirect/CRC_103_1AAC.aac",
+      "at": 1792739040
+    },
+    "w12": {
+      "lufs": -17.6,
+      "url": "https://loveradiodagupan.radioca.st/",
+      "at": 1792739042
+    },
+    "w11": {
+      "lufs": -8.7,
+      "url": "https://edge4.audioxi.com/8RADIO",
+      "at": 1792739043
+    },
+    "w10": {
+      "lufs": -17.6,
+      "url": "https://playerservices.streamtheworld.com/api/livestream-redirect/RADIO_89FM_ADP.aac?dist=site-89fm",
+      "at": 1792739045
+    },
+    "w13": {
+      "lufs": -13.8,
+      "url": "https://stream.zeno.fm/xs6zeac1ts8uv",
+      "at": 1792739045
+    },
+    "w14": {
+      "lufs": -5.3,
+      "url": "https://stream.zeno.fm/qpn8mkt8c4duv",
+      "at": 1792739046
+    },
+    "w16": {
+      "lufs": -17.5,
+      "url": "https://radios.iwstreaming.uy/8030/stream",
+      "at": 1792739047
+    },
+    "w08": {
+      "lufs": -6.8,
+      "url": "https://nr8.newradio.it:19574/stream",
+      "at": 1792739047
+    },
+    "w17": {
+      "lufs": -14,
+      "url": "https://live.radio.si/BestFM",
+      "at": 1792739048
+    },
+    "w15": {
+      "lufs": -12.4,
+      "url": "https://stream.player.arrow.nl/arrowcr",
+      "at": 1792739048
+    },
+    "w19": {
+      "lufs": null,
+      "url": "https://antares.dribbcast.com/proxy/kpop?mp=/s",
+      "at": 1792739048
+    },
+    "w06": {
+      "lufs": -9.8,
+      "url": "https://0n-classicrock.radionetz.de/0n-classicrock.mp3",
+      "at": 1792739049
+    },
+    "w05": {
+      "lufs": -9.4,
+      "url": "https://0n-70s.radionetz.de/0n-70s.mp3",
+      "at": 1792739049
+    },
+    "w20": {
+      "lufs": -3.6,
+      "url": "https://stream.zeno.fm/6n6ewddtad0uv",
+      "at": 1792739051
+    },
+    "w23": {
+      "lufs": -9.7,
+      "url": "https://stream.zenolive.com/mayn36v1v8quv.aac",
+      "at": 1792739051
+    },
+    "w24": {
+      "lufs": -13.8,
+      "url": "https://stream.laut.fm/canalradio",
+      "at": 1792739053
+    },
+    "w25": {
+      "lufs": -8.9,
+      "url": "https://stream-285.surfernetwork.com/ftly191pojttv?zt=eyJhbGciOiJIUzI1NiJ9.eyJzdHJlYW0iOiJmdGx5MTkxcG9qdHR2IiwiaG9zdCI6InN0cmVhbS0yODUuc3VyZmVybmV0d29yay5jb20iLCJ0bSI6ZmFsc2UsInJ0dGwiOjUsImp0aSI6ImxaZjR3RWdYUW02YTdhc05GUENoYWciLCJpYXQiOjE3OTI2NzA5MjYsImV4cCI6MTc5MjY3MDk4Nn0.KI19llCUkRwkyl_DQJZj4YUDFvbFFwUYorxj9SNZZcY",
+      "at": 1792739054
+    },
+    "w27": {
+      "lufs": -10.7,
+      "url": "https://stream-176.zeno.fm/umt5gqmg3reuv?zt=eyJhbGciOiJIUzI1NiJ9.eyJzdHJlYW0iOiJ1bXQ1Z3FtZzNyZXV2IiwiaG9zdCI6InN0cmVhbS0xNzYuemVuby5mbSIsInJ0dGwiOjUsImp0aSI6IkNZUXVUREM3VGNtTjEyblNnR0x4UkEiLCJpYXQiOjE3Mjk3NDI5MzAsImV4cCI6MTcyOTc0Mjk5MH0.nXD9Wgj-wiNAqBZ-Pdh_3sfnI3b-Nsa4DwbcZgO1o5I&adtonosListenerId=01JAYBBMWV0MGTJKRSBW480E4Z",
+      "at": 1792739055
+    },
+    "w22": {
+      "lufs": -15.7,
+      "url": "https://panel.retrolandigital.com/radio/8110/listen",
+      "at": 1792739056
+    },
+    "w18": {
+      "lufs": -13.2,
+      "url": "https://play.global.audio/bgestrada",
+      "at": 1792739056
+    },
+    "w21": {
+      "lufs": -18.5,
+      "url": "https://liveradio.mediainbox.net/radio3.mp3",
+      "at": 1792739056
+    },
+    "w28": {
+      "lufs": -11.7,
+      "url": "https://stream.zeno.fm/3w43axr9mg0uv",
+      "at": 1792739057
+    },
+    "w30": {
+      "lufs": -25.8,
+      "url": "https://citi973fm.radioca.st/index.html:80/;stream.mp3",
+      "at": 1792739057
+    },
+    "w29": {
+      "lufs": -18.8,
+      "url": "https://icecast.walmradio.com:8443/christmas",
+      "at": 1792739058
+    },
+    "w35": {
+      "lufs": null,
+      "url": "https://dancewave.online/dance.mp3",
+      "at": 1792739061
+    },
+    "w34": {
+      "lufs": null,
+      "url": "https://dancewave.online/retrodance.mp3",
+      "at": 1792739061
+    },
+    "w33": {
+      "lufs": -16.7,
+      "url": "https://live.radyositesihazir.com:10997/",
+      "at": 1792739063
+    },
+    "w32": {
+      "lufs": -12.7,
+      "url": "https://panel.retrolandigital.com/listen/cumbias_inmortales_radio/listen",
+      "at": 1792739064
+    },
+    "w38": {
+      "lufs": -11.7,
+      "url": "https://laradiossl.online:9226/;",
+      "at": 1792739065
+    },
+    "w37": {
+      "lufs": -11.7,
+      "url": "https://dfm-disc90.hostingradio.ru/disc9096.aacp",
+      "at": 1792739065
+    },
+    "w36": {
+      "lufs": -5.7,
+      "url": "https://dfm-dfmrusdance.hostingradio.ru/dfmrusdance96.aacp?0.9987259013359274",
+      "at": 1792739065
+    },
+    "w26": {
+      "lufs": -16.3,
+      "url": "https://lhttp-hw.qtfm.cn/live/15318233/64k.mp3",
+      "at": 1792739065
+    },
+    "w41": {
+      "lufs": null,
+      "url": "https://us-b4-p-e-qg12-audio.cdn.mdstrm.com/live-audio-aw/632c9d30aa9ace684913b853",
+      "at": 1792739066
+    },
+    "w43": {
+      "lufs": null,
+      "url": "https://ic2.smcdn.pl/5380-1.mp3#ESKA_ROCK",
+      "at": 1792739067
+    },
+    "w31": {
+      "lufs": -6.8,
+      "url": "https://radiopanther.radiolebowski.com/play",
+      "at": 1792739067
+    },
+    "w42": {
+      "lufs": null,
+      "url": "https://stream.zeno.fm/gjexooyemj3uv",
+      "at": 1792739068
+    },
+    "w46": {
+      "lufs": -15.9,
+      "url": "https://stream.zeno.fm/czdkk32qduhvv",
+      "at": 1792739069
+    },
+    "w47": {
+      "lufs": -9.7,
+      "url": "https://whsh4u-panel.com/proxy/yfryujzw/stream",
+      "at": 1792739070
+    },
+    "w45": {
+      "lufs": -12.9,
+      "url": "https://stream.bauermedia.sk/europa2.mp3",
+      "at": 1792739072
+    },
+    "w48": {
+      "lufs": -11.8,
+      "url": "https://stream.zeno.fm/zv3e5wykprhvv.mp3",
+      "at": 1792739073
+    },
+    "w50": {
+      "lufs": -8.8,
+      "url": "https://shoutcast.finestfm.fi/stream/1/:80/;stream",
+      "at": 1792739075
+    },
+    "w44": {
+      "lufs": -7.6,
+      "url": "https://stream-eurodance90.fr/radio/8000/128.mp3?1627933323",
+      "at": 1792739075
+    },
+    "w40": {
+      "lufs": -15.6,
+      "url": "https://netradio.ziniur.lt/easyfm.mp3",
+      "at": 1792739076
+    },
+    "w39": {
+      "lufs": -11.6,
+      "url": "https://s3.radio.co/scfd7273b2/listen",
+      "at": 1792739077
+    },
+    "w52": {
+      "lufs": -13.4,
+      "url": "https://stream-154.zeno.fm/t8gcyq6ts0quv",
+      "at": 1792739077
+    },
+    "w53": {
+      "lufs": -17.4,
+      "url": "https://orf-live.ors-shoutcast.at/fm4-q1a",
+      "at": 1792739078
+    },
+    "w49": {
+      "lufs": -6.6,
+      "url": "https://server7.servistreaming.com/proxy/fidelity?mp=%2Fstream%3Ftype%3D.mp3&_=1",
+      "at": 1792739079
+    },
+    "w51": {
+      "lufs": -14.2,
+      "url": "https://inolvidable-2.nty.uy/",
+      "at": 1792739079
+    },
+    "w58": {
+      "lufs": -7.8,
+      "url": "https://stream.zeno.fm/kvudezx1h2zuv",
+      "at": 1792739081
+    },
+    "w59": {
+      "lufs": -12.6,
+      "url": "https://api.bynetcdn.com/Redirector/glz/glglz/ICE-LIVE",
+      "at": 1792739082
+    },
+    "w55": {
+      "lufs": -11.5,
+      "url": "https://funradiobe.ice.infomaniak.ch/funradiobe-high.mp3",
+      "at": 1792739082
+    },
+    "w56": {
+      "lufs": -15.8,
+      "url": "https://listen.radioking.com/radio/459389/stream/514595",
+      "at": 1792739083
+    },
+    "w54": {
+      "lufs": -9.1,
+      "url": "https://freefmrock.radioca.st/",
+      "at": 1792739083
+    },
+    "w60": {
+      "lufs": -10.8,
+      "url": "https://media-ssl.musicradio.com/GoldMP3",
+      "at": 1792739083
+    },
+    "w61": {
+      "lufs": -8.4,
+      "url": "https://stream.zeno.fm/n2fd0edh9k8uv",
+      "at": 1792739084
+    },
+    "w65": {
+      "lufs": -12,
+      "url": "https://media-ssl.musicradio.com/Heart80sMP3",
+      "at": 1792739085
+    },
+    "w62": {
+      "lufs": -9.5,
+      "url": "https://stream-37.zeno.fm/zpksre88rm0uv",
+      "at": 1792739085
+    },
+    "w63": {
+      "lufs": -6.7,
+      "url": "https://radio.gotright.net/radio/8000/radio.mp3",
+      "at": 1792739086
+    },
+    "w68": {
+      "lufs": -8.4,
+      "url": "https://secure.live-streams.nl/main",
+      "at": 1792739087
+    },
+    "w70": {
+      "lufs": null,
+      "url": "https://edge.iono.fm/xice/51_medium.aac",
+      "at": 1792739088
+    },
+    "w57": {
+      "lufs": -9.5,
+      "url": "https://stream.gensokyoradio.net/3",
+      "at": 1792739090
+    },
+    "w66": {
+      "lufs": -9.2,
+      "url": "https://server7.servistreaming.com/proxy/hot?mp=%2Fstream%3Ftype%3D.mp3&_=1",
+      "at": 1792739092
+    },
+    "w69": {
+      "lufs": -11.8,
+      "url": "https://edge.iono.fm/xice/jacarandafm_live_high.mp3",
+      "at": 1792739092
+    },
+    "w72": {
+      "lufs": -15,
+      "url": "https://stream.zenolive.com/1sgzkhhm8ueuv",
+      "at": 1792739093
+    },
+    "w64": {
+      "lufs": -12.5,
+      "url": "https://ha-noi-community-radio.radiocult.fm/stream",
+      "at": 1792739093
+    },
+    "w71": {
+      "lufs": -8.2,
+      "url": "https://kamemefm-atunwadigital.streamguys1.com/kamemefm",
+      "at": 1792739094
+    },
+    "w77": {
+      "lufs": -6.6,
+      "url": "https://radiolatina.info/9930/stream",
+      "at": 1792739096
+    },
+    "w75": {
+      "lufs": -17.1,
+      "url": "https://playerservices.streamtheworld.com/api/livestream-redirect/FM999_56.mp3",
+      "at": 1792739097
+    },
+    "w67": {
+      "lufs": -8.8,
+      "url": "https://s2.radio.co/s2b2b68744/listen",
+      "at": 1792739097
+    },
+    "w73": {
+      "lufs": -8.2,
+      "url": "https://online.kissfm.ua/KissFM_Ukr",
+      "at": 1792739098
+    },
+    "w74": {
+      "lufs": -10.2,
+      "url": "https://live.radyositesihazir.com/8032/stream",
+      "at": 1792739098
+    },
+    "w76": {
+      "lufs": -9.5,
+      "url": "https://playerservices.streamtheworld.com/api/livestream-redirect/KEBUENAAAC.aac",
+      "at": 1792739098
+    },
+    "w81": {
+      "lufs": -10.1,
+      "url": "https://s2.ssl-stream.com/radio/8180/radio.mp3",
+      "at": 1792739100
+    },
+    "w80": {
+      "lufs": -9.8,
+      "url": "https://stream.zeno.fm/uf2r0d5ny39uv",
+      "at": 1792739100
+    },
+    "w78": {
+      "lufs": -15.7,
+      "url": "https://us-b4-p-e-qg12-audio.cdn.mdstrm.com/live-audio-aw/632cb48f613bac0856b931ab",
+      "at": 1792739101
+    },
+    "w85": {
+      "lufs": -8.8,
+      "url": "https://stream.zeno.fm/une3a02mb",
+      "at": 1792739103
+    },
+    "w86": {
+      "lufs": -12.5,
+      "url": "https://mangoradio.stream.laut.fm/mangoradio",
+      "at": 1792739104
+    },
+    "w79": {
+      "lufs": -9.5,
+      "url": "https://s2.radio.co:80/s9ecef4f68/listen",
+      "at": 1792739107
+    },
+    "w82": {
+      "lufs": -8.7,
+      "url": "https://streamingecuador.com:7051/stream",
+      "at": 1792739108
+    },
+    "w83": {
+      "lufs": -10.3,
+      "url": "https://s35.derstream.net/100austria.mp3",
+      "at": 1792739109
+    },
+    "w84": {
+      "lufs": -14.3,
+      "url": "https://c22.radioboss.fm:18318/stream",
+      "at": 1792739109
+    },
+    "w88": {
+      "lufs": -13,
+      "url": "https://edge.audioxi.com/NT",
+      "at": 1792739110
+    },
+    "w90": {
+      "lufs": -12.9,
+      "url": "https://icecast.omroep.nl/radio5-bb-mp3",
+      "at": 1792739110
+    },
+    "w92": {
+      "lufs": -13.4,
+      "url": "https://carina.streamerr.co:2020/stream/OnSportFM",
+      "at": 1792739111
+    },
+    "w91": {
+      "lufs": -6.6,
+      "url": "https://sslstream.okradio.net/;?type=http&nocache=8804",
+      "at": 1792739111
+    },
+    "w93": {
+      "lufs": -17,
+      "url": "https://orf-live.ors-shoutcast.at/oe3-q2a",
+      "at": 1792739111
+    },
+    "w89": {
+      "lufs": -8.6,
+      "url": "https://playerservices.streamtheworld.com/api/livestream-redirect/NOSTALGIEWAF80.mp3",
+      "at": 1792739112
+    },
+    "w94": {
+      "lufs": -6.6,
+      "url": "https://oxygenmusic.hu:8443/oxygenthe80shits",
+      "at": 1792739112
+    },
+    "w98": {
+      "lufs": -20.9,
+      "url": "https://stream20.usastreams.com/8094/stream",
+      "at": 1792739114
+    },
+    "w99": {
+      "lufs": -11.1,
+      "url": "https://pureibizaradio.clubbingradios.com:9518/PureIbizaRadio",
+      "at": 1792739118
+    },
+    "w95": {
+      "lufs": -14.7,
+      "url": "https://nrj.p4groupaudio.com/NRJ_MM",
+      "at": 1792739120
+    },
+    "w96": {
+      "lufs": -15.7,
+      "url": "https://p5n.p4groupaudio.com/P05AAH",
+      "at": 1792739120
+    },
+    "w97": {
+      "lufs": -14.1,
+      "url": "https://p6.p4groupaudio.com/P06_MM",
+      "at": 1792739121
+    },
+    "w102": {
+      "lufs": -11.4,
+      "url": "https://cdn.cybercdn.live/103FM/Live/icecast.audio",
+      "at": 1792739122
+    },
+    "w105": {
+      "lufs": -17.1,
+      "url": "https://unlimited3-cl.dps.live/biobiosantiago/mp3/icecast.audio",
+      "at": 1792739124
+    },
+    "w100": {
+      "lufs": -14.2,
+      "url": "https://relay0.r-a-d.io/main.mp3",
+      "at": 1792739125
+    },
+    "w107": {
+      "lufs": -14.8,
+      "url": "https://cast6.asurahosting.com/proxy/irfradio/stream",
+      "at": 1792739126
+    }
+  },
+  "localLufs": [
+    -16.3,
+    -14,
+    -13.1,
+    -10.1,
+    -9.7
+  ]
+}
