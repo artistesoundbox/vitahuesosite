@@ -60,7 +60,7 @@ export class TvRoom {
     this.scene = scene;
 
     const pmrem = new THREE.PMREMGenerator(renderer);
-    this._envTarget = pmrem.fromScene(new RoomEnvironment(), 0.05);
+    this._envTarget = pmrem.fromScene(new RoomEnvironment(), 0.02);
     scene.environment = this._envTarget.texture;
     pmrem.dispose();
 
@@ -335,7 +335,16 @@ export class TvRoom {
     const width = this.canvas.clientWidth || window.innerWidth;
     const height = this.canvas.clientHeight || window.innerHeight;
     this.renderer.setSize(width, height, false);
-    this.camera.aspect = width / Math.max(1, height);
+
+    const aspect = width / Math.max(1, height);
+    this.camera.aspect = aspect;
+    // On tall screens a fixed vertical FOV would crop the room down to the
+    // television, so keep a usable horizontal field of view instead.
+    const targetHorizontal = THREE.MathUtils.degToRad(68);
+    const verticalForWidth = THREE.MathUtils.radToDeg(
+      2 * Math.atan(Math.tan(targetHorizontal / 2) / aspect)
+    );
+    this.camera.fov = Math.min(82, Math.max(44, verticalForWidth));
     this.camera.updateProjectionMatrix();
   }
 
