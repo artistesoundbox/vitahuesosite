@@ -1,0 +1,36 @@
+Warning: add-on missing 'bl_info', this can cause poor performance!: 'C:\\Users\\Anthonitus\\AppData\\Roaming\\Blender Foundation\\Blender\\5.2\\scripts\\addons\\build_extension.py'
+ucupaint addon: Verbose is enabled
+ucupaint addon: Read in JSON settings from file
+Determined it's not yet time to check for updates -59801.133692
+Aborting check for updated, check interval not reached
+INFO: Ucupaint 3.0.0 is registered!
+ℹ️  blendkit: Verbose is enabled [22:29:02.406, addon_updater.py:150]
+ℹ️  blendkit: Read in JSON settings from file [22:29:02.407, addon_updater.py:150]
+ℹ️  blendkit: Ports reordered so first port is now 62485 (previous index was 0) [22:29:02.409, client_lib.py:163]
+blunder: the bridge needs an event loop; in background mode run `blender.exe -b --python bridge/addon.py` instead of enabling the add-on
+module changed on disk: 'C:\\Program Files\\Blender Foundation\\Blender 5.2\\5.2\\scripts\\addons_core\\bl_pkg\\__init__.py' reloading...
+INFO: Ucupaint update routine is done in 0.38 ms!
+Created history step 9c7644f5-2886-45b4-8bff-f2fa41f8c7b4
+ℹ️  blendkit: Created new search history step [22:29:02.680, search.py:2741]
+ℹ️  blendkit: No temporarily enabled addons to clean up [22:29:02.680, download.py:431]
+00:02.203  blend            | Read blend: "C:\Users\Anthonitus\Documents\GitHub\vitahuesosite\tvroom\tvroom.blend"
+INFO: Ucupaint update routine is done in 0.34 ms!
+ℹ️  blendkit: No temporarily enabled addons to clean up [22:29:02.715, download.py:431]
+00:04.219  render           | Saved: 'C:\Users\Anthonitus\Documents\GitHub\vitahuesosite\tvroom\_preview\camera.png'
+00:04.328  render           | Saved: 'C:\Users\Anthonitus\Documents\GitHub\vitahuesosite\tvroom\_preview\tv_from_room.png'
+00:04.438  render           | Saved: 'C:\Users\Anthonitus\Documents\GitHub\vitahuesosite\tvroom\_preview\room_wide.png'
+00:04.641  render           | Saved: 'C:\Users\Anthonitus\Documents\GitHub\vitahuesosite\tvroom\_preview\room_wide2.png'
+00:04.750  render           | Saved: 'C:\Users\Anthonitus\Documents\GitHub\vitahuesosite\tvroom\_preview\room_center.png'
+RENDERED C:\Users\Anthonitus\Documents\GitHub\vitahuesosite\tvroom\_preview\camera.png
+TV world loc [-10.475, 3.507, 6.512]
+TV matrix [[0.0, 0.039, 1.99, -10.475], [0.0, 1.99, -0.039, 3.507], [-1.99, 0.0, 0.0, 6.512], [0.0, 0.0, 0.0, 1.0]]
+RENDERED C:\Users\Anthonitus\Documents\GitHub\vitahuesosite\tvroom\_preview\tv_from_room.png
+RENDERED C:\Users\Anthonitus\Documents\GitHub\vitahuesosite\tvroom\_preview\room_wide.png
+RENDERED C:\Users\Anthonitus\Documents\GitHub\vitahuesosite\tvroom\_preview\room_wide2.png
+RENDERED C:\Users\Anthonitus\Documents\GitHub\vitahuesosite\tvroom\_preview\room_center.png
+INFO: Ucupaint 3.0.0 is unregistered!
+ℹ️  blendkit: Unregistering Blendkit add-on [22:29:05.243, __init__.py:3030]
+ℹ️  blendkit: No temporarily enabled addons to clean up [22:29:05.244, download.py:431]
+Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:35:40)
+
+Blender quit

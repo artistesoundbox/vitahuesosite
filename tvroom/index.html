@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Vita Hueso TV Room — a 3D living room with live television</title>
+  <meta name="description" content="Step into the Vita Hueso TV room: a 3D living room with the television always on, tuned to free live channels from iptv-org. Look around the room, then open the full-screen viewer to zap through thousands of channels — or send any stream to VLC." />
+  <meta name="author" content="Anthonitus (Vita Hueso)" />
+  <meta name="theme-color" content="#04060d" />
+  <meta name="color-scheme" content="dark" />
+  <link rel="canonical" href="https://artistesoundbox.github.io/vitahuesosite/tvroom/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Vita Hueso" />
+  <meta property="og:title" content="Vita Hueso TV Room — a 3D living room with live TV" />
+  <meta property="og:description" content="A 3D living room where the television is always on. Look around, open the viewer and zap through free live channels — or hand any stream to VLC." />
+  <meta property="og:url" content="https://artistesoundbox.github.io/vitahuesosite/tvroom/" />
+  <link rel="icon" type="image/png" href="../icon-192.png" />
+  <link rel="apple-touch-icon" href="../icon-192.png" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <link rel="stylesheet" href="css/tvroom.css" />
+</head>
+<body class="is-booting">
+
+  <!-- ── Boot / loading curtain ─────────────────────────────────────────── -->
+  <div class="boot" id="boot" role="status" aria-live="polite">
+    <div class="boot-mark">VITA HUESO</div>
+    <div class="boot-title">TV ROOM</div>
+    <div class="boot-bar"><i id="boot-bar-fill"></i></div>
+    <div class="boot-status" id="boot-status">Warming up the room…</div>
+  </div>
+
+  <!-- ── The room ───────────────────────────────────────────────────────── -->
+  <canvas id="room-canvas" aria-label="3D living room with a television"></canvas>
+
+  <div class="hud" id="hud" hidden>
+    <header class="hud-top">
+      <a class="hud-back" href="../index.html" title="Back to the main site">
+        <span aria-hidden="true">←</span> <span class="hud-back-label">Main site</span>
+      </a>
+      <div class="hud-brand"><i class="hud-live-dot" aria-hidden="true"></i> Vita Hueso · TV Room</div>
+      <div class="hud-tools">
+        <button class="hud-btn" id="sound-toggle" type="button" aria-pressed="false" title="Turn the room TV sound on">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7"/></svg>
+          <span class="hud-btn-label">Sound</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="hud-bottom">
+      <div class="now-card">
+        <span class="kicker">Now on the screen</span>
+        <strong class="now-name" id="room-now">Tuning…</strong>
+        <span class="now-meta" id="room-now-meta">live feed · iptv-org</span>
+      </div>
+
+      <div class="view-wrap">
+        <button class="view-tv-btn" id="open-viewer" type="button">
+          <span class="vtb-play" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg>
+          </span>
+          <span class="vtb-copy">
+            <span class="vtb-title">View TV</span>
+            <span class="vtb-sub">live channels · full screen</span>
+          </span>
+        </button>
+        <p class="hud-hint">Drag to look around · click the TV to tune in</p>
+      </div>
+
+      <div class="hud-tools hud-tools-right">
+        <button class="hud-btn" id="random-channel" type="button" title="Zap to a random channel">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l7 10h3M17 7h3M17 3l4 4-4 4M17 13h3M17 21l4-4-4-4M4 17h3l2.2-3.1"/></svg>
+          <span class="hud-btn-label">Zap</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- The live <video> lives here while the viewer is closed; the room's TV
+       screen shows it as a texture. It is moved into the viewer while open. -->
+  <div id="stage-source" class="stage-source" aria-hidden="true"></div>
+
+  <!-- ── Full-screen TV viewer ──────────────────────────────────────────── -->
+  <div class="viewer" id="viewer" hidden aria-label="Television viewer">
+    <div class="viewer-main" id="viewer-main">
+      <div class="video-frame" id="video-frame">
+        <div class="video-mount" id="video-mount"></div>
+
+        <div class="viewer-idle" id="viewer-idle">
+          <div class="vi-mark">VH · TV</div>
+          <p>Pick a channel from the list. The same feed stays on the television in the room.</p>
+        </div>
+
+        <div class="viewer-error" id="viewer-error" hidden>
+          <div class="ve-head">That channel would not open here</div>
+          <p class="ve-msg" id="viewer-error-msg">The stream refused the browser.</p>
+          <div class="ve-actions">
+            <button type="button" class="ve-btn" id="ve-retry">Try again</button>
+            <button type="button" class="ve-btn" id="ve-next">Next channel</button>
+            <button type="button" class="ve-btn ve-btn-vlc" id="ve-vlc">Open in VLC</button>
+          </div>
+          <p class="ve-note">Free feeds come and go. Plain-HTTP and geo-locked streams only work outside the browser — VLC plays those.</p>
+        </div>
+
+        <div class="viewer-top">
+          <button class="vbtn" id="viewer-close" type="button" title="Back to the room">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6"/></svg>
+            <span>Room</span>
+          </button>
+          <div class="viewer-now">
+            <i class="live-dot" aria-hidden="true"></i>
+            <span class="vn-name" id="viewer-now-name">No channel</span>
+            <span class="vn-meta" id="viewer-now-meta"></span>
+          </div>
+        </div>
+
+        <div class="viewer-controls" id="viewer-controls">
+          <button class="vbtn" id="ch-prev" type="button" title="Previous channel (←)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6v12L9 12zM6 5v14"/></svg>
+          </button>
+          <button class="vbtn vbtn-main" id="ch-play" type="button" title="Play / pause (space)">
+            <svg viewBox="0 0 24 24" class="icon-play" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+            <svg viewBox="0 0 24 24" class="icon-pause" aria-hidden="true"><path d="M8 5h3v14H8zM14 5h3v14h-3z"/></svg>
+          </button>
+          <button class="vbtn" id="ch-next" type="button" title="Next channel (→)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6v12l9-6zM18 5v14"/></svg>
+          </button>
+
+          <div class="vsep" aria-hidden="true"></div>
+
+          <button class="vbtn" id="ch-mute" type="button" title="Mute (m)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7"/><path class="slash" d="M4 4l16 16"/></svg>
+          </button>
+          <input class="vrange" id="ch-volume" type="range" min="0" max="1" step="0.01" value="0.85" aria-label="Volume" />
+
+          <div class="vsep" aria-hidden="true"></div>
+
+          <button class="vbtn vbtn-text" id="ch-random" type="button" title="Random channel">Zap</button>
+          <button class="vbtn vbtn-text" id="ch-vlc" type="button" title="Download this stream as a playlist for VLC">VLC</button>
+          <button class="vbtn" id="ch-fullscreen" type="button" title="Full screen (f)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <button class="browser-tab" id="browser-tab" type="button" title="Show the channel list (c)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      <span>Channels</span>
+    </button>
+
+    <aside class="browser" id="browser" aria-label="Channel list">
+      <div class="browser-head">
+        <div class="bh-title">Channel list <span class="bh-count" id="browser-count">—</span></div>
+        <button class="browser-close" id="browser-close" type="button" title="Hide the list">✕</button>
+      </div>
+
+      <div class="browser-filters">
+        <label class="search-wrap">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg>
+          <input id="ch-search" type="search" placeholder="Search 11,000+ channels…" autocomplete="off" spellcheck="false" />
+        </label>
+        <div class="filter-row">
+          <select id="ch-group" aria-label="Filter by category">
+            <option value="">All categories</option>
+          </select>
+          <select id="ch-country" aria-label="Filter by country">
+            <option value="">All countries</option>
+          </select>
+        </div>
+        <label class="toggle-row">
+          <input type="checkbox" id="ch-only-playable" />
+          <span>Only channels this browser can play</span>
+        </label>
+      </div>
+
+      <div class="chlist" id="chlist" role="listbox" aria-label="Channels">
+        <div class="chlist-status" id="chlist-status">Loading the playlist…</div>
+        <div class="chlist-rows" id="chlist-rows"></div>
+        <div class="chlist-sentinel" id="chlist-sentinel"></div>
+      </div>
+
+      <div class="browser-foot">
+        <span>Feeds from <a href="https://github.com/iptv-org/iptv" target="_blank" rel="noopener noreferrer">iptv-org</a></span>
+        <button class="foot-btn" id="ch-reload" type="button">Reload list</button>
+      </div>
+    </aside>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

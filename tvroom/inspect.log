@@ -1,0 +1,1487 @@
+Warning: add-on missing 'bl_info', this can cause poor performance!: 'C:\\Users\\Anthonitus\\AppData\\Roaming\\Blender Foundation\\Blender\\5.2\\scripts\\addons\\build_extension.py'
+ucupaint addon: Verbose is enabled
+ucupaint addon: Read in JSON settings from file
+Determined it's not yet time to check for updates -59834.559248
+Aborting check for updated, check interval not reached
+INFO: Ucupaint 3.0.0 is registered!
+ℹ️  blendkit: Verbose is enabled [22:28:28.974, addon_updater.py:150]
+ℹ️  blendkit: Read in JSON settings from file [22:28:28.975, addon_updater.py:150]
+ℹ️  blendkit: Ports reordered so first port is now 62485 (previous index was 0) [22:28:28.977, client_lib.py:163]
+blunder: the bridge needs an event loop; in background mode run `blender.exe -b --python bridge/addon.py` instead of enabling the add-on
+module changed on disk: 'C:\\Program Files\\Blender Foundation\\Blender 5.2\\5.2\\scripts\\addons_core\\bl_pkg\\__init__.py' reloading...
+INFO: Ucupaint update routine is done in 0.35 ms!
+Created history step 32acf315-e092-45b5-a389-ba023d74d0dd
+ℹ️  blendkit: Created new search history step [22:28:29.252, search.py:2741]
+ℹ️  blendkit: No temporarily enabled addons to clean up [22:28:29.253, download.py:431]
+00:02.032  blend            | Read blend: "C:\Users\Anthonitus\Documents\GitHub\vitahuesosite\tvroom\tvroom.blend"
+INFO: Ucupaint update routine is done in 0.46 ms!
+ℹ️  blendkit: No temporarily enabled addons to clean up [22:28:29.288, download.py:431]
+=== SCENE: Scene
+render engine: BLENDER_EEVEE res: 1920 1080
+world: World
+camera: Camera
+=== OBJECTS 47
+[
+ {
+  "name": "Light",
+  "type": "LIGHT",
+  "parent": null,
+  "loc": [
+   4.0762,
+   1.0055,
+   5.9039
+  ],
+  "rot": [
+   0.6503,
+   0.0552,
+   1.8664
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true,
+  "light": {
+   "kind": "POINT",
+   "energy": 1000.0,
+   "color": [
+    1.0,
+    1.0,
+    1.0
+   ]
+  }
+ },
+ {
+  "name": "Camera",
+  "type": "CAMERA",
+  "parent": null,
+  "loc": [
+   18.5414,
+   18.2655,
+   6.4799
+  ],
+  "rot": [
+   1.4476,
+   -0.0358,
+   2.1127
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true,
+  "cam": {
+   "lens": 29.0,
+   "type": "PERSP",
+   "sensor": 36.0
+  }
+ },
+ {
+  "name": "Sketchfab_model",
+  "type": "EMPTY",
+  "parent": null,
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "3ce6ca67227f4cf0809b60b0c8d0183f.fbx",
+  "type": "EMPTY",
+  "parent": "Sketchfab_model",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   0.01,
+   0.01,
+   0.01
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "RootNode",
+  "type": "EMPTY",
+  "parent": "3ce6ca67227f4cf0809b60b0c8d0183f.fbx",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "Cube",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   -864.324,
+   1832.3867,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "Cube_Material.003_0",
+  "type": "MESH",
+  "parent": "Cube",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   21.6096,
+   18.7428,
+   3.1657
+  ],
+  "mats": [
+   "Material.003"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 98,
+  "polys": 76
+ },
+ {
+  "name": "Cube.001",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   68.2279,
+   533.5828,
+   60.3679
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "Cube.001_Material.006_0",
+  "type": "MESH",
+  "parent": "Cube.001",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   11.2105,
+   0.4511,
+   11.2105
+  ],
+  "mats": [
+   "Material.006"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 20,
+  "polys": 10
+ },
+ {
+  "name": "Cube.002",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   100.7777,
+   0.0,
+   2186.2537
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "Cube.002_Material.008_0",
+  "type": "MESH",
+  "parent": "Cube.002",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   28.5401,
+   5.327,
+   20.729
+  ],
+  "mats": [
+   "Material.008"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 49,
+  "polys": 28
+ },
+ {
+  "name": "Cube.003",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   1071.299,
+   1992.3405,
+   924.7194
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "Cube.003_Material.002_0",
+  "type": "MESH",
+  "parent": "Cube.003",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   12.5074,
+   17.788,
+   4.5184
+  ],
+  "mats": [
+   "Material.002"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 80,
+  "polys": 64
+ },
+ {
+  "name": "Cylinder",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   0.0,
+   424.2929,
+   1737.4725
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "Cylinder_Material.010_0",
+  "type": "MESH",
+  "parent": "Cylinder",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   0.9888,
+   4.0784,
+   35.5521
+  ],
+  "mats": [
+   "Material.010"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 328,
+  "polys": 508
+ },
+ {
+  "name": "Cylinder.001",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   381.2239,
+   -1558.6066,
+   2037.0894
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "Cylinder.001_Material.010_0",
+  "type": "MESH",
+  "parent": "Cylinder.001",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   15.4726,
+   0.7586,
+   0.7586
+  ],
+  "mats": [
+   "Material.010"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 98,
+  "polys": 94
+ },
+ {
+  "name": "Cylinder.002",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   -413.283,
+   671.5968,
+   1738.5918
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "Cylinder.002_Material.010_0",
+  "type": "MESH",
+  "parent": "Cylinder.002",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   12.7798,
+   0.7586,
+   0.7586
+  ],
+  "mats": [
+   "Material.010"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 98,
+  "polys": 94
+ },
+ {
+  "name": "Cylinder.003",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   -413.283,
+   548.3444,
+   1738.5918
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "Cylinder.003_Material.010_0",
+  "type": "MESH",
+  "parent": "Cylinder.003",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   12.7798,
+   0.7586,
+   0.7586
+  ],
+  "mats": [
+   "Material.010"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 98,
+  "polys": 94
+ },
+ {
+  "name": "Cylinder.004",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   -105.9308,
+   424.2929,
+   1789.9987
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "Cylinder.004_Material.010_0",
+  "type": "MESH",
+  "parent": "Cylinder.004",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   0.9888,
+   4.0784,
+   35.5521
+  ],
+  "mats": [
+   "Material.010"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 328,
+  "polys": 508
+ },
+ {
+  "name": "Plane",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   0.0,
+   0.0,
+   82.7058
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "Plane_\ufffd\ufffd\ufffd\ufffd_0",
+  "type": "MESH",
+  "parent": "Plane",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   37.3171,
+   0.0,
+   47.1686
+  ],
+  "mats": [
+   "material"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 6,
+  "polys": 4
+ },
+ {
+  "name": "Plane.001",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   -1199.9126,
+   -0.0001,
+   833.314
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "Plane.001_Material.001_0",
+  "type": "MESH",
+  "parent": "Plane.001",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   27.3577,
+   23.1958,
+   21.5813
+  ],
+  "mats": [
+   "Material.001"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 46,
+  "polys": 24
+ },
+ {
+  "name": "Plane.002",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   0.0,
+   -1191.2601,
+   904.3068
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "Plane.002_Material.001_0",
+  "type": "MESH",
+  "parent": "Plane.002",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   32.099,
+   23.5338,
+   6.3747
+  ],
+  "mats": [
+   "Material.001"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 28,
+  "polys": 14
+ },
+ {
+  "name": "Plane.003",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   -1159.629,
+   -0.0001,
+   833.314
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "Plane.003_Material.002_0",
+  "type": "MESH",
+  "parent": "Plane.003",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   0.0,
+   23.4069,
+   10.4474
+  ],
+  "mats": [
+   "Material.002"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 4,
+  "polys": 2
+ },
+ {
+  "name": "Plane.004",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   0.0,
+   0.0,
+   2095.7974
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "Plane.004_Material.002_0",
+  "type": "MESH",
+  "parent": "Plane.004",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   30.4656,
+   0.0,
+   39.0801
+  ],
+  "mats": [
+   "Material.002"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 4,
+  "polys": 2
+ },
+ {
+  "name": "Spot",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   132.4841,
+   1962.5696,
+   1158.3036
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   113.4293,
+   113.4293,
+   113.4293
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "Object_32",
+  "type": "EMPTY",
+  "parent": "Spot",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "Object_33",
+  "type": "EMPTY",
+  "parent": "Object_32",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "material",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   -0.0,
+   655.8071,
+   103.1784
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "material_Material.004_0",
+  "type": "MESH",
+  "parent": "material",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   28.0463,
+   4.0058,
+   16.8482
+  ],
+  "mats": [
+   "Material.004"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 5232,
+  "polys": 3916
+ },
+ {
+  "name": "material.001",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   -0.0,
+   -88.8385,
+   66.2071
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "material.001_Material.009_0",
+  "type": "MESH",
+  "parent": "material.001",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   20.451,
+   13.713,
+   24.0142
+  ],
+  "mats": [
+   "Material.009"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 14113,
+  "polys": 9498
+ },
+ {
+  "name": "material.002",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   167.2564,
+   -3268.9773,
+   15.9589
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "material.002_Material.011_0",
+  "type": "MESH",
+  "parent": "material.002",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   24.2616,
+   6.7167,
+   16.2946
+  ],
+  "mats": [
+   "Material.011"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 7495,
+  "polys": 4486
+ },
+ {
+  "name": "material.003",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   0.0,
+   -3191.4644,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "material.003_Material.012_0",
+  "type": "MESH",
+  "parent": "material.003",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   24.0685,
+   21.7773,
+   49.0617
+  ],
+  "mats": [
+   "Material.012"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 6115,
+  "polys": 3806
+ },
+ {
+  "name": "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd \ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd8_20260512190452",
+  "type": "EMPTY",
+  "parent": "RootNode",
+  "loc": [
+   237.3843,
+   1980.4307,
+   949.7693
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   100.0,
+   100.0,
+   100.0
+  ],
+  "dims": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "mats": [],
+  "hide_render": false,
+  "visible": true
+ },
+ {
+  "name": "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd \ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd8_20260512190452_\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd \ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd8_20260512190452_0",
+  "type": "MESH",
+  "parent": "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd \ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd8_20260512190452",
+  "loc": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rot": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dims": [
+   16.2338,
+   16.7538,
+   0.0
+  ],
+  "mats": [
+   "8_20260512190452"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 4,
+  "polys": 2
+ },
+ {
+  "name": "Plane.005",
+  "type": "MESH",
+  "parent": null,
+  "loc": [
+   -10.4748,
+   3.507,
+   6.5119
+  ],
+  "rot": [
+   0.0194,
+   1.5708,
+   0.0
+  ],
+  "scale": [
+   1.9903,
+   1.9903,
+   1.9903
+  ],
+  "dims": [
+   3.1162,
+   5.2618,
+   0.0602
+  ],
+  "mats": [
+   "Material.005"
+  ],
+  "hide_render": false,
+  "visible": true,
+  "verts": 8,
+  "polys": 6
+ }
+]C:\Users\Anthonitus\Documents\GitHub\vitahuesosite\tvroom\inspect_scene.py:37: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  info = {"name": m.name, "nodes": m.use_nodes}
+C:\Users\Anthonitus\Documents\GitHub\vitahuesosite\tvroom\inspect_scene.py:38: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  if m.use_nodes:
+C:\Users\Anthonitus\Documents\GitHub\vitahuesosite\tvroom\inspect_scene.py:56: DeprecationWarning: 'World.use_nodes' is expected to be removed in Blender 6.0
+  if scn.world and scn.world.use_nodes:
+
+=== MATERIALS
+{"name": "8_20260512190452", "nodes": true, "node_types": ["BSDF_PRINCIPLED", "OUTPUT_MATERIAL", "FRAME", "MATH", "MATH", "TEX_IMAGE"], "images": [""]}
+{"name": "Material", "nodes": true, "node_types": ["OUTPUT_MATERIAL", "BSDF_PRINCIPLED"], "images": []}
+{"name": "material", "nodes": true, "node_types": ["BSDF_PRINCIPLED", "OUTPUT_MATERIAL", "NORMAL_MAP", "TEX_IMAGE"], "images": [""]}
+{"name": "Material.001", "nodes": true, "node_types": ["BSDF_PRINCIPLED", "OUTPUT_MATERIAL", "TEX_IMAGE", "NORMAL_MAP", "TEX_IMAGE"], "images": ["", ""]}
+{"name": "Material.002", "nodes": true, "node_types": ["BSDF_PRINCIPLED", "OUTPUT_MATERIAL", "TEX_IMAGE"], "images": [""]}
+{"name": "Material.003", "nodes": true, "node_types": ["BSDF_PRINCIPLED", "OUTPUT_MATERIAL"], "images": []}
+{"name": "Material.004", "nodes": true, "node_types": ["BSDF_PRINCIPLED", "OUTPUT_MATERIAL", "TEX_IMAGE", "NORMAL_MAP", "TEX_IMAGE"], "images": ["", ""]}
+{"name": "Material.005", "nodes": true, "node_types": ["BSDF_PRINCIPLED", "OUTPUT_MATERIAL"], "images": []}
+{"name": "Material.006", "nodes": true, "node_types": ["BSDF_PRINCIPLED", "OUTPUT_MATERIAL", "NORMAL_MAP", "TEX_IMAGE"], "images": [""]}
+{"name": "Material.008", "nodes": true, "node_types": ["BSDF_PRINCIPLED", "OUTPUT_MATERIAL", "TEX_IMAGE", "NORMAL_MAP", "TEX_IMAGE"], "images": ["", ""]}
+{"name": "Material.009", "nodes": true, "node_types": ["BSDF_PRINCIPLED", "OUTPUT_MATERIAL", "TEX_IMAGE", "NORMAL_MAP", "TEX_IMAGE", "UVMAP"], "images": ["", ""]}
+{"name": "Material.010", "nodes": true, "node_types": ["BSDF_PRINCIPLED", "OUTPUT_MATERIAL"], "images": []}
+{"name": "Material.011", "nodes": true, "node_types": ["BSDF_PRINCIPLED", "OUTPUT_MATERIAL", "TEX_IMAGE", "NORMAL_MAP", "TEX_IMAGE"], "images": ["", ""]}
+{"name": "Material.012", "nodes": true, "node_types": ["BSDF_PRINCIPLED", "OUTPUT_MATERIAL", "TEX_IMAGE", "NORMAL_MAP", "TEX_IMAGE"], "images": ["", ""]}
+=== IMAGES
+Image_0  FILE (512, 1024) packed
+Image_1  FILE (256, 1024) packed
+Image_10  FILE (1024, 1024) packed
+Image_11  FILE (1024, 1024) packed
+Image_12  FILE (1024, 1024) packed
+Image_13  FILE (1024, 1024) packed
+Image_14  FILE (1024, 1024) packed
+Image_15  FILE (512, 512) packed
+Image_2  FILE (512, 1024) packed
+Image_3  FILE (512, 1024) packed
+Image_4  FILE (512, 1024) packed
+Image_5  FILE (1024, 1024) packed
+Image_6  FILE (1024, 1024) packed
+Image_7  FILE (1024, 1024) packed
+Image_8  FILE (1024, 1024) packed
+Image_9  FILE (1024, 1024) packed
+Render Result  VIEWER (0, 0) 
+Viewer Node  VIEWER (256, 256) 
+=== COLLECTIONS
+Collection ['Light', 'Camera', 'Sketchfab_model', '3ce6ca67227f4cf0809b60b0c8d0183f.fbx', 'RootNode', 'Cube', 'Cube_Material.003_0', 'Cube.001', 'Cube.001_Material.006_0', 'Cube.002', 'Cube.002_Material.008_0', 'Cube.003', 'Cube.003_Material.002_0', 'Cylinder', 'Cylinder_Material.010_0', 'Cylinder.001', 'Cylinder.001_Material.010_0', 'Cylinder.002', 'Cylinder.002_Material.010_0', 'Cylinder.003', 'Cylinder.003_Material.010_0', 'Cylinder.004', 'Cylinder.004_Material.010_0', 'Plane', 'Plane_����_0', 'Plane.001', 'Plane.001_Material.001_0', 'Plane.002', 'Plane.002_Material.001_0', 'Plane.003', 'Plane.003_Material.002_0', 'Plane.004', 'Plane.004_Material.002_0', 'Spot', 'Object_32', 'Object_33', 'material', 'material_Material.004_0', 'material.001', 'material.001_Material.009_0', 'material.002', 'material.002_Material.011_0', 'material.003', 'material.003_Material.012_0', '������ ����������������8_20260512190452', '������ ����������������8_20260512190452_������ ����������������8_20260512190452_0', 'Plane.005']
+=== CUSTOM PROPS / TEXT
+=== WORLD NODES
+OUTPUT_WORLD World Output None
+BACKGROUND Background None
+INFO: Ucupaint 3.0.0 is unregistered!
+ℹ️  blendkit: Unregistering Blendkit add-on [22:28:29.522, __init__.py:3030]
+ℹ️  blendkit: No temporarily enabled addons to clean up [22:28:29.522, download.py:431]
+Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:35:40)
+
+Blender quit
