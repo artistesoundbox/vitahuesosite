@@ -1170,6 +1170,61 @@
       "lufs": -8,
       "url": "https://stream-31.zeno.fm/2ss1hgnu6hhvv",
       "at": 1792739254
+    },
+    "w163": {
+      "lufs": -12.8,
+      "url": "https://icecast.live.yle.fi/radio/YleX/icecast.audio",
+      "at": 1792739258
+    },
+    "w158": {
+      "lufs": -14.3,
+      "url": "https://play.global.audio/vanillahi.aac",
+      "at": 1792739260
+    },
+    "w157": {
+      "lufs": -27.1,
+      "url": "https://edge.mixlr.com/channel/cfldr",
+      "at": 1792739261
+    },
+    "w159": {
+      "lufs": -9.2,
+      "url": "https://smooth.vanillaradio.com:8032/live",
+      "at": 1792739261
+    },
+    "w156": {
+      "lufs": -9,
+      "url": "https://myradio24.org/tisradio",
+      "at": 1792739261
+    },
+    "w168": {
+      "lufs": -8.1,
+      "url": "https://qurango.net/radio/mahmoud_khalil_alhussary_warsh",
+      "at": 1792739262
+    },
+    "w164": {
+      "lufs": -9.9,
+      "url": "https://radiostreaming.ert.gr/ert-zeppelin",
+      "at": 1792739263
+    },
+    "w169": {
+      "lufs": -11,
+      "url": "https://s26.myradiostream.com:20274/listen.mp3",
+      "at": 1792739264
+    },
+    "w167": {
+      "lufs": -11.5,
+      "url": "https://cdn.cybercdn.live/Pervoia/Audio/icecast.audio",
+      "at": 1792739264
+    },
+    "w162": {
+      "lufs": -30.7,
+      "url": "https://exitos1530.radioca.st/stream",
+      "at": 1792739265
+    },
+    "w165": {
+      "lufs": -11.2,
+      "url": "https://stream2.zipfm.lt/zipfm128.mp3",
+      "at": 1792739266
     }
   },
   "localLufs": [

@@ -116,3 +116,28 @@ export function randomStation(exclude = []) {
 export function stationById(id) {
   return WORLD_STATIONS.find((s) => s.id === id) || null;
 }
+
+/** Great-circle distance in km, for "the station nearest me". */
+export function distanceKm(latA, lonA, latB, lonB) {
+  const rad = Math.PI / 180;
+  const dLat = (latB - latA) * rad;
+  const dLon = (lonB - lonA) * rad;
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(latA * rad) * Math.cos(latB * rad) * Math.sin(dLon / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * The closest station we have a location for. Country-centre stations compete
+ * too, so the answer is "nearest we know of", not a guarantee about the mast.
+ */
+export function nearestStation(lat, lon) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  let best = null;
+  for (const station of WORLD_STATIONS) {
+    if (!Number.isFinite(station.lat) || !Number.isFinite(station.lon)) continue;
+    const km = distanceKm(lat, lon, station.lat, station.lon);
+    if (!best || km < best.km) best = { station, km };
+  }
+  return best ? { station: best.station, km: Math.round(best.km) } : null;
+}
