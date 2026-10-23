@@ -24,6 +24,20 @@ function extensionOf(url) {
   }
 }
 
+/**
+ * Split "attrs,name" at the comma that ends the attributes. Commas inside
+ * quoted values (a user-agent like "Windows NT 10.0, Win64") must not count.
+ */
+function splitAttributes(line) {
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (ch === '"') inQuotes = !inQuotes;
+    else if (ch === ',' && !inQuotes) return [line.slice(0, i), line.slice(i + 1)];
+  }
+  return [line, ''];
+}
+
 function regionName(code) {
   try {
     return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) || code;
@@ -46,13 +60,12 @@ export function parsePlaylist(text) {
     if (!line) continue;
 
     if (line.startsWith('#EXTINF')) {
-      const comma = line.indexOf(',');
-      const head = comma === -1 ? line : line.slice(0, comma);
+      const [head, display] = splitAttributes(line);
       const attrs = {};
       for (const m of head.matchAll(ATTR_RE)) attrs[m[1].toLowerCase()] = m[2];
       meta = {
         attrs,
-        fullName: comma === -1 ? '' : line.slice(comma + 1).trim(),
+        fullName: display.trim(),
         userAgent: attrs['http-user-agent'] || '',
       };
       continue;

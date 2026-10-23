@@ -267,6 +267,8 @@ body.is-ready #room-canvas { opacity: 1; }
 }
 
 .hud-btn svg .wave { fill: none; }
+.hud-btn svg .slash { fill: none; }
+.hud-btn[aria-pressed="true"] svg .slash { opacity: 0; }
 .hud-btn[aria-pressed="true"] {
   color: var(--accent);
   border-color: var(--line-strong);

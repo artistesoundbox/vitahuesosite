@@ -667,7 +667,6 @@ export class Viewer {
   }
 
   _toggleBrowser(open) {
-    if (window.__tvroomDebug) console.trace('[tvroom] browser toggle', open);
     this.els.viewer.classList.toggle('browser-closed', !open);
     if (open) this._showControls();
   }
