@@ -118,6 +118,8 @@ const viewer = new Viewer({
   player,
   loadCatalog: (onProgress) => loadCatalog(onProgress),
   onOpen: () => {
+    // The person is driving now: stop the room's automatic feed rotation.
+    fallbackActive = false;
     hud.classList.add('is-dimmed');
   },
   onClose: () => {
@@ -126,6 +128,8 @@ const viewer = new Viewer({
     setRoomNow(player.channel);
   },
 });
+
+player.mount(stage);
 
 $('open-viewer').addEventListener('click', () => viewer.open());
 
@@ -166,12 +170,6 @@ player.on('error', () => {
   // The room tries the next featured feed before giving up on a picture.
   setTimeout(playFeatured, 600);
 });
-
-for (const select of viewer.els.rows ? [viewer.els.rows] : []) {
-  select.addEventListener('click', () => {
-    fallbackActive = false;
-  });
-}
 
 async function boot() {
   syncSound();
@@ -240,8 +238,5 @@ document.addEventListener('keydown', (ev) => {
     ev.preventDefault();
   }
 });
-
-// If the tab had no gesture yet, the sound toggle is the way in.
-if (roomReady) player.mount(stage);
 
 boot();
