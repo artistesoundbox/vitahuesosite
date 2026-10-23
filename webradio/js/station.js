@@ -1,12 +1,17 @@
 /* The on-air clock.
  *
- * Every listener derives the same broadcast from the same inputs: the track
- * catalogue, the programme blocks in config.js, a fixed epoch and UTC time.
- * Shuffle order is seeded by (UTC day + programme), so the reel is stable for
- * the whole day and identical on every device — a real station timeline,
- * served entirely from static files.
+ * Every listener derives the same broadcast from the same inputs: the clock,
+ * the programme blocks in config.js, a fixed epoch and UTC time.
  *
- * Nothing here touches the network; MP3 seeking is handled by the browser.
+ * The day is a grid of fixed slots. Most slots are a live station somewhere in
+ * the world (see js/world.js); a seeded number of slots each hour come home to
+ * the studio catalogue — your own songs, with the occasional CC guest — and a
+ * short station ID sits at the top of those segments. Slot boundaries and the
+ * station pick are both deterministic, so a laptop and a phone hear the same
+ * city at the same second.
+ *
+ * Nothing here touches the network; MP3 seeking and stream playback are the
+ * browser's job.
  */
 import { TRACKS } from './catalog.js';
 import * as catalog from './catalog.js';
@@ -15,10 +20,14 @@ import * as catalog from './catalog.js';
    older cached catalog.js would otherwise fail the whole module (and with it
    the site radio) because STATION_ID did not exist yet. */
 const STATION_ID = catalog.STATION_ID || null;
-import { PROGRAMS, STATION_EPOCH, DAY_MS, ROTATION } from './config.js';
+import { PROGRAMS, WORLD, STATION_EPOCH, DAY_MS, ROTATION } from './config.js';
 import { isBlocked, onBlockChange } from './blocklist.js';
+import { WORLD_STATIONS, worldTrack } from './world.js';
 
 const reels = new Map();
+/* A day is a whole number of slots; if the config does not divide evenly the
+   last slot is shortened rather than spilling into tomorrow. */
+const BLOCK_MS = 3600000;
 
 export function hashString(str) {
   let h = 2166136261;
@@ -48,7 +57,6 @@ function shuffled(list, rng) {
   return a;
 }
 
-const BLOCK_MS = 3600000;
 /* Pools are rebuilt whenever the device's blocklist changes: a disliked song
    leaves the reel entirely, so it cannot come back later in the day either. */
 let GUESTS = [];
@@ -86,10 +94,10 @@ function guestBagFor(guests, rng) {
 }
 
 /**
- * One long pass of the rotation: cycle the free library in shuffled order and
- * drop one of the artist's own songs in after every `originalEvery` guest
- * tracks. Both bags reshuffle when exhausted, and immediate repeats are
- * avoided even across a reshuffle.
+ * One long pass of the local rotation: cycle the free library in shuffled order
+ * and drop one of the artist's own songs in after every `originalEvery` guest
+ * tracks. Used by the all-local fallback and by the home segments, where the
+ * mix is inverted (mostly originals).
  */
 function buildSequence(pool, guests, rng, length = 96, seedRecent = []) {
   const sequence = [];
@@ -155,14 +163,76 @@ function buildSequence(pool, guests, rng, length = 96, seedRecent = []) {
   return sequence;
 }
 
+/* -------------------------------------------------------------- home slots */
+
 /**
- * Build one UTC day of programming. Deterministic for a given day.
- *
- * `carry` is the tail of the previous day's songs, so the no-repeat window also
- * holds across midnight — otherwise a song could close the night and open the
- * new day three slots later.
+ * The repertoire for a home segment: mostly the artist's own recordings, with
+ * a guest every few songs. Shares the day's cooldown list with the rest of the
+ * reel, so a song that just played in the last home segment does not return.
  */
-export function buildReel(dayStartMs, carry = []) {
+function homeSequence(program, rng, length, recent) {
+  const own = ORIGINALS.filter((t) => t.genres.some((g) => program.genres.includes(g)));
+  const ownPool = own.length >= 4 ? own : ORIGINALS;
+  const guestPool = GUESTS.length ? GUESTS : ownPool;
+  if (!ownPool.length) return [];
+
+  const share = Math.min(1, Math.max(0, Number(WORLD.homeShare) || 0.85));
+  const cooldown = Math.max(0, Number(ROTATION.noRepeatWindow) || 0);
+  const out = [];
+
+  const pick = (pool) => {
+    /* Six tries for something out of cooldown; then take what the draw gives,
+       because an empty segment is worse than a repeat. */
+    for (let i = 0; i < 6; i++) {
+      const candidate = pool[Math.floor(rng() * pool.length)];
+      if (!recent.includes(candidate.id)) return candidate;
+    }
+    return pool[Math.floor(rng() * pool.length)];
+  };
+
+  let guard = 0;
+  while (out.length < length && guard++ < length * 6) {
+    const pool = rng() < share ? ownPool : guestPool;
+    const track = pick(pool);
+    if (!track) break;
+    out.push(track);
+    recent.push(track.id);
+    while (recent.length > cooldown) recent.shift();
+  }
+  return out;
+}
+
+/** Positions inside the hour that come home to the studio, seeded per hour. */
+function homeSlotsFor(dayKey, hour, slotsPerHour) {
+  const count = Math.min(slotsPerHour, Math.max(0, Math.round(Number(WORLD.homeEveryHour) || 0)));
+  const set = new Set();
+  let guard = 0;
+  while (set.size < count && guard++ < 40) {
+    const rng = mulberry32(hashString(`${dayKey}|home-slot|${hour}|${set.size}|${STATION_EPOCH}`));
+    set.add(Math.floor(rng() * slotsPerHour));
+  }
+  return set;
+}
+
+/** Deterministic city for a slot, never the same station or country twice in a row. */
+function worldStationFor(dayKey, slot, previous) {
+  if (!WORLD_STATIONS.length) return null;
+  const count = WORLD_STATIONS.length;
+  const start = hashString(`${dayKey}|city|${slot}|${STATION_EPOCH}`) % count;
+  for (let step = 0; step < count; step++) {
+    const candidate = WORLD_STATIONS[(start + step) % count];
+    if (previous && candidate.id === previous.id) continue;
+    if (WORLD.avoidSameCountry && previous && candidate.countrycode === previous.countrycode) continue;
+    return candidate;
+  }
+  return WORLD_STATIONS[start];
+}
+
+/* ---------------------------------------------------------------- day reels */
+
+const homeSlotCache = new Map();
+
+function buildLocalReel(dayStartMs, carry = []) {
   const dayKey = new Date(dayStartMs).toISOString().slice(0, 10);
   const entries = [];
   let seq = 0;
@@ -171,24 +241,14 @@ export function buildReel(dayStartMs, carry = []) {
     const rng = mulberry32(hashString(`${dayKey}|${block.id}|${STATION_EPOCH}`));
     let pool = ORIGINALS.filter((t) => t.genres.some((g) => block.genres.includes(g)));
     if (pool.length < 6) pool = ORIGINALS.slice();
-    /* Everything of the artist's own is hidden: fall back to the whole
-       catalogue rather than building a reel with no originals to draw. */
     if (!pool.length) pool = TRACKS.filter((t) => !t.guest);
 
-    // The free library cycles in full every hour; start each pass with the
-    // tracks that fit this programme's mood, then the rest.
     const matching = GUESTS.filter((t) => t.genres.some((g) => block.genres.includes(g)));
     const rest = GUESTS.filter((t) => !matching.includes(t));
-    /* A focused show runs on its own shelf alone (with a floor so a thin
-       genre list cannot make the hour repeat itself); everything else keeps
-       the friendly mix with the matching tracks first. */
     const guests = block.focus && matching.length >= 12
       ? shuffled(matching, rng)
       : [...shuffled(matching, rng), ...shuffled(rest, rng)];
 
-    /* Carry the cooldown across the programme boundary, otherwise the same
-       song can close one hour and open the next. The first programme of the
-       day falls back to yesterday's tail for the same reason. */
     const recentSongs = () => {
       const tail = entries.filter((e) => !e.track.ident)
         .slice(-(Number(ROTATION.noRepeatWindow) || 0)).map((e) => e.track.id);
@@ -197,7 +257,6 @@ export function buildReel(dayStartMs, carry = []) {
 
     let sequence = buildSequence(pool, guests, rng, 96, recentSongs());
     let cursorIndex = 0;
-
     const start = block.start * BLOCK_MS;
     const end = block.end * BLOCK_MS;
 
@@ -218,6 +277,7 @@ export function buildReel(dayStartMs, carry = []) {
       const playMs = Math.min(fullMs, end - cursor);
       entries.push({
         key: `${dayKey}#${seq++}`,
+        kind: track.ident ? 'ident' : 'home',
         track,
         startMs: dayStartMs + cursor,
         endMs: dayStartMs + cursor + playMs,
@@ -231,6 +291,135 @@ export function buildReel(dayStartMs, carry = []) {
   return { dayKey, dayStartMs, entries };
 }
 
+/**
+ * Build one UTC day of the world feed.
+ *
+ * Every slot is either a live station or a home segment; the two tile the day
+ * exactly, so `getLiveState` never has to guess where the clock is.
+ */
+function buildWorldReel(dayStartMs, carry = []) {
+  const dayKey = new Date(dayStartMs).toISOString().slice(0, 10);
+  const slotMinutes = Math.min(30, Math.max(4, Number(WORLD.slotMinutes) || 10));
+  const slotMs = slotMinutes * 60000;
+  const slotsPerHour = Math.max(1, Math.round(BLOCK_MS / slotMs));
+  const slots = Math.ceil(DAY_MS / slotMs);
+  const identHours = Math.max(1, Math.round(Number(WORLD.identEveryHours) || 3));
+
+  const entries = [];
+  const recent = carry.slice();
+  let seq = 0;
+  let previousStation = null;
+  const homeCache = new Map();
+
+  for (let slot = 0; slot < slots; slot++) {
+    const slotIndex = slot * slotMs;
+    const startMs = dayStartMs + slotIndex;
+    const endMs = Math.min(dayStartMs + DAY_MS, startMs + slotMs);
+    if (endMs - startMs < 20000) continue;
+
+    const hour = Math.floor(slotIndex / BLOCK_MS);
+    const inHour = slot % slotsPerHour;
+    const program = PROGRAMS.find((p) => hour >= p.start && hour < p.end) || PROGRAMS[0];
+
+    if (!homeCache.has(hour)) homeCache.set(hour, homeSlotsFor(dayKey, hour, slotsPerHour));
+    const isHome = homeCache.get(hour).has(inHour);
+
+    let cursor = startMs;
+    let guard = 0;
+
+    if (isHome) {
+      /* The cut from a foreign city back to the studio is the station's most
+         recognisable moment, so it always opens with the ID. */
+      if (STATION_ID && endMs - cursor > STATION_ID.duration * 1000 + 12000) {
+        entries.push({
+          key: `${dayKey}#${seq++}`,
+          kind: 'ident',
+          track: STATION_ID,
+          startMs: cursor,
+          endMs: cursor + STATION_ID.duration * 1000,
+          cut: false,
+          program
+        });
+        cursor += STATION_ID.duration * 1000;
+      }
+
+      const rng = mulberry32(hashString(`${dayKey}|home-set|${hour}|${inHour}|${STATION_EPOCH}`));
+      const sequence = homeSequence(program, rng, 24, recent);
+      let i = 0;
+      while (endMs - cursor > 12000 && guard++ < 60 && i < sequence.length) {
+        const track = sequence[i++];
+        const fullMs = track.duration * 1000;
+        const playMs = Math.min(fullMs, endMs - cursor);
+        if (playMs < 8000) break;
+        entries.push({
+          key: `${dayKey}#${seq++}`,
+          kind: 'home',
+          track,
+          startMs: cursor,
+          endMs: cursor + playMs,
+          cut: playMs < fullMs - 750,
+          program
+        });
+        cursor += playMs;
+      }
+
+      /* Ran out of repertoire before the slot did: hold the last song to the
+         boundary rather than leaving a hole in the timeline. */
+      if (cursor < endMs && entries.length) {
+        const last = entries[entries.length - 1];
+        last.endMs = endMs;
+        last.cut = true;
+        cursor = endMs;
+      }
+      continue;
+    }
+
+    /* One branded break into the world feed every few hours; home slots are
+       already identified, so no double jingles. */
+    if (STATION_ID && inHour === 0 && hour % identHours === 0 && endMs - cursor > 90000) {
+      entries.push({
+        key: `${dayKey}#${seq++}`,
+        kind: 'ident',
+        track: STATION_ID,
+        startMs: cursor,
+        endMs: cursor + STATION_ID.duration * 1000,
+        cut: false,
+        program
+      });
+      cursor += STATION_ID.duration * 1000;
+    }
+
+    if (endMs - cursor < 30000) continue;
+    const station = worldStationFor(dayKey, slot, previousStation);
+    if (!station) continue;
+    previousStation = station;
+
+    entries.push({
+      key: `${dayKey}#${seq++}`,
+      kind: 'world',
+      track: worldTrack(station, (endMs - cursor) / 1000),
+      startMs: cursor,
+      endMs,
+      cut: false,
+      program
+    });
+  }
+
+  return { dayKey, dayStartMs, entries };
+}
+
+/**
+ * Build one UTC day of programming. Deterministic for a given day.
+ *
+ * `carry` is the tail of the previous day's songs, so the no-repeat window also
+ * holds across midnight — otherwise a song could close the night and open the
+ * new day three slots later.
+ */
+export function buildReel(dayStartMs, carry = []) {
+  if (!WORLD.enabled || !WORLD_STATIONS.length) return buildLocalReel(dayStartMs, carry);
+  return buildWorldReel(dayStartMs, carry);
+}
+
 const tails = new Map();
 
 function previousTail(dayStartMs) {
@@ -238,7 +427,10 @@ function previousTail(dayStartMs) {
   if (cached) return cached;
   const window = Number(ROTATION.noRepeatWindow) || 0;
   const before = buildReel(dayStartMs - DAY_MS);
-  const tail = before.entries.filter((e) => !e.track.ident).slice(-window).map((e) => e.track.id);
+  const tail = before.entries
+    .filter((e) => !e.track.ident && !e.track.world)
+    .slice(-window)
+    .map((e) => e.track.id);
   tails.set(dayStartMs, tail);
   if (tails.size > 4) tails.delete(tails.keys().next().value);
   return tail;
@@ -274,7 +466,7 @@ export function getLiveState(now = Date.now(), queueCount = 5) {
 
   let entry = entries[index];
   let offset = Math.max(0, (now - entry.startMs) / 1000);
-  if (offset > entry.track.duration) offset = entry.track.duration;
+  if (!entry.track.world && offset > entry.track.duration) offset = entry.track.duration;
 
   return {
     reel,
@@ -286,7 +478,24 @@ export function getLiveState(now = Date.now(), queueCount = 5) {
   };
 }
 
-/** Programme airing at a given moment (UTC clock). */
+/** The stations coming up after `count` upcoming entries, deduplicated by id. */
+export function upcomingCities(count = 3, now = Date.now()) {
+  const state = getLiveState(now, Math.max(count * 3, 8));
+  if (!state) return [];
+  const out = [];
+  const seen = new Set(state.entry.track.world ? [state.entry.track.station.id] : []);
+  for (const entry of state.queue) {
+    if (!entry.track.world) continue;
+    const id = entry.track.station.id;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push({ station: entry.track.station, startMs: entry.startMs, comesHome: false });
+    if (out.length >= count) break;
+  }
+  return out;
+}
+
+/* Programme airing at a given moment (UTC clock). */
 export function programAt(now = Date.now()) {
   const hour = new Date(now).getUTCHours();
   return PROGRAMS.find((p) => hour >= p.start && hour < p.end) || PROGRAMS[0];

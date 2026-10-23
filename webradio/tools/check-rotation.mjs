@@ -15,7 +15,7 @@ for (let d = 0; d < days; d++) {
   /* getReel is the path the browser takes, so midnight carry-over is
      exercised here rather than simulated. */
   for (const entry of getReel(start + d * DAY_MS + 12 * 3600 * 1000).entries) {
-    if (entry.track.ident) continue;
+    if (entry.track.ident || entry.track.world) continue;
     songs.push(entry.track);
   }
 }

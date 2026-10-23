@@ -9,8 +9,9 @@ import { radio } from './player.js';
 import { blockedIds, isBlocked, toggleBlocked, onBlockChange } from './blocklist.js';
 import {
   formatTime, formatDuration, localHourLabel, programAt,
-  msUntilNextProgram, formatCountdown
+  msUntilNextProgram, formatCountdown, upcomingCities
 } from './station.js';
+import { randomStation, WORLD_STATIONS, WORLD_COUNTRIES, WORLD_SOURCE } from './world.js';
 import { createVisualizer } from './visualizer.js';
 import { createCommunity } from './community.js';
 
@@ -485,6 +486,8 @@ function cacheEls() {
     'np-next', 'np-prev',
     'np-mute', 'np-mute-icon', 'np-volume', 'np-sleep', 'sleep-menu', 'np-mic', 'np-download',
     'np-share', 'np-credit', 'np-live-note', 'sleep-status',
+    'tuner-card', 'tuner-flag', 'tuner-name', 'tuner-place', 'tuner-note',
+    'tuner-next', 'tuner-slot', 'tuner-link', 'tuner-spin',
     'home-art', 'home-title', 'home-artist', 'home-album', 'home-mode', 'home-program', 'home-play',
     'home-play-label', 'home-queue', 'home-next-program',
     'queue', 'queue-count', 'recent', 'schedule-next',
@@ -513,16 +516,78 @@ function renderQueueList(listEl, tracks, options = {}) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'queue-item';
+    const sub = track.world
+      ? `<span class="tag-world">${esc(track.station.flag)} WORLD</span> ${esc(track.station.place)}, ${esc(track.station.country)}`
+      : `${track.ident ? 'Station ID' : `${esc(track.album)} · ${esc(track.genres[0] || '')}`}${track.guest ? ' · <span class="tag-cc">CC</span>' : ''}${track.ident ? ' · <span class="tag-cc">ID</span>' : ''}`;
     button.innerHTML = `
       <img src="${esc(track.art)}" alt="" loading="lazy" width="40" height="40" />
       <span>
         <span class="q-title">${esc(track.title)}</span>
-        <span class="q-sub">${track.ident ? 'Station ID' : `${esc(track.album)} · ${esc(track.genres[0] || '')}`}${track.guest ? ' · <span class="tag-cc">CC</span>' : ''}${track.ident ? ' · <span class="tag-cc">ID</span>' : ''}</span>
+        <span class="q-sub">${sub}</span>
       </span>
-      <time>${formatTime(track.duration)}</time>`;
+      <time>${track.world ? 'LIVE' : formatTime(track.duration)}</time>`;
     button.addEventListener('click', () => playPersonal(track, [track]));
     li.appendChild(button);
     listEl.appendChild(li);
+  });
+}
+
+/* ------------------------------------------------------------- world tuner */
+
+const localClock = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+/** The "World feed" card: where we are, and the next few cities. */
+function updateTuner(state) {
+  const name = els['tuner-name'];
+  if (!name) return;
+  const station = state.station;
+  els['tuner-card']?.classList.toggle('is-world', !!station);
+
+  if (els['tuner-flag']) els['tuner-flag'].textContent = station?.flag || '🌍';
+  name.textContent = station ? station.name : 'Vita Hueso Radio';
+  if (els['tuner-place']) {
+    els['tuner-place'].textContent = station
+      ? (station.place && station.place !== station.country
+        ? `${station.place} · ${station.country}`
+        : station.country)
+      : 'The studio feed';
+  }
+
+  const next = upcomingCities(3);
+  if (els['tuner-slot']) {
+    if (station && state.mode === 'world') els['tuner-slot'].textContent = 'Hand-tuned';
+    else if (next.length) els['tuner-slot'].textContent = `Next city ${localClock(next[0].startMs)}`;
+    else els['tuner-slot'].textContent = 'Live';
+  }
+  if (els['tuner-note']) {
+    els['tuner-note'].textContent = station
+      ? `${station.codec}${station.bitrate ? ` ${station.bitrate} kbps` : ''} · ${state.mode === 'live' ? 'on the clock' : 'hand-tuned'}`
+      : `${WORLD_STATIONS.length} live stations in ${WORLD_COUNTRIES} countries`;
+  }
+  if (els['tuner-next']) {
+    els['tuner-next'].innerHTML = next.map(({ station: s, startMs }) => `
+      <li><span class="tuner-flag-sm">${esc(s.flag)}</span>
+      <span class="tuner-next-place">${esc(s.place)}</span>
+      <time>${localClock(startMs)}</time></li>`).join('');
+  }
+  const link = els['tuner-link'];
+  if (link) {
+    const href = station?.homepage || 'https://www.radio-browser.info/';
+    if (link.getAttribute('href') !== href) link.href = href;
+    link.textContent = station?.homepage ? 'Station website' : 'Open radio directory';
+  }
+}
+
+function bindTuner() {
+  const spin = els['tuner-spin'];
+  if (!spin) return;
+  spin.addEventListener('click', () => {
+    const station = randomStation([radio.track?.station?.id]);
+    if (!station) {
+      toast('The world station list is empty — rebuild tools/build-world-radio.mjs.');
+      return;
+    }
+    radio.tuneWorld(station);
   });
 }
 
@@ -531,6 +596,23 @@ function updateProgress(position, duration) {
   const dur = Math.max(1, Number(duration) || 1);
   const pos = Math.min(dur, Math.max(0, Number(position) || 0));
   const live = radio.mode === 'live';
+
+  /* A live stream has no timeline to scrub: show how long this city has been
+     on the air and how long its slot lasts, and leave the bar inert. */
+  if (radio.track?.world) {
+    const slot = Math.max(0, Number(duration) || 0);
+    els['np-time'].textContent = formatTime(Math.max(0, Number(position) || 0));
+    els['np-duration'].textContent = slot > 1 ? formatTime(slot) : 'LIVE';
+    if (bar) {
+      bar.disabled = true;
+      bar.max = '1000';
+      bar.value = String(slot > 1 ? Math.min(1000, Math.round((pos / slot) * 1000)) : 0);
+      setFill(bar);
+    }
+    const dockBar = els['dock-bar'];
+    if (dockBar) dockBar.style.width = slot > 1 ? `${Math.min(100, (pos / slot) * 100)}%` : '100%';
+    return;
+  }
   els['np-time'].textContent = formatTime(pos);
   els['np-duration'].textContent = formatTime(dur);
   if (bar) {
@@ -552,6 +634,7 @@ function updateState(state) {
   const track = state.track;
   if (!track) return;
   const live = state.mode === 'live';
+  const world = !!track.world;
 
   if (track.id !== lastTrackId) {
     lastTrackId = track.id;
@@ -559,13 +642,14 @@ function updateState(state) {
     els['np-title'].textContent = track.title;
     els['np-artist'].textContent = track.artist;
     els['np-album'].textContent = track.album;
-    els['np-year'].textContent = track.year;
+    els['np-year'].textContent = world ? 'Live radio' : (track.year || '');
     els['home-title'].textContent = track.title;
     els['home-artist'].textContent = track.artist;
     els['home-album'].textContent = track.album;
     els['dock-title'].textContent = track.title;
     els['dock-artist'].textContent = `${track.artist} · ${track.album}`;
-    els['np-genres'].innerHTML = track.genres.map((g) => `<span class="chip">${esc(g)}</span>`).join('');
+    const chips = world && !track.genres.length ? [track.station.country] : track.genres;
+    els['np-genres'].innerHTML = chips.map((g) => `<span class="chip">${esc(g)}</span>`).join('');
     $$('.track-card').forEach((card) => card.classList.toggle('is-current', card.dataset.id === track.id));
   }
 
@@ -577,7 +661,7 @@ function updateState(state) {
     els['np-art'].alt = `${track.title} artwork`;
   }
 
-  const modeText = live ? 'LIVE' : 'PERSONAL';
+  const modeText = state.mode === 'live' ? 'LIVE' : state.mode === 'world' ? 'TUNED' : 'PERSONAL';
   els['np-mode'].textContent = modeText;
   els['np-mode'].dataset.mode = state.mode;
   els['home-mode'].textContent = modeText;
@@ -585,6 +669,11 @@ function updateState(state) {
   els['dock-mode'].textContent = modeText;
   els['dock'].dataset.mode = state.mode;
   els['np-rejoin'].classList.toggle('hidden', live);
+
+  /* A live station has nothing to favourite, hide or download — those buttons
+     belong to the catalogue, not to a broadcaster's stream. */
+  ['np-fav', 'np-block', 'np-download'].forEach((id) => els[id]?.classList.toggle('hidden', world));
+  els['dock-fav']?.classList.toggle('hidden', world);
   const blockBtn = els['np-block'];
   if (blockBtn && radio.track) {
     const hidden = isBlocked(radio.track.id);
@@ -598,9 +687,13 @@ function updateState(state) {
   els['np-program'].textContent = state.program.name;
   els['home-program'].textContent = state.program.name;
 
-  els['np-live-note'].textContent = live
-    ? 'Live broadcast — position follows the station clock.'
-    : 'Library playback — drag to seek, skip as you like.';
+  els['np-live-note'].textContent = world
+    ? (live
+      ? `Live from ${track.station.place} — a real broadcast from ${track.station.country}. There is no rewind on a live stream; the next city arrives at the end of this slot.`
+      : `Hand-tuned to ${track.station.name}, live from ${track.station.country}. Rejoin the broadcast whenever you like.`)
+    : live
+      ? 'Live broadcast — position follows the station clock.'
+      : 'Library playback — drag to seek, skip as you like.';
 
   const playing = state.playing;
   els['np-play'].setAttribute('aria-label', playing ? 'Pause' : 'Play');
@@ -652,7 +745,22 @@ function updateState(state) {
   const credit = els['np-credit'];
   if (credit) {
     credit.textContent = '';
-    if (isCC(track)) {
+    if (world) {
+      const station = track.station;
+      const span = document.createElement('span');
+      span.textContent = `Live stream · ${station.place}, ${station.country} · ${station.codec}${station.bitrate ? ` ${station.bitrate} kbps` : ''} · `;
+      credit.appendChild(span);
+      if (station.homepage) {
+        const link = document.createElement('a');
+        link.href = station.homepage;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = 'Station website';
+        credit.appendChild(link);
+      } else {
+        credit.appendChild(document.createTextNode(`via ${WORLD_SOURCE}`));
+      }
+    } else if (isCC(track)) {
       const span = document.createElement('span');
       span.textContent = `Guest track · ${track.artist} · ${track.license} · `;
       const link = document.createElement('a');
@@ -680,8 +788,10 @@ function updateState(state) {
     lastQueueKey = queueKey;
     renderQueueList(els['queue'], state.queue, { empty: 'The AutoDJ is choosing the next track.' });
     renderQueueList(els['home-queue'], state.queue.slice(0, 4));
-    if (els['queue-count']) els['queue-count'].textContent = live ? 'AutoDJ · live' : 'Your queue';
+    if (els['queue-count']) els['queue-count'].textContent = live ? 'World feed · live' : 'Your queue';
   }
+
+  updateTuner(state);
 
   const recentKey = state.recent.map((t) => t.id).join(',');
   if (recentKey !== lastRecentKey) {
@@ -719,7 +829,7 @@ function playAlbum(albumId) {
 }
 
 function downloadTrack(track) {
-  if (!track) return;
+  if (!track || track.world) return;
   const link = document.createElement('a');
   link.href = track.src;
   link.download = `${track.artist} - ${track.title}.mp3`;
@@ -766,6 +876,7 @@ function bindPlayer() {
   els['dock-open'].addEventListener('click', () => { location.hash = 'radio'; });
 
   els['np-fav'].addEventListener('click', () => {
+    if (radio.track?.world) return;
     const active = radio.toggleFavorite();
     if (active) {
       toast(`Added to favorites — ${radio.favorites.size} saved. Browse them under Favorites in the Library.`);
@@ -780,7 +891,7 @@ function bindPlayer() {
      listeners skip forward. */
   els['np-block'].addEventListener('click', () => {
     const track = radio.track;
-    if (!track) return;
+    if (!track || track.world) return;
     const hidden = toggleBlocked(track.id);
     if (!hidden) {
       toast('Back in rotation.');
@@ -790,7 +901,10 @@ function bindPlayer() {
     if (radio.mode === 'live') radio.rejoinLive();
     else radio.next();
   });
-  els['dock-fav'].addEventListener('click', () => radio.toggleFavorite());
+  els['dock-fav'].addEventListener('click', () => {
+    if (radio.track?.world) return;
+    radio.toggleFavorite();
+  });
 
   els['np-mute'].addEventListener('click', () => radio.toggleMute());
   els['dock-mute'].addEventListener('click', () => radio.toggleMute());
@@ -798,7 +912,7 @@ function bindPlayer() {
   els['np-volume'].addEventListener('input', (event) => radio.setVolume(Number(event.target.value) / 100));
 
   els['np-progress'].addEventListener('input', (event) => {
-    if (radio.mode === 'live') return;
+    if (radio.mode !== 'personal' || radio.track?.world) return;
     radio.seek(Number(event.target.value));
   });
 
@@ -1214,6 +1328,7 @@ function init() {
   renderGallery();
   renderAbout();
   bindPlayer();
+  bindTuner();
   bindLibrary();
   bindForms();
 

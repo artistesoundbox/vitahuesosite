@@ -13,6 +13,7 @@
 import { TRACKS } from './catalog.js';
 import { getLiveState, programAt, msUntilNextProgram } from './station.js';
 import { isBlocked } from './blocklist.js';
+import { worldTrack } from './world.js';
 
 const KEYS = {
   volume: 'vh.volume',
@@ -81,6 +82,13 @@ export class Radio extends EventTarget {
     this.sleepEndsAt = 0;
     this.sleepTimer = null;
 
+    /* World feed. `worldJoinedAt` is when this stream was tuned in, so the
+       player can show how long the city has been on. `failedWorld` remembers
+       stations that did not answer and skips them for the rest of the visit. */
+    this.worldJoinedAt = 0;
+    this.failedWorld = new Set();
+    this.worldTimer = null;
+
     this.mic = { on: false, stream: null, ctx: null, recorder: null, chunks: [], url: '', volume: null };
 
     this.preload = new Audio();
@@ -109,6 +117,7 @@ export class Radio extends EventTarget {
     if (this.live) {
       this.track = this.live.entry.track;
       this.entry = this.live.entry;
+      if (this.track.world) this.worldJoinedAt = Date.now() - (this.live.offset || 0) * 1000;
     }
 
     this.bindAudio();
@@ -158,6 +167,12 @@ export class Radio extends EventTarget {
 
     a.addEventListener('error', () => {
       if (!a.getAttribute('src')) return;
+      /* A dead station is routine on the open directory: skip the city, not
+         the whole broadcast. */
+      if (this.track?.world) {
+        this.worldFailed();
+        return;
+      }
       this.loading = false;
       this.error = 'This track could not be loaded.';
       this.emitState();
@@ -184,14 +199,14 @@ export class Radio extends EventTarget {
   updateSession() {
     if (!('mediaSession' in navigator) || !this.track) return;
     const t = this.track;
+    const art = this.artFor(t);
+    const type = art.startsWith('data:image/svg') || art.endsWith('.svg') ? 'image/svg+xml' : 'image/jpeg';
     try {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: t.title,
         artist: t.artist,
         album: t.album,
-        artwork: [
-          { src: this.artFor(t), sizes: '512x512', type: t.art.endsWith('.svg') ? 'image/svg+xml' : 'image/jpeg' }
-        ]
+        artwork: [{ src: art, sizes: '512x512', type }]
       });
       this.setSessionState();
     } catch { /* old browser */ }
@@ -207,8 +222,14 @@ export class Radio extends EventTarget {
   }
 
   emitTime() {
+    const world = !!this.track?.world;
     this.dispatchEvent(new CustomEvent('time', {
-      detail: { position: this.audio.currentTime || 0, duration: this.track?.duration || 0 }
+      detail: {
+        position: world ? this.position() : (this.audio.currentTime || 0),
+        duration: world
+          ? (this.mode === 'live' ? (this.track?.duration || 0) : 0)
+          : (this.track?.duration || 0)
+      }
     }));
   }
 
@@ -217,6 +238,11 @@ export class Radio extends EventTarget {
   }
 
   handleEnded() {
+    /* A live stream has no end; if one closes its socket, treat it as a drop. */
+    if (this.track?.world) {
+      this.worldFailed();
+      return;
+    }
     if (this.mode === 'personal') {
       this.next();
       return;
@@ -250,8 +276,14 @@ export class Radio extends EventTarget {
         this.entry = state.entry;
         this.track = state.entry.track;
       } else if (this.playing) {
-        if (!this.entry || state.entry.key !== this.entry.key) {
+        /* Only re-sync to the clock when the segment we are holding has
+           actually ended: after a dead station we may already be playing an
+           upcoming city, and yanking it back would loop on the dead one. */
+        if (!this.entry || (state.entry.key !== this.entry.key && this.entry.endMs <= Date.now())) {
           this.playLive(state.entry, state.offset);
+        } else if (this.track?.world) {
+          /* No drift correction on a live stream: the encoder is the clock. */
+          this.emitTime();
         } else if (Math.abs(this.audio.currentTime - state.offset) > 12) {
           try { this.audio.currentTime = state.offset; } catch { /* not seekable yet */ }
         }
@@ -265,7 +297,7 @@ export class Radio extends EventTarget {
   start() {
     this.yielded = false;   // an explicit play here takes the floor back
     this.started = true;
-    if (this.mode === 'personal' && this.track) {
+    if (this.mode !== 'live' && this.track) {
       this.audio.play().catch((err) => this.playFailed(err));
       return;
     }
@@ -287,6 +319,11 @@ export class Radio extends EventTarget {
   }
 
   playLive(entry, offset = 0) {
+    if (entry?.track?.world) {
+      this.playWorld(entry.track, entry, offset);
+      return;
+    }
+    this.clearWorldTimer();
     const a = this.audio;
 
     // Joining in the final second of a track would look like a failed play:
@@ -331,7 +368,106 @@ export class Radio extends EventTarget {
     this.preloadNext();
   }
 
+  /* ------------------------------------------------------------ world feed */
+
+  /** Play a live station. With an `entry` it is on the clock; without, hand-tuned. */
+  playWorld(track, entry = null, offset = 0) {
+    if (!track) return;
+    const a = this.audio;
+    this.clearWorldTimer();
+    this.mode = entry ? 'live' : 'world';
+    this.entry = entry || null;
+    this.track = track;
+    this.started = true;
+    this.loading = true;
+    this.error = '';
+    this.pendingSeek = null;
+    this.worldJoinedAt = Date.now() - Math.max(0, offset) * 1000;
+
+    const src = this.srcFor(track);
+    if (a.getAttribute('src') !== src) a.src = src;
+
+    this.onTrackChange();
+    a.play().then(() => {
+      this.loading = false;
+      this.emitState();
+    }).catch((err) => this.playFailed(err));
+
+    /* A stream that never starts is common enough to plan for: 12 seconds and
+       the city is skipped instead of the player sitting on "connecting". */
+    this.worldTimer = setTimeout(() => {
+      this.worldTimer = null;
+      if (!this.playing) this.worldFailed();
+    }, 12000);
+  }
+
+  clearWorldTimer() {
+    if (this.worldTimer) clearTimeout(this.worldTimer);
+    this.worldTimer = null;
+  }
+
+  /** A station did not answer: remember it and move the broadcast on. */
+  worldFailed() {
+    this.clearWorldTimer();
+    const station = this.track?.station;
+    this.loading = false;
+    this.playing = false;
+    if (station) {
+      this.failedWorld.add(station.id);
+      this.notice(`${station.name} is off the air — moving on.`);
+    }
+
+    if (this.mode !== 'live') {
+      this.rejoinLive();
+      return;
+    }
+
+    const state = getLiveState();
+    if (!state) return;
+    const from = this.entry && state.entry?.key === this.entry.key
+      ? state.queue
+      : [state.entry, ...(state.queue || [])];
+    const next = from.find((e) => e && !(e.track.world && this.failedWorld.has(e.track.station.id)));
+    if (next) {
+      this.playLive(next, Math.max(0, (Date.now() - next.startMs) / 1000));
+      return;
+    }
+    this.pause();
+    this.notice('The world feed is unreachable right now. Try again in a moment.');
+  }
+
+  /** Hand-tune a station; the clock resumes with "Rejoin live". */
+  tuneWorld(station) {
+    if (!station) return;
+    this.failedWorld.delete(station.id);
+    this.playWorld(worldTrack(station, 0), null, 0);
+    this.notice(`Off the clock — tuned to ${station.name}, ${station.place}.`);
+  }
+
+  /** Skip to another city without leaving the world feed. */
+  tuneNext() {
+    const state = getLiveState(Date.now(), 10);
+    const currentId = this.track?.station?.id;
+    const pool = [
+      ...(state?.entry?.track?.world && state.entry.track.id !== this.track?.id ? [state.entry] : []),
+      ...(state?.queue || [])
+    ].filter((e) => e.track?.world);
+    const next = pool.find((e) => e.track.station.id !== currentId && !this.failedWorld.has(e.track.station.id))
+      || pool.find((e) => e.track.station.id !== currentId);
+    if (!next) {
+      this.rejoinLive();
+      return;
+    }
+    this.playWorld(next.track, null, 0);
+    this.notice(`Off the clock — ${next.track.station.name}. Rejoin live any time.`);
+  }
+
   playTrack(track, options = {}) {
+    if (track?.world) {
+      this.playWorld(track, null, 0);
+      return;
+    }
+    this.clearWorldTimer();
     const a = this.audio;
     this.mode = 'personal';
     this.entry = null;
@@ -361,6 +497,9 @@ export class Radio extends EventTarget {
   }
 
   playFailed(err) {
+    /* A blocked autoplay is not a dead station: stop the watchdog so the city
+       is not skipped while the listener has simply not tapped play yet. */
+    this.clearWorldTimer();
     this.loading = false;
     this.playing = false;
     if (err && err.name === 'NotAllowedError') {
@@ -373,6 +512,10 @@ export class Radio extends EventTarget {
   }
 
   next() {
+    if (this.track?.world) {
+      this.tuneNext();
+      return;
+    }
     if (this.mode === 'live') {
       this.skipLive();
       return;
@@ -390,7 +533,7 @@ export class Radio extends EventTarget {
   }
 
   prev() {
-    if (this.mode === 'live') {
+    if (this.mode !== 'personal') {
       this.rejoinLive();
       this.notice('Back on the live broadcast.');
       return;
@@ -423,7 +566,7 @@ export class Radio extends EventTarget {
   }
 
   seek(seconds) {
-    if (this.mode === 'live') return;
+    if (this.mode !== 'personal' || this.track?.world) return;
     try { this.audio.currentTime = Math.max(0, Number(seconds) || 0); } catch { /* ignore */ }
     this.emitTime();
   }
@@ -518,10 +661,13 @@ export class Radio extends EventTarget {
 
   onTrackChange() {
     if (!this.track) return;
-    const h = this.history.filter((x) => x.id !== this.track.id);
-    h.unshift({ id: this.track.id, at: Date.now() });
-    this.history = h.slice(0, 40);
-    write(KEYS.history, this.history);
+    /* Live stations are not library history — "recently played" stays songs. */
+    if (!this.track.world) {
+      const h = this.history.filter((x) => x.id !== this.track.id);
+      h.unshift({ id: this.track.id, at: Date.now() });
+      this.history = h.slice(0, 40);
+      write(KEYS.history, this.history);
+    }
     this.updateSession();
     this.emitState();
     this.dispatchEvent(new CustomEvent('trackchange', { detail: this.track }));
@@ -529,7 +675,7 @@ export class Radio extends EventTarget {
 
   preloadNext() {
     const next = this.upNext(1)[0];
-    if (!next) return;
+    if (!next || next.world) return;
     try {
       if (this.preload.getAttribute('src') !== this.srcFor(next)) this.preload.src = this.srcFor(next);
     } catch { /* ignore */ }
@@ -637,6 +783,9 @@ export class Radio extends EventTarget {
   /* -------------------------------------------------------------- snapshot */
 
   position() {
+    /* A live stream reports 0 or Infinity as currentTime, so its position is
+       simply how long this city has been tuned in. */
+    if (this.track?.world) return Math.max(0, (Date.now() - this.worldJoinedAt) / 1000);
     if (this.audio.currentTime > 0 && (this.playing || this.started)) return this.audio.currentTime;
     return this.mode === 'live' ? (this.live?.offset || 0) : 0;
   }
@@ -644,6 +793,7 @@ export class Radio extends EventTarget {
   snapshot() {
     const state = getLiveState();
     const program = state?.entry.program || programAt();
+    const world = !!this.track?.world;
     return {
       mode: this.mode,
       started: this.started,
@@ -652,10 +802,14 @@ export class Radio extends EventTarget {
       error: this.error,
       track: this.track,
       position: this.position(),
-      duration: this.track?.duration || 0,
+      duration: world
+        ? (this.mode === 'live' ? (this.track?.duration || 0) : 0)
+        : (this.track?.duration || 0),
+      world,
+      station: world ? this.track.station : null,
       volume: this.audio.volume,
       muted: this.muted,
-      favorite: this.isFavorite(this.track),
+      favorite: world ? false : this.isFavorite(this.track),
       queue: this.upNext(6),
       recent: this.recentlyPlayed(6),
       favorites: [...this.favorites],

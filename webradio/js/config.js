@@ -108,6 +108,32 @@ export const ROTATION = {
   funShare: 0.85
 };
 
+/* World feed — the station's main source.
+ *
+ * The day is cut into fixed slots, aligned to UTC, and each slot is one live
+ * station from data/world-radio.json. Because the slot grid and the station
+ * pick are both derived from the clock and a fixed seed, every listener is in
+ * the same city at the same moment; the streams themselves are already live, so
+ * nobody is ahead of anybody either.
+ *
+ * `homeEveryHour` slots out of each hour come home to the studio catalogue
+ * (your own songs, with the occasional CC guest). With 10-minute slots, 1 home
+ * slot per hour is roughly 15% of the day.
+ *
+ * `homeShare` is how much of those home slots is your own recordings rather
+ * than guest tracks. `identEveryHours` drops the station ID ahead of a world
+ * slot that many hours apart (home slots always open with one).
+ *
+ * Set `enabled: false` to go back to the all-local reel. */
+export const WORLD = {
+  enabled: true,
+  slotMinutes: 10,
+  homeEveryHour: 1,
+  homeShare: 0.85,
+  identEveryHours: 3,
+  avoidSameCountry: true
+};
+
 export const SLEEP_CHOICES = [15, 30, 45, 60, 90, 120];
 
 /* Listener count.

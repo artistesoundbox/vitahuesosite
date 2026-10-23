@@ -87,6 +87,7 @@
     <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 005.7 0l2.6-2.6a4 4 0 00-5.7-5.7L11.4 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M14 10a4 4 0 00-5.7 0l-2.6 2.6a4 4 0 005.7 5.7l1.2-1.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
     <symbol id="i-radio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M7.5 7.5a6.4 6.4 0 000 9M16.5 7.5a6.4 6.4 0 010 9M4.5 4.5a10.6 10.6 0 000 15M19.5 4.5a10.6 10.6 0 010 15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
     <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 12h2l2-6 3 12 3-15 3 18 2-9h3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.2 3.6 8.5S14.4 18.2 12 20.5c-2.4-2.3-3.6-5.2-3.6-8.5S9.6 5.8 12 3.5z" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
   </svg>
 
   <!-- Site banner, same art as the portal home page. Doubles as the way back. -->
@@ -219,7 +220,7 @@
         <div>
           <p class="eyebrow"><span class="live-dot"></span> VH·SIGNAL · 24/7</p>
           <h1>The Radio</h1>
-          <p class="lede">A single continuous broadcast. Skip and you step off the timeline — jump back in whenever you like.</p>
+          <p class="lede">A world feed: a live station in a different city every ten minutes, and once an hour the signal comes home to the studio catalogue. Skip and you step off the clock — rejoin whenever you like.</p>
         </div>
         <span class="badge badge-live" id="radio-listeners" title="People listening right now" aria-live="polite">
           <span class="dot"></span><b id="radio-presence">—</b> listening
@@ -298,6 +299,29 @@
         </article>
 
         <aside class="radio-side">
+          <section class="side-card glass tuner-card" id="tuner-card">
+            <header class="side-head">
+              <h3><svg class="icon"><use href="#i-globe"/></svg> World feed</h3>
+              <span class="side-meta" id="tuner-slot">Live</span>
+            </header>
+            <div class="tuner-now">
+              <span class="tuner-flag" id="tuner-flag" aria-hidden="true">🌍</span>
+              <div class="tuner-ident">
+                <p class="tuner-name" id="tuner-name">Vita Hueso Radio</p>
+                <p class="tuner-place" id="tuner-place">The studio feed</p>
+              </div>
+              <span class="tuner-live"><span class="dot"></span>LIVE</span>
+            </div>
+            <p class="tuner-note" id="tuner-note">—</p>
+            <ul class="tuner-next" id="tuner-next"></ul>
+            <div class="tuner-actions">
+              <button class="btn btn-ghost btn-sm" id="tuner-spin" type="button">
+                <svg class="icon"><use href="#i-radio"/></svg> Spin the dial
+              </button>
+              <a class="tuner-link" id="tuner-link" href="https://www.radio-browser.info/" target="_blank" rel="noopener noreferrer">Open radio directory</a>
+            </div>
+          </section>
+
           <section class="side-card glass">
             <header class="side-head">
               <h3><svg class="icon"><use href="#i-wave"/></svg> Up next</h3>
@@ -414,7 +438,8 @@
         <article class="prose glass">
           <p class="lede">Vita Hueso is the recording project of artistesoundbox — songs about rest, forgiveness, self-trust, and the quiet work of coming home to yourself.</p>
           <p>The catalogue began as voice notes and voice-and-piano sketches, and grew into four volumes of songs plus a small Spanish EP. Some pieces are full productions; others are deliberately bare, close to the breath, closer to the room they were made in.</p>
-          <p>This station exists because the music should not need a platform's permission to be heard. Every file lives on this site. The player streams them directly, on a schedule that keeps running whether one person is listening or a thousand. No algorithm decides what comes next here — a clock and a catalogue do.</p>
+          <p>This station exists because the music should not need a platform's permission to be heard. Every file lives on this site. The player streams them directly, on a schedule that keeps running whether one person is listening or a thousand. No algorithm decides what comes next here — a clock, a catalogue and a directory of public broadcasters do.</p>
+          <p>The broadcast now opens outward: most of the day is a live world feed, one real station in one city at a time, drawn from the open <a href="https://www.radio-browser.info/" target="_blank" rel="noopener noreferrer">Radio Browser</a> directory of public streams. Once an hour the signal comes home for a short set of these songs, opens with a station ID, and heads back out. The city changes on the same clock for every listener, so the broadcast is still shared rather than personal.</p>
           <p>The only non-original music on the station is a small set of Creative Commons instrumentals, credited in full below and in <a href="CREDITS.md">CREDITS.md</a>. They sit inside the rotation rather than replacing it: the station is, and stays, the artist's own work.</p>
 
           <h2>What the station plays</h2>
