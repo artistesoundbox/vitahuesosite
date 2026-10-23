@@ -616,6 +616,46 @@
       "lufs": -17,
       "url": "https://eu8.fastcast4u.com/proxy/clyedupq/stream",
       "at": 1792739144
+    },
+    "w121": {
+      "lufs": -17,
+      "url": "https://stream.bauermedia.sk/melody-hi.mp3",
+      "at": 1792739147
+    },
+    "w118": {
+      "lufs": -6.9,
+      "url": "https://streaming.tdiradio.com/radiolola.mp3",
+      "at": 1792739147
+    },
+    "w120": {
+      "lufs": -14.2,
+      "url": "https://radiomars.ice.infomaniak.ch/radiomars-128.mp3",
+      "at": 1792739147
+    },
+    "w128": {
+      "lufs": -10,
+      "url": "https://us9.maindigitalstream.com/ssl/radiosol",
+      "at": 1792739148
+    },
+    "w129": {
+      "lufs": -13.8,
+      "url": "https://listen.senemultimedia.net:8112/stream",
+      "at": 1792739150
+    },
+    "w124": {
+      "lufs": -23.2,
+      "url": "https://strm.radionula.com/classics",
+      "at": 1792739151
+    },
+    "w122": {
+      "lufs": -10.2,
+      "url": "https://sechin.grupocentroserver.com/radio/8060/radio.mp3",
+      "at": 1792739153
+    },
+    "w127": {
+      "lufs": -17.9,
+      "url": "https://playerservices.streamtheworld.com/api/livestream-redirect/RIVADAVIA.mp3",
+      "at": 1792739154
     }
   },
   "localLufs": [
