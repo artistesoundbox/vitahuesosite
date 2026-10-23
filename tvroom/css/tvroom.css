@@ -553,10 +553,22 @@ body.is-ready #room-canvas { opacity: 1; }
 .viewer.is-idle .viewer-controls { opacity: 0; transform: translateY(10px); pointer-events: none; }
 .viewer.is-idle .video-frame { cursor: none; }
 
+.viewer-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+#viewer-home {
+  text-decoration: none;
+}
+
 .vbtn {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  text-decoration: none;
   padding: 8px 12px;
   min-width: 40px;
   min-height: 38px;
@@ -1165,6 +1177,12 @@ body.is-ready #room-canvas { opacity: 1; }
   .vbtn { padding: 7px 9px; min-width: 36px; }
   .viewer-now { flex: 1; }
   .viewer-now .vn-meta { display: none; }
+  .viewer-nav .vbtn { padding: 7px 10px; }
+}
+
+@media (max-width: 460px) {
+  .viewer-nav .vbtn span { display: none; }
+  .viewer-nav .vbtn { min-width: 38px; padding: 8px 10px; }
 }
 
 @media (max-width: 640px) {
