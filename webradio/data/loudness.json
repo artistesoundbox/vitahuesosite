@@ -566,6 +566,56 @@
       "lufs": -9.7,
       "url": "https://cloud9.ldwebstudios.net:7000/;",
       "at": 1792739134
+    },
+    "w115": {
+      "lufs": -15.7,
+      "url": "https://live.radio.si/Krka",
+      "at": 1792739136
+    },
+    "w112": {
+      "lufs": -10.7,
+      "url": "https://cloudstream2032.conectarhosting.com:7311/;",
+      "at": 1792739136
+    },
+    "w87": {
+      "lufs": null,
+      "url": "https://naxidigital-exyu128ssl.streaming.rs:8242/;stream.nsv",
+      "at": 1792739138
+    },
+    "w110": {
+      "lufs": -11.8,
+      "url": "https://emiteradio.com/proxy/cumbia90s?mp=/stream",
+      "at": 1792739138
+    },
+    "w111": {
+      "lufs": -9.5,
+      "url": "https://icecast.stv.livebox.sk/fm_128.mp3",
+      "at": 1792739140
+    },
+    "w119": {
+      "lufs": -16.8,
+      "url": "https://sonic.mediatelekom.net/9316/stream",
+      "at": 1792739140
+    },
+    "w116": {
+      "lufs": -9.5,
+      "url": "https://us-b4-p-e-pb13-audio.cdn.mdstrm.com/live-audio-aw/5fada56fe4e09508207a7951?",
+      "at": 1792739141
+    },
+    "w114": {
+      "lufs": -13.2,
+      "url": "https://streams.radio.co/see730c7ab/listen",
+      "at": 1792739143
+    },
+    "w117": {
+      "lufs": -14.6,
+      "url": "https://stream.zeno.fm/28hgnyp8568uv",
+      "at": 1792739144
+    },
+    "w123": {
+      "lufs": -17,
+      "url": "https://eu8.fastcast4u.com/proxy/clyedupq/stream",
+      "at": 1792739144
     }
   },
   "localLufs": [
