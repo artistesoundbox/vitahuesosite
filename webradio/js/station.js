@@ -489,7 +489,7 @@ export function upcomingCities(count = 3, now = Date.now()) {
     const id = entry.track.station.id;
     if (seen.has(id)) continue;
     seen.add(id);
-    out.push({ station: entry.track.station, startMs: entry.startMs, comesHome: false });
+    out.push({ station: entry.track.station, startMs: entry.startMs });
     if (out.length >= count) break;
   }
   return out;
