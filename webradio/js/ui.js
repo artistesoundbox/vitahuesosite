@@ -12,6 +12,7 @@ import {
   msUntilNextProgram, formatCountdown, upcomingCities
 } from './station.js';
 import { randomStation, WORLD_STATIONS, WORLD_COUNTRIES, WORLD_SOURCE } from './world.js';
+import { createGlobe } from './globe.js';
 import { createVisualizer } from './visualizer.js';
 import { createCommunity } from './community.js';
 
@@ -53,6 +54,10 @@ function toast(message) {
 }
 
 const community = createCommunity();
+
+/* The little globe in the world-feed card. Created in init() so it can measure
+   its canvas once the card is laid out. */
+let globe = null;
 
 /* ------------------------------------------------------------- formatting */
 
@@ -487,7 +492,7 @@ function cacheEls() {
     'np-mute', 'np-mute-icon', 'np-volume', 'np-sleep', 'sleep-menu', 'np-mic', 'np-download',
     'np-share', 'np-credit', 'np-live-note', 'sleep-status',
     'tuner-card', 'tuner-flag', 'tuner-name', 'tuner-place', 'tuner-note',
-    'tuner-next', 'tuner-slot', 'tuner-link', 'tuner-spin',
+    'tuner-next', 'tuner-slot', 'tuner-link', 'tuner-spin', 'tuner-globe', 'tuner-globe-meta',
     'home-art', 'home-title', 'home-artist', 'home-album', 'home-mode', 'home-program', 'home-play',
     'home-play-label', 'home-queue', 'home-next-program',
     'queue', 'queue-count', 'recent', 'schedule-next',
@@ -551,6 +556,11 @@ function updateTuner(state) {
         ? `${station.place} · ${station.country}`
         : station.country)
       : 'The studio feed';
+  }
+
+  globe?.setFocus(station);
+  if (els['tuner-globe-meta']) {
+    els['tuner-globe-meta'].textContent = `${WORLD_STATIONS.length} stations · ${WORLD_COUNTRIES} countries`;
   }
 
   const next = upcomingCities(3);
@@ -1350,6 +1360,9 @@ function init() {
   if (year) year.textContent = String(new Date().getFullYear());
 
   community.start();
+
+  globe = createGlobe($('tuner-globe'));
+  globe.setPoints(WORLD_STATIONS.map((s) => ({ id: s.id, lat: s.lat, lon: s.lon })));
 
   createVisualizer($('viz-hero'), () => ({ track: radio.track, playing: radio.playing }), { bars: 72 });
   createVisualizer($('viz-radio'), () => ({ track: radio.track, playing: radio.playing }), { bars: 48 });
