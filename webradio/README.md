@@ -113,14 +113,26 @@ catalogue cuts in once an hour.
   stations that did not answer, skips to the next scheduled segment, and falls
   back to the next home segment if the next cities are dead too. A 12-second
   watchdog catches a stream that hangs without ever erroring.
-- **Picking a place.** The card carries two dropdowns — **State / region**
-  (grouped by country, built from the directory's `state` field) and **Town /
-  station** (the stations in that region). Choosing a town tunes it. The open
-  directory publishes a region for every station and street coordinates for
-  only some, so the second list is the station itself rather than an invented
-  town name.
+- **Picking a place.** The card carries a search box and two dropdowns —
+  **State / region** (grouped by country, built from the directory's `state`
+  field) and **Town / station** (the stations in that region). Choosing a town
+  tunes it. Every country group starts with an **All of …** row, because
+  several broadcasters report the country itself as their region and would
+  otherwise sit in a one-item bucket while the rest of the country hides in
+  the row above. Long directory labels are shown by common name (United
+  States, United Kingdom, South Korea, Russia, Netherlands, Philippines,
+  Dominican Republic, Venezuela). The open directory publishes a region for
+  every station and street coordinates for only some, so the second list is
+  the station itself rather than an invented town name.
+- **Search.** The box above the picker narrows the country/region list as you
+  type: country, state and station names all match, so "walm" finds the New
+  York row that holds WALM HD and "united" leaves the United States and the
+  United Kingdom. Typing never changes what is playing — the clock keeps
+  playing until a region or town is chosen — and the selection stays put while
+  a query is open.
 - **Leaning.** The **Lean the feed here** switch under the picker biases the
-  clock toward that region instead of only hand-tuning one station:
+  clock toward that region — or the whole country, when an **All of …** row is
+  selected — instead of only hand-tuning one station:
   `WORLD.leanShare` (default **0.6**) of the world slots are drawn from the
   chosen region and the rest still travel. The slot grid is untouched, so a
   leaning listener crosses cities on the same :00/:10 boundaries as everyone
@@ -494,9 +506,15 @@ rest of `vitahuesosite`:
   (catalogue median). A station measured 7.9 dB hotter than the target played at
   `audio.volume` 0.322 with the slider at 0.8, and a studio song at 0.908 — the
   trim follows the track. The 9 unreadable samples play untrimmed.
-- Tuner picker: 61 country groups and 105 regions; changing the region tunes its
-  first station, changing the town tunes that station, and both selects follow
-  whatever is on the air without fighting the user.
+- Tuner picker: 61 country groups and 166 rows (105 regions + an **All of …**
+  row per country); the United States group lists all three of its stations, and
+  changing the region or town tunes the first station in it. The selection
+  stays where it was chosen while the clock moves inside that scope, and the
+  search box filters to country, state and station names ("united" → US + UK,
+  "walm" → New York); a query never changes playback.
+- Country lean: selecting **All of United States** with the lean on gave a
+  3-station pool, a 50% share of one day's world slots, and all three of its
+  stations appearing in the reel.
 - Near me: with a mocked San Juan position the locator tuned the San Juan
   station (1 km), synced both dropdowns to Puerto Rico → San Juan PR, and marked
   the listener in amber on the globe.
