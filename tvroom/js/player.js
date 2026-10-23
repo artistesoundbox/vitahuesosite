@@ -9,7 +9,7 @@
  */
 
 const HLS_MODULE = 'https://unpkg.com/hls.js@1.7.3/dist/hls.mjs';
-const START_TIMEOUT = 14000;
+const START_TIMEOUT = 12000;
 
 let hlsPromise = null;
 function loadHls() {
@@ -121,6 +121,7 @@ export class LivePlayer {
       this._wantPlaying = true;
       this._clearWatchdog();
       this._recoveries = 0;
+      this._levelErrors = 0;
       this._setState('playing');
     });
     video.addEventListener('pause', () => {
@@ -224,11 +225,15 @@ export class LivePlayer {
   _onHlsError(data, Hls) {
     if (!data) return;
     if (!data.fatal) {
-      // Playlist-level failures are retried by hls.js and never escalate to
-      // fatal, so a CORS-blocked level would sit on "loading" forever.
+      // Playlist-level failures never escalate to fatal, so a CORS-blocked level
+      // would sit on "loading" forever. hls.js also aborts level requests when
+      // it switches rendition, so only give up when nothing has ever decoded
+      // and the failures keep coming.
       if (data.details === 'levelLoadError' || data.details === 'levelLoadTimeOut') {
-        this._levelErrors += 1;
-        if (this._levelErrors >= 3) this._fail(describeFailure(data.details));
+        if (this.video.videoWidth === 0 && this.state === 'loading') {
+          this._levelErrors += 1;
+          if (this._levelErrors >= 5) this._fail(describeFailure(data.details));
+        }
       }
       return;
     }
