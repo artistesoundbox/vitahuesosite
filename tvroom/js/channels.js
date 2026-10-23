@@ -101,6 +101,67 @@ export function parsePlaylist(text) {
   return channels;
 }
 
+/**
+ * A small memory of streams that failed here.
+ *
+ * Liveness cannot be known ahead of time — a feed that is dead in one country
+ * plays fine in another, and CORS differs per host — so the room learns: a
+ * channel that fails in this browser is remembered, hidden from the list by
+ * default and skipped when zapping. "Reset" in the list footer forgets them.
+ */
+export class ChannelHealth {
+  constructor(key = 'vh-tvroom-dead-v1', limit = 400) {
+    this.key = key;
+    this.limit = limit;
+    this.entries = new Map();
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          for (const [url, when] of parsed) this.entries.set(url, when);
+        }
+      }
+    } catch {
+      /* storage can be unavailable in private modes */
+    }
+  }
+
+  isDead(url) {
+    return this.entries.has(url);
+  }
+
+  get size() {
+    return this.entries.size;
+  }
+
+  markDead(url) {
+    if (!url) return false;
+    const existed = this.entries.has(url);
+    this.entries.delete(url);
+    this.entries.set(url, Date.now());
+    while (this.entries.size > this.limit) {
+      const oldest = this.entries.keys().next().value;
+      this.entries.delete(oldest);
+    }
+    this._save();
+    return !existed;
+  }
+
+  clear() {
+    this.entries.clear();
+    this._save();
+  }
+
+  _save() {
+    try {
+      localStorage.setItem(this.key, JSON.stringify([...this.entries.entries()]));
+    } catch {
+      /* quota or private mode: the list simply will not persist */
+    }
+  }
+}
+
 function fold(text) {
   return text
     .toLowerCase()
@@ -131,13 +192,18 @@ export class Catalog {
     this.playableCount = channels.filter((c) => c.playable).length;
   }
 
-  /** @returns {Array<object>} channels matching every active filter */
-  filter({ query = '', group = '', country = '', playableOnly = false } = {}) {
+  /**
+   * @returns {Array<object>} channels matching every active filter
+   * @param {{query?:string, group?:string, country?:string, playableOnly?:boolean, hideDead?:boolean, isDead?:(url:string)=>boolean}} options
+   */
+  filter({ query = '', group = '', country = '', playableOnly = false, hideDead = false, isDead } = {}) {
     const needle = fold(query.trim());
+    const checkDead = hideDead && typeof isDead === 'function' ? isDead : null;
     return this.channels.filter((ch) => {
       if (playableOnly && !ch.playable) return false;
       if (group && ch.group !== group) return false;
       if (country && ch.country !== country) return false;
+      if (checkDead && checkDead(ch.url)) return false;
       if (needle && !ch.search.includes(needle)) return false;
       return true;
     });

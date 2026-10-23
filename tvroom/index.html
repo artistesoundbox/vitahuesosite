@@ -184,6 +184,13 @@
           <input type="checkbox" id="ch-only-playable" />
           <span>Only channels this browser can play</span>
         </label>
+        <div class="toggle-row toggle-row-split">
+          <label class="toggle-inline">
+            <input type="checkbox" id="ch-hide-dead" checked />
+            <span>Hide channels that failed here</span>
+          </label>
+          <button class="dead-reset" id="ch-reset-dead" type="button" hidden>Reset · <span id="dead-count">0</span></button>
+        </div>
       </div>
 
       <div class="chlist" id="chlist" role="listbox" aria-label="Channels">

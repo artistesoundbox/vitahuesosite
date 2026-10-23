@@ -119,6 +119,7 @@ export class LivePlayer {
 
     video.addEventListener('playing', () => {
       this._wantPlaying = true;
+      this.playedSinceTune = true;
       this._clearWatchdog();
       this._recoveries = 0;
       this._levelErrors = 0;
@@ -267,6 +268,7 @@ export class LivePlayer {
     if (!channel) return;
     const token = ++this._token;
     this.channel = channel;
+    this.playedSinceTune = false;
     this._recoveries = 0;
     this._levelErrors = 0;
     this._teardown();

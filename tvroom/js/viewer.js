@@ -9,6 +9,7 @@
  */
 
 import { openInVlc, copyStreamUrl } from './player.js';
+import { ChannelHealth } from './channels.js';
 
 const PAGE_SIZE = 90;
 const IDLE_MS = 3200;
@@ -43,6 +44,7 @@ export class Viewer {
     this._idleTimer = 0;
     this._mutedBefore = true;
     this._pendingUnsupported = null;
+    this.health = new ChannelHealth();
 
     this.els = {
       viewer: $('viewer'),
@@ -75,6 +77,9 @@ export class Viewer {
       group: $('ch-group'),
       country: $('ch-country'),
       playableOnly: $('ch-only-playable'),
+      hideDead: $('ch-hide-dead'),
+      resetDead: $('ch-reset-dead'),
+      deadCount: $('dead-count'),
       list: $('chlist'),
       rows: $('chlist-rows'),
       status: $('chlist-status'),
@@ -88,6 +93,7 @@ export class Viewer {
     this._bindUi();
     this._observeSentinel();
     this._syncVolume();
+    this._syncDeadUi();
     this._toggleBrowser(true);
   }
 
@@ -116,6 +122,9 @@ export class Viewer {
     });
 
     player.on('error', ({ message }) => {
+      // A channel that never produced a frame is dead for this browser: note
+      // it so it stops turning up, but leave mid-playback drops alone.
+      if (!player.playedSinceTune && player.channel) this._markDead(player.channel.url);
       this.showError(message || 'The stream could not be opened.', 'stream');
       this._showControls();
     });
@@ -208,6 +217,13 @@ export class Viewer {
     els.group.addEventListener('change', () => this._applyFilters());
     els.country.addEventListener('change', () => this._applyFilters());
     els.playableOnly.addEventListener('change', () => this._applyFilters());
+    els.hideDead.addEventListener('change', () => this._applyFilters());
+    els.resetDead.addEventListener('click', () => {
+      this.health.clear();
+      this._syncDeadUi();
+      this._applyFilters();
+      this.showToast('Dead-channel marks cleared.');
+    });
     els.reload.addEventListener('click', () => this._reloadCatalog());
 
     // Cropped channel names are worth reading in full
@@ -498,8 +514,17 @@ export class Viewer {
     const group = this.els.group.value;
     const country = this.els.country.value;
     const playableOnly = this.els.playableOnly.checked;
+    const hideDead = this.els.hideDead.checked;
 
-    this.filtered = this.catalog.filter({ query, group, country, playableOnly });
+    this.filtered = this.catalog.filter({
+      query,
+      group,
+      country,
+      playableOnly,
+      hideDead,
+      isDead: (url) => this.health.isDead(url),
+    });
+    this._syncDeadUi();
     this.rendered = 0;
     this.els.rows.textContent = '';
     this.els.list.scrollTop = 0;
@@ -574,7 +599,14 @@ export class Viewer {
 
     row.append(logo, body);
 
-    if (!channel.playable) {
+    if (this.health.isDead(channel.url)) {
+      row.classList.add('is-dead');
+      const badge = document.createElement('span');
+      badge.className = 'ch-flag ch-flag-dead';
+      badge.textContent = 'Dead';
+      badge.title = 'This feed failed in this browser — reset the marks in the footer to try again';
+      row.appendChild(badge);
+    } else if (!channel.playable) {
       const badge = document.createElement('span');
       badge.className = 'ch-flag';
       badge.textContent = 'VLC';
@@ -644,8 +676,31 @@ export class Viewer {
 
   _zapPool() {
     if (!this.filtered.length) return [];
+    const alive = this.filtered.filter((ch) => ch.playable && !this.health.isDead(ch.url));
+    if (alive.length) return alive;
     const playable = this.filtered.filter((ch) => ch.playable);
     return playable.length ? playable : this.filtered;
+  }
+
+  _markDead(url) {
+    if (this.health.markDead(url)) this._syncDeadUi();
+    const row = this.els.rows.querySelector(`.ch[data-url="${CSS.escape(url)}"]`);
+    if (row) {
+      row.classList.add('is-dead');
+      const existing = row.querySelector('.ch-flag');
+      if (existing) existing.remove();
+      const badge = document.createElement('span');
+      badge.className = 'ch-flag ch-flag-dead';
+      badge.textContent = 'Dead';
+      row.appendChild(badge);
+      if (this.els.hideDead.checked) row.remove();
+    }
+  }
+
+  _syncDeadUi() {
+    const count = this.health.size;
+    this.els.deadCount.textContent = String(count);
+    this.els.resetDead.hidden = count === 0;
   }
 
   zap(direction) {
