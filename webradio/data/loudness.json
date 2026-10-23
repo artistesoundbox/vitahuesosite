@@ -551,6 +551,21 @@
       "lufs": -15.9,
       "url": "https://onair.armisa.it/listen/armisa/radio.mp3",
       "at": 1792739131
+    },
+    "w108": {
+      "lufs": -15.9,
+      "url": "https://stream-icy.bauermedia.pt/comercial.mp3",
+      "at": 1792739131
+    },
+    "w106": {
+      "lufs": -9.1,
+      "url": "https://canelaradio.makrodigital.com:9280/stream",
+      "at": 1792739133
+    },
+    "w113": {
+      "lufs": -9.7,
+      "url": "https://cloud9.ldwebstudios.net:7000/;",
+      "at": 1792739134
     }
   },
   "localLufs": [
