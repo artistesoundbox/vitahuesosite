@@ -610,9 +610,12 @@ export class Viewer {
   _revealActive() {
     if (!this.activeUrl || !this.filtered.length) return;
     const idx = this.filtered.findIndex((ch) => ch.url === this.activeUrl);
-    if (idx < 0) return;
+    // Only scroll to the playing channel when it is close enough that doing
+    // so does not build thousands of rows. Beyond that the search box is the
+    // better way to find it.
+    if (idx < 0 || idx > this.rendered + 240) return;
     const target = Math.min(this.filtered.length, Math.max(idx + 12, this.rendered));
-    while (this.rendered < target && this.rendered - idx < 900) this._renderPage();
+    while (this.rendered < target) this._renderPage();
     const row = this.els.rows.querySelector(`.ch[data-url="${CSS.escape(this.activeUrl)}"]`);
     if (row && typeof row.scrollIntoView === 'function') {
       row.scrollIntoView({ block: 'nearest' });
@@ -632,6 +635,7 @@ export class Viewer {
   }
 
   _toggleBrowser(open) {
+    if (window.__tvroomDebug) console.trace('[tvroom] browser toggle', open);
     this.els.viewer.classList.toggle('browser-closed', !open);
     if (open) this._showControls();
   }
