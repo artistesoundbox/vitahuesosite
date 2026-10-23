@@ -102,7 +102,8 @@ catalogue cuts in once an hour.
   — hands the listener to the shared clock and is remembered per device
   (`vh.live.home`); clearing that key (or `WORLD.home: null`) opens on the
   world clock again. The home station is matched by country + place, so a
-  rebuilt directory does not lose it.
+  rebuilt directory does not lose it, and the hand-off from the portal dock
+  continues the stream that was playing rather than snapping to the clock.
 - **Slot grid.** The UTC day is cut into ten-minute slots (`WORLD.slotMinutes`).
   Slot boundaries are absolute, so every listener is in the same slot at the
   same second — and because the streams themselves are live, nobody is ahead of
@@ -509,7 +510,7 @@ rest of `vitahuesosite`:
 - Default station: a fresh profile opened on **Salseo Radio · Quebradillas ·
   Puerto Rico** (`mode: world`, card slot *Home station*, picker on Puerto Rico
   → Quebradillas) and pressing play streamed
-  `listen.radioking.com/radio/399811/stream/452110` at `readyState 3` with
+  `listen.radioking.com/radio/399811/stream/452110` at `readyState 4` with
   `currentTime` advancing. **Rejoin live** moved to the
   clock (`mode: live`), stored `vh.live.home = false`, and a reload stayed on
   the clock; clearing the key opened on Quebradillas again. A studio-feed
