@@ -11,7 +11,7 @@
  * lock-screen playback keeps working. Mic monitoring uses its own graph.
  */
 import { TRACKS } from './catalog.js';
-import { getLiveState, programAt, msUntilNextProgram } from './station.js';
+import { getLiveState, programAt, msUntilNextProgram, setLiveSource } from './station.js';
 import { isBlocked } from './blocklist.js';
 import { worldTrack } from './world.js';
 import { LOUDNESS } from './loudness.js';
@@ -447,6 +447,35 @@ export class Radio extends EventTarget {
     }
     this.pause();
     this.notice('The world feed is unreachable right now. Try again in a moment.');
+  }
+
+  /**
+   * Switch programming (world feed ↔ studio) without leaving the page. The
+   * clock keeps running underneath, so the new feed picks up at the offset it
+   * would have been at anyway; a paused player stays paused.
+   */
+  setFeed(source) {
+    setLiveSource(source);
+    const state = getLiveState();
+    if (!state) return false;
+    this.live = state;
+    if (this.mode === 'personal') return true;   // the clock changes underneath
+    if (!this.started) {
+      this.entry = state.entry;
+      this.track = state.entry.track;
+      this.emitState();
+      return true;
+    }
+    if (this.playing) {
+      this.playLive(state.entry, state.offset);
+      return true;
+    }
+    /* Paused: show what the new feed is playing, and wait for play. */
+    this.mode = 'live';
+    this.entry = state.entry;
+    this.track = state.entry.track;
+    this.emitState();
+    return true;
   }
 
   /** Hand-tune a station; the clock resumes with "Rejoin live". */

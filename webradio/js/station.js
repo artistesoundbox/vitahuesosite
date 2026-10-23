@@ -25,6 +25,9 @@ import { isBlocked, onBlockChange } from './blocklist.js';
 import { WORLD_STATIONS, worldTrack } from './world.js';
 
 const reels = new Map();
+/* Which programming the clock is running. `world` is the station as designed;
+   `studio` is the same clock running the artist's own catalogue end to end. */
+let liveSource = 'world';
 /* A day is a whole number of slots; if the config does not divide evenly the
    last slot is shortened rather than spilling into tomorrow. */
 const BLOCK_MS = 3600000;
@@ -245,6 +248,24 @@ export function setWorldLean(key) {
 
 export function getWorldLean() {
   return leanKey ? { key: leanKey, stations: leanPool.slice() } : null;
+}
+
+/**
+ * Switch the live clock between the world feed and the studio programme.
+ * The slot grid itself is unchanged, so coming back lands on the city that is
+ * on the air right now, not where you left it.
+ */
+export function setLiveSource(source) {
+  const next = source === 'studio' ? 'studio' : 'world';
+  if (next === liveSource) return liveSource;
+  liveSource = next;
+  reels.clear();
+  tails.clear();
+  return liveSource;
+}
+
+export function getLiveSource() {
+  return liveSource;
 }
 
 const leanShare = () => Math.min(1, Math.max(0, Number(WORLD.leanShare) || 0));
@@ -479,6 +500,7 @@ function buildWorldReel(dayStartMs, carry = []) {
  * new day three slots later.
  */
 export function buildReel(dayStartMs, carry = []) {
+  if (liveSource === 'studio') return buildLocalReel(dayStartMs, carry);
   if (!WORLD.enabled || !WORLD_STATIONS.length) return buildLocalReel(dayStartMs, carry);
   return buildWorldReel(dayStartMs, carry);
 }

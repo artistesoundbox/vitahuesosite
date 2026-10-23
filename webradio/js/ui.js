@@ -10,7 +10,7 @@ import { blockedIds, isBlocked, toggleBlocked, onBlockChange } from './blocklist
 import {
   formatTime, formatDuration, localHourLabel, programAt,
   msUntilNextProgram, formatCountdown, upcomingCities,
-  setWorldLean, getWorldLean
+  setWorldLean, getWorldLean, getLiveSource
 } from './station.js';
 import { randomStation, nearestStation, WORLD_STATIONS, WORLD_COUNTRIES, WORLD_SOURCE } from './world.js';
 import { createGlobe } from './globe.js';
@@ -496,6 +496,7 @@ function cacheEls() {
     'tuner-card', 'tuner-flag', 'tuner-name', 'tuner-place', 'tuner-note',
     'tuner-next', 'tuner-slot', 'tuner-link', 'tuner-spin', 'tuner-globe', 'tuner-globe-meta',
     'tuner-region', 'tuner-town', 'tuner-locate', 'tuner-lean', 'tuner-lean-hint',
+    'tuner-src-world', 'tuner-src-studio',
     'home-art', 'home-title', 'home-artist', 'home-album', 'home-mode', 'home-program', 'home-play',
     'home-play-label', 'home-queue', 'home-next-program',
     'queue', 'queue-count', 'recent', 'schedule-next',
@@ -648,6 +649,47 @@ function clearLean() {
   refreshLeanHints();
 }
 
+/* ----------------------------------------------------------------- live feed */
+
+/* Which clock the player follows: the world feed or the studio catalogue. Kept
+   on the device so a reload stays where the listener left it. */
+const FEED_KEY = 'vh.live.source';
+
+function readFeed() {
+  try { return localStorage.getItem(FEED_KEY) === 'studio' ? 'studio' : 'world'; } catch { return 'world'; }
+}
+
+function writeFeed(source) {
+  try { localStorage.setItem(FEED_KEY, source); } catch { /* private mode */ }
+}
+
+function syncFeedButtons(source) {
+  for (const [key, id] of [['world', 'tuner-src-world'], ['studio', 'tuner-src-studio']]) {
+    const button = els[id];
+    if (!button) continue;
+    const on = key === source;
+    button.classList.toggle('is-on', on);
+    button.setAttribute('aria-pressed', String(on));
+  }
+}
+
+function chooseFeed(source, { announce = true } = {}) {
+  const same = source === getLiveSource();
+  /* Already on this feed: a press still means "put me back on the clock"
+     when the player is sitting on a hand-tuned station. */
+  if (same && radio.mode !== 'world') return;
+  if (same) radio.rejoinLive();
+  else radio.setFeed(source);
+  writeFeed(source);
+  syncFeedButtons(source);
+  if (announce) {
+    toast(source === 'studio'
+      ? 'Tuned to the studio — the station’s own programming, all original.'
+      : 'Back on the world feed — the city on the air right now.');
+  }
+  updateTuner(radio.snapshot());
+}
+
 function fillTunerTowns(key, selectedId = '') {
   const select = els['tuner-town'];
   if (!select) return;
@@ -689,16 +731,20 @@ function updateTuner(state) {
   const name = els['tuner-name'];
   if (!name) return;
   const station = state.station;
+  const studio = getLiveSource() === 'studio';
   els['tuner-card']?.classList.toggle('is-world', !!station);
+  syncFeedButtons(studio ? 'studio' : 'world');
 
-  if (els['tuner-flag']) els['tuner-flag'].textContent = station?.flag || '🌍';
+  if (els['tuner-flag']) els['tuner-flag'].textContent = station?.flag || (studio ? '🎙️' : '🌍');
   name.textContent = station ? station.name : 'Vita Hueso Radio';
   if (els['tuner-place']) {
-    els['tuner-place'].textContent = station
-      ? (station.place && station.place !== station.country
+    if (station) {
+      els['tuner-place'].textContent = station.place && station.place !== station.country
         ? `${station.place} · ${station.country}`
-        : station.country)
-      : 'The studio feed';
+        : station.country;
+    } else {
+      els['tuner-place'].textContent = studio ? 'The studio · all original' : 'The studio feed';
+    }
   }
 
   globe?.setFocus(station);
@@ -709,14 +755,18 @@ function updateTuner(state) {
 
   const next = upcomingCities(3);
   if (els['tuner-slot']) {
-    if (station && state.mode === 'world') els['tuner-slot'].textContent = 'Hand-tuned';
+    if (studio && state.mode === 'live') els['tuner-slot'].textContent = 'Studio live';
+    else if (station && state.mode === 'world') els['tuner-slot'].textContent = 'Hand-tuned';
     else if (next.length) els['tuner-slot'].textContent = `Next city ${localClock(next[0].startMs)}`;
     else els['tuner-slot'].textContent = 'Live';
   }
   if (els['tuner-note']) {
-    const lean = leanPlaceName();
+    const lean = studio ? '' : leanPlaceName();
     const parts = [];
-    if (station) {
+    if (studio && !station) {
+      parts.push('All-original programming');
+      parts.push(state.mode === 'live' ? 'on the clock' : 'paused');
+    } else if (station) {
       parts.push(`${station.codec}${station.bitrate ? ` ${station.bitrate} kbps` : ''}`);
       parts.push(state.mode === 'live' ? 'on the clock' : 'hand-tuned');
     } else {
@@ -748,6 +798,13 @@ function bindTuner() {
 
   fillTunerRegions();
   if (region && region.value) fillTunerTowns(region.value);
+
+  /* Restore the feed last used on this device before anything plays. */
+  const savedFeed = readFeed();
+  syncFeedButtons(savedFeed);
+  if (savedFeed === 'studio') radio.setFeed('studio');
+  els['tuner-src-world']?.addEventListener('click', () => chooseFeed('world'));
+  els['tuner-src-studio']?.addEventListener('click', () => chooseFeed('studio'));
 
   /* Restore a lean saved on this device. A station list rebuild can drop a
      region, so only a key that still exists is honoured. */
@@ -785,8 +842,9 @@ function bindTuner() {
       return;
     }
     /* Tune the region right away so the switch has an audible answer; the
-       clock itself picks it up from the next slot boundary. */
-    const first = tunerPlace(region?.value)?.stations[0];
+       clock itself picks it up from the next slot boundary. The studio feed
+       is left alone — its listener asked for local programming. */
+    const first = getLiveSource() === 'studio' ? null : tunerPlace(region?.value)?.stations[0];
     if (first) {
       tunerSync.station = first.id;
       radio.tuneWorld(first);
@@ -1043,8 +1101,9 @@ function updateState(state) {
   }
 
   if (els['queue-count']) {
+    const studio = getLiveSource() === 'studio';
     els['queue-count'].textContent = live
-      ? 'World feed · live'
+      ? (studio ? 'Studio · live' : 'World feed · live')
       : state.mode === 'world' ? 'World feed · off clock' : 'Your queue';
   }
 

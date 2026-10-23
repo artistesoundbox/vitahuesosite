@@ -304,6 +304,14 @@
               <h3><svg class="icon"><use href="#i-globe"/></svg> World feed</h3>
               <span class="side-meta" id="tuner-slot">Live</span>
             </header>
+            <div class="tuner-source" role="group" aria-label="Live programming">
+              <button type="button" class="is-on" id="tuner-src-world" aria-pressed="true" title="The shared world clock">
+                <svg class="icon"><use href="#i-globe"/></svg> World feed
+              </button>
+              <button type="button" id="tuner-src-studio" aria-pressed="false" title="The station's own programming">
+                <svg class="icon"><use href="#i-radio"/></svg> The studio
+              </button>
+            </div>
             <div class="tuner-globe">
               <canvas id="tuner-globe" width="620" height="260" aria-hidden="true"></canvas>
               <span class="tuner-globe-meta" id="tuner-globe-meta">Loading the world…</span>
@@ -365,7 +373,7 @@
               <h3><svg class="icon"><use href="#i-users"/></svg> On the station</h3>
               <span class="side-meta">Live</span>
             </header>
-            <p class="community-copy"><b id="room-count">—</b> listening right now — the same broadcast on every device, so nobody is ahead and nobody is behind.</p>
+            <p class="community-copy"><b id="room-count">—</b> listening right now — one shared clock, so nobody is ahead and nobody is behind.</p>
           </section>
         </aside>
       </div>
