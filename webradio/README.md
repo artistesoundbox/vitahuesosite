@@ -416,13 +416,32 @@ rest of `vitahuesosite`:
 - Contact form: clipboard path works, with a visible selectable fallback when a
   browser refuses clipboard access.
 - Library: search, genre filter, empty state, sort, favorites-only.
-- Listener count: two clients on the same topic each see 2; a stale check-in
-  (older than the TTL) is not counted; the count drops back to 1 after a
-  client's `gone` message or when the heartbeat expires.
-- Widget/embed: inline player and floating launcher both play the live feed.
-- Layout checked at 1440×900, 1200×900 and 390×844.
+- Listener count: `js/community.js` joins one Supabase presence channel under a
+  random per-browser id; with no keys configured the page shows 1 rather than
+  inventing a number. A genuine two-device count still needs a Supabase project
+  (the config values were never supplied).
+- World feed timeline: one seeded UTC day is 242 entries — 120 live-station
+  slots, 91 home songs and 31 station IDs, tiling the 24 hours with **zero gaps
+  and zero overlaps**; 83.3% world airtime, 16.5% home, 89 different cities in
+  the day.
+- World streams: the built list is 169 stations in 61 countries, every one probed
+  for audio at build time (HTTPS, MP3/AAC, no HLS/Ogg, no talk/news tags); a
+  browser played a real station to `readyState 3` with `currentTime` advancing.
+- Dead station: tuning to an unreachable stream failed over to the scheduled
+  broadcast within a few seconds, logged the station as dead, and returned to
+  `mode: live` at the correct slot offset.
+- Handoff: forcing a segment end moved the player from the live stream to the
+  next home song (`readyState 4`, local MP3, slot timer), and `Rejoin live` put
+  it back on the world feed at the right offset. Skip → next city → pause →
+  resume → rejoin all behaved.
+- Globe: canvas is 231×132 CSS / 231×132 backing pixels, all painted pixels
+  inside the 61 px sphere radius, no paint outside the rim.
+- Widget/embed: inline player and floating launcher both play the live feed and
+  show the world station's title, place and slot timer.
+- Layout checked at 390×844 and 320×720 with the tuner card and globe: no
+  horizontal overflow, no element crossing the viewport edge.
 
-Not verified in this environment: real iOS/Android lock-screen behaviour,
-Safari autoplay edge cases, and ntfy's per-visitor daily message quota (which
-is why the heartbeat is ten minutes). See the notes in the verification list
-above.
+Not verified in this environment: real iOS/Android lock-screen behaviour, Safari
+  autoplay edge cases, and the globe's animation loop (this headless browser
+  never fires `requestAnimationFrame`; the static frame it paints was verified
+  by pixel inspection). See the notes in the verification list above.
