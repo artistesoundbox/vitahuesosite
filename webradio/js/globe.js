@@ -31,6 +31,7 @@ export function createGlobe(canvas) {
   let raf = 0;
   let lastFrame = 0;
   let inView = true;
+  const stats = { frames: 0, paints: 0 };
 
   /* The grid is the same every frame, so it is projected from precomputed unit
      vectors rather than recomputed from trigonometry. */
@@ -169,10 +170,12 @@ export function createGlobe(canvas) {
 
   function frame(now) {
     raf = requestAnimationFrame(frame);
+    stats.frames += 1;
     if (!inView || document.hidden) return;
     if (now - lastFrame < 33) return;   // ~30 fps is plenty for this
     lastFrame = now;
     rotation += (target - rotation) * 0.08;
+    stats.paints += 1;
     draw(now, false);
   }
 
@@ -227,6 +230,7 @@ export function createGlobe(canvas) {
     setFocus,
     resize,
     ensureSize,
+    stats,
     destroy() {
       cancelAnimationFrame(raf);
       observer?.disconnect();

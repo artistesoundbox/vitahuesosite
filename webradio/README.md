@@ -1,9 +1,10 @@
 # Vita Hueso Radio — a 24/7 radio station in a folder
 
 A complete, self-hosted online radio station built with plain HTML, CSS and
-JavaScript. Every track streams from this folder. There is no radio host, no
-paid API and no build step — the station runs on a clock, a catalogue and a
-browser.
+JavaScript. Most of the day is a **live world feed** — a station in another city
+every ten minutes — and once an hour the signal comes home to the artist's own
+catalogue. There is no radio host, no paid API and no build step: the station
+runs on a clock, a catalogue, an open directory of public streams and a browser.
 
 - **Live now:** https://artistesoundbox.github.io/vitahuesosite/webradio/
 - **Widget demo:** https://artistesoundbox.github.io/vitahuesosite/webradio/widget-demo.html
@@ -34,7 +35,9 @@ in the browser).
 
 ## How the "live" part works
 
-There is no streaming server, so "live" is a deterministic timeline:
+The station's backbone is the **world feed** (next section); the rules below
+describe the local catalogue that fills the home segments and the all-local
+fallback. There is no streaming server, so "live" is a deterministic timeline:
 
 1. `data/library.json` defines the catalogue; `tools/build-catalog.mjs` writes
    exact track durations into `js/catalog.js`.
@@ -85,25 +88,78 @@ same reel, so they always agree with what is playing.
 
 ---
 
+## The world feed (the station's main source)
+
+The radio page is driven by live stations around the world; the artist's own
+catalogue cuts in once an hour.
+
+- **Slot grid.** The UTC day is cut into ten-minute slots (`WORLD.slotMinutes`).
+  Slot boundaries are absolute, so every listener is in the same slot at the
+  same second — and because the streams themselves are live, nobody is ahead of
+  anybody inside a slot either.
+- **City pick.** A slot's station comes from `js/world-stations.js`, chosen by a
+  seeded hash of the UTC date + slot number. The same station and the same
+  country never repeat back to back. Same list + same clock = same city on
+  every device.
+- **Home segments.** One slot per hour (`WORLD.homeEveryHour`) is the studio
+  catalogue instead: it opens with the station ID, then plays your own songs
+  (85% of the picks, `WORLD.homeShare`) with the occasional CC guest. With
+  ten-minute slots that is about **16% of the day** — the world leads, your
+  music is the visiting hour.
+- **IDs.** Every home segment opens with `audio/id/radiobreak.mp3`; one world
+  slot every `WORLD.identEveryHours` hours (default **3**) opens with it too.
+- **When a stream dies.** Routine on an open directory. The player remembers
+  stations that did not answer, skips to the next scheduled segment, and falls
+  back to the next home segment if the next cities are dead too. A 12-second
+  watchdog catches a stream that hangs without ever erroring.
+- **Off the clock.** Next, "Spin the dial", and clicking any city in the queue
+  hand-tune a station without leaving the feed; **Rejoin live** puts you back on
+  the shared clock. A hand-tuned stream shows the slot length when it came from
+  the schedule, and `LIVE` when it has no end.
+
+**Where the stations come from.** [Radio Browser](https://www.radio-browser.info),
+a free and open directory of public internet radio streams. No key, no account,
+no server. Radio Garden publishes no API or embed of its own — its site talks to
+undocumented internal endpoints — so the same content is assembled here from the
+open directory instead of borrowed from them. Every stream is the broadcaster's
+own, played directly by the browser: nothing is recorded, relayed or
+re-encoded. Each station's name links back to its own website.
+
+Rebuild the list (this also re-probes every stream and rewrites the module):
+
+```bash
+node tools/build-world-radio.mjs
+```
+
+The builder keeps only stations that are HTTPS, MP3 or AAC (no HLS, no Ogg),
+not tagged as news/talk/sport/religious, at most three per country, and it
+probes every URL for real audio bytes before writing `js/world-stations.js`.
+Set `WORLD.enabled = false` in `js/config.js` to go back to the all-local reel;
+`ROTATION` then applies to the whole day again.
+
+---
+
 ## Features → where they live
 
 | Feature | Implementation |
 | --- | --- |
 | Large player, play/pause/skip/volume/mute | `index.html` `#np`, `js/player.js`, `js/ui.js` |
 | Continuous playback across sections | Single-page hash router; one persistent `<audio>` element |
-| AutoDJ 24/7 shuffle | `js/station.js` deterministic reel |
+| World feed: slots, city pick, home segments | `js/station.js`, `js/world.js`, `js/world-stations.js` |
+| Station list builder + stream probe | `tools/build-world-radio.mjs` |
+| Tuner card, next cities, spin the dial | `js/ui.js`, `index.html` |
+| Little live globe | `js/globe.js` (canvas, no assets) |
 | Now playing + art + duration | Embedded ID3 cover extracted by the build |
 | Queue / recently played | `state.queue`, `vh.history` in localStorage |
-| Listener counter | Presence envelopes over the community relay |
+| Listener counter | `js/community.js` (Supabase Realtime presence) |
 | Favorites, search, genre filters | `js/ui.js`, `vh.favorites` in localStorage |
 | "Never play this again" (per device) | `js/blocklist.js`, `vh.blocked` in localStorage |
 | Sleep timer | `radio.setSleep(minutes)` |
 | Live mic mode | Local monitor + recorded "mic take" (`radio.toggleMic`) |
 | Scheduled playlists | `PROGRAMS` in `js/config.js` |
-| Chat + emoji | `js/community.js`, `js/ui.js` (`CHAT_EMOJI`) |
 | Embeddable widget | `embed.html`, `widget.js`, `widget-demo.html` |
 | SEO | Meta/OG/Twitter tags, JSON-LD `RadioStation`, `sitemap.xml`, `robots.txt` |
-| Fast repeat loads | `sw.js` caches the shell (never the MP3s) |
+| Fast repeat loads | `sw.js` caches the shell (never the MP3s or the streams) |
 
 ---
 
@@ -314,7 +370,11 @@ rest of `vitahuesosite`:
   and is only written into the `mailto:`/Gmail links at submit time, so the
   visible copy says "send it straight from Gmail" instead of naming the inbox.
   Clearing `contactEmail` falls back to copying the message for YouTube/GitHub.
-- `js/config.js` → programme names, hours (UTC), genres, and the community topic.
+- `js/config.js` → programme names, hours (UTC), genres; `WORLD` (slot length,
+  home slots per hour, own-song share, ID cadence); and the Supabase presence
+  values in `COMMUNITY`.
+- `js/world-stations.js` → generated. Rebuild with
+  `node tools/build-world-radio.mjs` rather than editing by hand.
 - `index.html` → About copy, canonical URL, JSON-LD.
 - `data/library.json` → genres were assigned from titles, not by listening.
   Adjust them to match how the records actually feel.
