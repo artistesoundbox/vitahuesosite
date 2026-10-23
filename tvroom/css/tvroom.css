@@ -420,9 +420,18 @@ body.is-ready #room-canvas { opacity: 1; }
   font-size: 9.5px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--dim);
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+  color: rgba(214, 230, 248, 0.82);
+  text-shadow: 0 1px 3px #000, 0 0 10px rgba(0, 0, 0, 0.9);
   text-align: center;
+}
+
+.hud-hint::before {
+  content: "";
+  display: block;
+  width: 26px;
+  height: 1px;
+  margin: 0 auto 7px;
+  background: linear-gradient(90deg, transparent, rgba(110, 231, 255, 0.55), transparent);
 }
 
 /* Hidden host for the live video element while the viewer is closed */
