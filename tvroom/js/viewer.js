@@ -311,15 +311,28 @@ export class Viewer {
     this.els.viewer.classList.remove('is-idle');
     document.body.classList.add('viewer-open');
 
-    if (window.innerWidth > 860) this._toggleBrowser(true);
-    else this._toggleBrowser(false);
+    // Take over playback: the same <video>, now on the big screen, with sound.
+    this._mutedBefore = this.player.muted;
+    this.player.mount(this.els.mount);
+    this.player.setMuted(false);
+    if (this.player.video.volume === 0) this.player.setVolume(0.8);
+    this._syncVolume();
+
+    this.els.error.hidden = true;
+    this.els.idle.hidden = !!this.player.channel;
+    this._setNowPlaying(this.player.channel);
+
+    // The list is open by default: picking a channel is why you came.
+    this._toggleBrowser(!channel);
     this._showControls();
     this.onOpen();
 
-    if (channel) this.select(channel);
-    else {
-      this._ensureCatalog().then(() => this._revealActive());
-      this._revealActive();
+    if (channel) {
+      this.select(channel);
+    } else {
+      this._ensureCatalog().then((catalog) => {
+        if (catalog) this._revealActive();
+      });
     }
 
     if (this.player.channel && this.player.video.paused) this.player.toggle();

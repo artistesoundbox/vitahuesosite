@@ -105,7 +105,9 @@ player.on('channel', (channel) => setRoomNow(channel));
 player.on('volume', syncSound);
 player.on('state', (state) => {
   if (room) room.setSignal(state === 'playing' ? 'live' : 'offline');
-  if (state === 'error') {
+  if (state === 'playing' || state === 'loading') {
+    setRoomNow(player.channel);
+  } else if (state === 'error') {
     nowName.textContent = 'No signal';
     nowMeta.textContent = 'the feed dropped · press View TV';
   }

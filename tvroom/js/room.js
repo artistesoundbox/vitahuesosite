@@ -194,6 +194,15 @@ export class TvRoom {
       onProgress(total ? event.loaded / total : 0);
     });
     const root = gltf.scene;
+    // The scan of a room environment is bright; let the lamps and the TV keep
+    // some contrast instead of flattening everything to the same grey.
+    root.traverse((obj) => {
+      if (!obj.isMesh) return;
+      const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+      for (const material of materials) {
+        if (material && 'envMapIntensity' in material) material.envMapIntensity = 0.55;
+      }
+    });
     this.scene.add(root);
     this._buildScreen(root);
     return root;
@@ -341,11 +350,11 @@ export class TvRoom {
     this.camera.aspect = aspect;
     // On tall screens a fixed vertical FOV would crop the room down to the
     // television, so keep a usable horizontal field of view instead.
-    const targetHorizontal = THREE.MathUtils.degToRad(66);
+    const targetHorizontal = THREE.MathUtils.degToRad(64);
     const verticalForWidth = THREE.MathUtils.radToDeg(
       2 * Math.atan(Math.tan(targetHorizontal / 2) / aspect)
     );
-    this.camera.fov = Math.min(80, Math.max(44, verticalForWidth));
+    this.camera.fov = Math.min(70, Math.max(44, verticalForWidth));
     this.camera.updateProjectionMatrix();
   }
 

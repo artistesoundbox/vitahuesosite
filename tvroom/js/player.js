@@ -9,7 +9,7 @@
  */
 
 const HLS_MODULE = 'https://unpkg.com/hls.js@1.7.3/dist/hls.mjs';
-const START_TIMEOUT = 17000;
+const START_TIMEOUT = 14000;
 
 let hlsPromise = null;
 function loadHls() {
@@ -108,6 +108,7 @@ export class LivePlayer {
     this._hls = null;
     this._watchdog = 0;
     this._recoveries = 0;
+    this._levelErrors = 0;
     this._host = null;
     this._listeners = new Map();
     this._token = 0;
@@ -221,7 +222,16 @@ export class LivePlayer {
   }
 
   _onHlsError(data, Hls) {
-    if (!data || !data.fatal) return;
+    if (!data) return;
+    if (!data.fatal) {
+      // Playlist-level failures are retried by hls.js and never escalate to
+      // fatal, so a CORS-blocked level would sit on "loading" forever.
+      if (data.details === 'levelLoadError' || data.details === 'levelLoadTimeOut') {
+        this._levelErrors += 1;
+        if (this._levelErrors >= 3) this._fail(describeFailure(data.details));
+      }
+      return;
+    }
     const type = data.type;
     if (type === Hls.ErrorTypes.NETWORK_ERROR && this._recoveries < 1) {
       this._recoveries += 1;
@@ -253,6 +263,7 @@ export class LivePlayer {
     const token = ++this._token;
     this.channel = channel;
     this._recoveries = 0;
+    this._levelErrors = 0;
     this._teardown();
     this._setState('loading');
     this._emit('channel', channel);
