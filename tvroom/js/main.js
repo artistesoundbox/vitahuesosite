@@ -17,27 +17,11 @@ const $ = (id) => document.getElementById(id);
  */
 const FEATURED = [
   {
-    name: 'NASA TV',
-    group: 'Science',
-    country: 'US',
-    countryName: 'United States',
-    url: 'https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8',
-    playable: true,
-  },
-  {
-    name: 'France 24 English',
-    group: 'News',
-    country: 'FR',
-    countryName: 'France',
-    url: 'https://static.france24.com/live/F24_EN_LO_HLS/live_web.m3u8',
-    playable: true,
-  },
-  {
-    name: 'DW English',
-    group: 'News',
-    country: 'DE',
-    countryName: 'Germany',
-    url: 'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
+    name: 'Red Bull TV',
+    group: 'Sports',
+    country: 'AT',
+    countryName: 'Austria',
+    url: 'https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8',
     playable: true,
   },
   {
@@ -49,11 +33,19 @@ const FEATURED = [
     playable: true,
   },
   {
-    name: 'Red Bull TV',
-    group: 'Sports',
-    country: 'AT',
-    countryName: 'Austria',
-    url: 'https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8',
+    name: 'DW English',
+    group: 'News',
+    country: 'DE',
+    countryName: 'Germany',
+    url: 'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
+    playable: true,
+  },
+  {
+    name: 'NASA TV',
+    group: 'Science',
+    country: 'US',
+    countryName: 'United States',
+    url: 'https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8',
     playable: true,
   },
 ];
