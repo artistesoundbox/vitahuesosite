@@ -163,7 +163,14 @@ export class Radio extends EventTarget {
       this.emitState();
     });
 
-    a.addEventListener('ended', () => this.handleEnded());
+    /* Chrome/Safari can fire a stale `ended` for the source that a new
+       assignment just aborted. Only a real end (ended === true AND the src of
+       the track we think we are playing) may advance the broadcast. */
+    a.addEventListener('ended', () => {
+      if (!a.ended) return;
+      if (a.getAttribute('src') !== this.srcFor(this.track)) return;
+      this.handleEnded();
+    });
 
     a.addEventListener('error', () => {
       if (!a.getAttribute('src')) return;
@@ -284,7 +291,7 @@ export class Radio extends EventTarget {
         } else if (this.track?.world) {
           /* No drift correction on a live stream: the encoder is the clock. */
           this.emitTime();
-        } else if (Math.abs(this.audio.currentTime - state.offset) > 12) {
+        } else if (this.entry.key === state.entry.key && Math.abs(this.audio.currentTime - state.offset) > 12) {
           try { this.audio.currentTime = state.offset; } catch { /* not seekable yet */ }
         }
       }

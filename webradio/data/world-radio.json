@@ -2,7 +2,7 @@
   "source": "Radio Browser (radio-browser.info)",
   "note": "Public internet radio streams. Each station is owned by its broadcaster; the station name links back to its homepage.",
   "generated": "2026-10-23",
-  "count": 168,
+  "count": 169,
   "stations": [
     {
       "id": "w01",
@@ -22,6 +22,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://radiodimensionemix.torontocast.stream/",
+      "lat": 43.63789777781491,
+      "lon": -79.38755268995014,
+      "geo": "station",
       "votes": 4878
     },
     {
@@ -40,6 +43,9 @@
       "codec": "AAC",
       "bitrate": 128,
       "homepage": "https://m80.iol.pt/",
+      "lat": 38.70908932739828,
+      "lon": -9.151954650878908,
+      "geo": "station",
       "votes": 2085
     },
     {
@@ -54,7 +60,10 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "",
-      "votes": 11321
+      "lat": 26.8,
+      "lon": 30.8,
+      "geo": "country",
+      "votes": 11322
     },
     {
       "id": "w04",
@@ -74,6 +83,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://musica80.radioclub.es/",
+      "lat": 40.5,
+      "lon": -3.7,
+      "geo": "country",
       "votes": 20140
     },
     {
@@ -93,6 +105,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "",
+      "lat": 50.3115,
+      "lon": 11.923,
+      "geo": "station",
       "votes": 11048
     },
     {
@@ -113,6 +128,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "",
+      "lat": 50.3115,
+      "lon": 11.923,
+      "geo": "station",
       "votes": 18339
     },
     {
@@ -132,6 +150,9 @@
       "codec": "AAC+",
       "bitrate": 96,
       "homepage": "https://www.crc.cr/crc103-1/",
+      "lat": 9.7,
+      "lon": -83.8,
+      "geo": "country",
       "votes": 353
     },
     {
@@ -152,7 +173,10 @@
       "codec": "MP3",
       "bitrate": 0,
       "homepage": "https://www.70-80.it/",
-      "votes": 13590
+      "lat": 41.9,
+      "lon": 12.6,
+      "geo": "country",
+      "votes": 13591
     },
     {
       "id": "w09",
@@ -170,6 +194,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.radio-australia.org/",
+      "lat": -32.97549066584426,
+      "lon": 146.42578125000003,
+      "geo": "station",
       "votes": 910
     },
     {
@@ -187,6 +214,9 @@
       "codec": "AAC+",
       "bitrate": 128,
       "homepage": "https://www.radiorock.com.br/",
+      "lat": -14.2,
+      "lon": -51.9,
+      "geo": "country",
       "votes": 7264
     },
     {
@@ -205,6 +235,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://8radio.com/",
+      "lat": 53.4,
+      "lon": -8.2,
+      "geo": "country",
       "votes": 1117
     },
     {
@@ -221,30 +254,13 @@
       "codec": "MP3",
       "bitrate": 96,
       "homepage": "https://www.loveradio.com.ph/dagupan",
+      "lat": 12.9,
+      "lon": 121.8,
+      "geo": "country",
       "votes": 2569
     },
     {
       "id": "w13",
-      "name": "Adroit Jazz Underground",
-      "country": "The United States Of America",
-      "countrycode": "US",
-      "flag": "🇺🇸",
-      "place": "New York",
-      "tags": [
-        "avant-garde",
-        "bebop",
-        "big band",
-        "bop",
-        "combos"
-      ],
-      "url": "https://icecast.walmradio.com:8443/jazz",
-      "codec": "MP3",
-      "bitrate": 320,
-      "homepage": "https://walmradio.com/jazz",
-      "votes": 184426
-    },
-    {
-      "id": "w14",
       "name": "Amapiano FM",
       "country": "South Africa",
       "countrycode": "ZA",
@@ -255,10 +271,13 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://radiosa.org/amapiano/",
+      "lat": -30.6,
+      "lon": 22.9,
+      "geo": "country",
       "votes": 3070
     },
     {
-      "id": "w15",
+      "id": "w14",
       "name": "Anime Para Ti",
       "country": "Japan",
       "countrycode": "JP",
@@ -274,10 +293,13 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.facebook.com/radioanimeparati",
+      "lat": 36.2,
+      "lon": 138.3,
+      "geo": "country",
       "votes": 4927
     },
     {
-      "id": "w16",
+      "id": "w15",
       "name": "Arrow Classic Rock",
       "country": "The Netherlands",
       "countrycode": "NL",
@@ -292,10 +314,13 @@
       "codec": "MP3",
       "bitrate": 96,
       "homepage": "https://www.arrow.nl/",
+      "lat": 52.212081295561816,
+      "lon": 4.437576817581431,
+      "geo": "station",
       "votes": 6370
     },
     {
-      "id": "w17",
+      "id": "w16",
       "name": "Babel",
       "country": "Uruguay",
       "countrycode": "UY",
@@ -312,10 +337,13 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://babel.uy/",
+      "lat": -32.5,
+      "lon": -55.8,
+      "geo": "country",
       "votes": 668
     },
     {
-      "id": "w18",
+      "id": "w17",
       "name": "Best FM Ljubljana",
       "country": "Slovenia",
       "countrycode": "SI",
@@ -326,10 +354,13 @@
       "codec": "MP3",
       "bitrate": 0,
       "homepage": "https://bestfm.svet24.si/live/radio.html",
+      "lat": 46.2,
+      "lon": 15,
+      "geo": "country",
       "votes": 1428
     },
     {
-      "id": "w19",
+      "id": "w18",
       "name": "BG Estrada",
       "country": "Bulgaria",
       "countrycode": "BG",
@@ -342,10 +373,13 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://bgradio.bg/",
+      "lat": 42.6977,
+      "lon": 23.3219,
+      "geo": "station",
       "votes": 6792
     },
     {
-      "id": "w20",
+      "id": "w19",
       "name": "Big B Radio - Kpop",
       "country": "The Republic Of Korea",
       "countrycode": "KR",
@@ -359,10 +393,13 @@
       "codec": "MP3",
       "bitrate": 192,
       "homepage": "https://bigbradio.net/kpop",
+      "lat": 35.9,
+      "lon": 127.8,
+      "geo": "country",
       "votes": 2699
     },
     {
-      "id": "w21",
+      "id": "w20",
       "name": "Bollywood Gaane Purane",
       "country": "India",
       "countrycode": "IN",
@@ -373,10 +410,13 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://gaanepurane.my-free.website/",
+      "lat": 20.6,
+      "lon": 79,
+      "geo": "country",
       "votes": 42891
     },
     {
-      "id": "w22",
+      "id": "w21",
       "name": "Cadena 3 Cordoba",
       "country": "Argentina",
       "countrycode": "AR",
@@ -389,10 +429,13 @@
       "codec": "MP3",
       "bitrate": 0,
       "homepage": "https://www.cadena3.com/radio-en-vivo/cadena-3",
+      "lat": -38.4,
+      "lon": -63.6,
+      "geo": "country",
       "votes": 1774
     },
     {
-      "id": "w23",
+      "id": "w22",
       "name": "Café Romántico Radio (Monterrey)",
       "country": "Mexico",
       "countrycode": "MX",
@@ -409,10 +452,13 @@
       "codec": "AAC",
       "bitrate": 96,
       "homepage": "https://caferomanticoradio.com/",
+      "lat": 25.681874597616083,
+      "lon": -100.31607627868654,
+      "geo": "station",
       "votes": 14874
     },
     {
-      "id": "w24",
+      "id": "w23",
       "name": "Campus Radio Kenya",
       "country": "Kenya",
       "countrycode": "KE",
@@ -423,10 +469,13 @@
       "codec": "AAC",
       "bitrate": 96,
       "homepage": "https://www.campusradio.co.ke/",
+      "lat": 0,
+      "lon": 37.9,
+      "geo": "country",
       "votes": 277
     },
     {
-      "id": "w25",
+      "id": "w24",
       "name": "Canal Radio Cruces Cienfuegos",
       "country": "Cuba",
       "countrycode": "CU",
@@ -437,10 +486,13 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://canalradio.caster.fm/",
+      "lat": 21.5,
+      "lon": -77.8,
+      "geo": "country",
       "votes": 629
     },
     {
-      "id": "w26",
+      "id": "w25",
       "name": "Caracas. Salsa Romántica...",
       "country": "Bolivarian Republic Of Venezuela",
       "countrycode": "VE",
@@ -454,10 +506,13 @@
       "codec": "AAC",
       "bitrate": 128,
       "homepage": "https://zeno.fm/radio/caracas-salsa-romantica-cmej/",
+      "lat": 6.4,
+      "lon": -66.6,
+      "geo": "country",
       "votes": 1237
     },
     {
-      "id": "w27",
+      "id": "w26",
       "name": "CBS 파워라디오 [Music FM]",
       "country": "The Republic Of Korea",
       "countrycode": "KR",
@@ -470,10 +525,13 @@
       "codec": "MP3",
       "bitrate": 0,
       "homepage": "https://cbsfm.modoo.at/",
+      "lat": 35.9,
+      "lon": 127.8,
+      "geo": "country",
       "votes": 305
     },
     {
-      "id": "w28",
+      "id": "w27",
       "name": "Cherry Radio Music 247",
       "country": "Vietnam",
       "countrycode": "VN",
@@ -486,10 +544,13 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "",
+      "lat": 14.1,
+      "lon": 108.3,
+      "geo": "country",
       "votes": 58
     },
     {
-      "id": "w29",
+      "id": "w28",
       "name": "ChinaGhana Fm",
       "country": "Ghana",
       "countrycode": "GH",
@@ -502,7 +563,33 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.chinaghana.com/",
+      "lat": 7.9,
+      "lon": -1,
+      "geo": "country",
       "votes": 1682
+    },
+    {
+      "id": "w29",
+      "name": "Christmas Vinyl HD",
+      "country": "The United States Of America",
+      "countrycode": "US",
+      "flag": "🇺🇸",
+      "place": "New York",
+      "tags": [
+        "christian",
+        "christmas",
+        "easy listening",
+        "hd",
+        "holiday"
+      ],
+      "url": "https://icecast.walmradio.com:8443/christmas",
+      "codec": "MP3",
+      "bitrate": 320,
+      "homepage": "https://walmradio.com/christmas",
+      "lat": 40.75166,
+      "lon": -73.97538,
+      "geo": "station",
+      "votes": 170731
     },
     {
       "id": "w30",
@@ -516,6 +603,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://citinewsroom.com/livestream/",
+      "lat": 6.594760977509223,
+      "lon": -1.40625,
+      "geo": "station",
       "votes": 4820
     },
     {
@@ -536,30 +626,13 @@
       "codec": "AAC",
       "bitrate": 192,
       "homepage": "",
+      "lat": 39.5,
+      "lon": -98.4,
+      "geo": "country",
       "votes": 59041
     },
     {
       "id": "w32",
-      "name": "Classic Vinyl HD",
-      "country": "The United States Of America",
-      "countrycode": "US",
-      "flag": "🇺🇸",
-      "place": "New York",
-      "tags": [
-        "1930",
-        "1940",
-        "1950",
-        "1960",
-        "beautiful music"
-      ],
-      "url": "https://icecast.walmradio.com:8443/classic",
-      "codec": "MP3",
-      "bitrate": 320,
-      "homepage": "https://walmradio.com/classic",
-      "votes": 308756
-    },
-    {
-      "id": "w33",
       "name": "Cumbias Inmortales Radio (Monterrey)",
       "country": "Mexico",
       "countrycode": "MX",
@@ -576,10 +649,13 @@
       "codec": "AAC",
       "bitrate": 96,
       "homepage": "",
+      "lat": 25.682611854984852,
+      "lon": -100.31564712524415,
+      "geo": "station",
       "votes": 13132
     },
     {
-      "id": "w34",
+      "id": "w33",
       "name": "DAMAR TURK FM",
       "country": "Türkiye",
       "countrycode": "TR",
@@ -590,10 +666,13 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.damarturkfm.com/",
+      "lat": 38.9,
+      "lon": 35.2,
+      "geo": "country",
       "votes": 16904
     },
     {
-      "id": "w35",
+      "id": "w34",
       "name": "Dance Wave Retro!",
       "country": "Hungary",
       "countrycode": "HU",
@@ -606,10 +685,13 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://dancewave.online/",
+      "lat": 47.2,
+      "lon": 19.5,
+      "geo": "country",
       "votes": 54938
     },
     {
-      "id": "w36",
+      "id": "w35",
       "name": "Dance Wave!",
       "country": "Hungary",
       "countrycode": "HU",
@@ -622,10 +704,13 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://dancewave.online/",
-      "votes": 573405
+      "lat": 47.2,
+      "lon": 19.5,
+      "geo": "country",
+      "votes": 573408
     },
     {
-      "id": "w37",
+      "id": "w36",
       "name": "DFM RUSSIAN DANCE",
       "country": "The Russian Federation",
       "countrycode": "RU",
@@ -638,10 +723,13 @@
       "codec": "AAC+",
       "bitrate": 96,
       "homepage": "https://dfm.ru/",
+      "lat": 61.5,
+      "lon": 105.3,
+      "geo": "country",
       "votes": 55519
     },
     {
-      "id": "w38",
+      "id": "w37",
       "name": "DFM Дискач 90-х",
       "country": "The Russian Federation",
       "countrycode": "RU",
@@ -656,10 +744,13 @@
       "codec": "AAC",
       "bitrate": 96,
       "homepage": "https://dfm.ru/",
+      "lat": 61.5,
+      "lon": 105.3,
+      "geo": "country",
       "votes": 56002
     },
     {
-      "id": "w39",
+      "id": "w38",
       "name": "DJ Shaggy Venezuela Radio",
       "country": "Bolivarian Republic Of Venezuela",
       "countrycode": "VE",
@@ -675,10 +766,13 @@
       "codec": "AAC+",
       "bitrate": 128,
       "homepage": "https://djshaggyvenezuela.com/",
+      "lat": 6.4,
+      "lon": -66.6,
+      "geo": "country",
       "votes": 1371
     },
     {
-      "id": "w40",
+      "id": "w39",
       "name": "Doubleclap Radio",
       "country": "Finland",
       "countrycode": "FI",
@@ -695,10 +789,13 @@
       "codec": "MP3",
       "bitrate": 192,
       "homepage": "https://doubleclap.dance/",
+      "lat": 61.9,
+      "lon": 25.7,
+      "geo": "country",
       "votes": 544
     },
     {
-      "id": "w41",
+      "id": "w40",
       "name": "Easy FM",
       "country": "Lithuania",
       "countrycode": "LT",
@@ -714,10 +811,13 @@
       "codec": "MP3",
       "bitrate": 256,
       "homepage": "https://www.ziniuradijas.lt/easy-fm/",
+      "lat": 55.2,
+      "lon": 23.9,
+      "geo": "country",
       "votes": 3436
     },
     {
-      "id": "w42",
+      "id": "w41",
       "name": "El Sol (Medellín) 107.9 FM",
       "country": "Colombia",
       "countrycode": "CO",
@@ -730,10 +830,13 @@
       "codec": "AAC",
       "bitrate": 125,
       "homepage": "https://elsol.rcnradio.com/?city=Medellin",
+      "lat": 4.6,
+      "lon": -74.3,
+      "geo": "country",
       "votes": 2363
     },
     {
-      "id": "w43",
+      "id": "w42",
       "name": "Emisora de Radio \"ATodaMecha\"",
       "country": "Cuba",
       "countrycode": "CU",
@@ -747,7 +850,27 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "",
+      "lat": 20.92296241226858,
+      "lon": -79.36523437500001,
+      "geo": "station",
       "votes": 444
+    },
+    {
+      "id": "w43",
+      "name": "ESKA ROCK",
+      "country": "Poland",
+      "countrycode": "PL",
+      "flag": "🇵🇱",
+      "place": "Poland",
+      "tags": [],
+      "url": "https://ic2.smcdn.pl/5380-1.mp3#ESKA_ROCK",
+      "codec": "MP3",
+      "bitrate": 128,
+      "homepage": "https://www.eskarock.pl/",
+      "lat": 51.9,
+      "lon": 19.1,
+      "geo": "country",
+      "votes": 9197
     },
     {
       "id": "w44",
@@ -767,7 +890,10 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://eurodance90.fr/",
-      "votes": 43773
+      "lat": 46.2,
+      "lon": 2.2,
+      "geo": "country",
+      "votes": 43774
     },
     {
       "id": "w45",
@@ -783,7 +909,10 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.europa2.sk/",
-      "votes": 3913
+      "lat": 48.7,
+      "lon": 19.7,
+      "geo": "country",
+      "votes": 3914
     },
     {
       "id": "w46",
@@ -803,6 +932,9 @@
       "codec": "MP3",
       "bitrate": 96,
       "homepage": "https://www.facebook.com/exafmguatemala/",
+      "lat": 14.626030940165991,
+      "lon": -90.51652908325195,
+      "geo": "station",
       "votes": 3793
     },
     {
@@ -821,6 +953,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.extremedeephouse.com/",
+      "lat": 42.7,
+      "lon": 25.5,
+      "geo": "country",
       "votes": 1532
     },
     {
@@ -837,6 +972,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://radio.ma.co/",
+      "lat": 31.8,
+      "lon": -7.1,
+      "geo": "country",
       "votes": 6283
     },
     {
@@ -851,6 +989,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://fidelitypr.com/",
+      "lat": 18.2,
+      "lon": -66.6,
+      "geo": "country",
       "votes": 609
     },
     {
@@ -865,6 +1006,9 @@
       "codec": "MP3",
       "bitrate": 192,
       "homepage": "https://finestfm.fi/",
+      "lat": 58.6,
+      "lon": 25,
+      "geo": "country",
       "votes": 1429
     },
     {
@@ -879,6 +1023,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "",
+      "lat": -32.5,
+      "lon": -55.8,
+      "geo": "country",
       "votes": 2067
     },
     {
@@ -895,6 +1042,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.facebook.com/profile.php?id=100063864529826",
+      "lat": 14.5,
+      "lon": -14.5,
+      "geo": "country",
       "votes": 2968
     },
     {
@@ -915,6 +1065,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://fm4.orf.at/",
+      "lat": 48.1776994,
+      "lon": 16.2877707,
+      "geo": "station",
       "votes": 2500
     },
     {
@@ -935,6 +1088,9 @@
       "codec": "MP3",
       "bitrate": 320,
       "homepage": "",
+      "lat": -35.81335872633349,
+      "lon": 141.85546875000003,
+      "geo": "station",
       "votes": 762
     },
     {
@@ -949,6 +1105,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "",
+      "lat": 50.5,
+      "lon": 4.5,
+      "geo": "country",
       "votes": 3000
     },
     {
@@ -963,6 +1122,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://fyah105.com/",
+      "lat": 18.1,
+      "lon": -77.3,
+      "geo": "country",
       "votes": 1215
     },
     {
@@ -980,6 +1142,9 @@
       "codec": "MP3",
       "bitrate": 256,
       "homepage": "https://gensokyoradio.net/",
+      "lat": 36.2,
+      "lon": 138.3,
+      "geo": "country",
       "votes": 2405
     },
     {
@@ -996,6 +1161,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://stream.zeno.fm/kvudezx1h2zuv",
+      "lat": 0,
+      "lon": 37.9,
+      "geo": "country",
       "votes": 1277
     },
     {
@@ -1010,6 +1178,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://glz.co.il/%D7%92%D7%9C%D7%92%D7%9C%D7%A6",
+      "lat": 31,
+      "lon": 34.9,
+      "geo": "country",
       "votes": 3092
     },
     {
@@ -1030,7 +1201,10 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.mygoldmusic.co.uk/",
-      "votes": 18809
+      "lat": 55.4,
+      "lon": -3.4,
+      "geo": "country",
+      "votes": 18810
     },
     {
       "id": "w61",
@@ -1044,6 +1218,9 @@
       "codec": "AAC",
       "bitrate": 128,
       "homepage": "https://zeno.fm/goldy-fm/",
+      "lat": 20.6,
+      "lon": 79,
+      "geo": "country",
       "votes": 26847
     },
     {
@@ -1064,6 +1241,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.gospelfmjamaica.com/",
+      "lat": 18.1,
+      "lon": -77.3,
+      "geo": "country",
       "votes": 1930
     },
     {
@@ -1084,6 +1264,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://gospotainment.com/",
+      "lat": 9.1,
+      "lon": 8.7,
+      "geo": "country",
       "votes": 1141
     },
     {
@@ -1102,6 +1285,9 @@
       "codec": "MP3",
       "bitrate": 160,
       "homepage": "https://www.hanoicommunityradio.com/",
+      "lat": 14.1,
+      "lon": 108.3,
+      "geo": "country",
       "votes": 50
     },
     {
@@ -1122,6 +1308,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.heart.co.uk/80s",
+      "lat": 55.4,
+      "lon": -3.4,
+      "geo": "country",
       "votes": 36224
     },
     {
@@ -1139,6 +1328,9 @@
       "codec": "MP3",
       "bitrate": 96,
       "homepage": "https://hot102pr.com/",
+      "lat": 18.456032561247593,
+      "lon": -66.09718322753908,
+      "geo": "station",
       "votes": 1091
     },
     {
@@ -1153,6 +1345,9 @@
       "codec": "MP3",
       "bitrate": 320,
       "homepage": "https://badradio.nz/",
+      "lat": -40.9,
+      "lon": 174.9,
+      "geo": "country",
       "votes": 300
     },
     {
@@ -1173,7 +1368,10 @@
       "codec": "MP3",
       "bitrate": 256,
       "homepage": "https://www.intenseradio.net/",
-      "votes": 51438
+      "lat": 52.00352,
+      "lon": 4.16072,
+      "geo": "station",
+      "votes": 51439
     },
     {
       "id": "w69",
@@ -1189,6 +1387,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.jakarandafm.com/",
+      "lat": -30.6,
+      "lon": 22.9,
+      "geo": "country",
       "votes": 1869
     },
     {
@@ -1205,6 +1406,9 @@
       "codec": "AAC",
       "bitrate": 0,
       "homepage": "https://www.jozifm.co.za/",
+      "lat": -30.6,
+      "lon": 22.9,
+      "geo": "country",
       "votes": 1571
     },
     {
@@ -1219,6 +1423,9 @@
       "codec": "AAC",
       "bitrate": 127,
       "homepage": "https://www.mediamax.app/kameme-fm",
+      "lat": 0,
+      "lon": 37.9,
+      "geo": "country",
       "votes": 2131
     },
     {
@@ -1237,6 +1444,9 @@
       "codec": "MP3",
       "bitrate": 192,
       "homepage": "https://emisorasunidas.com/kiss977/",
+      "lat": 15.8,
+      "lon": -90.2,
+      "geo": "country",
       "votes": 2846
     },
     {
@@ -1253,6 +1463,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.kissfm.ua/",
+      "lat": 50.482840660446655,
+      "lon": 30.485866806375277,
+      "geo": "station",
       "votes": 9479
     },
     {
@@ -1267,6 +1480,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://live.radyositesihazir.com/8032/stream",
+      "lat": 38.9,
+      "lon": 35.2,
+      "geo": "country",
       "votes": 10648
     },
     {
@@ -1287,6 +1503,9 @@
       "codec": "MP3",
       "bitrate": 96,
       "homepage": "https://la100.cienradios.com/",
+      "lat": -34.60169564406928,
+      "lon": -58.43730926513672,
+      "geo": "station",
       "votes": 4392
     },
     {
@@ -1307,6 +1526,9 @@
       "codec": "AAC+",
       "bitrate": 192,
       "homepage": "https://www.kebuena.com.mx/",
+      "lat": 23.6,
+      "lon": -102.6,
+      "geo": "country",
       "votes": 9801
     },
     {
@@ -1327,6 +1549,9 @@
       "codec": "MP3",
       "bitrate": 192,
       "homepage": "https://www.ecuatorianita.com/",
+      "lat": -1.8,
+      "lon": -78.2,
+      "geo": "country",
       "votes": 690
     },
     {
@@ -1347,6 +1572,9 @@
       "codec": "AAC",
       "bitrate": 125,
       "homepage": "",
+      "lat": 4.6,
+      "lon": -74.3,
+      "geo": "country",
       "votes": 6711
     },
     {
@@ -1365,6 +1593,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.laretro.cl/",
+      "lat": -35.7,
+      "lon": -71.5,
+      "geo": "country",
       "votes": 6443
     },
     {
@@ -1381,6 +1612,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://stream.zeno.fm/uf2r0d5ny39uv",
+      "lat": 26.59343927024179,
+      "lon": -81.63208007812501,
+      "geo": "station",
       "votes": 308
     },
     {
@@ -1397,6 +1631,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://labgateradio.com/accueil/progressive-rock/",
+      "lat": 56.1,
+      "lon": -106.3,
+      "geo": "country",
       "votes": 4684
     },
     {
@@ -1413,6 +1650,9 @@
       "codec": "AAC",
       "bitrate": 128,
       "homepage": "https://www.los40.com.ec/",
+      "lat": -0.22927327360954372,
+      "lon": -78.51864337921144,
+      "geo": "station",
       "votes": 1013
     },
     {
@@ -1432,6 +1672,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.lounge.fm/",
+      "lat": 48.1993032,
+      "lon": 16.3605854,
+      "geo": "station",
       "votes": 1965
     },
     {
@@ -1446,6 +1689,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.rockradio.lv/",
+      "lat": 56.9,
+      "lon": 24.6,
+      "geo": "country",
       "votes": 833
     },
     {
@@ -1462,6 +1708,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://stream.zeno.fm/une3a02mb",
+      "lat": 31.8,
+      "lon": -7.1,
+      "geo": "country",
       "votes": 7112
     },
     {
@@ -1479,7 +1728,10 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://mangoradio.de/",
-      "votes": 828613
+      "lat": 51.2,
+      "lon": 10.4,
+      "geo": "country",
+      "votes": 828615
     },
     {
       "id": "w87",
@@ -1493,6 +1745,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.naxi.rs/exyu",
+      "lat": 44,
+      "lon": 21,
+      "geo": "country",
       "votes": 3376
     },
     {
@@ -1507,6 +1762,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.newstalk.com/",
+      "lat": 53.3485838734705,
+      "lon": -6.251220703125001,
+      "geo": "station",
       "votes": 3683
     },
     {
@@ -1523,6 +1781,9 @@
       "codec": "MP3",
       "bitrate": 192,
       "homepage": "",
+      "lat": 50.5,
+      "lon": 4.5,
+      "geo": "country",
       "votes": 2652
     },
     {
@@ -1542,6 +1803,9 @@
       "codec": "MP3",
       "bitrate": 192,
       "homepage": "https://www.nporadio5.nl/",
+      "lat": 52.1,
+      "lon": 5.3,
+      "geo": "country",
       "votes": 5654
     },
     {
@@ -1556,6 +1820,9 @@
       "codec": "AAC+",
       "bitrate": 128,
       "homepage": "https://www.okradio.net/",
+      "lat": 44,
+      "lon": 21,
+      "geo": "country",
       "votes": 10703
     },
     {
@@ -1570,7 +1837,10 @@
       "codec": "MP3",
       "bitrate": 96,
       "homepage": "",
-      "votes": 11782
+      "lat": 26.8,
+      "lon": 30.8,
+      "geo": "country",
+      "votes": 11783
     },
     {
       "id": "w93",
@@ -1587,6 +1857,9 @@
       "codec": "MP3",
       "bitrate": 192,
       "homepage": "",
+      "lat": 48.1776994,
+      "lon": 16.2877707,
+      "geo": "station",
       "votes": 2030
     },
     {
@@ -1605,6 +1878,9 @@
       "codec": "MP3",
       "bitrate": 320,
       "homepage": "https://oxygenmusic.hu/",
+      "lat": 47.2,
+      "lon": 19.5,
+      "geo": "country",
       "votes": 10961
     },
     {
@@ -1624,6 +1900,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.p12hitmix.no/",
+      "lat": 61.120930879735546,
+      "lon": 10.462401226998631,
+      "geo": "station",
       "votes": 664
     },
     {
@@ -1642,6 +1921,9 @@
       "codec": "AAC",
       "bitrate": 191,
       "homepage": "https://www.lydenavnorge.no/p5-nonstop-hits",
+      "lat": 61.120930879735546,
+      "lon": 10.462401226998631,
+      "geo": "station",
       "votes": 1136
     },
     {
@@ -1660,6 +1942,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://p6.no/",
+      "lat": 61.120930879735546,
+      "lon": 10.462401226998631,
+      "geo": "station",
       "votes": 507
     },
     {
@@ -1674,6 +1959,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://planet1075.com/",
+      "lat": 9.7,
+      "lon": -83.8,
+      "geo": "country",
       "votes": 529
     },
     {
@@ -1692,6 +1980,9 @@
       "codec": "MP3",
       "bitrate": 256,
       "homepage": "https://www.pureibizaradio.com/",
+      "lat": 40.5,
+      "lon": -3.7,
+      "geo": "country",
       "votes": 13101
     },
     {
@@ -1709,6 +2000,9 @@
       "codec": "MP3",
       "bitrate": 0,
       "homepage": "",
+      "lat": 36.2,
+      "lon": 138.3,
+      "geo": "country",
       "votes": 2269
     },
     {
@@ -1723,6 +2017,9 @@
       "codec": "MP3",
       "bitrate": 320,
       "homepage": "https://kuku.pleier.ee/",
+      "lat": 59.43096988687643,
+      "lon": 24.771423339843754,
+      "geo": "station",
       "votes": 1412
     },
     {
@@ -1737,6 +2034,9 @@
       "codec": "MP3",
       "bitrate": 0,
       "homepage": "https://103fm.maariv.co.il/",
+      "lat": 31,
+      "lon": 34.9,
+      "geo": "country",
       "votes": 3970
     },
     {
@@ -1753,7 +2053,10 @@
       "codec": "AAC",
       "bitrate": 128,
       "homepage": "https://radio357.pl/",
-      "votes": 11335
+      "lat": 51.9,
+      "lon": 19.1,
+      "geo": "country",
+      "votes": 11336
     },
     {
       "id": "w104",
@@ -1773,7 +2076,10 @@
       "codec": "MP3",
       "bitrate": 0,
       "homepage": "https://armisa.it/",
-      "votes": 27288
+      "lat": 46.332278,
+      "lon": 10.235862,
+      "geo": "station",
+      "votes": 27290
     },
     {
       "id": "w105",
@@ -1787,6 +2093,9 @@
       "codec": "MP3",
       "bitrate": 0,
       "homepage": "https://www.biobiochile.cl/",
+      "lat": -35.7,
+      "lon": -71.5,
+      "geo": "country",
       "votes": 2982
     },
     {
@@ -1801,6 +2110,9 @@
       "codec": "MP3",
       "bitrate": 96,
       "homepage": "https://web.canelaradio.com/",
+      "lat": -0.206636934558138,
+      "lon": -78.49868774414064,
+      "geo": "station",
       "votes": 3416
     },
     {
@@ -1815,6 +2127,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://radiochacaltayafm.com.bo/",
+      "lat": -16.3,
+      "lon": -63.6,
+      "geo": "country",
       "votes": 2675
     },
     {
@@ -1829,6 +2144,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://radiocomercial.pt/",
+      "lat": 39.4,
+      "lon": -8.2,
+      "geo": "country",
       "votes": 2116
     },
     {
@@ -1846,6 +2164,9 @@
       "codec": "AAC",
       "bitrate": 128,
       "homepage": "https://audioplayer.pe/corazon",
+      "lat": -9.2,
+      "lon": -75,
+      "geo": "country",
       "votes": 2332
     },
     {
@@ -1865,6 +2186,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://cumbia90.emisora.info/",
+      "lat": -16.494838647988793,
+      "lon": -68.13890218734743,
+      "geo": "station",
       "votes": 7385
     },
     {
@@ -1884,7 +2208,10 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://fm.rtvs.sk/",
-      "votes": 10099
+      "lat": 48.7,
+      "lon": 19.7,
+      "geo": "country",
+      "votes": 10100
     },
     {
       "id": "w112",
@@ -1904,6 +2231,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://radiogigantebolivia.com.bo/",
+      "lat": -16.502267989253124,
+      "lon": -68.13772201538087,
+      "geo": "station",
       "votes": 4848
     },
     {
@@ -1922,6 +2252,9 @@
       "codec": "AAC+",
       "bitrate": 128,
       "homepage": "https://www.radiohuancayo.com.pe/",
+      "lat": -9.2,
+      "lon": -75,
+      "geo": "country",
       "votes": 3812
     },
     {
@@ -1936,6 +2269,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://radioinfinita.com/",
+      "lat": 15.8,
+      "lon": -90.2,
+      "geo": "country",
       "votes": 1759
     },
     {
@@ -1955,6 +2291,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://radiokrka.si/",
+      "lat": 45.814383844698945,
+      "lon": 15.154566764831545,
+      "geo": "station",
       "votes": 1641
     },
     {
@@ -1971,6 +2310,9 @@
       "codec": "AAC",
       "bitrate": 128,
       "homepage": "",
+      "lat": -9.2,
+      "lon": -75,
+      "geo": "country",
       "votes": 3372
     },
     {
@@ -1990,6 +2332,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://zeno.fm/radio/radiolaromantica/",
+      "lat": 6.4,
+      "lon": -66.6,
+      "geo": "country",
       "votes": 1367
     },
     {
@@ -2006,6 +2351,9 @@
       "codec": "MP3",
       "bitrate": 0,
       "homepage": "",
+      "lat": 44,
+      "lon": 21,
+      "geo": "country",
       "votes": 3946
     },
     {
@@ -2022,6 +2370,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "",
+      "lat": 40.5,
+      "lon": -3.7,
+      "geo": "country",
       "votes": 12182
     },
     {
@@ -2036,6 +2387,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.radiomars.ma/ar/",
+      "lat": 31.8,
+      "lon": -7.1,
+      "geo": "country",
       "votes": 6137
     },
     {
@@ -2050,6 +2404,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://radiomelody.sk/",
+      "lat": 48.7,
+      "lon": 19.7,
+      "geo": "country",
       "votes": 3697
     },
     {
@@ -2064,6 +2421,9 @@
       "codec": "MP3",
       "bitrate": 320,
       "homepage": "https://sechin.grupocentroserver.com/public/radio_mil_recuerdos_costa_rica",
+      "lat": 9.836442317442208,
+      "lon": -84.09484863281251,
+      "geo": "station",
       "votes": 1203
     },
     {
@@ -2078,7 +2438,10 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "",
-      "votes": 15923
+      "lat": 20.6,
+      "lon": 79,
+      "geo": "country",
+      "votes": 15924
     },
     {
       "id": "w124",
@@ -2098,6 +2461,9 @@
       "codec": "MP3",
       "bitrate": 0,
       "homepage": "https://radionula.com/",
+      "lat": 46.2,
+      "lon": 15,
+      "geo": "country",
       "votes": 1599
     },
     {
@@ -2118,6 +2484,9 @@
       "codec": "MP3",
       "bitrate": 0,
       "homepage": "https://fediverse.blog/~/RadioPip%C3%ADCuc%C3%BA",
+      "lat": -32.5,
+      "lon": -55.8,
+      "geo": "country",
       "votes": 1178
     },
     {
@@ -2132,6 +2501,9 @@
       "codec": "AAC",
       "bitrate": 0,
       "homepage": "https://www.radiorecord.ru/station/rus",
+      "lat": 61.5,
+      "lon": 105.3,
+      "geo": "country",
       "votes": 47041
     },
     {
@@ -2146,6 +2518,9 @@
       "codec": "MP3",
       "bitrate": 96,
       "homepage": "",
+      "lat": -38.4,
+      "lon": -63.6,
+      "geo": "country",
       "votes": 6750
     },
     {
@@ -2160,6 +2535,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://radiosol.cl/",
+      "lat": -35.7,
+      "lon": -71.5,
+      "geo": "country",
       "votes": 4773
     },
     {
@@ -2178,6 +2556,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://radiothiossane.net/",
+      "lat": 14.5,
+      "lon": -14.5,
+      "geo": "country",
       "votes": 2552
     },
     {
@@ -2192,6 +2573,9 @@
       "codec": "MP3",
       "bitrate": 320,
       "homepage": "https://www.radiovoima.fi/",
+      "lat": 61.9,
+      "lon": 25.7,
+      "geo": "country",
       "votes": 337
     },
     {
@@ -2208,6 +2592,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://live.radyositesihazir.com/8078/stream",
+      "lat": 38.9,
+      "lon": 35.2,
+      "geo": "country",
       "votes": 14258
     },
     {
@@ -2228,6 +2615,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://radiosuitenetwork.torontocast.stream/",
+      "lat": 43.6266250623248,
+      "lon": -79.385261896897,
+      "geo": "station",
       "votes": 8518
     },
     {
@@ -2245,6 +2635,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://relaxfm.lt/",
+      "lat": 55.2,
+      "lon": 23.9,
+      "geo": "country",
       "votes": 4417
     },
     {
@@ -2261,6 +2654,9 @@
       "codec": "AAC",
       "bitrate": 96,
       "homepage": "",
+      "lat": 60.1,
+      "lon": 18.6,
+      "geo": "country",
       "votes": 1551
     },
     {
@@ -2277,6 +2673,9 @@
       "codec": "MP3",
       "bitrate": 320,
       "homepage": "https://sky.ee/rockfm",
+      "lat": 59.43348416306439,
+      "lon": 24.746429426595572,
+      "geo": "station",
       "votes": 5196
     },
     {
@@ -2296,6 +2695,9 @@
       "codec": "AAC+",
       "bitrate": 128,
       "homepage": "https://rri.co.id/",
+      "lat": -0.8,
+      "lon": 113.9,
+      "geo": "country",
       "votes": 4044
     },
     {
@@ -2310,6 +2712,9 @@
       "codec": "AAC",
       "bitrate": 0,
       "homepage": "https://www.rts.sn/",
+      "lat": 14.711400429396372,
+      "lon": -17.45597949997248,
+      "geo": "station",
       "votes": 5564
     },
     {
@@ -2327,6 +2732,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://sbfmparepare.radio12345.com/",
+      "lat": -0.8,
+      "lon": 113.9,
+      "geo": "country",
       "votes": 3583
     },
     {
@@ -2341,6 +2749,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://radio.modernghana.com/station/shattamovementradio",
+      "lat": 7.9,
+      "lon": -1,
+      "geo": "country",
       "votes": 209
     },
     {
@@ -2359,6 +2770,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.vip-radios.fm/station/smooth-jazz-lounge",
+      "lat": -14.2,
+      "lon": -51.9,
+      "geo": "country",
       "votes": 5015
     },
     {
@@ -2373,6 +2787,9 @@
       "codec": "MP3",
       "bitrate": 0,
       "homepage": "https://splashfm1055.com/",
+      "lat": 9.1,
+      "lon": 8.7,
+      "geo": "country",
       "votes": 1866
     },
     {
@@ -2387,6 +2804,9 @@
       "codec": "AAC",
       "bitrate": 96,
       "homepage": "",
+      "lat": 12.9,
+      "lon": 121.8,
+      "geo": "country",
       "votes": 5132
     },
     {
@@ -2401,6 +2821,9 @@
       "codec": "MP3",
       "bitrate": 0,
       "homepage": "https://www.suncityradio.fm/",
+      "lat": 18.1,
+      "lon": -77.3,
+      "geo": "country",
       "votes": 1526
     },
     {
@@ -2419,6 +2842,9 @@
       "codec": "AAC",
       "bitrate": 312,
       "homepage": "https://sverigesradio.se/",
+      "lat": 60.1,
+      "lon": 18.6,
+      "geo": "country",
       "votes": 1680
     },
     {
@@ -2439,6 +2865,9 @@
       "codec": "AAC",
       "bitrate": 312,
       "homepage": "https://sverigesradio.se/",
+      "lat": 60.1,
+      "lon": 18.6,
+      "geo": "country",
       "votes": 746
     },
     {
@@ -2453,6 +2882,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://tangocopenhagen.radio/",
+      "lat": 56.3,
+      "lon": 9.5,
+      "geo": "country",
       "votes": 825
     },
     {
@@ -2467,6 +2899,9 @@
       "codec": "AAC",
       "bitrate": 130,
       "homepage": "",
+      "lat": -40.9,
+      "lon": 174.9,
+      "geo": "country",
       "votes": 304
     },
     {
@@ -2487,6 +2922,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.themusicmachine.co.uk/",
+      "lat": 55.4,
+      "lon": -3.4,
+      "geo": "country",
       "votes": 21873
     },
     {
@@ -2505,6 +2943,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.todayfm.com/",
+      "lat": 53.4,
+      "lon": -8.2,
+      "geo": "country",
       "votes": 2025
     },
     {
@@ -2521,7 +2962,10 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.tokfm.pl/Tokfm/0,0.html",
-      "votes": 10374
+      "lat": 51.9,
+      "lon": 19.1,
+      "geo": "country",
+      "votes": 10375
     },
     {
       "id": "w151",
@@ -2535,6 +2979,9 @@
       "codec": "AAC+",
       "bitrate": 256,
       "homepage": "https://www.tomorrowland.com/home/radio",
+      "lat": 50.5,
+      "lon": 4.5,
+      "geo": "country",
       "votes": 3051
     },
     {
@@ -2551,6 +2998,9 @@
       "codec": "AAC+",
       "bitrate": 128,
       "homepage": "https://latina104.net/top-merengue-radio/",
+      "lat": 18.7,
+      "lon": -70.2,
+      "geo": "country",
       "votes": 2533
     },
     {
@@ -2567,6 +3017,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://topradio.lv/",
+      "lat": 56.958437707931544,
+      "lon": 24.057148282896332,
+      "geo": "station",
       "votes": 1072
     },
     {
@@ -2583,6 +3036,9 @@
       "codec": "AAC+",
       "bitrate": 128,
       "homepage": "https://latina104.net/top-salsa-radio/",
+      "lat": 18.7,
+      "lon": -70.2,
+      "geo": "country",
       "votes": 2516
     },
     {
@@ -2603,6 +3059,9 @@
       "codec": "AAC+",
       "bitrate": 128,
       "homepage": "https://latina104.net/top-urbano",
+      "lat": 18.7,
+      "lon": -70.2,
+      "geo": "country",
       "votes": 2439
     },
     {
@@ -2619,6 +3078,9 @@
       "codec": "MP3",
       "bitrate": 320,
       "homepage": "https://twitter.com/tranceisstar",
+      "lat": 48.4,
+      "lon": 31.2,
+      "geo": "country",
       "votes": 7696
     },
     {
@@ -2633,6 +3095,9 @@
       "codec": "MP3",
       "bitrate": 0,
       "homepage": "https://www.urbanradio945.com/",
+      "lat": 9.1,
+      "lon": 8.7,
+      "geo": "country",
       "votes": 1495
     },
     {
@@ -2649,6 +3114,9 @@
       "codec": "AAC",
       "bitrate": 160,
       "homepage": "https://radioplay.bg/",
+      "lat": 42.6977,
+      "lon": 23.3219,
+      "geo": "station",
       "votes": 1446
     },
     {
@@ -2663,10 +3131,35 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://www.vanillaradio.com/listen-smooth-flavors/",
+      "lat": 39.1,
+      "lon": 21.8,
+      "geo": "country",
       "votes": 5799
     },
     {
       "id": "w160",
+      "name": "WALM HD",
+      "country": "The United States Of America",
+      "countrycode": "US",
+      "flag": "🇺🇸",
+      "place": "New York",
+      "tags": [
+        "christian",
+        "christian music",
+        "contemporary christian",
+        "jesus"
+      ],
+      "url": "https://icecast.walmradio.com:8443/walm",
+      "codec": "MP3",
+      "bitrate": 320,
+      "homepage": "https://walmradio.com/walm",
+      "lat": 40.75166,
+      "lon": -73.97538,
+      "geo": "station",
+      "votes": 167603
+    },
+    {
+      "id": "w161",
       "name": "Win Radio Manila",
       "country": "The Philippines",
       "countrycode": "PH",
@@ -2677,10 +3170,13 @@
       "codec": "MP3",
       "bitrate": 192,
       "homepage": "https://winradioph.net/",
+      "lat": 12.9,
+      "lon": 121.8,
+      "geo": "country",
       "votes": 2883
     },
     {
-      "id": "w161",
+      "id": "w162",
       "name": "WUPR Éxitos 1530",
       "country": "Puerto Rico",
       "countrycode": "PR",
@@ -2693,10 +3189,13 @@
       "codec": "MP3",
       "bitrate": 185,
       "homepage": "",
+      "lat": 18.2,
+      "lon": -66.6,
+      "geo": "country",
       "votes": 684
     },
     {
-      "id": "w162",
+      "id": "w163",
       "name": "YleX",
       "country": "Finland",
       "countrycode": "FI",
@@ -2709,10 +3208,13 @@
       "codec": "AAC+",
       "bitrate": 128,
       "homepage": "https://www.ylex.fi/",
+      "lat": 59.9549142425675,
+      "lon": 24.908686056733135,
+      "geo": "station",
       "votes": 569
     },
     {
-      "id": "w163",
+      "id": "w164",
       "name": "Zeppelin 106.7",
       "country": "Greece",
       "countrycode": "GR",
@@ -2729,10 +3231,13 @@
       "codec": "MP3",
       "bitrate": 192,
       "homepage": "https://webradio.ert.gr/",
+      "lat": 38.01303667973779,
+      "lon": 23.82546186447144,
+      "geo": "station",
       "votes": 8897
     },
     {
-      "id": "w164",
+      "id": "w165",
       "name": "ZipFM",
       "country": "Lithuania",
       "countrycode": "LT",
@@ -2743,10 +3248,13 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://zipfm.lt/",
+      "lat": 55.31371246684659,
+      "lon": 24.180908203125,
+      "geo": "station",
       "votes": 2940
     },
     {
-      "id": "w165",
+      "id": "w166",
       "name": "Авторадио Латвия",
       "country": "Latvia",
       "countrycode": "LV",
@@ -2759,10 +3267,13 @@
       "codec": "AAC",
       "bitrate": 96,
       "homepage": "",
+      "lat": 56.9,
+      "lon": 24.6,
+      "geo": "country",
       "votes": 2108
     },
     {
-      "id": "w166",
+      "id": "w167",
       "name": "Первое радио 89.1FM",
       "country": "Israel",
       "countrycode": "IL",
@@ -2775,10 +3286,13 @@
       "codec": "MP3",
       "bitrate": 0,
       "homepage": "https://www.891fm.co.il/",
+      "lat": 31,
+      "lon": 34.9,
+      "geo": "country",
       "votes": 2187
     },
     {
-      "id": "w167",
+      "id": "w168",
       "name": "إذاعة محمود خليل الحصري",
       "country": "Egypt",
       "countrycode": "EG",
@@ -2789,10 +3303,13 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "",
-      "votes": 15595
+      "lat": 26.8,
+      "lon": 30.8,
+      "geo": "country",
+      "votes": 15596
     },
     {
-      "id": "w168",
+      "id": "w169",
       "name": "新西兰中文广播电台 FM90.6 Radio Chinese",
       "country": "New Zealand",
       "countrycode": "NZ",
@@ -2809,6 +3326,9 @@
       "codec": "MP3",
       "bitrate": 128,
       "homepage": "https://fm906.co.nz/",
+      "lat": -40.9,
+      "lon": 174.9,
+      "geo": "country",
       "votes": 524
     }
   ]

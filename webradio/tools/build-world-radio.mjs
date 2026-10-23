@@ -67,6 +67,45 @@ const REGION_NAMES = {
   'PE-LIM': 'Lima', 'UY-MO': 'Montevideo'
 };
 
+/* Approximate country centres, for the globe in the tuner card. The directory
+   only occasionally carries station coordinates, so the country centroid is the
+   honest fallback — the pin says "a station in this country", not "this street". */
+const COUNTRY_GEO = {
+  AE: [23.4, 53.8], AL: [41.2, 20.2], AM: [40.1, 45.0], AO: [-11.2, 17.9],
+  AR: [-38.4, -63.6], AT: [47.5, 14.6], AU: [-25.3, 133.8], AZ: [40.1, 47.6],
+  BA: [43.9, 17.7], BD: [23.7, 90.4], BE: [50.5, 4.5], BG: [42.7, 25.5],
+  BH: [26.1, 50.6], BO: [-16.3, -63.6], BR: [-14.2, -51.9], BY: [53.7, 27.9],
+  CA: [56.1, -106.3], CH: [46.8, 8.2], CL: [-35.7, -71.5], CM: [7.4, 12.4],
+  CN: [35.9, 104.2], CO: [4.6, -74.3], CR: [9.7, -83.8], CU: [21.5, -77.8],
+  CW: [12.2, -69.0], CY: [35.1, 33.4], CZ: [49.8, 15.5], DE: [51.2, 10.4],
+  DK: [56.3, 9.5], DO: [18.7, -70.2], DZ: [28.0, 1.7], EC: [-1.8, -78.2],
+  EE: [58.6, 25.0], EG: [26.8, 30.8], ES: [40.5, -3.7], ET: [9.1, 40.5],
+  FI: [61.9, 25.7], FJ: [-17.7, 178.1], FR: [46.2, 2.2], GB: [55.4, -3.4],
+  GE: [42.3, 43.4], GH: [7.9, -1.0], GR: [39.1, 21.8], GT: [15.8, -90.2],
+  HK: [22.3, 114.2], HN: [15.2, -86.2], HR: [45.1, 15.2], HT: [18.9, -72.3],
+  HU: [47.2, 19.5], ID: [-0.8, 113.9], IE: [53.4, -8.2], IL: [31.0, 34.9],
+  IN: [20.6, 79.0], IQ: [33.2, 43.7], IR: [32.4, 53.7], IS: [64.9, -19.0],
+  IT: [41.9, 12.6], JM: [18.1, -77.3], JO: [31.3, 36.4], JP: [36.2, 138.3],
+  KE: [-0.0, 37.9], KH: [12.6, 104.9], KR: [35.9, 127.8], KW: [29.3, 47.5],
+  KZ: [48.0, 66.9], LB: [33.9, 35.9], LK: [7.9, 80.8], LT: [55.2, 23.9],
+  LU: [49.8, 6.1], LV: [56.9, 24.6], LY: [26.3, 17.2], MA: [31.8, -7.1],
+  MD: [47.4, 28.4], ME: [42.7, 19.4], MK: [41.6, 21.7], MM: [21.9, 96.0],
+  MN: [46.9, 103.8], MT: [35.9, 14.4], MU: [-20.3, 57.6], MX: [23.6, -102.6],
+  MY: [4.2, 101.9], MZ: [-18.7, 35.5], NA: [-22.9, 18.5], NG: [9.1, 8.7],
+  NI: [12.9, -85.2], NL: [52.1, 5.3], NO: [60.5, 8.5], NP: [28.4, 84.1],
+  NZ: [-40.9, 174.9], OM: [21.0, 57.0], PA: [8.5, -80.8], PE: [-9.2, -75.0],
+  PH: [12.9, 121.8], PK: [30.4, 69.3], PL: [51.9, 19.1], PR: [18.2, -66.6],
+  PS: [31.9, 35.2], PT: [39.4, -8.2], PY: [-23.4, -58.4], QA: [25.3, 51.2],
+  RO: [45.9, 24.9], RS: [44.0, 21.0], RU: [61.5, 105.3], RW: [-2.0, 29.9],
+  SA: [23.9, 45.1], SD: [12.9, 30.2], SE: [60.1, 18.6], SG: [1.35, 103.8],
+  SI: [46.2, 15.0], SK: [48.7, 19.7], SN: [14.5, -14.5], SO: [5.2, 46.2],
+  SR: [3.9, -56.0], SV: [13.8, -88.9], SY: [34.8, 38.9], TH: [15.9, 101.0],
+  TN: [33.9, 9.5], TR: [38.9, 35.2], TT: [10.7, -61.2], TW: [23.7, 121.0],
+  TZ: [-6.4, 34.9], UA: [48.4, 31.2], UG: [1.4, 32.3], US: [39.5, -98.4],
+  UY: [-32.5, -55.8], UZ: [41.4, 64.6], VE: [6.4, -66.6], VN: [14.1, 108.3],
+  YE: [15.6, 48.5], ZA: [-30.6, 22.9], ZM: [-13.1, 27.8], ZW: [-19.0, 29.2]
+};
+
 const BAD_URL = /\.(m3u8|m3u|pls|xspf)(\?|$)/i;
 const GOOD_CODEC = /^(mp3|aac|aac\+|mpeg)$/i;
 /* Names and tags that read as a directory entry, a talk station, or a test
@@ -224,6 +263,11 @@ async function main() {
     .sort((a, b) => String(a.name).localeCompare(String(b.name)))
     .map((s, index) => {
       const cc = String(s.countrycode).toUpperCase();
+      const lat = Number(s.geo_lat);
+      const lon = Number(s.geo_long);
+      const hasGeo = s.geo_lat != null && s.geo_long != null
+        && Number.isFinite(lat) && Math.abs(lat) <= 90
+        && Number.isFinite(lon) && Math.abs(lon) <= 180;
       return {
         id: `w${String(index + 1).padStart(2, '0')}`,
         name: stationName(s.name),
@@ -236,6 +280,9 @@ async function main() {
         codec: String(s.codec || 'MP3').toUpperCase(),
         bitrate: Number(s.bitrate) || 0,
         homepage: /^https:\/\//.test(s.homepage || '') ? s.homepage : '',
+        lat: hasGeo ? lat : (COUNTRY_GEO[cc]?.[0] ?? 0),
+        lon: hasGeo ? lon : (COUNTRY_GEO[cc]?.[1] ?? 0),
+        geo: hasGeo ? 'station' : 'country',
         votes: Number(s.votes) || 0
       };
     });
