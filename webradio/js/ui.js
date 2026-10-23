@@ -825,6 +825,9 @@ function bindTuner() {
     tunerSync.region = key;
     fillTunerTowns(key);
     if (els['tuner-lean']?.checked) setLean(key);
+    /* On the studio feed the region picker is a preference, not a tuner: it
+       must not pull the listener out of the studio programme. */
+    if (getLiveSource() === 'studio') return;
     const station = WORLD_STATIONS.find((s) => s.id === town?.value);
     if (!station) return;
     tunerSync.station = station.id;

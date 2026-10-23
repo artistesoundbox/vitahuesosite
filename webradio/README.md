@@ -118,13 +118,28 @@ catalogue cuts in once an hour.
   directory publishes a region for every station and street coordinates for
   only some, so the second list is the station itself rather than an invented
   town name.
+- **Leaning.** The **Lean the feed here** switch under the picker biases the
+  clock toward that region instead of only hand-tuning one station:
+  `WORLD.leanShare` (default **0.6**) of the world slots are drawn from the
+  chosen region and the rest still travel. The slot grid is untouched, so a
+  leaning listener crosses cities on the same :00/:10 boundaries as everyone
+  else. Two slots in the same station are merged into one entry, so a region
+  with a single station stays tuned rather than reconnecting every ten minutes.
+  The preference is per device (`localStorage`, key `vh.world.lean`); clearing
+  the switch puts the shared feed straight back.
+- **Studio feed.** The **World feed / The studio** switch at the top of the card
+  swaps programming without leaving the page: the world clock, or the
+  all-original catalogue reel end to end. The station clock keeps running
+  underneath, so switching back lands on whatever city is on the air now, and
+  the choice is remembered per device (`vh.live.source`).
 - **Near me.** The locator button asks the browser for a position and tunes the
   closest station in the list (great-circle distance over station coordinates,
   falling back to country centres), then marks you in amber on the globe.
 - **Off the clock.** Next, "Spin the dial", and clicking any city in the queue
   hand-tune a station without leaving the feed; **Rejoin live** puts you back on
   the shared clock. A hand-tuned stream shows the slot length when it came from
-  the schedule, and `LIVE` when it has no end.
+  the schedule, and `LIVE` when it has no end. A hand-tuned station plays over
+  whichever feed is selected, and rejoining returns to that feed.
 
 **Where the stations come from.** [Radio Browser](https://www.radio-browser.info),
 a free and open directory of public internet radio streams. No key, no account,
@@ -484,6 +499,15 @@ rest of `vitahuesosite`:
 - Near me: with a mocked San Juan position the locator tuned the San Juan
   station (1 km), synced both dropdowns to Puerto Rico → San Juan PR, and marked
   the listener in amber on the globe.
+- Leaning: with `WORLD.leanShare = 0.6`, a 20-day build put 61.4% of world slots
+  in the chosen region (baseline 1/169 for a single station); the same lean
+  built twice produced identical cities, clearing it restored the shared picks
+  exactly, and adjacent slots in one station were merged instead of restarting
+  the stream.
+- Studio feed: switching while a station played moved to a local MP3
+  (`readyState 4`, offset 147.9 s into the live local reel, loudness trim
+  applied); switching back resumed a real world stream at the correct slot
+  offset with its own trim. The choice survives a reload.
 - Widget/embed: inline player and floating launcher both play the live feed and
   show the world station's title, place and slot timer.
 - Layout checked at 390×844 and 320×720 with the tuner card and globe: no
