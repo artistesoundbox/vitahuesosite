@@ -14,8 +14,8 @@
   <meta property="og:title" content="Vita Hueso TV Room — a 3D living room with live TV" />
   <meta property="og:description" content="A 3D living room where the television is always on. Look around, open the viewer and zap through free live channels — or hand any stream to VLC." />
   <meta property="og:url" content="https://artistesoundbox.github.io/vitahuesosite/tvroom/" />
-  <link rel="icon" type="image/png" href="../icon-192.png" />
-  <link rel="apple-touch-icon" href="../icon-192.png" />
+  <link rel="icon" type="image/png" href="tvroomicon.png" />
+  <link rel="apple-touch-icon" href="tvroomicon.png" />
   <script type="importmap">
   {
     "imports": {
@@ -109,10 +109,16 @@
         </div>
 
         <div class="viewer-top">
-          <button class="vbtn" id="viewer-close" type="button" title="Back to the room">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6"/></svg>
-            <span>Room</span>
-          </button>
+          <div class="viewer-nav">
+            <button class="vbtn" id="viewer-close" type="button" title="Back to the room">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6"/></svg>
+              <span>Back</span>
+            </button>
+            <a class="vbtn" id="viewer-home" href="../index.html" title="Main site — Vitamina Hueso">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7M6.5 9.6V20h11V9.6"/></svg>
+              <span>Home</span>
+            </a>
+          </div>
           <div class="viewer-now">
             <i class="live-dot" aria-hidden="true"></i>
             <span class="vn-name" id="viewer-now-name">No channel</span>

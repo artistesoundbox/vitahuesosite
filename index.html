@@ -28,9 +28,9 @@
     </script>
     <style>
         /* Icon grid: 3 per row, left to right (banner above, labels under each).
-           Eleven icons plus the music chip is twelve at three across — exactly
-           four full rows rather than five, so the stack stays shorter than it was
-           — which the fit-to-screen rules at the bottom of this block like. */
+           Twelve icons plus the music chip is thirteen at three across — five
+           rows, the last one short — which the fit-to-screen rules at the bottom
+           of this block size for. */
         .button-container {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -271,6 +271,27 @@
         .music-link:hover { opacity: 1; filter: drop-shadow(0 0 12px rgba(180, 90, 255, 0.6)); }
         #music-img { display: block; width: 100%; height: auto; }
 
+        /* TV ROOM art button — its own broadcast badge, cool blue glow */
+        .tv-art-link {
+            pointer-events: auto;
+            display: block;
+            text-align: center;
+            line-height: 0;
+        }
+        #tv-art-img {
+            display: block;
+            max-width: 215px;
+            width: 100%;
+            height: auto;
+            margin: 0 auto;
+            border-radius: 50%;
+            box-shadow: 0 0 22px rgba(110, 231, 255, 0.32);
+            transition: box-shadow 0.25s ease;
+        }
+        .tv-art-link:hover #tv-art-img {
+            box-shadow: 0 0 30px rgba(110, 231, 255, 0.55);
+        }
+
         /* MOVIES art button — same spec as the PLAY art button */
         .movies-art-link {
             pointer-events: auto;
@@ -346,7 +367,7 @@
         .button-container { gap: 30px 26px; }
         .music-link { width: auto; margin: 0; }
         #site-banner-img { width: min(330px, 60vw); }
-        #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #sq-art-img, #gp-art-img, #bb-art-img, #music-img {
+        #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #sq-art-img, #gp-art-img, #bb-art-img, #tv-art-img, #music-img {
             display: block;
             margin: 0 auto;   /* keep the chip centered under the column */
             width: auto;
@@ -377,7 +398,7 @@
                 gap: 22px 10px;
                 max-width: 560px;
             }
-            #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #sq-art-img, #gp-art-img, #bb-art-img, #music-img {
+            #play-art-img, #movies-art-img, #hs-art-img, #ca-art-img, #tya-art-img, #seb-art-img, #sst-art-img, #gev-art-img, #sq-art-img, #gp-art-img, #bb-art-img, #tv-art-img, #music-img {
                 max-width: min(100%, 210px);
                 max-height: clamp(110px, 19vh, 190px);
             }
@@ -482,6 +503,13 @@
                 <a href="3rdshooter-abootonthebrave/brokenboot/index.html" class="ca-art-link" id="bb-button" aria-label="A Broken Boot On The Brave – hold the clearing and boot the attackers off the floating climb">
                     <img src="3rdshooter-abootonthebrave/abrookenbootonthebraveicon.png" alt="A Broken Boot On The Brave" id="bb-art-img" />
                     <span class="art-label">A Broken Boot</span>
+                </a>
+
+            <!-- TV ROOM — the 3D living room whose television is always live -->
+
+                <a href="tvroom/" class="tv-art-link" id="tv-button" aria-label="TV Room – step into a 3D living room and watch live channels">
+                    <img src="tvroom/tvroomicon.png" alt="TV Room – live local TV" id="tv-art-img" />
+                    <span class="art-label">TV Room</span>
                 </a>
 
         <!-- MY MUSIC — the fivetilogy on BandLab -->
