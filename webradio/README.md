@@ -420,9 +420,9 @@ rest of `vitahuesosite`:
   random per-browser id; with no keys configured the page shows 1 rather than
   inventing a number. A genuine two-device count still needs a Supabase project
   (the config values were never supplied).
-- World feed timeline: one seeded UTC day is 242 entries — 120 live-station
-  slots, 91 home songs and 31 station IDs, tiling the 24 hours with **zero gaps
-  and zero overlaps**; 83.3% world airtime, 16.5% home, 89 different cities in
+- World feed timeline: one seeded UTC day is 241 entries — 120 live-station
+  slots, 90 home songs and 31 station IDs, tiling the 24 hours with **zero gaps
+  and zero overlaps**; 83.3% world airtime, 16.5% home, 87 different cities in
   the day.
 - World streams: the built list is 169 stations in 61 countries, every one probed
   for audio at build time (HTTPS, MP3/AAC, no HLS/Ogg, no talk/news tags); a
