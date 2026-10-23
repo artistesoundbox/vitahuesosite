@@ -652,7 +652,9 @@ export class Radio extends EventTarget {
   }
 
   upNext(count = 5) {
-    if (this.mode === 'live') {
+    /* Off the clock but still on a live station, "up next" is the schedule —
+       the cities and studio sets the broadcast will reach. */
+    if (this.mode === 'live' || this.track?.world) {
       const state = getLiveState(Date.now(), Math.max(count, 6));
       return (state?.queue || []).slice(0, count).map((e) => e.track);
     }

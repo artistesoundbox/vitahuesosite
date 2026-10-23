@@ -788,7 +788,11 @@ function updateState(state) {
     lastQueueKey = queueKey;
     renderQueueList(els['queue'], state.queue, { empty: 'The AutoDJ is choosing the next track.' });
     renderQueueList(els['home-queue'], state.queue.slice(0, 4));
-    if (els['queue-count']) els['queue-count'].textContent = live ? 'World feed · live' : 'Your queue';
+    if (els['queue-count']) {
+      els['queue-count'].textContent = live
+        ? 'World feed · live'
+        : state.mode === 'world' ? 'World feed · off clock' : 'Your queue';
+    }
   }
 
   updateTuner(state);
