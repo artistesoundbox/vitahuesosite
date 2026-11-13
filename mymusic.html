@@ -164,7 +164,8 @@
     <h1>MY MUSIC</h1>
     <p class="tag">A five‑chapter journey of awakening, reflection, acceptance, transformation, and
     creation — an urban fusion saga where every album reveals a new layer of the self.
-    Music for the subconscious, by Vitamina Hueso.</p>
+    Music for the subconscious, by Vitamina Hueso. Outside the saga sit the loosies —
+    deeper messages that don’t belong to a chapter.</p>
     <a class="bl-btn" href="https://www.bandlab.com/artistesoundbox" target="_blank" rel="noopener">Open BandLab profile ↗</a>
   </header>
 
@@ -181,8 +182,8 @@
   </div>
 
   <p class="footer-note">All five chapters stream straight from BandLab — press play on any album
-  to open its player right here. The full catalog, singles, and new releases live on the
-  BandLab profile above.</p>
+  to open its player right here. The loosies play from YouTube, right here too. The full
+  catalog and new releases also live on the BandLab profile above.</p>
 
 <script>
 'use strict';
@@ -217,6 +218,12 @@ var ALBUMS = [
     id: '463efe5e-3a30-f111-8ef3-6045bd2d91c7', cover: 'covers/album5.jpg',
     desc: '“The spark of manifestation. Electric calm meets intention; the artist steps into motion, shaping worlds with quiet confidence and luminous resolve.”',
     list: ['01 · Déjalo Fluir (Let it Flow)', '02 · Azul en mis Manos', '03 · Galaxias con Ritmo', '04 · Stretch like a Cat', '05 · Drifting into Me', '06 · I Zen-ter Myself', '07 · Simply Be', '08 · Enough for Now', '09 · No More Conflicting Thoughts', '010 · Inner Light', '011 · A Flame that Doesn’t Seem to Move', '012 · Not a Goodbye but a New Welcome']
+  },
+  {
+    label: 'Loosie · 2026 · outside the fivetilogy',
+    name: 'Jesus Is Not Coming!',
+    yt: 'N4DKE3_ssBQ', cover: 'covers/loosies1.jpg',
+    desc: '“He already came, and he has been here the whole time. You are his home — so there is nothing left to wait for in the sky, and nothing he has to miss.”'
   }
 ];
 
@@ -232,20 +239,23 @@ var openPlayer = null;   // only one album player at a time
 ALBUMS.forEach(function (a) {
   var sec = document.createElement('section');
   sec.className = 'album';
+  var label = a.label || ('Chapter ' + a.n + ' · ' + a.month + ' ' + a.year + ' · ' + a.tracks + ' tracks');
+  var actions = a.yt
+    ? '<button class="play-btn">▶ Watch here</button>' +
+      '<a class="bl-link" target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=' + a.yt + '">Watch on YouTube ↗</a>'
+    : '<button class="play-btn">▶ Play the album</button>' +
+      '<a class="bl-link" target="_blank" rel="noopener" href="https://www.bandlab.com/artistesoundbox/albums/' + a.id + '">Open on BandLab ↗</a>';
   sec.innerHTML =
     '<div class="cover"><img src="' + a.cover + '" alt="' + esc(a.name) + ' cover art" loading="lazy"></div>' +
     '<div class="info">' +
-      '<div class="chapter">Chapter ' + a.n + ' · ' + a.month + ' ' + a.year + ' · ' + a.tracks + ' tracks</div>' +
+      '<div class="chapter">' + label + '</div>' +
       '<h2>' + esc(a.name) + '</h2>' +
       '<p class="desc">' + esc(a.desc) + '</p>' +
-      '<div class="actions">' +
-        '<button class="play-btn">▶ Play the album</button>' +
-        '<a class="bl-link" target="_blank" rel="noopener" href="https://www.bandlab.com/artistesoundbox/albums/' + a.id + '">Open on BandLab ↗</a>' +
-      '</div>' +
+      '<div class="actions">' + actions + '</div>' +
       '<div class="player"></div>' +
-      '<details class="tracks"><summary>Track list</summary><ol>' +
+      (a.list ? '<details class="tracks"><summary>Track list</summary><ol>' +
         a.list.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') +
-      '</ol></details>' +
+      '</ol></details>' : '') +
     '</div>';
 
   var btn = sec.querySelector('.play-btn');
@@ -263,10 +273,12 @@ ALBUMS.forEach(function (a) {
       return;
     }
     var f = document.createElement('iframe');
-    f.src = 'https://www.bandlab.com/embed/collection/?id=' + a.id;   // collection route = albums/playlists; plain ?id= is tracks-only
+    f.src = a.yt
+      ? 'https://www.youtube.com/embed/' + a.yt
+      : 'https://www.bandlab.com/embed/collection/?id=' + a.id;   // collection route = albums/playlists; plain ?id= is tracks-only
     f.allow = 'autoplay; encrypted-media';
     f.loading = 'lazy';
-    f.title = a.name + ' — BandLab player';
+    f.title = a.name + (a.yt ? ' — YouTube player' : ' — BandLab player');
     slot.appendChild(f);
     openPlayer = slot;
     openPlayer._btn = btn;
