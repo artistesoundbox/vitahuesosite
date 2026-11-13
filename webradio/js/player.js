@@ -714,7 +714,11 @@ export class Radio extends EventTarget {
 
   resolve(path) {
     if (!path) return path;
-    if (/^(https?:)?\/\//i.test(path) || path.startsWith('/')) return path;
+    /* Anything with its own scheme is already resolved — http(s) catalogue and
+       stream URLs, but also the inline data: tiles world.js draws for stations
+       (and blob: object URLs). Only bare catalogue-relative paths get the base
+       prefix, otherwise a data: URI becomes webradio/data:image/... and 404s. */
+    if (/^[a-z][a-z0-9+.-]*:/i.test(path) || path.startsWith('/')) return path;
     return this.base + path;
   }
 
